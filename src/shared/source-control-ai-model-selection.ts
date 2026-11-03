@@ -1,7 +1,4 @@
-import type {
-  CommitMessageAiSettings,
-  CommitMessageAiModelCapability
-} from './commit-message-ai-types'
+import type { CommitMessageAiModelCapability } from './commit-message-ai-types'
 import { LOCAL_COMMIT_MESSAGE_HOST_KEY } from './commit-message-host-key'
 import type { TuiAgent } from './tui-agent'
 import type {
@@ -95,31 +92,26 @@ export function mergeSelectedModelByAgentByHost(
 
 export function getDiscoveredModels(
   source: SourceControlAiSettings,
-  legacy: CommitMessageAiSettings | null | undefined,
   hostKey: string,
   agentId: TuiAgent
 ): CommitMessageAiModelCapability[] {
   return (
     source.discoveredModelsByAgentByHost?.[hostKey]?.[agentId] ??
     (hostKey === LOCAL_COMMIT_MESSAGE_HOST_KEY
-      ? (source.discoveredModelsByAgent?.[agentId] ??
-        legacy?.discoveredModelsByAgentByHost?.[hostKey]?.[agentId] ??
-        legacy?.discoveredModelsByAgent?.[agentId] ??
-        [])
-      : (legacy?.discoveredModelsByAgentByHost?.[hostKey]?.[agentId] ?? []))
+      ? (source.discoveredModelsByAgent?.[agentId] ?? [])
+      : [])
   )
 }
 
 export function selectPersistedModelId(args: {
   source: SourceControlAiSettings
-  legacy: CommitMessageAiSettings | null | undefined
   repoOverrides: RepoSourceControlAiOverrides | null | undefined
   operation: AiTextOperation
   hostKey: string
   agentId: TuiAgent
   defaultModelId: string
 }): string {
-  const { source, legacy, repoOverrides, operation, hostKey, agentId, defaultModelId } = args
+  const { source, repoOverrides, operation, hostKey, agentId, defaultModelId } = args
   return (
     (operation === 'conversationName'
       ? undefined
@@ -141,10 +133,6 @@ export function selectPersistedModelId(args: {
       hostKey,
       agentId
     ) ??
-    legacy?.selectedModelByAgentByHost?.[hostKey]?.[agentId] ??
-    (hostKey === LOCAL_COMMIT_MESSAGE_HOST_KEY
-      ? legacy?.selectedModelByAgent?.[agentId]
-      : undefined) ??
     defaultModelId
   )
 }
@@ -152,7 +140,6 @@ export function selectPersistedModelId(args: {
 export function resolveThinkingLevel(args: {
   model: CommitMessageAiModelCapability
   source: SourceControlAiSettings
-  legacy: CommitMessageAiSettings | null | undefined
   repoOverrides: RepoSourceControlAiOverrides | null | undefined
   operation: AiTextOperation
 }): string | undefined {
@@ -168,8 +155,7 @@ export function resolveThinkingLevel(args: {
     args.source.modelOverridesByOperation?.[args.operation]?.selectedThinkingByModel?.[
       args.model.id
     ] ??
-    args.source.selectedThinkingByModel[args.model.id] ??
-    args.legacy?.selectedThinkingByModel?.[args.model.id]
+    args.source.selectedThinkingByModel[args.model.id]
   return args.model.thinkingLevels.some((level) => level.id === persisted)
     ? persisted
     : args.model.defaultThinkingLevel

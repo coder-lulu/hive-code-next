@@ -9,6 +9,9 @@ export type OrcaCloudAuthConfig = {
   profileEndpoint: string
   orgEndpoint: string
   logoutEndpoint: string
+  relayTokenEndpoint?: string | null
+  relayDirectorUrl?: string | null
+  connectorTokenEndpoint?: string | null
   clientId: string
   scope: string
 }
@@ -124,6 +127,9 @@ export function getOrcaCloudAuthConfig(
       logoutEndpoint:
         cleanEndpointUrl(configEnv.ORCA_CLOUD_LOGOUT_URL) ??
         endpoint(apiBaseUrl, '/v1/desktop/auth/logout'),
+      relayTokenEndpoint: cleanEndpointUrl(configEnv.ORCA_CLOUD_RELAY_TOKEN_URL),
+      relayDirectorUrl: cleanEndpointUrl(configEnv.ORCA_RELAY_URL),
+      connectorTokenEndpoint: cleanEndpointUrl(configEnv.ORCA_CLOUD_CONNECTOR_TOKEN_URL),
       clientId,
       scope: configEnv.ORCA_CLOUD_AUTH_SCOPE?.trim() || productDefaults.scope || DEFAULT_SCOPE
     }
@@ -144,4 +150,12 @@ export function isOrcaCloudDevAuthEnabled(
   packaged: boolean = isPackagedOrcaBuild()
 ): boolean {
   return env.ORCA_CLOUD_DEV_AUTH === '1' && env.NODE_ENV !== 'production' && !packaged
+}
+
+/** The product has no host-key gateway contract; authenticated Hive push owns production delivery. */
+export function getOrcaPushGatewayUrl(
+  env: NodeJS.ProcessEnv = process.env,
+  packaged = isPackagedOrcaBuild()
+): string | null {
+  return packaged ? null : cleanUrl(env.ORCA_PUSH_GATEWAY_URL, true)
 }

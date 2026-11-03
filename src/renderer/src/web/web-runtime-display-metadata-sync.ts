@@ -7,10 +7,10 @@ import {
   getClientForEnvironment,
   isCurrentWebRuntimeDisplayOwner,
   mergeWebRuntimeDisplayMetadata,
-  WebRuntimeDisplayMetadataError,
-  webRuntimeState,
-  type WebRuntimeDisplayOwner
+  webRuntimeState
 } from './preload-api/web-runtime-session'
+import type { WebRuntimeDisplayOwner } from './preload-api/web-runtime-display-projection'
+import { WebRuntimeDisplayMetadataError } from './preload-api/web-runtime-display-projection'
 
 export async function refreshWebRuntimeDisplayMetadata(
   owner: WebRuntimeDisplayOwner,

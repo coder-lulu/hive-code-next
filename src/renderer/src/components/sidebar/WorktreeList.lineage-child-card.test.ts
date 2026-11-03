@@ -36,7 +36,6 @@ vi.mock('./WorktreeContextMenu', () => createWorktreeContextMenuModuleMock())
 vi.mock('@/components/ui/tooltip', () => createTooltipModuleMock())
 vi.mock('@/components/ui/dropdown-menu', () => createDropdownMenuModuleMock())
 
-// Why: describe title is shared across the split files so test full names stay stable.
 describe('WorktreeList lineage child card renderer', () => {
   beforeAll(async () => {
     await loadWorktreeList()
@@ -75,10 +74,10 @@ describe('WorktreeList lineage child card renderer', () => {
     setLineageFixtureState()
     const markup = await renderWorktreeListMarkup()
 
-    expect(getOptionOpeningTag(markup, 'child')).toContain('padding-left:14px')
+    expect(getOptionOpeningTag(markup, 'child')).not.toContain('padding-left')
     expect(getCardOpeningTag(markup, 'child')).toContain('data-content-indent="0"')
     expect(getCardOpeningTag(markup, 'child')).toContain('data-flush-surface="true"')
-    expect(getOptionOpeningTag(markup, 'grandchild')).toContain('padding-left:28px')
+    expect(getOptionOpeningTag(markup, 'grandchild')).not.toContain('padding-left')
     expect(getCardOpeningTag(markup, 'grandchild')).toContain('data-content-indent="0"')
     expect(getCardOpeningTag(markup, 'grandchild')).toContain('data-flush-surface="true"')
   })
@@ -182,34 +181,32 @@ describe('WorktreeList lineage child card renderer', () => {
     expect(parentRow).not.toContain('padding-left')
   })
 
-  it('keeps ungrouped repositories under the derived group indentation step', async () => {
+  it('passes one group indentation step into the card when grouped by project', async () => {
     setLineageFixtureState('repo')
     const markup = await renderWorktreeListMarkup()
 
     const parentRow = getOptionOpeningTag(markup, 'parent')
 
-    expect(markup).toContain('Ungrouped')
-    expect(parentRow).toContain('padding-left:14px')
-    expect(getCardOpeningTag(markup, 'parent')).toContain('data-content-indent="24"')
+    expect(parentRow).not.toContain('padding-left')
+    expect(getCardOpeningTag(markup, 'parent')).toContain('data-content-indent="20"')
     expect(getCardOpeningTag(markup, 'parent')).toContain('data-flush-surface="true"')
   })
 
-  it('keeps nested card inner padding aligned inside the derived ungrouped space', async () => {
+  it('inherits grouped parent padding through the child wrapper', async () => {
     setLineageFixtureState('repo')
     const markup = await renderWorktreeListMarkup()
 
-    expect(getOptionOpeningTag(markup, 'child')).toContain('padding-left:14px')
-    expect(markup).toContain('Ungrouped')
-    expect(getCardOpeningTag(markup, 'child')).toContain('data-content-indent="24"')
+    expect(getOptionOpeningTag(markup, 'child')).not.toContain('padding-left')
+    expect(getCardOpeningTag(markup, 'child')).toContain('data-content-indent="0"')
     expect(getCardOpeningTag(markup, 'child')).toContain('data-flush-surface="true"')
   })
 
-  it('keeps nested card inner padding aligned inside project groups', async () => {
+  it('does not repeat project group padding inside nested cards', async () => {
     setLineageFixtureState('repo', { projectGrouped: true })
     const markup = await renderWorktreeListMarkup()
 
-    expect(getOptionOpeningTag(markup, 'child')).toContain('padding-left:14px')
-    expect(getCardOpeningTag(markup, 'child')).toContain('data-content-indent="24"')
+    expect(getOptionOpeningTag(markup, 'child')).not.toContain('padding-left')
+    expect(getCardOpeningTag(markup, 'child')).toContain('data-content-indent="0"')
     expect(getCardOpeningTag(markup, 'child')).toContain('data-flush-surface="true"')
   })
 

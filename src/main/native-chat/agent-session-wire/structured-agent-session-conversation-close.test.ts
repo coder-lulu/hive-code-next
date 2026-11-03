@@ -99,7 +99,11 @@ describe('closing the handle', () => {
     expect(statusRows().at(-1)?.hostExecutionOwned).toBeUndefined()
     const late: { type: string; sessions?: AgentSessionStatusSummary[] }[] = []
     rig.host.subscribeStatus({ id: 'late', emit: (event) => late.push(event) })
-    expect(late[0]?.sessions?.map((summary) => summary.sessionId)).toContain(SESSION)
+    expect(
+      late
+        .findLast((event) => event.type === 'snapshot')
+        ?.sessions?.map((summary) => summary.sessionId)
+    ).toContain(SESSION)
     expect(reader.events.some((event) => event.type === 'end')).toBe(false)
 
     const sent = await rig.host.send(CALLER, restTestSend('after the close', fence()))
@@ -134,7 +138,7 @@ describe('closing the handle', () => {
     await foundRestTestChat(rig)
 
     await rig.host.close(SESSION, 'evict')
-    expect(rig.adapter.closeSession).toHaveBeenCalledWith(SESSION)
+    expect(rig.adapter.closeSession).toHaveBeenCalledWith(SESSION, undefined)
     // The stop says not-running; the row belongs to the tab, so nothing forgets it.
     expect(rig.sink.forget).not.toHaveBeenCalled()
     expect(rig.sink.publish.mock.calls.at(-1)?.[0]).toMatchObject({ sessionId: SESSION })
@@ -225,10 +229,7 @@ describe('a start that never finishes (P2-15)', () => {
   it('is stopped by the sweep, and the message held for it carries its one row and rejection', async () => {
     const stopReason = `Codex never finished starting, so ${APP_DISPLAY_NAME} stopped it.`
     const spawn = rig.adapter.acquire.getMockImplementation()!
-    rig.adapter.acquire.mockImplementationOnce(async (input) => ({
-      ...(await spawn(input)),
-      providerChildPhase: 'starting' as const
-    }))
+    rig.adapter.acquire.mockImplementationOnce(rig.heldStart(spawn))
     // Held for the starting child, which never proves its start.
     const reader = collectSubscriber()
     const attached = await rig.host.attach(CALLER, hostTestAttachParams(null))
@@ -242,7 +243,7 @@ describe('a start that never finishes (P2-15)', () => {
     rig.clock.now += IDLE_MS + 1
 
     await sweepOnce(rig.host)
-    expect(rig.adapter.closeSession).toHaveBeenCalledWith(SESSION)
+    expect(rig.adapter.closeSession).toHaveBeenCalledWith(SESSION, undefined)
     await vi.waitFor(() =>
       expect(readerSaw(reader.events).submissions).toContainEqual(
         expect.objectContaining({ dispatchState: 'rejected', reason: stopReason })

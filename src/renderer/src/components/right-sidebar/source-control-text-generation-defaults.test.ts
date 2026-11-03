@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { getDefaultSettings } from '../../../../shared/constants'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
-import { sourceControlTextGenerationDefaultsMatchTarget } from './source-control/ai/text-generation-defaults'
+import {
+  hasConfiguredCommitMessageGenerationDefaults,
+  sourceControlTextGenerationDefaultsMatchTarget
+} from './source-control/ai/text-generation-defaults'
 
 function settings(): GlobalSettings {
   const base = getDefaultSettings('/tmp')
@@ -23,6 +26,14 @@ function settings(): GlobalSettings {
 }
 
 describe('sourceControlTextGenerationDefaultsMatchTarget', () => {
+  it('does not treat a forged retired commit-message agent as a configured current recipe', () => {
+    const forgedSettings = {
+      ...getDefaultSettings('/tmp'),
+      sourceControlAi: undefined,
+      commitMessageAi: { enabled: true, agentId: 'codex' }
+    }
+    expect(hasConfiguredCommitMessageGenerationDefaults({ settings: forgedSettings })).toBe(false)
+  })
   it('returns true when the current params match the global saved recipe', () => {
     const currentSettings = settings()
     expect(

@@ -17,7 +17,7 @@ export function emptyTerminalSessionProfile(): string {
     // A fixed install id: load mints a random one when it is missing.
     settings: {
       ...state.settings,
-      telemetry: { existedBeforeTelemetryRelease: true, optedIn: null, installId: 'install-1' }
+      telemetry: { optedIn: null, installId: 'install-1' }
     },
     workspaceSession: getDefaultWorkspaceSession(),
     workspaceSessionsByHostId: {}
@@ -26,16 +26,25 @@ export function emptyTerminalSessionProfile(): string {
 
 /** Opens a real Store on SQLite in `directory`, seeding it first when `seed` is given. */
 export async function openTopologyStore(directory: string, seed?: string): Promise<Store> {
+  return (await openTopologyStoreWithAuthority(directory, seed)).store
+}
+
+/** Expose the real delayed authority for durable-write failure injection. */
+export async function openTopologyStoreWithAuthority(
+  directory: string,
+  seed?: string
+): Promise<{ store: Store; authority: DelayedAuthority }> {
   const inner = new ProfileStateSqliteAuthority(join(directory, 'profile-state.db'), 'topology')
   if (seed) {
     inner.writeSerializedState(Buffer.from(seed))
   }
+  const authority = new DelayedAuthority(inner)
   const store = new Store({
     dataFile: join(directory, 'orca-data.json'),
-    profileStateAuthority: new DelayedAuthority(inner)
+    profileStateAuthority: authority
   })
   await store.flushPendingOrThrowAsync()
-  return store
+  return { store, authority }
 }
 
 /** Quit and relaunch: drain pending writes, close, and load the profile cold. */

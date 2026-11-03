@@ -21,7 +21,7 @@ import {
 } from '../agent-session-journal/journal-host-database-test-support'
 import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
 import { claudeProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
-import { NO_STRUCTURED_AGENTS } from './structured-agent-session-adapter-router-test-support'
+import { claudeAndCodexAgents } from './structured-agent-session-adapter-router-test-support'
 
 const CALLER = { callerKey: 'client-claude' }
 const CLAUDE_SESSION = '019fd532-7c11-7a90-b6de-4e1a2c3d5f61'
@@ -57,6 +57,7 @@ function adapter(): StructuredAgentSessionAdapter {
   acquire = vi.fn(async ({ fence, spawnToken, options }) => {
     activeModel = options?.model ?? DEFAULT_MODEL
     return {
+      acquisitionGeneration: globalThis.crypto.randomUUID(),
       process: { hostId: 'local', pid: 4200, processStartTimeMs: NOW, spawnToken },
       link: {
         linkId: `claude-native-${fence}`,
@@ -68,12 +69,15 @@ function adapter(): StructuredAgentSessionAdapter {
     }
   })
   return {
+    open: vi.fn(async () => ({ reportedOptions: { model: activeModel } })),
     acquire,
     dispatch: vi.fn(),
     cancelTurn: vi.fn(async () => ({ cancelled: true })),
     answerPrompt: vi.fn(async () => undefined),
-    setOption,
-    awaitOptionWritable: () => optionWritable,
+    setOption: async (input) => {
+      await optionWritable
+      return setOption(input)
+    },
     readOptions: vi.fn(async () => ({ current: { model: activeModel }, models: [] })),
     closeSession: vi.fn(async () => {
       activeModel = DEFAULT_MODEL
@@ -89,7 +93,7 @@ beforeEach(async () => {
   optionWritable = Promise.resolve()
   store = await openTestAgentSessionRecordStore(root)
   host = new StructuredAgentSessionHost({
-    agents: NO_STRUCTURED_AGENTS,
+    agents: claudeAndCodexAgents(),
     logger: createStructuredAgentSessionLogger(),
     store,
     adapter: adapter(),

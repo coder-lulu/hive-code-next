@@ -6,7 +6,7 @@ import {
   getWorkspaceStatusGroupKey
 } from '../../../../../../shared/workspace-statuses'
 import { ALL_GROUP_KEY, getPRLaneKey } from './group-keys'
-import type { WorktreeGroupBy } from './row-types'
+import type { WorktreeGroupBy } from '../../../../../../shared/sidebar-list/row-types'
 import { getProjectGroupHostId } from '@/store/slices/project-group-owner-routing'
 import { composeWorktreeHostIdentity } from '../../../../../../shared/worktree/host-qualified-identity'
 

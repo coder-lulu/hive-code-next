@@ -13,6 +13,7 @@ import { RuntimeUntitledPlaceholderCommands } from './runtime-untitled-placehold
 import type { RuntimeFileExplorerPath } from './files/file-target'
 import type { Store } from '../persistence'
 import type * as GitCommonDirectory from '../../shared/git-common-directory'
+import type * as WindowsAcl from '../../shared/secure-path-windows-acl'
 
 const ports = vi.hoisted(() => ({
   authorize: vi.fn<(path: string) => Promise<string>>(),
@@ -20,7 +21,24 @@ const ports = vi.hoisted(() => ({
   fixtureRoot: null as string | null,
   environmentError: null as Error | null
 }))
-vi.mock('../ipc/filesystem-auth', () => ({ resolveAuthorizedPath: ports.authorize }))
+vi.mock('../ipc/filesystem/filesystem-auth', () => ({ resolveAuthorizedPath: ports.authorize }))
+vi.mock('../../shared/secure-path-windows-acl', async (importOriginal) => {
+  const actual = await importOriginal<typeof WindowsAcl>()
+  return {
+    ...actual,
+    // Filesystem lifecycle tests use only this fixture tree; native DACL enforcement has separate tests.
+    restrictWindowsPathAsync: async (path: string) => {
+      if (!ports.fixtureRoot) {
+        throw new Error('Fixture root is unavailable')
+      }
+      const part = relative(ports.fixtureRoot, path)
+      if (isAbsolute(part) || part === '..' || part.startsWith(`..${sep}`)) {
+        throw new Error('Fixture path escaped its root')
+      }
+      return true
+    }
+  }
+})
 vi.mock('../../shared/git-common-directory', async (importOriginal) => {
   const actual = await importOriginal<typeof GitCommonDirectory>()
   return {

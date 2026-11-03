@@ -1,4 +1,4 @@
-/** Phone authorization remains bound to its paired Runtime, even when that desktop renders another host. */
+// Baseline: a phone paired to a desktop client sees only desktop workspaces until mirror slice S2; update the server-row assertion when that slice lands.
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { expect, test } from './helpers/orca-app'
@@ -6,7 +6,7 @@ import { launchPhoneMirrorTopology } from './helpers/phone-mirror-topology'
 import { RuntimeClient } from '../../src/cli/runtime/client'
 import type { RuntimeWorktreePsSummary } from '../../src/shared/runtime-worktree-contracts'
 
-test('a phone token lists only its paired desktop workspace and excludes another Runtime', async ({
+test('baseline until S2: phone paired with a desktop lists its local workspace but not its server workspace', async ({
   testRepoPath
 }, testInfo) => {
   test.setTimeout(120_000)
@@ -46,7 +46,8 @@ test('a phone token lists only its paired desktop workspace and excludes another
     )
     const paths = worktrees.map((row) => row.path)
     expect(paths).toContain(testRepoPath)
-    // Rendering another Runtime does not delegate that host to the phone token.
+    // BASELINE: the server's workspace is missing from the phone. S2 flips this to an `expect.poll`
+    // with toContain, since the desktop hydrates the server's rows asynchronously.
     expect(paths).not.toContain(serverFolder)
   } finally {
     await dispose()

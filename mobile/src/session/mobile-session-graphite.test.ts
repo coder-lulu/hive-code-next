@@ -1,115 +1,111 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('react-native', () => ({
   Platform: { select: (choices: Record<string, unknown>) => choices.default },
-  StyleSheet: {
-    hairlineWidth: 1,
-    create: <T>(styles: T) => styles
-  }
+  StyleSheet: { hairlineWidth: 1, create: <T>(styles: T) => styles }
 }))
 
-import { darkTheme, lightTheme } from '../theme/mobile-theme'
-import { createMobileNativeChatMessageStyles } from './mobile-native-chat-message-styles'
-import { createMobileNativeChatViewStyles } from './mobile-native-chat-view-styles'
-import { createMobileSessionReaderStyles } from './mobile-session-reader-styles'
-import { createMobileSessionStyles, resolveMobileSessionTheme } from './mobile-session-styles'
+import { activateMobileUiLocale, translate } from '../i18n/mobile-i18n'
+import { styles as message } from './native-chat/transcript/mobile-native-chat-message-styles'
+import { styles as view } from './mobile-native-chat-view-styles'
+import { mobileSessionReaderStyles as reader } from './mobile-session-reader-styles'
+import { styles } from './mobile-session-styles'
+import {
+  composerInputStyles as composer,
+  COMPOSER_CONTROL_SIZE
+} from '../components/composer-input/composer-input-styles'
 import {
   readMobileSessionRouteSource,
   readMobileSessionRouteSourceFamily
 } from './mobile-session-route-source-family.test-support'
+import { applyMobileColorScheme, paletteForScheme } from '../theme/mobile-theme'
 
-describe('Session Graphite presentation', () => {
-  it.each([lightTheme, darkTheme])('uses the $scheme semantic theme', (theme) => {
-    const message = createMobileNativeChatMessageStyles(theme)
-    const view = createMobileNativeChatViewStyles(theme)
-    const reader = createMobileSessionReaderStyles(theme)
+afterEach(() => applyMobileColorScheme('dark'))
 
-    expect(message.userBubble.backgroundColor).toBe(theme.color.bg.selected)
-    expect(message.userText.color).toBe(theme.color.text.inverse)
-    expect(message.toolPreviewLink.color).toBe(theme.color.brand.primary)
-    expect(view.root.backgroundColor).toBe(theme.color.bg.canvas)
-    expect(view.fab.backgroundColor).toBe(theme.color.bg.elevated)
-    expect(reader.markdownTextInput.backgroundColor).toBe(theme.color.bg.canvas)
-    expect(reader.filePreviewScroll.backgroundColor).toBe(theme.color.bg.surface)
-  })
+afterEach(() => activateMobileUiLocale('en'))
 
-  it('keeps interactive chat controls at the shared minimum touch target', () => {
-    const view = createMobileNativeChatViewStyles(lightTheme)
-
-    expect(view.fab.width).toBe(lightTheme.size.minimumTouchTarget)
-    expect(view.fab.height).toBe(lightTheme.size.minimumTouchTarget)
-    expect(view.loadEarlier.minHeight).toBe(lightTheme.size.minimumTouchTarget)
-  })
-
-  it.each([lightTheme, darkTheme])(
-    'themes the $scheme Session shell and terminal controls',
-    (theme) => {
-      const styles = createMobileSessionStyles(theme)
-
-      expect(styles.container.backgroundColor).toBe(theme.color.bg.canvas)
-      expect(styles.sessionChrome.backgroundColor).toBe(theme.color.bg.surface)
-      expect(styles.sessionTopBar.minHeight).toBe(theme.size.navigationBarHeight)
-      expect(styles.backButton.width).toBe(theme.size.minimumTouchTarget)
-      expect(styles.tab.minHeight).toBe(theme.size.minimumTouchTarget)
-      expect(styles.createButton.backgroundColor).toBe(theme.color.bg.selected)
-      expect(styles.createButtonText.color).toBe(theme.color.text.inverse)
-      expect(styles.accessoryBar.backgroundColor).toBe(theme.color.bg.surface)
-      expect(styles.accessoryKey.minHeight).toBe(theme.size.minimumTouchTarget)
-      expect(styles.sendButton.backgroundColor).toBe(theme.color.bg.selected)
+describe('Session live presentation', () => {
+  it.each(['light', 'dark', 'light'] as const)(
+    'uses the %s palette in the actual transcript and readers',
+    (scheme) => {
+      applyMobileColorScheme(scheme)
+      const palette = paletteForScheme(scheme)
+      expect(message.userBubble.backgroundColor).toBe(palette.chatUserSurface)
+      expect(message.userBubble.borderColor).toBe(palette.chatUserBorder)
+      expect(view.root.backgroundColor).toBe(palette.bgBase)
+      expect(view.fab.backgroundColor).toBe(palette.bgRaised)
+      expect(reader.markdownTextInput.backgroundColor).toBe(palette.bgBase)
+      expect(reader.filePreviewScroll.backgroundColor).toBe(palette.editorSurface)
     }
   )
 
-  it('keeps terminal sessions on the selected app theme', () => {
-    expect(resolveMobileSessionTheme(lightTheme, 'terminal')).toBe(lightTheme)
-    expect(resolveMobileSessionTheme(lightTheme, 'file')).toBe(lightTheme)
-    expect(resolveMobileSessionTheme(darkTheme, 'terminal')).toBe(darkTheme)
-    expect(resolveMobileSessionTheme(darkTheme, 'browser')).toBe(darkTheme)
+  it('keeps the compact jump control and full-height history action', () => {
+    expect(view.fab).toMatchObject({ width: 38, height: 38 })
+    expect(view.loadEarlier.height).toBeGreaterThanOrEqual(44)
   })
 
-  it('binds the split Session surface to the runtime semantic theme', () => {
-    const source = readMobileSessionRouteSourceFamily()
-
-    expect(source).toContain('useMobileSessionThemeStyles(controller.activeSessionTab?.type)')
-    expect(source).toContain('resolveMobileSessionTheme(appTheme, activeTabType)')
-    expect(source).not.toMatch(/\bcolors\./)
-  })
-
-  it('keeps fixed Session and Quick Command chrome localized', () => {
-    const sources = [
-      'MobileMarkdownReader.tsx',
-      '../components/MobileLoadErrorState.tsx',
-      'MobileNativeChatAsk.tsx',
-      'MobileNativeChatComposer.tsx',
-      'MobileNativeChatQuestion.tsx',
-      'MobileNativeChatSessionOptionPickers.tsx',
-      'MobileNativeChatView.tsx',
-      'QuickCommandEditorForm.tsx',
-      'QuickCommandsList.tsx',
-      'QuickCommandsSheet.tsx'
-    ].map((file) => readMobileSessionRouteSource(`./${file}`))
-    const source = sources.join('\n')
-
-    for (const label of [
-      '重试',
-      '取消',
-      '提交',
-      '发送消息',
-      '选择模型',
-      '快捷命令',
-      '新建快捷命令'
-    ]) {
-      expect(source).toContain(label)
+  it.each(['light', 'dark'] as const)(
+    'themes the %s merged Session shell and composer',
+    (scheme) => {
+      applyMobileColorScheme(scheme)
+      const palette = paletteForScheme(scheme)
+      expect(styles.container.backgroundColor).toBe(palette.bgBase)
+      expect(styles.sessionChrome.backgroundColor).toBe(palette.bgPanel)
+      expect(styles.sessionTopBar.minHeight).toBe(44)
+      expect(styles.headerButton).toMatchObject({ width: 36, height: 36 })
+      expect(styles.tab.minHeight).toBeGreaterThanOrEqual(44)
+      expect(styles.createButton.backgroundColor).toBe(palette.bgRaised)
+      expect(styles.createButtonText.color).toBe(palette.textPrimary)
+      expect(composer.box.backgroundColor).toBe(palette.composerSurface)
+      expect(composer.sendButton.backgroundColor).toBe(palette.surfaceBright)
+      expect(composer.controlButton).toMatchObject({
+        width: COMPOSER_CONTROL_SIZE,
+        height: COMPOSER_CONTROL_SIZE
+      })
     }
-    for (const legacy of [
-      '>Retry<',
-      '>Cancel<',
-      '>Submit<',
-      'accessibilityLabel="Send message"',
-      "'Select model'",
-      "'Quick Commands'",
-      "'New quick command'"
-    ]) {
-      expect(source).not.toContain(legacy)
+  )
+
+  it('keeps terminal, file and browser panes on the selected app palette', () => {
+    for (const scheme of ['light', 'dark', 'light'] as const) {
+      applyMobileColorScheme(scheme)
+      const palette = paletteForScheme(scheme)
+      expect(styles.container.backgroundColor).toBe(palette.bgBase)
+      expect(reader.filePreviewScroll.backgroundColor).toBe(palette.editorSurface)
+      expect(styles.browserFrame.flex).toBe(1)
+    }
+  })
+
+  it('binds the split Session surface to live styles and scheme subscription', () => {
+    const source = readMobileSessionRouteSourceFamily()
+    expect(source).toContain('useMobileColorScheme()')
+    expect(readMobileSessionRouteSource('./mobile-session-styles.ts')).toContain('themedStyles(')
+    expect(source).toContain('mobile-session-styles')
+  })
+
+  it('localizes fixed Session and Quick Command chrome through current producers', async () => {
+    await activateMobileUiLocale('zh')
+    const cases = [
+      ['../components/MobileLoadErrorState.tsx', 'common.retry', '重试'],
+      ['native-chat/input/MobileNativeChatAsk.tsx', 'common.cancel', '取消'],
+      ['native-chat/input/MobileNativeChatAsk.tsx', 'chat.ask.submit', '提交'],
+      [
+        'native-chat/composer/MobileNativeChatComposer.tsx',
+        'chat.composer.sendMessage',
+        '发送消息'
+      ],
+      ['QuickCommandsSheet.tsx', 'session.quickCommandsSheet.title', '快捷命令'],
+      ['QuickCommandsList.tsx', 'session.quickCommandsList.newCommand', '新建快捷命令']
+    ]
+    const picker = readMobileSessionRouteSource(
+      './native-chat/input/MobileNativeChatSessionOptionPickers.tsx'
+    )
+    expect(picker).toContain('chat.sessionOptionPickers.modelLabel')
+    expect(
+      translate('chat.sessionOptionPickers.modelLabel', 'missing translation', { value: 'Claude' })
+    ).toBe('模型，Claude')
+    for (const [file, key, label] of cases) {
+      expect(readMobileSessionRouteSource('./' + file)).toContain(key)
+      expect(translate(key, 'missing translation')).toBe(label)
     }
   })
 })

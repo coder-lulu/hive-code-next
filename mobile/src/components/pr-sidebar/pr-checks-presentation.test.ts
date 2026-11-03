@@ -1,13 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { PRCheckDetail } from '../../../../src/shared/github/check-types'
 import {
-  checkOutcome,
   firstFailingCheckKey,
-  getPRReviewerRows,
   prCheckKey,
   prChecksSummaryLabel,
   prStateBadge,
-  sortPRChecks,
   summarizePRChecks
 } from './pr-checks-presentation'
 
@@ -21,53 +18,13 @@ function check(over: Partial<PRCheckDetail>): PRCheckDetail {
   }
 }
 
-describe('checkOutcome', () => {
-  it('treats a completed null-conclusion check as neutral, not failure', () => {
-    expect(checkOutcome(check({ status: 'completed', conclusion: null }))).toBe('neutral')
-  })
-  it('treats queued/in_progress as pending', () => {
-    expect(checkOutcome(check({ status: 'queued', conclusion: null }))).toBe('pending')
-    expect(checkOutcome(check({ status: 'in_progress', conclusion: null }))).toBe('pending')
-  })
-  it('maps failure/cancelled/timed_out to failure', () => {
-    expect(checkOutcome(check({ conclusion: 'failure' }))).toBe('failure')
-    expect(checkOutcome(check({ conclusion: 'cancelled' }))).toBe('failure')
-    expect(checkOutcome(check({ conclusion: 'timed_out' }))).toBe('failure')
-  })
-  it('maps a merge-blocking action_required gate to failure', () => {
-    expect(checkOutcome(check({ conclusion: 'action_required' }))).toBe('failure')
-  })
-  it('maps skipped to success and neutral to neutral (desktop parity)', () => {
-    expect(checkOutcome(check({ conclusion: 'skipped' }))).toBe('success')
-    expect(checkOutcome(check({ conclusion: 'neutral' }))).toBe('neutral')
-  })
-})
-
-describe('sortPRChecks', () => {
-  it('orders failures first, then pending, then success', () => {
-    const checks = [
-      check({ name: 'ok', conclusion: 'success' }),
-      check({ name: 'pending', status: 'in_progress', conclusion: null }),
-      check({ name: 'broke', conclusion: 'failure' })
-    ]
-    expect(sortPRChecks(checks).map((c) => c.name)).toEqual(['broke', 'pending', 'ok'])
-  })
-  it('is stable within a bucket', () => {
-    const checks = [
-      check({ name: 'a', conclusion: 'failure' }),
-      check({ name: 'b', conclusion: 'failure' })
-    ]
-    expect(sortPRChecks(checks).map((c) => c.name)).toEqual(['a', 'b'])
-  })
-})
-
 describe('firstFailingCheckKey', () => {
   it('returns the key of the first failing check in the given order', () => {
-    const checks = sortPRChecks([
+    const checks = [
       check({ name: 'ok', checkRunId: 1, conclusion: 'success' }),
       check({ name: 'broke', checkRunId: 2, conclusion: 'failure' }),
       check({ name: 'also-broke', checkRunId: 3, conclusion: 'cancelled' })
-    ])
+    ]
     expect(firstFailingCheckKey(checks)).toBe(prCheckKey(check({ checkRunId: 2 })))
   })
   it('returns null when nothing is failing', () => {
@@ -81,15 +38,15 @@ describe('firstFailingCheckKey', () => {
 })
 
 describe('summarizePRChecks', () => {
-  it('returns a localized empty summary for an empty list', () => {
+  it('returns a "No checks" summary for an empty list', () => {
     const summary = summarizePRChecks([])
     expect(summary.total).toBe(0)
     expect(summary.outcome).toBe('none')
-    expect(summary.label).toBe('暂无检查')
+    expect(summary.label).toBe('No checks')
   })
   it('reads the empty header as unavailable, not absent, when the checks read failed', () => {
     const summary = summarizePRChecks([])
-    expect(prChecksSummaryLabel(summary, null)).toBe('暂无检查')
+    expect(prChecksSummaryLabel(summary, null)).toBe('No checks')
     expect(prChecksSummaryLabel(summary, 'The host sent a reply this app could not read')).toBe(
       'Checks unavailable'
     )
@@ -107,7 +64,7 @@ describe('summarizePRChecks', () => {
       failed: 1,
       outcome: 'failure'
     })
-    expect(summary.label).toBe('1 项失败 · 1 项等待中 · 1 项通过')
+    expect(summary.label).toBe('1 failing · 1 pending · 1 passed')
   })
   it('reports pending when no failures but some pending', () => {
     expect(
@@ -132,7 +89,7 @@ describe('summarizePRChecks', () => {
       failed: 0,
       outcome: 'neutral'
     })
-    expect(summary.label).toBe('2 项中性')
+    expect(summary.label).toBe('2 neutral')
   })
   it('counts skipped as passed so the sidebar matches desktop and the tasks grid', () => {
     const summary = summarizePRChecks([
@@ -141,7 +98,7 @@ describe('summarizePRChecks', () => {
       check({ conclusion: 'skipped' })
     ])
     expect(summary).toMatchObject({ total: 3, passed: 3, outcome: 'success' })
-    expect(summary.label).toBe('3 项通过')
+    expect(summary.label).toBe('3 passed')
   })
 })
 
@@ -155,49 +112,9 @@ describe('prCheckKey', () => {
 
 describe('prStateBadge', () => {
   it('maps each PR state to a label + status-color token matching the workspace-list badge', () => {
-    expect(prStateBadge('open')).toEqual({ label: '打开', token: 'statusGreen' })
-    expect(prStateBadge('closed')).toEqual({ label: '已关闭', token: 'statusRed' })
-    expect(prStateBadge('merged')).toEqual({ label: '已合并', token: 'statusPurple' })
-    expect(prStateBadge('draft')).toEqual({ label: '草稿', token: 'textSecondary' })
-  })
-})
-
-describe('getPRReviewerRows', () => {
-  it('returns empty for no reviewers', () => {
-    expect(getPRReviewerRows({})).toEqual([])
-  })
-  it('labels requested-only reviewers as Requested', () => {
-    const rows = getPRReviewerRows({
-      reviewRequests: [{ login: 'alice', name: 'Alice', avatarUrl: 'a' }]
-    })
-    expect(rows).toEqual([
-      {
-        login: 'alice',
-        name: 'Alice',
-        avatarUrl: 'a',
-        stateLabel: '已请求',
-        token: 'statusAmber'
-      }
-    ])
-  })
-  it('maps latest-review states to labels', () => {
-    const rows = getPRReviewerRows({
-      latestReviews: [
-        { login: 'bob', state: 'APPROVED' },
-        { login: 'carol', state: 'CHANGES_REQUESTED' }
-      ]
-    })
-    expect(rows.map((r) => [r.login, r.stateLabel, r.token])).toEqual([
-      ['bob', '已批准', 'statusGreen'],
-      ['carol', '已请求更改', 'statusRed']
-    ])
-  })
-  it('dedupes a reviewer present in both requests and reviews (requested wins)', () => {
-    const rows = getPRReviewerRows({
-      reviewRequests: [{ login: 'alice', name: null, avatarUrl: '' }],
-      latestReviews: [{ login: 'alice', state: 'APPROVED' }]
-    })
-    expect(rows).toHaveLength(1)
-    expect(rows[0].stateLabel).toBe('已请求')
+    expect(prStateBadge('open')).toEqual({ label: 'Open', token: 'statusGreen' })
+    expect(prStateBadge('closed')).toEqual({ label: 'Closed', token: 'statusRed' })
+    expect(prStateBadge('merged')).toEqual({ label: 'Merged', token: 'statusPurple' })
+    expect(prStateBadge('draft')).toEqual({ label: 'Draft', token: 'textSecondary' })
   })
 })

@@ -9,7 +9,6 @@ import {
 } from '../../../../shared/rpc-contract/git-params'
 
 type CommitMessageGenerationOverride = {
-  commitMessageAi?: GlobalSettings['commitMessageAi']
   sourceControlAi?: GlobalSettings['sourceControlAi']
   sourceControlAiResolvedParams?: ResolvedSourceControlAiGenerationParams
   agentCmdOverrides?: GlobalSettings['agentCmdOverrides']
@@ -20,7 +19,6 @@ type CommitMessageGenerationOverride = {
 // Why: generateCommitMessage and generatePullRequestFields share the same optional
 // override fields; returning undefined when none are set keeps the no-override call path.
 function buildCommitMessageGenerationOverride(params: {
-  commitMessageAi?: unknown
   sourceControlAi?: unknown
   sourceControlAiResolvedParams?: unknown
   agentCmdOverrides?: unknown
@@ -28,7 +26,6 @@ function buildCommitMessageGenerationOverride(params: {
   commitMessageDiscoveryHostKey?: string
 }): CommitMessageGenerationOverride | undefined {
   if (
-    params.commitMessageAi === undefined &&
     params.sourceControlAi === undefined &&
     params.sourceControlAiResolvedParams === undefined &&
     params.agentCmdOverrides === undefined &&
@@ -38,9 +35,6 @@ function buildCommitMessageGenerationOverride(params: {
     return undefined
   }
   return {
-    ...(params.commitMessageAi !== undefined
-      ? { commitMessageAi: params.commitMessageAi as GlobalSettings['commitMessageAi'] }
-      : {}),
     ...(params.sourceControlAi !== undefined
       ? { sourceControlAi: params.sourceControlAi as GlobalSettings['sourceControlAi'] }
       : {}),

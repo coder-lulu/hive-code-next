@@ -29,7 +29,10 @@ import type { RpcDispatchStreamingOptions } from '../dispatcher-stream-options'
 import { SESSION_TAB_METHODS } from './session-tabs'
 import { STRUCTURED_AGENT_SESSION_METHODS } from './structured-agent-session'
 import { commitStructuredAgentSessionCreate } from './structured-agent-session-create'
-import { closeTestJournalHostDatabases, openTestJournalHostDatabase } from '../../../native-chat/agent-session-journal/journal-host-database-test-support'
+import {
+  closeTestJournalHostDatabases,
+  openTestJournalHostDatabase
+} from '../../../native-chat/agent-session-journal/journal-host-database-test-support'
 import { createStructuredAgentSessionLogger } from '../../../native-chat/agent-session-wire/structured-agent-session-logger'
 import { codexProviderHandle } from '../../../../shared/agent-session-provider-handle-encoding'
 import { NO_STRUCTURED_AGENTS } from '../../../native-chat/agent-session-wire/structured-agent-session-adapter-router-test-support'
@@ -53,6 +56,7 @@ export let closeSession: ReturnType<typeof vi.fn<() => Promise<boolean>>>
 
 function providerAdapter(): StructuredAgentSessionAdapter {
   return {
+    open: vi.fn(async () => ({ reportedOptions: {} })),
     supportsLocation: (location) =>
       location.executionHostId === 'local' && location.wslDistro === null,
     acquire: vi.fn(async (input) => {
@@ -61,6 +65,7 @@ function providerAdapter(): StructuredAgentSessionAdapter {
       }
       acquisitions++
       return {
+        acquisitionGeneration: globalThis.crypto.randomUUID(),
         process: {
           hostId: 'local',
           pid: 4000 + acquisitions,
@@ -189,7 +194,7 @@ beforeEach(async () => {
   runtime = new OrcaRuntimeService()
   vi.spyOn(runtime, 'getClientSettings').mockReturnValue(
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the structured-chat policy reads only this one setting on these paths.
-    { experimentalNativeChat: true } as ReturnType<OrcaRuntimeService['getClientSettings']>
+    { nativeChatProviders: {} } as ReturnType<OrcaRuntimeService['getClientSettings']>
   )
   dispatcher = new RpcDispatcher({
     runtime,

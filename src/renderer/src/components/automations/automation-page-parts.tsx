@@ -2,25 +2,23 @@ import React from 'react'
 import type { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import type { AutomationRun } from '../../../../shared/automations-types'
-import { getIntlLocale, translate } from '@/i18n/i18n'
-import { createLocalizedCatalog } from '@/i18n/localized-catalog'
+import { translate } from '@/i18n/i18n'
+import { formatUiNarrowRelativeTime } from '@/i18n/relative-time-format'
+import { uiDateTimeFormat } from '@/i18n/ui-intl-formatters'
 
-// Cache per language so long tables do not construct a formatter for every cell.
-const getAutomationDateTimeFormatter = createLocalizedCatalog(
-  () =>
-    new Intl.DateTimeFormat(getIntlLocale(), {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit'
-    })
-)
+// Reuse one formatter across run cells; per-cell construction dominates large-history rendering.
+const AUTOMATION_DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = {
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit'
+}
 
 export function formatAutomationDateTime(value: number | null | undefined): string {
   if (!value) {
-    return translate('auto.components.automations.automation.page.parts.never', 'Never')
+    return translate('auto.components.automations.automationPageParts.never', 'Never')
   }
-  return getAutomationDateTimeFormatter().format(value)
+  return uiDateTimeFormat(AUTOMATION_DATE_TIME_OPTIONS).format(value)
 }
 
 export function formatAutomationRelativeTime(
@@ -35,46 +33,17 @@ export function formatAutomationRelativeTime(
   const minuteMs = 60 * 1000
   const hourMs = 60 * minuteMs
   const dayMs = 24 * hourMs
+  const sign = diffMs >= 0 ? 1 : -1
   if (absMs < minuteMs) {
-    return translate('auto.components.automations.automation.page.parts.relativeNow', 'now')
+    return translate('auto.components.automations.automationPageParts.now', 'now')
   }
-  let text: string
   if (absMs < hourMs) {
-    text = translate(
-      'auto.components.automations.automation.page.parts.relativeMinutes',
-      '{{value0}}m',
-      {
-        value0: Math.round(absMs / minuteMs)
-      }
-    )
-  } else if (absMs < dayMs) {
-    text = translate(
-      'auto.components.automations.automation.page.parts.relativeHours',
-      '{{value0}}h',
-      {
-        value0: Math.round(absMs / hourMs)
-      }
-    )
-  } else {
-    text = translate(
-      'auto.components.automations.automation.page.parts.relativeDays',
-      '{{value0}}d',
-      {
-        value0: Math.round(absMs / dayMs)
-      }
-    )
+    return formatUiNarrowRelativeTime(sign * Math.round(absMs / minuteMs), 'minute')
   }
-  return diffMs >= 0
-    ? translate(
-        'auto.components.automations.automation.page.parts.relativeFuture',
-        'in {{value0}}',
-        { value0: text }
-      )
-    : translate(
-        'auto.components.automations.automation.page.parts.relativePast',
-        '{{value0}} ago',
-        { value0: text }
-      )
+  if (absMs < dayMs) {
+    return formatUiNarrowRelativeTime(sign * Math.round(absMs / hourMs), 'hour')
+  }
+  return formatUiNarrowRelativeTime(sign * Math.round(absMs / dayMs), 'day')
 }
 
 export function formatAutomationDateTimeWithRelative(
@@ -104,32 +73,44 @@ export function getAutomationRunStatusVariant(
 export function getAutomationRunStatusLabel(status: AutomationRun['status']): string {
   switch (status) {
     case 'pending':
-      return translate('auto.components.automations.automation.page.parts.queued', 'Queued')
+      return translate('auto.components.automations.automationPageParts.runStatusPending', 'Queued')
     case 'dispatching':
-      return translate('auto.components.automations.automation.page.parts.starting', 'Starting')
+      return translate(
+        'auto.components.automations.automationPageParts.runStatusDispatching',
+        'Starting'
+      )
     case 'dispatched':
-      return translate('auto.components.automations.automation.page.parts.launched', 'Launched')
+      return translate(
+        'auto.components.automations.automationPageParts.runStatusDispatched',
+        'Launched'
+      )
     case 'completed':
-      return translate('auto.components.automations.automation.list.last.run.done', 'Done')
+      return translate('auto.components.automations.automationPageParts.runStatusCompleted', 'Done')
     case 'skipped_precheck':
       return translate(
-        'auto.components.automations.automation.page.parts.precheckSkipped',
+        'auto.components.automations.automationPageParts.runStatusSkippedPrecheck',
         'Precheck skipped'
       )
     case 'skipped_missed':
-      return translate('auto.components.automations.automation.page.parts.skipped', 'Skipped')
+      return translate(
+        'auto.components.automations.automationPageParts.runStatusSkippedMissed',
+        'Skipped'
+      )
     case 'skipped_unavailable':
       return translate(
-        'auto.components.automations.automation.page.parts.unavailable',
+        'auto.components.automations.automationPageParts.runStatusSkippedUnavailable',
         'Unavailable'
       )
     case 'skipped_needs_interactive_auth':
       return translate(
-        'auto.components.automations.automation.page.parts.needsCredentials',
+        'auto.components.automations.automationPageParts.runStatusSkippedNeedsInteractiveAuth',
         'Needs credentials'
       )
     case 'dispatch_failed':
-      return translate('auto.components.automations.automation.list.last.run.failed', 'Failed')
+      return translate(
+        'auto.components.automations.automationPageParts.runStatusDispatchFailed',
+        'Failed'
+      )
   }
 }
 
@@ -151,6 +132,28 @@ export function Field({
     <div className={cn('min-w-0 space-y-1.5', className)}>
       <div className={cn('text-xs text-muted-foreground', labelClassName)}>{label}</div>
       {children}
+    </div>
+  )
+}
+
+export function AutomationRunErrorNotice({
+  label,
+  error,
+  className
+}: {
+  label: string
+  error: string
+  className?: string
+}): React.JSX.Element {
+  return (
+    <div
+      role="alert"
+      className={cn(
+        'rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive',
+        className
+      )}
+    >
+      <span className="font-medium">{label}</span> {error}
     </div>
   )
 }

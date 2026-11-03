@@ -1,6 +1,6 @@
 import i18next from 'i18next'
 import { expect, it } from 'vitest'
-import { parsePluginLanguagePackArtifact } from '../../../shared/plugins/plugin-language-pack-artifact'
+import { parsePluginLanguagePackArtifact } from '../../../shared/plugins/artifacts/plugin-language-pack-artifact'
 import en from './locales/en.json'
 import es from './locales/es.json'
 import fr from './locales/fr.json'
@@ -34,7 +34,16 @@ it.each([
   async (locale, catalog) => {
     // Bundled security copy is intentionally unavailable to plugin language packs.
     expect(
-      parsePluginLanguagePackArtifact(JSON.stringify({ settings: catalog.settings }))
+      parsePluginLanguagePackArtifact(
+        JSON.stringify({
+          settings: {
+            appearance: catalog.settings.appearance,
+            agents: Object.fromEntries(
+              AGENT_SETTINGS_KEYS.map((key) => [key, catalog.settings.agents[key]])
+            )
+          }
+        })
+      )
     ).toMatchObject({ ok: true })
 
     const instance = i18next.createInstance()

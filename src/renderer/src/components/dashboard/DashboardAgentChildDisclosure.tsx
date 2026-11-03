@@ -1,8 +1,8 @@
 import React, { useCallback } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { getChildAgentDisclosureLabel } from '@/lib/child-agent-disclosure-copy'
 import { Button } from '@/components/ui/button'
+import { translate } from '@/i18n/i18n'
 
 type Props = {
   childAgentCount?: number
@@ -64,7 +64,19 @@ export function DashboardAgentChildDisclosure({
         onKeyDown={stopKeyDown}
         data-agent-child-disclosure-button=""
         className="col-start-1 row-start-1 -mr-1.5"
-        aria-label={getChildAgentDisclosureLabel(childAgentCount ?? 0, childAgentsExpanded)}
+        aria-label={
+          childAgentsExpanded
+            ? translate(
+                'auto.components.dashboard.DashboardAgentChildDisclosure.hideChildAgents',
+                'Hide {{count}} child agents',
+                { count: childAgentCount, defaultValue_one: 'Hide {{count}} child agent' }
+              )
+            : translate(
+                'auto.components.dashboard.DashboardAgentChildDisclosure.showChildAgents',
+                'Show {{count}} child agents',
+                { count: childAgentCount, defaultValue_one: 'Show {{count}} child agent' }
+              )
+        }
         aria-expanded={childAgentsExpanded}
       >
         <ChevronDown

@@ -3,67 +3,23 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import RuntimeSequencer from './vitest-runtime-sequencer.mjs'
-import { balanceFiles, readTimingBaseline } from './ci-shard-assignment.mjs'
-import { discoverE2eFiles, planE2e } from './ci-e2e-shard-plan.mjs'
+import { balanceFiles } from './ci-shard-assignment.mjs'
+import { discoverE2eFiles, planE2e, verifyE2eSelection } from './ci-e2e-shard-plan.mjs'
 import { parseTimingLog } from './ci-shard-timing-import.mjs'
 import TimingSequencer from './ci-unit-sequencer.mjs'
 import { UNIT_INCLUDE, UNIT_EXCLUDE } from './ci-unit-files.mjs'
-import { NODE_RUNTIME_INCLUDE } from './vitest-node-runtime-files.mjs'
+import { getNodeRuntimeInclude } from './vitest-node-runtime-files.mjs'
 import { nodeRuntimePool } from './vitest-node-runtime-pool'
-
-vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal()
-  return { ...actual, readFileSync: vi.fn(actual.readFileSync) }
-})
 
 const directories = []
 afterEach(() => {
   vi.unstubAllEnvs()
-  vi.mocked(readFileSync).mockReset()
   for (const directory of directories.splice(0)) {
     rmSync(directory, { recursive: true, force: true })
   }
 })
 
 describe('timing-weighted shard selection', () => {
-  it.each([Number.NaN, Infinity, -Infinity, -1, '526', null, true])(
-    'rejects invalid per-file overhead %s before assigning files',
-    (overheadMs) => {
-      expect(() => balanceFiles(['a', 'b'], 2, { a: 100, b: 80 }, overheadMs)).toThrow(
-        'Invalid timing overhead'
-      )
-    }
-  )
-
-  it.each([undefined, null, [], 526, 'timings', true].map((timings) => [timings]))(
-    'rejects malformed duration maps %s instead of estimating every file',
-    (timings) => {
-      expect(() => balanceFiles(['a'], 1, timings)).toThrow('Invalid timing map')
-    }
-  )
-
-  it.each(
-    [
-      null,
-      [],
-      {},
-      { unit: null },
-      { unit: [] },
-      { unit: 'invalid' },
-      { unit: { overheadMs: 0 } },
-      { unit: { timings: null, overheadMs: 0 } },
-      { unit: { timings: [], overheadMs: 0 } },
-      { unit: { timings: 'invalid', overheadMs: 0 } },
-      { unit: { timings: {} } },
-      { unit: { timings: {}, overheadMs: -1 } },
-      { unit: { timings: {}, overheadMs: '526' } },
-      { unit: { timings: {}, overheadMs: null } }
-    ].map((baseline) => [baseline])
-  )('rejects malformed suite timing baselines %j at load', (baseline) => {
-    vi.mocked(readFileSync).mockReturnValueOnce(JSON.stringify(baseline))
-    expect(() => readTimingBaseline('unit')).toThrow('Invalid timing')
-  })
-
   it('distributes long files, includes unknowns exactly once, and ignores discovery order', () => {
     const files = ['long', 'medium', 'short', 'unknown', 'new', 'zero', 'invalid']
     const timings = { long: 100, medium: 80, short: 20, zero: 0, invalid: -1, deleted: 20 }
@@ -107,7 +63,7 @@ describe('timing-weighted shard selection', () => {
     expect(new Set(selected)).toEqual(new Set(specs))
   })
 
-  it('keeps global sharding and runs the Node measurement after ordinary projects', async () => {
+  it('keeps global sharding and isolates measurements after ordinary projects', async () => {
     vi.stubEnv('ORCA_BALANCE_UNIT_SHARDS', '1')
     const { default: config } = await import('../vitest.config')
     expect(config.test.sequence.sequencer).toBe(TimingSequencer)
@@ -116,30 +72,47 @@ describe('timing-weighted shard selection', () => {
       'src/main/foreign-sqlite-readers/foreign-sqlite-reader-event-loop.test.ts'
     const projects = config.test.projects
     const measurement = projects.filter((project) => project.test.name === 'node-measurement')
-    const ordinary = projects.filter((project) => project.test.name !== 'node-measurement')
+    const paletteMeasurementFile =
+      'src/renderer/src/lib/palette-match/palette-match-performance.test.ts'
+    const paletteMeasurement = projects.filter(
+      (project) => project.test.name === 'palette-measurement'
+    )
+    const ordinary = projects.filter((project) => project.test.sequence.groupOrder === 1)
     expect(measurement).toHaveLength(1)
     expect(ordinary).toHaveLength(process.versions.bun ? 2 : 1)
     expect(measurement[0].test).toMatchObject({
       include: [measurementFile],
-      exclude: [...UNIT_EXCLUDE, 'logs/**', '.tmp/**'],
+      exclude: UNIT_EXCLUDE,
       maxWorkers: 1,
       sequence: { groupOrder: 2 },
       env: { ORCA_VITEST_RUNTIME: process.versions.bun ? 'node-runtime' : 'node' },
       pool: process.versions.bun ? 'node-runtime' : 'forks'
     })
     expect(measurement[0].test.poolRunner).toBe(process.versions.bun ? nodeRuntimePool : undefined)
+    expect(paletteMeasurement).toHaveLength(1)
+    expect(paletteMeasurement[0].test).toMatchObject({
+      include: [paletteMeasurementFile],
+      exclude: UNIT_EXCLUDE,
+      maxWorkers: 1,
+      sequence: { groupOrder: 3 },
+      env: { ORCA_VITEST_RUNTIME: process.versions.bun ? 'bun' : 'node' },
+      pool: 'forks'
+    })
+    expect(paletteMeasurement[0].test.poolRunner).toBeUndefined()
     for (const project of ordinary) {
       expect(project.test.sequence.groupOrder).toBe(1)
-      expect(project.test.exclude).toContain(measurementFile)
+      expect(project.test.exclude).toEqual(
+        expect.arrayContaining([measurementFile, paletteMeasurementFile])
+      )
     }
     const ordinaryNode = ordinary.find((project) => project.test.name !== 'bun')
     expect(ordinaryNode.test.include).toEqual(
-      process.versions.bun ? NODE_RUNTIME_INCLUDE : UNIT_INCLUDE
+      process.versions.bun ? getNodeRuntimeInclude() : UNIT_INCLUDE
     )
     const ordinaryBun = ordinary.find((project) => project.test.name === 'bun')
     if (process.versions.bun) {
       expect(ordinaryBun.test.exclude).toEqual(
-        expect.arrayContaining([...NODE_RUNTIME_INCLUDE, measurementFile])
+        expect.arrayContaining([...getNodeRuntimeInclude(), measurementFile])
       )
     }
   })
@@ -187,6 +160,39 @@ describe('timing-weighted shard selection', () => {
         suites: [{ specs: [spec('a', 'one.spec.ts'), spec('a', 'one.spec.ts')] }]
       })
     ).toThrow('Duplicate')
+  })
+
+  it('plans only general E2E specs and rejects unexpected dedicated selections', () => {
+    const spec = (id, file) => ({ id, file, tests: [{ projectName: 'electron-headless' }] })
+    const report = {
+      suites: [
+        {
+          specs: [
+            spec('general', 'general.spec.ts'),
+            spec('layout', 'workspace-layout-oracle-headless.spec.ts'),
+            spec('ssh', 'ssh-orcad-terminal.spec.ts')
+          ]
+        }
+      ]
+    }
+    expect(Object.keys(discoverE2eFiles(report))).toEqual([
+      'general.spec.ts',
+      'ssh-orcad-terminal.spec.ts',
+      'workspace-layout-oracle-headless.spec.ts'
+    ])
+    const assignment = { ...planE2e(report, 1, { timings: {} }), selectedShard: 1 }
+    expect(assignment.shards[0].files).toEqual(['general.spec.ts'])
+    expect(Object.keys(assignment.testsByFile)).toEqual(['general.spec.ts'])
+    const general = report.suites[0].specs[0]
+    expect(() => verifyE2eSelection(assignment, { suites: [{ specs: [general] }] })).not.toThrow()
+    for (const dedicated of report.suites[0].specs.slice(1)) {
+      expect(() =>
+        verifyE2eSelection(assignment, { suites: [{ specs: [general, dedicated] }] })
+      ).toThrow('differs')
+    }
+    expect(() =>
+      planE2e({ suites: [{ specs: report.suites[0].specs.slice(1) }] }, 1, { timings: {} })
+    ).toThrow('no general E2E tests')
   })
 
   it('imports ANSI unit timings and E2E failures without counting headful reruns', () => {

@@ -1,6 +1,5 @@
 import { useEffect } from 'react'
 import { LOCAL_EXECUTION_HOST_ID, toRuntimeExecutionHostId } from '../../../shared/execution-host'
-import { isNativeChatEnabled } from '../../../shared/structured-native-chat-launch-route'
 import { lastVerifiedRuntimeStatus } from '../../../shared/runtime-host-status'
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store/types'
@@ -14,12 +13,6 @@ import {
   subscribeLocalRuntimeCapabilitiesKnown
 } from './local-runtime-capabilities'
 import { localStructuredChatsInUse } from './local-structured-chats'
-
-// Why gated: a host older than this build installs its structured host to answer, which a profile
-// that never uses structured chat must not pay for; only with chats in use can a launch route to one.
-function structuredChatSettingOn(state: Pick<AppState, 'settings'>): boolean {
-  return isNativeChatEnabled(state.settings)
-}
 
 async function syncLocalHost(settings: AppState['settings']): Promise<void> {
   if (!(await localStructuredChatsInUse(settings))) {
@@ -45,32 +38,22 @@ function syncPairedHosts(statuses: AppState['runtimeStatusByEnvironmentId']): vo
   retainHostStructuredAgents(hostIds)
 }
 
-/** Reads each host's registered agents once its status says it publishes them and structured chat
- *  is in use, and again when a paired host's runtime changes. The local host is read when the chat
- *  setting turns on and whenever its capabilities land, so a read made before they were known is
- *  made again. Returns the unsubscribe. */
+/** Catalog availability serves explicit chat/history requests independently of launch defaults.
+ *  Reads remain fenced by the host's advertised capability and current runtime identity. */
 export function installHostStructuredAgentsSync(): () => void {
   const initial = useAppStore.getState()
   void syncLocalHost(initial.settings)
-  if (structuredChatSettingOn(initial)) {
-    syncPairedHosts(initial.runtimeStatusByEnvironmentId)
-  }
+  syncPairedHosts(initial.runtimeStatusByEnvironmentId)
   const stopLocal = subscribeLocalRuntimeCapabilitiesKnown(() => {
     if (!readHostStructuredAgentsForRuntime(LOCAL_EXECUTION_HOST_ID, null)) {
       void syncLocalHost(useAppStore.getState().settings)
     }
   })
   const stopStore = useAppStore.subscribe((state, previousState) => {
-    const on = structuredChatSettingOn(state)
-    const turnedOn = on && !structuredChatSettingOn(previousState)
-    if (turnedOn) {
+    if (state.settings !== previousState.settings) {
       void syncLocalHost(state.settings)
     }
-    if (
-      on &&
-      (turnedOn ||
-        state.runtimeStatusByEnvironmentId !== previousState.runtimeStatusByEnvironmentId)
-    ) {
+    if (state.runtimeStatusByEnvironmentId !== previousState.runtimeStatusByEnvironmentId) {
       syncPairedHosts(state.runtimeStatusByEnvironmentId)
     }
   })

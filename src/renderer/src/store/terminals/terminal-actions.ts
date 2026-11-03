@@ -5,13 +5,13 @@ import type { TerminalLayoutSnapshot, TerminalTab } from '../../../../shared/ter
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { AgentExplicitLaunchPermissionMode } from '../../../../shared/tui-agent-permissions'
 import type { WorkspaceSessionState } from '../../../../shared/workspace-session-state-types'
-import type { SetupSplitDirection } from '../../../../shared/worktree/launch-types'
 import type {
   AgentProviderSessionMetadata,
-  SleepingAgentLaunchConfig
+  SleepingAgentLaunchConfig,
+  SleepingAgentSessionRecord
 } from '../../../../shared/agent-session-resume'
 import type { StartupCommandDelivery } from '../../../../shared/codex-startup-delivery'
-import type { SessionOptionValue } from '../../../../shared/native-chat-session-options'
+import type { SessionOptionValue } from '../../../../shared/native-chat/input/native-chat-session-options'
 import type { AgentStartedTelemetry } from '../../lib/worktree-startup-payload'
 import type { AiVaultSessionTitle } from '../../../../shared/ai-vault-session-title'
 import type { SessionProjectAssignment } from '../../../../shared/session-project-assignment'
@@ -20,16 +20,22 @@ import type {
   TerminalTabTitleUpdate
 } from '../slices/terminal-tab-title-batch'
 import type { NativeChatLaunchDraft, NativeChatLaunchPrompt } from '@/lib/native-chat-launch-prompt'
-import type { AgentStatusWorktreeShutdownReason } from '../slices/agent-status'
+import type { AgentStatusWorktreeShutdownReason } from '../slices/agent-status/agent-status-contract'
 import type {
   TerminalTabCloseReason,
   TerminalTabRetirementPlan
 } from '../slices/terminal-tab-retirement'
 import type {
+  AccountRestartAgent,
   AutomaticAgentResumeClaim,
   CodexRestartNotice,
   HydrateWorkspaceSessionOptions
 } from './terminal-contracts'
+
+/** Main's answer to a sleep it ran; on success, the wake records it keeps (null: another host's). */
+export type HostTerminalStop =
+  | { failed: false; records: readonly SleepingAgentSessionRecord[] | null }
+  | { failed: true; stoppedPtyIds: readonly string[] }
 
 export type TerminalActions = {
   setTerminalStartupRestorationReady: (value: boolean) => void
@@ -76,6 +82,8 @@ export type TerminalActions = {
       split?: TabSplitTarget
       recordInteraction?: boolean
       id?: string
+      /** `id` is a mirrored host tab's `web-terminal-` id, minted here and never taken from IPC. */
+      mirroredHostTab?: boolean
       launchAgent?: TuiAgent
       /** The pane a host `agent.launch` laid out before its agent existed, while its fate is open. */
       agentLaunchPane?: TerminalTab['agentLaunchPane']
@@ -132,7 +140,7 @@ export type TerminalActions = {
       recordInteraction?: boolean
     }
   ) => void
-  setTabColor: (tabId: string, color: string | null) => void
+  setTabColor: (tabId: string, color: string | null, opts?: { recordInteraction?: boolean }) => void
   /** What the tab keeps about the launch that laid out one of its panes; undefined clears it.
    *  `remount` remounts the tab's panes, so one whose spawn was refused spawns again. */
   setTabAgentLaunchPane: (
@@ -157,6 +165,9 @@ export type TerminalActions = {
       sleepingPaneKeys?: string[]
       expectedRuntimePtyIds?: string[]
       backendOwnsPtyTeardown?: boolean
+      /** Main stops these terminals itself: the window only guards and then commits its panes. */
+      hostStop?: Promise<HostTerminalStop>
+      onAdmitted?: () => void
     }
   ) => Promise<void>
   /** Captures resumable pane evidence and publishes suppression before exact physical teardown. */
@@ -173,8 +184,9 @@ export type TerminalActions = {
   suppressPtyExit: (ptyId: string) => void
   consumeSuppressedPtyExit: (ptyId: string) => boolean
   isPtyShutdownPending: (ptyId: string) => boolean
-  queueCodexPaneRestarts: (ptyIds: string[]) => void
-  consumePendingCodexPaneRestart: (ptyId: string) => boolean
+  /** Codex also marks its restart notices answered. */
+  queuePaneAccountRestarts: (ptyIds: string[], agent: AccountRestartAgent) => void
+  consumePendingPaneAccountRestart: (ptyId: string) => AccountRestartAgent | null
   markCodexRestartNotices: (
     notices: (Pick<CodexRestartNotice, 'previousAccountLabel' | 'nextAccountLabel'> &
       Partial<Pick<CodexRestartNotice, 'previousAccountId' | 'nextAccountId'>> & {
@@ -207,6 +219,7 @@ export type TerminalActions = {
       envToDelete?: string[]
       launchConfig?: SleepingAgentLaunchConfig
       resumeProviderSession?: AgentProviderSessionMetadata
+      resumeOrigin?: 'saved'
       launchToken?: string
       launchAgent?: TuiAgent
       agentPermissionMode?: AgentExplicitLaunchPermissionMode
@@ -234,6 +247,7 @@ export type TerminalActions = {
     envToDelete?: string[]
     launchConfig?: SleepingAgentLaunchConfig
     resumeProviderSession?: AgentProviderSessionMetadata
+    resumeOrigin?: 'saved'
     launchToken?: string
     launchAgent?: TuiAgent
     agentPermissionMode?: AgentExplicitLaunchPermissionMode
@@ -246,19 +260,6 @@ export type TerminalActions = {
     }
     showSessionRestoredBanner?: boolean
     telemetry?: AgentStartedTelemetry
-  } | null
-  queueTabSetupSplit: (
-    tabId: string,
-    startup: {
-      command: string
-      env?: Record<string, string>
-      direction: SetupSplitDirection
-    }
-  ) => void
-  consumeTabSetupSplit: (tabId: string) => {
-    command: string
-    env?: Record<string, string>
-    direction: SetupSplitDirection
   } | null
   queueTabIssueCommandSplit: (
     tabId: string,

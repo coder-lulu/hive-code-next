@@ -5,6 +5,7 @@ import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import type { WorkspacePortScanResult } from '../../../shared/workspace-ports'
 import { parseWebPairingInput, type WebPairingOffer } from './web-pairing'
 import { WebRuntimeClient } from './web-runtime-client'
+import { pairedRuntimeConnectionFromOffer } from '../../../shared/paired-runtime-connection'
 
 const pairingInput = process.env.ORCA_REMOTE_ACCESS_PAIRING_INPUT
 const proxyEndpoint = process.env.ORCA_REMOTE_ACCESS_PROXY_ENDPOINT
@@ -18,7 +19,7 @@ function requireResult<T>(response: RuntimeRpcResponse<unknown>): T {
 }
 
 async function openClient(offer: WebPairingOffer): Promise<WebRuntimeClient> {
-  const client = new WebRuntimeClient(offer)
+  const client = new WebRuntimeClient(pairedRuntimeConnectionFromOffer(offer))
   requireResult(await client.call('status.get', undefined, { timeoutMs: 15_000 }))
   return client
 }

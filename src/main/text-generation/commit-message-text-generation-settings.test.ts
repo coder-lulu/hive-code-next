@@ -1,25 +1,25 @@
 import { describe, expect, it } from 'vitest'
 import { getDefaultSettings } from '../../shared/constants'
-import { sourceControlAiSettingsFromLegacy } from '../../shared/source-control-ai'
+import { normalizeSourceControlAiSettings } from '../../shared/source-control-ai'
 import type { GlobalSettings } from '../../shared/global-settings-types'
 import { resolveCommitMessageSettings } from './commit-message-text-generation'
 
-function syncSourceControlAiFromLegacy(settings: GlobalSettings): void {
-  settings.sourceControlAi = sourceControlAiSettingsFromLegacy(settings.commitMessageAi)
+function normalizeCurrentSettings(settings: GlobalSettings): void {
+  settings.sourceControlAi = normalizeSourceControlAiSettings(settings.sourceControlAi)
 }
 
 describe('resolveCommitMessageSettings', () => {
   it('falls back when a dynamic persisted model was not discovered', () => {
     const settings = getDefaultSettings('/tmp')
-    settings.commitMessageAi = {
+    settings.sourceControlAi = {
+      ...settings.sourceControlAi!,
       enabled: true,
       agentId: 'codex',
       selectedModelByAgent: { codex: 'retired-model' },
       selectedThinkingByModel: {},
-      customPrompt: 'Use Conventional Commits.',
-      customAgentCommand: ''
+      customAgentCommand: '',
+      instructionsByOperation: { commitMessage: 'Use Conventional Commits.' }
     }
-    settings.sourceControlAi = undefined
 
     const result = resolveCommitMessageSettings(settings)
 
@@ -37,15 +37,16 @@ describe('resolveCommitMessageSettings', () => {
 
   it('falls back from stale Claude version ids to the CLI alias default', () => {
     const settings = getDefaultSettings('/tmp')
-    settings.commitMessageAi = {
+    settings.sourceControlAi = {
+      ...settings.sourceControlAi!,
       enabled: true,
       agentId: 'claude',
       selectedModelByAgent: { claude: 'claude-sonnet-4-6' },
       selectedThinkingByModel: { sonnet: 'low' },
-      customPrompt: '',
-      customAgentCommand: ''
+      customAgentCommand: '',
+      instructionsByOperation: { commitMessage: '' }
     }
-    syncSourceControlAiFromLegacy(settings)
+    normalizeCurrentSettings(settings)
 
     const result = resolveCommitMessageSettings(settings)
 
@@ -77,7 +78,8 @@ describe('resolveCommitMessageSettings', () => {
 
   it('preserves dynamic persisted models that were discovered by the CLI', () => {
     const settings = getDefaultSettings('/tmp')
-    settings.commitMessageAi = {
+    settings.sourceControlAi = {
+      ...settings.sourceControlAi!,
       enabled: true,
       agentId: 'cursor',
       selectedModelByAgent: { cursor: 'gpt-5.2' },
@@ -92,10 +94,10 @@ describe('resolveCommitMessageSettings', () => {
         ]
       },
       selectedThinkingByModel: { 'gpt-5.2': 'xhigh' },
-      customPrompt: '',
-      customAgentCommand: ''
+      customAgentCommand: '',
+      instructionsByOperation: { commitMessage: '' }
     }
-    syncSourceControlAiFromLegacy(settings)
+    normalizeCurrentSettings(settings)
 
     const result = resolveCommitMessageSettings(settings)
 
@@ -111,7 +113,8 @@ describe('resolveCommitMessageSettings', () => {
 
   it('uses host-scoped discovered models for SSH worktrees', () => {
     const settings = getDefaultSettings('/tmp')
-    settings.commitMessageAi = {
+    settings.sourceControlAi = {
+      ...settings.sourceControlAi!,
       enabled: true,
       agentId: 'cursor',
       selectedModelByAgent: { cursor: 'auto' },
@@ -121,10 +124,10 @@ describe('resolveCommitMessageSettings', () => {
         'ssh:conn-1': { cursor: [{ id: 'remote-only', label: 'Remote Only' }] }
       },
       selectedThinkingByModel: {},
-      customPrompt: '',
-      customAgentCommand: ''
+      customAgentCommand: '',
+      instructionsByOperation: { commitMessage: '' }
     }
-    syncSourceControlAiFromLegacy(settings)
+    normalizeCurrentSettings(settings)
 
     const result = resolveCommitMessageSettings(settings, 'ssh:conn-1')
 
@@ -139,15 +142,16 @@ describe('resolveCommitMessageSettings', () => {
 
   it('falls back to the model default thinking level when a persisted level is stale', () => {
     const settings = getDefaultSettings('/tmp')
-    settings.commitMessageAi = {
+    settings.sourceControlAi = {
+      ...settings.sourceControlAi!,
       enabled: true,
       agentId: 'codex',
       selectedModelByAgent: { codex: 'gpt-5.4-mini' },
       selectedThinkingByModel: { 'gpt-5.4-mini': 'turbo' },
-      customPrompt: '',
-      customAgentCommand: ''
+      customAgentCommand: '',
+      instructionsByOperation: { commitMessage: '' }
     }
-    syncSourceControlAiFromLegacy(settings)
+    normalizeCurrentSettings(settings)
 
     const result = resolveCommitMessageSettings(settings)
 
@@ -164,15 +168,16 @@ describe('resolveCommitMessageSettings', () => {
   it('passes the per-agent command override into non-interactive planning', () => {
     const settings = getDefaultSettings('/tmp')
     settings.agentCmdOverrides.codex = 'npx codex'
-    settings.commitMessageAi = {
+    settings.sourceControlAi = {
+      ...settings.sourceControlAi!,
       enabled: true,
       agentId: 'codex',
       selectedModelByAgent: { codex: 'gpt-5.4-mini' },
       selectedThinkingByModel: {},
-      customPrompt: '',
-      customAgentCommand: ''
+      customAgentCommand: '',
+      instructionsByOperation: { commitMessage: '' }
     }
-    syncSourceControlAiFromLegacy(settings)
+    normalizeCurrentSettings(settings)
 
     const result = resolveCommitMessageSettings(settings)
 
@@ -187,15 +192,16 @@ describe('resolveCommitMessageSettings', () => {
 
   it('falls back when persisted thinking belongs to an undiscovered dynamic model', () => {
     const settings = getDefaultSettings('/tmp')
-    settings.commitMessageAi = {
+    settings.sourceControlAi = {
+      ...settings.sourceControlAi!,
       enabled: true,
       agentId: 'cursor',
       selectedModelByAgent: { cursor: 'gpt-5.2' },
       selectedThinkingByModel: { 'gpt-5.2': 'xhigh' },
-      customPrompt: '',
-      customAgentCommand: ''
+      customAgentCommand: '',
+      instructionsByOperation: { commitMessage: '' }
     }
-    syncSourceControlAiFromLegacy(settings)
+    normalizeCurrentSettings(settings)
 
     const result = resolveCommitMessageSettings(settings)
 
@@ -210,15 +216,16 @@ describe('resolveCommitMessageSettings', () => {
 
   it('requires a non-empty custom command for custom agents', () => {
     const settings = getDefaultSettings('/tmp')
-    settings.commitMessageAi = {
+    settings.sourceControlAi = {
+      ...settings.sourceControlAi!,
       enabled: true,
       agentId: 'custom',
       selectedModelByAgent: {},
       selectedThinkingByModel: {},
-      customPrompt: '',
-      customAgentCommand: '   '
+      customAgentCommand: '   ',
+      instructionsByOperation: { commitMessage: '' }
     }
-    syncSourceControlAiFromLegacy(settings)
+    normalizeCurrentSettings(settings)
 
     expect(resolveCommitMessageSettings(settings)).toEqual({
       ok: false,

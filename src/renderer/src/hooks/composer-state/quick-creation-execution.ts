@@ -1,15 +1,51 @@
-import type { QuickCreationExecutionInput } from './composer-model'
+import type { ComposerModel } from './composer-model'
+
+type QuickCreationExecutionInput = Pick<
+  ComposerModel,
+  | 'agentPermissionMode'
+  | 'agentPrompt'
+  | 'clearNewWorkspaceDraft'
+  | 'createMultiple'
+  | 'effectivePresetId'
+  | 'ephemeralVmRecipes'
+  | 'ephemeralVmsEnabled'
+  | 'isSubmissionCancelled'
+  | 'linkedGitLabIssue'
+  | 'linkedGitLabMR'
+  | 'normalizedSparseDirectories'
+  | 'onCreated'
+  | 'parentWorktreeId'
+  | 'persistDraft'
+  | 'persistSetupAgentStartupPolicy'
+  | 'prepareQuickSubmit'
+  | 'resetForNextCreate'
+  | 'resolvedInitialWorkspaceStatus'
+  | 'selectedEphemeralVmRecipeId'
+  | 'selectedRepoAgentLaunchFact'
+  | 'selectedRepoExecutionHostId'
+  | 'selectedRepoIsGit'
+  | 'selectedRepoIsRemote'
+  | 'selectedRepoTarget'
+  | 'selectedRepoStartupShell'
+  | 'selectedWorkspaceTarget'
+  | 'settings'
+  | 'sparseEnabled'
+  | 'taskSourceContext'
+  | 'telemetrySource'
+>
 
 import { useCallback } from 'react'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { WorktreeCreationRequest } from '@/lib/pending-worktree-creation'
 import { useAppStore } from '@/store'
+import { isWorkspaceStatusAllowedOnHost } from '@/store/host-workspace-status-columns'
 import { settleComposerSubmit } from '@/lib/composer-submit-cancellation'
 import { runBackgroundWorktreeCreation } from '@/lib/worktree-creation-flow'
+import type { ComposerCreateHandoff } from '@/lib/composer-create-handoff'
 import { translate } from '@/i18n/i18n'
+import { resolveQuickCreateLinkedWorkItemPrompt } from '@/lib/linked-work-item-context'
 import { buildQuickComposerStartup } from './quick-startup-plan'
 import { buildQuickCreationRequest, type QuickSubmitOptions } from './quick-creation-request'
-import { resolveQuickCreationLaunchPrompt } from './quick-creation-launch-prompt'
 import type { PendingSmartGitHubSubmitResolution } from './source-selection-decisions'
 import { resolveAgentSessionLaunchRoute } from '@/lib/agent-session-launch-plan'
 
@@ -54,7 +90,8 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
       workspaceNameSeed: string,
       workspaceRunContext: WorktreeCreationRequest['workspaceRunContext'],
       repoId: string,
-      options?: QuickSubmitOptions
+      options?: QuickSubmitOptions,
+      handoff?: ComposerCreateHandoff
     ): Promise<void> => {
       const prepared = await prepareQuickSubmit(
         smartGitHubResolution,
@@ -82,6 +119,7 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
         linkedLinearIssueWorkspaceId,
         linkedLinearIssueOrganizationUrlKey,
         effectiveBranchNameOverride,
+        branchIntent,
         submitBaseBranch,
         createDisplayName,
         pendingFirstAgentMessageRename,
@@ -90,23 +128,25 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
 
       const promptLinkedWorkItem = agent === null ? null : submitLinkedWorkItem
 
-      const { prompt: quickPrompt, draftPrompt: quickDraftPrompt } =
-        resolveQuickCreationLaunchPrompt({
-          linkedWorkItem: promptLinkedWorkItem,
-          agentPrompt,
-          note: trimmedNote
-        })
+      const explicitPrompt = agentPrompt.trim()
+      const resolvedPrompt = resolveQuickCreateLinkedWorkItemPrompt(
+        promptLinkedWorkItem,
+        explicitPrompt || trimmedNote
+      )
+      const quickPrompt =
+        !promptLinkedWorkItem && explicitPrompt ? explicitPrompt : resolvedPrompt.prompt
+      const quickDraftPrompt = resolvedPrompt.draftPrompt
 
       const {
         startupPlan,
         backendStartup,
         telemetry: quickTelemetry
       } = buildQuickComposerStartup({
+        agentPermissionMode,
         agent,
         prompt: quickPrompt,
         draftPrompt: quickDraftPrompt,
         settings,
-        agentPermissionMode,
         launchHost: selectedRepoAgentLaunchFact,
         shell: selectedRepoStartupShell,
         isRemote: selectedRepoIsRemote,
@@ -149,8 +189,10 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
 
       const promptDelivery = quickDraftPrompt ? 'draft' : 'auto-submit'
       // Why: the verdict is persisted on the request as data and re-entered once the worktree exists.
-      const agentLaunchRoute = agent
-        ? resolveAgentSessionLaunchRoute(useAppStore.getState(), {
+      const agentLaunchRoute = !agent
+        ? 'terminal-tui'
+        : (options?.launchChoice?.route ??
+          resolveAgentSessionLaunchRoute(useAppStore.getState(), {
             agent,
             workspace: {
               kind: selectedRepoIsGit ? 'git-worktree' : 'folder',
@@ -160,10 +202,8 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
                 : (workspaceRunContext?.hostId ?? selectedRepoExecutionHostId ?? undefined)
             },
             prompt: quickDraftPrompt ?? quickPrompt,
-            promptDelivery,
-            tuiCustomization: { agentPermissionMode }
-          })
-        : 'terminal-tui'
+            promptDelivery
+          }))
       const structuredLaunch = agentLaunchRoute === 'structured-native-chat'
 
       const request = buildQuickCreationRequest({
@@ -194,8 +234,22 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
         linkedLinearIssueWorkspaceId,
         linkedLinearIssueOrganizationUrlKey,
         branchNameOverride: effectiveBranchNameOverride,
+        branchIntent,
         parentWorktreeId,
-        workspaceStatus: resolvedInitialWorkspaceStatus,
+        // A lane's host-only column applies only when creating on that host.
+        workspaceStatus:
+          resolvedInitialWorkspaceStatus &&
+          isWorkspaceStatusAllowedOnHost(
+            useAppStore.getState(),
+            {
+              hostId: workspaceRunContext?.hostId ?? selectedRepoExecutionHostId,
+              runtimeOwnerEnvironmentId:
+                selectedRepoTarget?.kind === 'environment' ? selectedRepoTarget.environmentId : null
+            },
+            resolvedInitialWorkspaceStatus
+          )
+            ? resolvedInitialWorkspaceStatus
+            : undefined,
         linkedGitLabMR,
         linkedGitLabIssue,
         includeGitLabLinks: smartGitHubResolution.kind === 'none',
@@ -226,7 +280,16 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
         clearNewWorkspaceDraft()
       }
 
-      runBackgroundWorktreeCreation(request)
+      if (handoff) {
+        handoff.start(request)
+      } else {
+        runBackgroundWorktreeCreation(request)
+      }
+
+      // The composer already closed at handoff; closing again could dismiss a newer modal.
+      if (handoff?.isHandedOff()) {
+        return
+      }
 
       if (createMultiple) {
         resetForNextCreate()

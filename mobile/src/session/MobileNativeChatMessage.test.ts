@@ -1,9 +1,10 @@
+import type { ReactNode } from 'react'
 import { createElement } from 'react'
 import * as Clipboard from 'expo-clipboard'
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentJournalToolCallItem } from '../../../src/shared/agent-session-journal-types'
-import { MAX_TOOL_DETAIL_LENGTH } from '../../../src/shared/native-chat-tool-summary'
+import { MAX_TOOL_DETAIL_LENGTH } from '../../../src/shared/native-chat/tools/native-chat-tool-summary'
 import { projectStructuredItemToNativeChat } from '../../../src/shared/structured-agent-session-projection'
 import type { NativeChatMessage } from '../../../src/shared/native-chat-types'
 import { AGENT_SESSION_HOST_STATUS_COPY } from '../../../src/shared/agent-session-host-status-rows'
@@ -13,7 +14,7 @@ const styles = createMobileNativeChatMessageStyles(lightTheme)
 
 vi.mock('react-native', async () => {
   const React = await import('react')
-  const Text = ({ children, ...props }: { children?: unknown }): unknown =>
+  const Text = ({ children, ...props }: { children?: ReactNode }): unknown =>
     React.createElement('Text', props, children)
   return {
     Alert: { alert: vi.fn() },
@@ -30,10 +31,10 @@ vi.mock('react-native', async () => {
     Image: 'Image',
     Platform: { OS: 'ios' },
     Pressable: 'Pressable',
-    ScrollView: ({ children, ...props }: { children?: unknown }) =>
+    ScrollView: ({ children, ...props }: { children?: ReactNode }) =>
       React.createElement('ScrollView', props, children),
     Text,
-    View: ({ children, ...props }: { children?: unknown }) =>
+    View: ({ children, ...props }: { children?: ReactNode }) =>
       React.createElement('View', props, children),
     StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 }
   }

@@ -1,13 +1,18 @@
 import type { PRCheckDetail } from '../../../src/shared/github/check-types'
 import type { PRInfo } from '../../../src/shared/github/pull-request-types'
+import type { GitPushTarget } from '../../../src/shared/worktree/types'
 import type { GitHubWorkItemDetails } from '../../../src/shared/github/work-item-types'
 import type { GitHubPrReadOutcome, GitHubPrRepoSlug } from './github-pr-rpc'
-import { resolveLinkedPrNumber } from './mobile-pr-sidebar-resolve'
+import { isGitHubPRSuppressed } from '../../../src/shared/worktree/github-pr-suppression'
+import type { WorktreeGitHubPRLink, MobilePrLinkOutcome } from '../source-control/mobile-pr-link'
+import type { GitHubLinkBase } from '../../../src/shared/worktree/github-link-base'
 
 // Pure state machine for the mobile PR sidebar. Kept free of React/native imports
 // so the transitions are unit-testable under the node Vitest config (KTD5).
 
 export type PrSidebarData = {
+  githubLinkBase: GitHubLinkBase | null
+  pushTarget: GitPushTarget | null
   pr: PRInfo
   details: GitHubWorkItemDetails | null
   checks: PRCheckDetail[]
@@ -56,10 +61,20 @@ export type PrSidebarLoadDeps = {
   >
   // The worktree's persisted linkedPR (fallback resolver for closed/merged PRs).
   // Fetched in parallel with forBranch to keep it off the critical path.
-  fetchWorktreeLinkedPR: (worktreeId: string) => Promise<number | null>
+  fetchWorktreeGitHubPRLink: (worktreeId: string) => Promise<WorktreeGitHubPRLink | null>
+  clearWorktreeReviewLink: (
+    worktreeId: string,
+    expected: WorktreeGitHubPRLink,
+    isCurrent: () => boolean
+  ) => Promise<MobilePrLinkOutcome>
   fetchPRForBranch: (
     worktreeId: string,
-    args: { branch: string; linkedPRNumber?: number | null }
+    args: {
+      branch: string
+      linkedPRNumber?: number | null
+      fallbackPRNumber?: number | null
+      currentHeadOid?: string | null
+    }
   ) => Promise<GitHubPrReadOutcome<PRInfo | null>>
   fetchWorkItemDetails: (
     worktreeId: string,
@@ -71,11 +86,50 @@ export type PrSidebarLoadDeps = {
   ) => Promise<GitHubPrReadOutcome<PRCheckDetail[]>>
 }
 
+// Keep positive head/branch evidence: a failed containment probe is not divergence.
+function hasStaleReviewLink(
+  pr: PRInfo | null,
+  link: WorktreeGitHubPRLink,
+  branch: string,
+  head: string | null
+): boolean {
+  const summary = link.summary
+  const linkedPR = link.githubLinkBase.linkedPR
+  if (
+    !summary ||
+    !head ||
+    linkedPR === null ||
+    pr?.number !== linkedPR ||
+    summary.isBare ||
+    summary.isArchived ||
+    summary.head !== head ||
+    summary.branch.replace(/^refs\/heads\//, '') !== branch.replace(/^refs\/heads\//, '')
+  ) {
+    return false
+  }
+  if (pr.state === 'merged') {
+    return (
+      pr.headDivergedFromMergedPRAtOid === head &&
+      pr.headSha !== head &&
+      pr.confirmedContainedHeadOid !== head
+    )
+  }
+  const prBranch = pr.headRefName?.trim() ?? ''
+  const currentBranch = branch.replace(/^refs\/heads\//, '').trim()
+  return (
+    (pr.state === 'open' || pr.state === 'draft') &&
+    prBranch !== '' &&
+    currentBranch !== '' &&
+    prBranch !== currentBranch &&
+    summary.pushTargetBranch !== prBranch &&
+    pr.headSha !== head
+  )
+}
+
 // Phase 1: load the PR + checks fast and show the sidebar. The heavy comments/body
 // payload (workItemDetails) is deferred to loadPrSidebarDetails so it never blocks the
 // actionable PR UI — `data.details` starts null and is filled in by the second phase.
-// forBranch + the worktree linkedPR read run in parallel (independent), then combine
-// via resolveLinkedPrNumber so a closed/merged linked PR still resolves (KTD4).
+// The persisted link is resolved first; branch lookup is a fallback after proven stale-link cleanup.
 export async function loadPrSidebarData(
   deps: PrSidebarLoadDeps,
   args: {
@@ -83,25 +137,61 @@ export async function loadPrSidebarData(
     branch: string
     headSha?: string | null
     prRepo?: GitHubPrRepoSlug | null
+    isCurrent: () => boolean
   }
 ): Promise<PrSidebarState> {
   try {
-    const [hintOutcome, linkedPR] = await Promise.all([
+    const { isCurrent } = args
+    if (!isCurrent()) {
+      return { kind: 'hidden' }
+    }
+    const [hintOutcome, link] = await Promise.all([
       deps.fetchForBranch(args.worktreeId, { branch: args.branch }),
-      deps.fetchWorktreeLinkedPR(args.worktreeId)
+      deps.fetchWorktreeGitHubPRLink(args.worktreeId)
     ])
     const branchHint =
       hintOutcome.ok && hintOutcome.result?.provider === 'github' ? hintOutcome.result.number : null
-    const linkedPRNumber = resolveLinkedPrNumber(branchHint, linkedPR)
-
-    const prOutcome = await deps.fetchPRForBranch(args.worktreeId, {
-      branch: args.branch,
-      linkedPRNumber
-    })
+    if (!isCurrent()) {
+      return { kind: 'hidden' }
+    }
+    let githubLinkBase = link?.githubLinkBase ?? null
+    const pushTarget = link?.summary?.pushTarget ?? null
+    const fetchPR = (linkedPRNumber: number | null) =>
+      deps.fetchPRForBranch(args.worktreeId, {
+        branch: args.branch,
+        linkedPRNumber,
+        fallbackPRNumber: linkedPRNumber === null ? branchHint : null,
+        currentHeadOid: args.headSha ?? null
+      })
+    let prOutcome = await fetchPR(githubLinkBase?.linkedPR ?? null)
+    if (!isCurrent()) {
+      return { kind: 'hidden' }
+    }
+    if (
+      link &&
+      prOutcome.ok &&
+      hasStaleReviewLink(prOutcome.result, link, args.branch, args.headSha ?? null)
+    ) {
+      const cleared = await deps.clearWorktreeReviewLink(args.worktreeId, link, isCurrent)
+      if (!isCurrent()) {
+        return { kind: 'hidden' }
+      }
+      if (!cleared.ok) {
+        return failureState(cleared.error)
+      }
+      githubLinkBase = { ...link.githubLinkBase, linkedPR: null }
+      prOutcome = await fetchPR(null)
+      if (!isCurrent()) {
+        return { kind: 'hidden' }
+      }
+    }
     if (!prOutcome.ok) {
       return failureState(prOutcome.error)
     }
-    if (!prOutcome.result) {
+    if (
+      !prOutcome.result ||
+      (githubLinkBase && isGitHubPRSuppressed(githubLinkBase, prOutcome.result.number))
+    ) {
       // GitHub repo, but this branch has no open/linked PR — surfaced as an empty state.
       return { kind: 'none' }
     }
@@ -115,6 +205,9 @@ export async function loadPrSidebarData(
       // checks correctly; fall back to an explicit override then null.
       prRepo: pr.prRepo ?? args.prRepo ?? null
     })
+    if (!isCurrent()) {
+      return { kind: 'hidden' }
+    }
     // details: null = comments still loading (phase 2). The header/reviewers degrade to
     // the PRInfo fields until it arrives.
     // Checks are contained the way phase 2 is: a failed read costs the checks row, not
@@ -122,12 +215,26 @@ export async function loadPrSidebarData(
     if (!checksOutcome.ok) {
       return {
         kind: 'ready',
-        data: { pr, details: null, checks: [], checksError: checksOutcome.error }
+        data: {
+          pr,
+          githubLinkBase,
+          pushTarget,
+          details: null,
+          checks: [],
+          checksError: checksOutcome.error
+        }
       }
     }
     return {
       kind: 'ready',
-      data: { pr, details: null, checks: checksOutcome.result, checksError: null }
+      data: {
+        pr,
+        githubLinkBase,
+        pushTarget,
+        details: null,
+        checks: checksOutcome.result,
+        checksError: null
+      }
     }
   } catch (err) {
     // Why: a dep that rejects (instead of returning `{ ok:false }`) must still

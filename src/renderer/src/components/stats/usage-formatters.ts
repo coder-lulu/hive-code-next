@@ -19,10 +19,10 @@ export function formatCost(value: number | null): string {
 
 export function formatUpdatedAt(timestamp: number | null): string {
   if (!timestamp) {
-    return translate('auto.components.stats.usage.formatters.notScannedYet', 'Not scanned yet')
+    return translate('auto.components.stats.usageFormatters.notScannedYet', 'Not scanned yet')
   }
-  return translate('auto.components.stats.usage.formatters.updatedAt', 'Updated {{value0}}', {
-    value0: new Date(timestamp).toLocaleString(getIntlLocale())
+  return translate('auto.components.stats.usageFormatters.updatedAt', 'Updated {{time}}', {
+    time: new Date(timestamp).toLocaleString(getIntlLocale())
   })
 }
 

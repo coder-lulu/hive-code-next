@@ -1,6 +1,6 @@
 import WebSocket from 'ws'
-import type { RemoteRuntimeSubscription } from '../../shared/remote-runtime-client'
-import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
+import type { RemoteRuntimeSubscription } from '../../shared/remote-runtime/remote-runtime-client'
+import { RemoteRuntimeClientError } from '../../shared/remote-runtime/remote-runtime-client-error'
 import { HiveAccountRelayPool } from '../../shared/hive-account-relay-pool'
 import type { HiveAccountRelaySocket } from '../../shared/hive-account-relay-channel'
 import type {

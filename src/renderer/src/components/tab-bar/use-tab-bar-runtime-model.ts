@@ -12,7 +12,7 @@ import { useAgentDetectionTargetForWorktree } from '@/hooks/useAgentDetectionTar
 import { getConnectionIdFromState } from '@/lib/connection-context'
 import { getLocalProjectExecutionRuntimeContext } from '@/lib/local-preflight-context'
 import { isNativeChatTranscriptLocalReadable } from '@/lib/native-chat-transcript-readability'
-import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
+import { runtimeEnvironmentIdOrLocalUnlessTwin } from '@/lib/worktree-runtime-owner'
 import { runtimeTargetForOwnerEnvironment } from '@/runtime/runtime-client-target'
 import { useOptionalShortcutLabel, useShortcutLabel } from '@/hooks/useShortcutLabel'
 import {
@@ -60,6 +60,7 @@ export function resolveWindowsPowerShellImplementationSetting(settings: GlobalSe
 }
 
 export type TabBarRuntimeModel = {
+  agentDetectionTarget: ReturnType<typeof useAgentDetectionTargetForWorktree>
   newTerminalShortcut: string
   newBrowserShortcut: string
   newSimulatorShortcut: string
@@ -129,7 +130,7 @@ export function useTabBarRuntimeModel({
   const settings = useAppStore((s) => s.settings)
   // Why: use the worktree's owning host so offered Windows shells match the host that actually runs the terminal.
   const activeRuntimeEnvironmentId = useAppStore(
-    (s) => getRuntimeEnvironmentIdForWorktree(s, worktreeId)?.trim() || null
+    (s) => runtimeEnvironmentIdOrLocalUnlessTwin(s, worktreeId)?.trim() || null
   )
   // Why: retained tab strips rerun selectors on every store write; reuse canonical indexes, don't flatten both slices here.
   const worktreeConnectionId = useAppStore(
@@ -250,13 +251,15 @@ export function useTabBarRuntimeModel({
   // Why: tab-wide launch/title hints are safe only before split; gate the view-mode toggle to the active leaf's agent.
   const toggleTabViewMode = useAppStore((s) => s.toggleTabViewMode)
   // Why: every retained TabBar observes the same hot maps; one selector shares their projections.
-  const { nativeChatEnabled, tabAgentTypesByTabId, nativeChatTabWideFallbackUnsafeTabsById } =
-    useAppStore(useShallow(selectTabBarAgentProjections))
+  const { tabAgentTypesByTabId, nativeChatTabWideFallbackUnsafeTabsById } = useAppStore(
+    useShallow(selectTabBarAgentProjections)
+  )
   const nativeChatTranscriptIsLocalReadable = useAppStore((s) =>
     isNativeChatTranscriptLocalReadable(getConnectionIdFromState(s, worktreeId))
   )
 
   return {
+    agentDetectionTarget,
     newTerminalShortcut,
     newBrowserShortcut,
     newSimulatorShortcut,
@@ -279,7 +282,6 @@ export function useTabBarRuntimeModel({
     unifiedTabByVisibleId,
     workspaceHasSimulatorTab,
     toggleTabViewMode,
-    nativeChatEnabled,
     tabAgentTypesByTabId,
     nativeChatTabWideFallbackUnsafeTabsById,
     nativeChatTranscriptIsLocalReadable,

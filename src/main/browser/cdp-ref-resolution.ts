@@ -37,7 +37,7 @@ export class CdpRefResolution {
       )
     }
 
-    // Why: iframe refs use a child session with independent nav history, so a parent-navId check would falsely reject them.
+    // Child sessions have independent history; parent navigation IDs cannot validate their refs.
     if (!entry.sessionId) {
       const currentNavId = await this.getNavigationId(sender)
       if (state.navigationId && currentNavId !== state.navigationId) {
@@ -55,7 +55,7 @@ export class CdpRefResolution {
       await refSender('DOM.describeNode', { backendNodeId: entry.backendDOMNodeId })
       return entry
     } catch {
-      // Why: dynamic pages re-render nodes, detaching snapshot refs; re-query the AX tree by role+name for the fresh node.
+      // Re-rendering can detach snapshot nodes; recover from the accessibility tree.
       const recovered = await this.tryRecoverRef(refSender, entry)
       if (recovered) {
         entry.backendDOMNodeId = recovered
@@ -91,7 +91,6 @@ export class CdpRefResolution {
     return { cx: (x1 + x3) / 2, cy: (y1 + y3) / 2 }
   }
 
-  // Why: cross-origin iframes report iframe-local coords, but Input events use parent-page space; add the iframe offset.
   private async getIframeOffset(
     guest: WebContents,
     sessionId: string
@@ -103,7 +102,6 @@ export class CdpRefResolution {
     for (const [targetId, sid] of state.iframeSessions) {
       if (sid === sessionId) {
         try {
-          // Why: match the iframe's target URL against DOM iframe src to pick the right element on multi-iframe pages.
           const { targetInfo } = (await parentSender('Target.getTargetInfo', {
             targetId
           })) as { targetInfo: { url?: string } }
@@ -125,14 +123,13 @@ export class CdpRefResolution {
 
           const rects = JSON.parse(result.value) as { x: number; y: number; src: string }[]
 
-          // Match by URL first (reliable for cross-origin iframes)
           if (targetUrl) {
             for (const rect of rects) {
               if (rect.src === targetUrl) {
                 return { offsetX: rect.x, offsetY: rect.y }
               }
             }
-            // Why: iframe may redirect after load so src differs from target URL; match by origin as a fallback.
+            // Redirects can change the target URL while preserving the iframe’s origin.
             try {
               const targetOrigin = new URL(targetUrl).origin
               for (const rect of rects) {
@@ -141,16 +138,15 @@ export class CdpRefResolution {
                 }
               }
             } catch {
-              // URL parsing failed — fall through
+              // Invalid URLs still allow the single-iframe fallback.
             }
           }
 
-          // Fallback: if only one iframe exists, use its position
           if (rects.length === 1) {
             return { offsetX: rects[0].x, offsetY: rects[0].y }
           }
         } catch {
-          // Can't determine offset, return zero (best effort)
+          // If discovery fails, keep local coordinates as a best-effort fallback.
         }
         break
       }
@@ -159,7 +155,7 @@ export class CdpRefResolution {
     return { offsetX: 0, offsetY: 0 }
   }
 
-  // Why: Input.dispatchMouseEvent uses parent-page coords, so translate iframe-local coords for iframe elements.
+  // Input events use parent-page coordinates; iframe node geometry is frame-local.
   async getPageCoordinates(
     guest: WebContents,
     refEntry: RefEntry,
@@ -173,7 +169,7 @@ export class CdpRefResolution {
     return { cx: localCx + offsetX, cy: localCy + offsetY }
   }
 
-  // Why: nth-index disambiguates duplicate role+name matches so recovery hits the original element, not the first match.
+  // Prefer the snapshot ordinal among duplicate role/name matches before other live nodes.
   private async tryRecoverRef(sender: CdpCommandSender, entry: RefEntry): Promise<number | null> {
     try {
       const { nodes } = (await sender('Accessibility.getFullAXTree')) as {
@@ -202,7 +198,7 @@ export class CdpRefResolution {
         }
       }
     } catch {
-      // AX tree unavailable — can't recover
+      // The accessibility tree may be unavailable during recovery.
     }
     return null
   }

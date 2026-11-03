@@ -4,22 +4,23 @@ import type { RecordedValue } from './recording-values'
 
 type FieldShape = 'list' | 'map' | 'whole'
 
-/**
- * How each observation field is interned. `sender`, `payloads` and `effects` are append-only
- * histories and `settlements` is keyed by action id, so every checkpoint after the first re-states
- * its predecessor's entries: pooling the whole field stored that shared prefix once per checkpoint,
- * and once per reply partition in a matrix golden. Interning per entry stores it once per file.
- *
- * Declared rather than sniffed from the value, so an empty list cannot be encoded as a map and a
- * projection that changes a field's container fails loudly instead of silently switching encodings.
- * `Record<keyof Observation, …>` makes a new observation field declare how it interns.
- */
-import {
-  canonicalRecordingJson as canonicalJson,
-  OBSERVATION_FIELD_KINDS,
-  OBSERVATION_FIELDS
-} from '../../../../config/scripts/upstream-recording-inputs.mjs'
-export { OBSERVATION_FIELDS }
+// Intern entries rather than whole histories to share repeated checkpoint prefixes.
+// Declare field shapes so empty lists/maps cannot switch encodings and new fields require a choice.
+const FIELD_SHAPES = {
+  sender: 'list',
+  payloads: 'list',
+  settlements: 'map',
+  state: 'whole',
+  effects: 'list'
+} as const satisfies Record<keyof Observation, FieldShape>
+
+export const OBSERVATION_FIELDS = [
+  'sender',
+  'payloads',
+  'settlements',
+  'state',
+  'effects'
+] as const satisfies readonly (keyof typeof FIELD_SHAPES)[]
 
 export type ValuePool = Record<string, RecordedValue>
 type InternedField<Shape extends FieldShape> = Shape extends 'list'
@@ -28,16 +29,28 @@ type InternedField<Shape extends FieldShape> = Shape extends 'list'
     ? Record<string, string>
     : string
 export type InternedObservation = {
-  [Field in keyof typeof OBSERVATION_FIELD_KINDS]: InternedField<
-    (typeof OBSERVATION_FIELD_KINDS)[Field]
-  >
+  [Field in keyof typeof FIELD_SHAPES]: InternedField<(typeof FIELD_SHAPES)[Field]>
 }
 export type InternedRecording = {
   scenario: string
   checkpoints: { id: string; observation: InternedObservation }[]
 }
 
-export { canonicalRecordingJson as canonicalJson } from '../../../../config/scripts/upstream-recording-inputs.mjs'
+export function canonicalJson(value: RecordedValue): string {
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value)
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalJson).join(',')}]`
+  }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: canonicalJson only reaches here for a plain object observation.
+  const record = value as Record<string, RecordedValue>
+  return `{${Object.keys(record)
+    .sort()
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: a recorded object holds recorded values.
+    .map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key] as RecordedValue)}`)
+    .join(',')}}`
+}
 
 export function valueHash(value: RecordedValue): string {
   return canonicalJsonHash(canonicalJson(value))
@@ -89,9 +102,9 @@ export function internRecording(recording: Recording): {
       const value = checkpoint.observation[field]
       const at = `${checkpoint.id}.${field}`
       observation[field] =
-        OBSERVATION_FIELD_KINDS[field] === 'list'
+        FIELD_SHAPES[field] === 'list'
           ? listEntries(at, value).map((entry, index) => intern(entry, `${at}[${index}]`))
-          : OBSERVATION_FIELD_KINDS[field] === 'map'
+          : FIELD_SHAPES[field] === 'map'
             ? Object.fromEntries(
                 mapEntries(at, value).map(([key, entry]) => [key, intern(entry, `${at}.${key}`)])
               )
@@ -110,4 +123,53 @@ export function internRecording(recording: Recording): {
   return { values, recording: { scenario: recording.scenario, checkpoints } }
 }
 
-export { resolveRecording } from '../../../../config/scripts/upstream-recording-inputs.mjs'
+export function resolveRecording(values: ValuePool, recording: InternedRecording): Recording {
+  // Validate content addresses so editing a pooled value cannot silently change every checkpoint referencing it.
+  for (const [hash, value] of Object.entries(values)) {
+    if (valueHash(value) !== hash) {
+      throw new Error(`Golden value ${hash} does not hash to its pool key`)
+    }
+  }
+  const referenced = new Set<string>()
+  const resolve = (hash: unknown, at: string): RecordedValue => {
+    if (typeof hash !== 'string' || !Object.hasOwn(values, hash)) {
+      throw new Error(`Golden value ${JSON.stringify(hash)} is missing from the pool (${at})`)
+    }
+    referenced.add(hash)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the hash was resolved against the same pool that interned it.
+    return values[hash] as RecordedValue
+  }
+  const resolved = {
+    scenario: recording.scenario,
+    checkpoints: recording.checkpoints.map((checkpoint) => {
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: every declared field is assigned below before the value is read.
+      const observation = {} as Observation
+      for (const field of OBSERVATION_FIELDS) {
+        const interned: unknown = checkpoint.observation[field]
+        const at = `${checkpoint.id}.${field}`
+        if (FIELD_SHAPES[field] === 'list') {
+          if (!Array.isArray(interned)) {
+            throw new Error(`Golden field ${at} is not a list of pool hashes`)
+          }
+          observation[field] = interned.map((hash, index) => resolve(hash, `${at}[${index}]`))
+        } else if (FIELD_SHAPES[field] === 'map') {
+          if (interned === null || typeof interned !== 'object' || Array.isArray(interned)) {
+            throw new Error(`Golden field ${at} is not a map of pool hashes`)
+          }
+          observation[field] = Object.fromEntries(
+            Object.entries(interned).map(([key, hash]) => [key, resolve(hash, `${at}.${key}`)])
+          )
+        } else {
+          observation[field] = resolve(interned, at)
+        }
+      }
+      return { id: checkpoint.id, observation }
+    })
+  }
+  // An entry no checkpoint reads is content in the file that nothing compares.
+  const orphans = Object.keys(values).filter((hash) => !referenced.has(hash))
+  if (orphans.length) {
+    throw new Error(`Golden pool holds unreferenced values: ${orphans.join(', ')}`)
+  }
+  return resolved
+}

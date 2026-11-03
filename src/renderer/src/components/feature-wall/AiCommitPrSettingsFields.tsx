@@ -7,7 +7,7 @@ import {
   type CommitMessageAgentCapability,
   type CommitMessageModelCapability
 } from '../../../../shared/commit-message-agent-spec'
-import type { CommitMessageAiSettings } from '../../../../shared/commit-message-ai-types'
+import type { SourceControlAiSettings } from '../../../../shared/source-control-ai-types'
 import { AgentIcon } from '@/lib/agent-catalog'
 import { cn } from '@/lib/utils'
 import { Input } from '../ui/input'
@@ -17,7 +17,7 @@ import { translate } from '@/i18n/i18n'
 import { commitMessageAgentLabel } from './ai-commit-pr-settings-helpers'
 
 type AiCommitPrSettingsFieldsProps = {
-  config: CommitMessageAiSettings
+  config: SourceControlAiSettings
   selectPortalRoot: HTMLElement | null
   agentSelectValue: string | undefined
   activeCapability: CommitMessageAgentCapability | undefined
@@ -28,7 +28,7 @@ type AiCommitPrSettingsFieldsProps = {
   onAgentChange: (newAgentId: string) => void
   onModelChange: (newModelId: string) => void
   onThinkingChange: (newLevelId: string) => void
-  writeConfig: (patch: Partial<CommitMessageAiSettings>) => void
+  writeConfig: (patch: Partial<SourceControlAiSettings>) => void
 }
 
 export function AiCommitPrSettingsFields({

@@ -1,5 +1,8 @@
 import type { AppState } from '../../types'
-import { movePaneKeyedRecord, removePaneKeys } from '../agent-status-pane-keyed-records'
+import {
+  movePaneKeyedRecord,
+  removePaneKeys
+} from '../agent-status/agent-status-pane-keyed-records'
 import { omitRecordKeys } from '../worktrees/teardown/record-key-omission'
 import { paneKeyTabId } from './workspace-live-markers'
 

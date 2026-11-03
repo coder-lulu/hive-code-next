@@ -9,14 +9,12 @@ import {
   type SidebarHostScopeOption
 } from './sidebar-host-options'
 
-/** Shared host-scope derivation for the sidebar scope strip and the workspace
- * options menu so both surfaces consume the same live runtime status without
- * duplicating store wiring. */
+/** Share live host derivation between the scope strip and workspace options. */
 export function useSidebarHostScopeOptions(): {
   hostOptions: SidebarHostOption[]
   hostScopeOptions: SidebarHostScopeOption[]
 } {
-  const { i18n } = useTranslation()
+  useTranslation()
   const repos = useAppStore((s) => s.repos)
   const sshTargetLabels = useAppStore((s) => s.sshTargetLabels)
   const sshConnectionStates = useAppStore((s) => s.sshConnectionStates)
@@ -27,34 +25,18 @@ export function useSidebarHostScopeOptions(): {
   const wslHostServerFilesMissing = useAppStore((s) => s.wslHostServerFiles === 'missing')
 
   const hostLabelOverrides = useExecutionHostDisplayLabels()
-  const hostOptions = useMemo(
-    () =>
-      buildSidebarHostOptions({
-        repos,
-        sshTargetLabels,
-        sshConnectionStates,
-        settings,
-        runtimeEnvironments,
-        runtimeStatusByEnvironmentId,
-        hostLabelOverrides,
-        language: i18n.resolvedLanguage,
-        wslHostStatuses,
-        wslHostsEnabled: true,
-        wslHostServerFilesMissing
-      }),
-    [
-      repos,
-      sshTargetLabels,
-      sshConnectionStates,
-      settings,
-      runtimeEnvironments,
-      runtimeStatusByEnvironmentId,
-      hostLabelOverrides,
-      i18n.resolvedLanguage,
-      wslHostStatuses,
-      wslHostServerFilesMissing
-    ]
-  )
+  const hostOptions = buildSidebarHostOptions({
+    repos,
+    sshTargetLabels,
+    sshConnectionStates,
+    settings,
+    runtimeEnvironments,
+    runtimeStatusByEnvironmentId,
+    hostLabelOverrides,
+    wslHostStatuses,
+    wslHostsEnabled: true,
+    wslHostServerFilesMissing
+  })
   const hostScopeOptions = useMemo(() => buildSidebarHostScopeOptions(hostOptions), [hostOptions])
 
   return { hostOptions, hostScopeOptions }

@@ -1,3 +1,4 @@
+import './rpc/unused-default-rpc-methods.test-fixture'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -6,10 +7,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OrcaRuntimeService } from './orca-runtime'
 import { OrcaRuntimeRpcServer } from './runtime-rpc'
 import { DeviceRegistry } from './device-registry'
+import { FILE_METHODS } from './rpc/methods/files'
 import { E2EEChannel } from './rpc/e2ee-channel'
-import { generateKeyPair } from './rpc/e2ee-crypto'
-import { RuntimeE2EEClientSession } from '../../shared/runtime-e2ee-client-session'
-import { REMOTE_RUNTIME_MAX_OUTBOUND_JSON_BYTES } from '../../shared/remote-runtime-memory-limits'
+import { decrypt, deriveSharedKey, encrypt, generateKeyPair } from '../../shared/e2ee-crypto'
+import { REMOTE_RUNTIME_MAX_OUTBOUND_JSON_BYTES } from '../../shared/remote-runtime/remote-runtime-memory-limits'
 import type { DirEntry } from '../../shared/filesystem-entry-types'
 import { RUNTIME_RPC_REPLY_TOO_LARGE_CODE } from './runtime-rpc/runtime-rpc-reply-size-limit'
 
@@ -25,7 +26,12 @@ function hugeListing(): DirEntry[] {
 function createServer() {
   const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-rpc-reply-size-'))
   const runtime = new OrcaRuntimeService()
-  const server = new OrcaRuntimeRpcServer({ runtime, userDataPath, enableWebSocket: false })
+  const server = new OrcaRuntimeRpcServer({
+    runtime,
+    methods: FILE_METHODS,
+    userDataPath,
+    enableWebSocket: false
+  })
   server['deviceRegistry'] = new DeviceRegistry(userDataPath)
   const device = server['deviceRegistry'].addDevice('paired-desktop', 'runtime')
   return { runtime, server, device }
@@ -57,28 +63,25 @@ function connectEncryptedChannel() {
     onReady: vi.fn(),
     onError
   })
-  const sharedKey = RuntimeE2EEClientSession.create({
-    desktopPublicKeyB64: Buffer.from(serverKeys.publicKey).toString('base64'),
-    transport: 'direct',
-    clientKeyPair: clientKeys
-  })
-  channel.handleRawMessage(JSON.stringify(sharedKey.hello))
-  expect(sharedKey.acceptReady(JSON.parse(sent[0]!))).toBe(true)
-  channel.handleRawMessage(sharedKey.sealText(sharedKey.authMessage('tok')))
-  expect(sharedKey.isAuthenticated(sharedKey.openText(sent[1]!)!)).toBe(true)
-  let readFrames = sent.length
-  const replies: unknown[] = []
+  channel.handleRawMessage(
+    JSON.stringify({
+      type: 'e2ee_hello',
+      publicKeyB64: Buffer.from(clientKeys.publicKey).toString('base64')
+    })
+  )
+  const sharedKey = deriveSharedKey(clientKeys.secretKey, serverKeys.publicKey)
+  channel.handleRawMessage(
+    encrypt(JSON.stringify({ type: 'e2ee_auth', deviceToken: 'tok' }), sharedKey)
+  )
+  const handshakeFrames = sent.length
   return {
     channel,
     sharedKey,
     onError,
-    replies: () => {
-      for (const frame of sent.slice(readFrames)) {
-        replies.push(JSON.parse(sharedKey.openText(frame) ?? 'null'))
-      }
-      readFrames = sent.length
-      return replies
-    }
+    replies: () =>
+      sent
+        .slice(handshakeFrames)
+        .map((frame): unknown => JSON.parse(decrypt(frame, sharedKey) ?? 'null'))
   }
 }
 
@@ -106,12 +109,13 @@ describe('remote RPC replies over the encrypted channel', () => {
     })
 
     encrypted.channel.handleRawMessage(
-      encrypted.sharedKey.sealText(
+      encrypt(
         JSON.stringify({
           id: 'read-flat',
           method: 'files.readDir',
           params: { worktree: 'id:wt-1', relativePath: 'flat' }
-        })
+        }),
+        encrypted.sharedKey
       )
     )
     await vi.waitFor(() => expect(encrypted.replies()).toHaveLength(1))
@@ -153,8 +157,9 @@ describe('remote RPC replies over the encrypted channel', () => {
     })
 
     encrypted.channel.handleRawMessage(
-      encrypted.sharedKey.sealText(
-        JSON.stringify({ id: 'big', method: 'agentSessions.list', params: {} })
+      encrypt(
+        JSON.stringify({ id: 'big', method: 'agentSessions.list', params: {} }),
+        encrypted.sharedKey
       )
     )
     await vi.waitFor(() => expect(encrypted.replies()).toHaveLength(1))

@@ -1,23 +1,31 @@
 import { Pressable, Text } from 'react-native'
-import type { AuthFailedBannerActionProps } from './auth-failed-banner-styles'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
+import { authFailedBannerStyles as styles } from './auth-failed-banner-styles'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 
-// The page delegates re-pair to the shell; reconnect and removal belong to the native app.
-export function AuthFailedBannerActions({ copy, styles, onRepair }: AuthFailedBannerActionProps) {
+// Offer shell-routed /pair-scan only; web forceReconnect is null and page-host-removal-refusal rejects Remove, so direct users to app for both.
+export function AuthFailedBannerActions({
+  onRepair
+}: {
+  canRetry: boolean
+  onRetry: () => void
+  onRepair: () => void
+  onRemove?: () => void
+}) {
+  const t = useMobileTranslation()
+  useMobileColorScheme()
   return (
     <>
-      <Pressable
-        accessibilityLabel={copy.repairAccessibility}
-        accessibilityRole="button"
-        style={({ pressed }) => [styles.action, styles.secondaryAction, pressed && styles.pressed]}
-        onPress={onRepair}
-      >
-        <Text maxFontSizeMultiplier={1.3} style={styles.secondaryText}>
-          {copy.repair}
+      <Pressable style={styles.action} onPress={onRepair}>
+        <Text style={styles.actionText}>
+          {t('components.authFailedBannerActions.repair', 'Re-pair')}
         </Text>
       </Pressable>
-
-      <Text maxFontSizeMultiplier={1.3} style={styles.note}>
-        Reconnect or remove this host from the HiveCode app.
+      <Text style={styles.note}>
+        {t(
+          'components.authFailedBannerActions.webNote',
+          'Reconnect or remove this host from the HiveCode app.'
+        )}
       </Text>
     </>
   )

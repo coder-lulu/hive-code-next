@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 import { ShareUsageCard, type ShareUsageCardProps } from './ShareUsageCard'
 import { translate } from '@/i18n/i18n'
+
 import { buildUsageShareText } from './share-card-utils'
 import { PRODUCT_PUBLIC_LINKS } from '@/product-links'
 
@@ -24,8 +25,7 @@ export function ShareUsageButton(props: ShareUsageButtonProps): React.JSX.Elemen
   const [copied, setCopied] = useState(false)
   const [capturing, setCapturing] = useState(false)
   const copiedResetTimerRef = useRef<number | null>(null)
-  // Why: image capture/clipboard IPC can resolve after dialog teardown; avoid
-  // state writes and reset timers after this control unmounts.
+  // Capture/clipboard IPC may finish after unmount; guard later state writes and reset timers.
   const isMountedRef = useRef(false)
 
   const clearCopiedResetTimer = useCallback((): void => {

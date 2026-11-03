@@ -9,7 +9,7 @@ const OWNED = { sessionId: 'chat-1', workspaceId: 'repo-1::worktree-1' }
 const ROW = { sessionId: 's1', filePath: '/sessions/s1.jsonl' }
 const RESUMABLE = { worktreeId: 'repo-1::worktree-2', disabled: false }
 
-describe('Resume in New CLI eligibility', () => {
+describe('Switch to Terminal eligibility', () => {
   it('offers the fork for Claude and Codex rows native chat owns', () => {
     expect(
       aiVaultSessionCliForkWorktreeId(
@@ -70,8 +70,8 @@ describe('Resume in New CLI eligibility', () => {
   })
 })
 
-describe('Resume in New CLI failure text', () => {
-  const UPDATE = 'Update HiveCode on the host that runs this chat to resume it in a new CLI.'
+describe('Switch to Terminal failure text', () => {
+  const UPDATE = 'Update Orca on the host that runs this chat to resume it in a new CLI.'
 
   it.each([
     'agent_session_conflict',

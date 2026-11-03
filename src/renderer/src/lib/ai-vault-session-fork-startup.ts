@@ -59,8 +59,8 @@ export function buildAiVaultForkStartupForWorktree(
     },
     platform,
     shell: liveShell,
-    agentArgs: resolveTuiAgentLaunchArgs(session.agent, state.settings?.agentDefaultArgs),
-    agentEnv: resolveTuiAgentLaunchEnv(session.agent, state.settings?.agentDefaultEnv),
+    agentArgs: resolveTuiAgentLaunchArgs(session.agent, state.settings),
+    agentEnv: resolveTuiAgentLaunchEnv(session.agent, state.settings),
     resumeInLaunchCwd: true,
     fork: true
   })
@@ -90,7 +90,7 @@ export function buildAiVaultCopiedSessionStartupForWorktree(
   const { platform, liveShell } = resolveAiVaultResumeHost(args)
   const shell = resolveStartupShell(platform, liveShell)
   const configuredArgs = isTuiAgent(args.session.agent)
-    ? resolveTuiAgentLaunchArgs(args.session.agent, args.state.settings?.agentDefaultArgs)
+    ? resolveTuiAgentLaunchArgs(args.session.agent, args.state.settings)
     : ''
   const configured = tokenizeStartupCommand(configuredArgs, shell)
   if (!configured.ok) {
@@ -143,7 +143,7 @@ export function assertAiVaultCopiedSessionLaunchAllowed(args: AiVaultResumeWorkt
     args.state.settings?.agentCmdOverrides?.opencode ||
     getTuiAgentLaunchCommand(TUI_AGENT_CONFIG.opencode, platform)
   const parsed = tokenizeStartupCommand(
-    `${command} ${resolveTuiAgentLaunchArgs('opencode', args.state.settings?.agentDefaultArgs)}`,
+    `${command} ${resolveTuiAgentLaunchArgs('opencode', args.state.settings)}`,
     resolveStartupShell(platform, liveShell)
   )
   if (!parsed.ok) {

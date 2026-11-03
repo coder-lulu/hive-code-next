@@ -1,3 +1,5 @@
+import { launchRecordStore } from '../runtime/structured-agent-launch-composition.test-support'
+import { AgentCliInstallationError } from '../native-chat/agent-cli-installation-error'
 import { createAcpStructuredLaunchResolver } from '../runtime/structured-agent-launch-composition.test-support'
 import { describe, expect, it, vi } from 'vitest'
 import type { AgentSessionRecord } from '../../shared/agent-session-record'
@@ -44,13 +46,14 @@ function resolve(
   const spec = { ...acpLaunchSpecFor(agent)!, ...options.spec }
   const probeVersion = vi.fn<
     NonNullable<Parameters<typeof createAcpStructuredLaunchResolver>[1]['probeVersion']>
-  >(async (_input, supports) => supports(options.version ?? '1.0.46'))
+  >(async () => ({ version: options.version ?? '1.0.46' }))
   const prepareVisuals = vi.fn(async () =>
     options.visuals === false ? null : { folder: FOLDER, skill: SKILL }
   )
   const logger = { warn: vi.fn(), error: vi.fn() }
   const launch = createAcpStructuredLaunchResolver(spec, {
-    store: { getRecord: () => record(spec), pinLaunchDirectory: vi.fn() },
+    dataDirectory: `${process.cwd()}/logs/upstream-sync/20261102/agent-domain/fixtures`,
+    store: launchRecordStore(() => record(spec), vi.fn()),
     readJournal: () => null,
     resolveWorkspacePath: async () => '/repo/worktree',
     resolveEnvironment: async () => ({ PATH: '/usr/bin', HOME: '/home/user' }),
@@ -110,8 +113,7 @@ describe('ACP launch visuals', () => {
     expect(launch.env[NATIVE_CHAT_SCRATCH_DIR_ENV]).toBe(FOLDER)
   })
 
-  // OMP's settings layers (global, profile, project, overlays) replace lists, so any config of
-  // Orca's would hide the user's own skill folders; a plugin folder adds beside them.
+  // OMP config layers replace skill lists; a plugin directory preserves the user's configured folders.
   it("gives OMP the plugin folder, leaving the user's config files as they set them", async () => {
     const launch = await resolve('omp', {
       version: '17.0.5',
@@ -141,6 +143,10 @@ describe('ACP launch visuals', () => {
   })
 
   it('still refuses a release the agent does not run structured chats on', async () => {
-    await expect(resolve('omp', { version: '16.0.0' }).launch).rejects.toThrow()
+    const launch = resolve('omp', { version: '16.0.0' }).launch
+    await expect(launch).rejects.toBeInstanceOf(AgentCliInstallationError)
+    await expect(launch).rejects.toMatchObject({
+      installation: { agent: 'omp', installedVersion: '16.0.0', minimumVersion: '17.0.5' }
+    })
   })
 })

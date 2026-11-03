@@ -1,4 +1,7 @@
-import type { NativeChatGlobalSettings } from './native-chat-appearance-settings'
+import type { AgentPermissionGlobalSettings } from './tui-agent-permission-choice'
+import type { BrowserProfileScope } from './browser-profile-scope'
+import type { TelemetrySettings } from './telemetry-settings-types'
+import type { GlobalSettingsBase } from './global-settings-base'
 import type { ExecutionHostId } from './execution-host'
 import type { OrcaWorkspaceLayout } from './orca-workspace-layout'
 import type { GitHubProjectSettings } from './github/project-types'
@@ -6,17 +9,15 @@ import type { VoiceSettings } from './speech-types'
 import type { AiVaultSearchSettings } from './ai-vault-search-settings'
 import type { GitLabProjectSettings } from './gitlab-types'
 import type { TaskProvider } from './task-providers'
-import type { KeybindingOverrides, TerminalShortcutPolicy } from './keybindings'
+import type { TerminalShortcutPolicy } from './keybindings'
 import type { AppIconId } from './app-icon'
 import type { SourceControlAiSettings } from './source-control-ai-types'
 import type { ClaudeAgentTeamsMode } from './claude-agent-teams-tmux-compat'
 import type { TerminalCustomTheme } from './terminal-custom-themes'
 import type { UiLanguage } from './ui-language'
 import type { GlobalWindowsRuntimeDefault } from './project-execution-runtime'
-import type { PersistedNativeChatSessionOptions } from './native-chat-session-options'
-import type { AgentChatPermissionMode } from './agent-chat-permission-mode'
+import type { PersistedNativeChatSessionOptions } from './native-chat/input/native-chat-session-options'
 import type { ComputerAwakeMode } from './computer-awake-mode'
-import type { CommitMessageAiSettings } from './commit-message-ai-types'
 import type { HostSettingOverrides } from './host-setting-overrides'
 import type {
   ClaudeManagedAccount,
@@ -49,7 +50,14 @@ export type { WorktreeVisibilityDefaults } from './repo-types'
 /** MiniMax account region used to select the quota endpoint. */
 export type MiniMaxEndpoint = 'overseas' | 'cn'
 
-export type GlobalSettings = NativeChatGlobalSettings & {
+export type GlobalSettings = GlobalSettingsBase & {
+  codexShareHistoryAcrossAccounts?: boolean
+  orchestrationChatErrorEscalationEnabled?: boolean
+  nodeDistMirrorUrl?: string
+  tabSwitchKeybindingSeed?: 'pending' | 'done'
+  uiLanguagePortugueseMigrationApplied?: boolean
+  agentPermissionDefault?: AgentPermissionGlobalSettings['agentPermissionDefault']
+  agentPermissionOverrides?: AgentPermissionGlobalSettings['agentPermissionOverrides']
   agentNpmRegistry?: AgentNpmRegistry
   workspaceDir: string
   /** Host-owned defaults used when a repository has no explicit visibility override. */
@@ -67,9 +75,6 @@ export type GlobalSettings = NativeChatGlobalSettings & {
    *  a short name derived from the first prompt once work begins. Users can
    *  still turn this off from global Git settings. */
   autoRenameBranchFromWork: boolean
-  /** One-shot migration guard for the default-on rollout. Existing profiles
-   *  without the guard are flipped on once; later explicit opt-outs stick. */
-  autoRenameBranchFromWorkDefaultedOn?: boolean
   branchPrefix: BranchPrefixStrategy
   branchPrefixCustom: string
   /** Jira key casing for newly generated Jira-linked workspace and branch names.
@@ -98,12 +103,6 @@ export type GlobalSettings = NativeChatGlobalSettings & {
    *  normal system clipboard; Linux and macOS enable it by default, Windows
    *  leaves middle-click semantics unchanged unless the user opts in. */
   primarySelectionMiddleClickPaste?: boolean
-  /** One-shot migration guard for turning the Linux default on for profiles
-   *  that persisted the earlier off-by-default value. */
-  primarySelectionMiddleClickPasteDefaultedForLinux?: boolean
-  /** One-shot migration guard for widening the terminal-style default to
-   *  Linux/macOS while preserving later explicit opt-outs. */
-  primarySelectionMiddleClickPasteDefaultedForTerminalDefaults?: boolean
   terminalFontSize: number
   terminalFontFamily: string
   terminalFontWeight: number
@@ -112,8 +111,6 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   terminalScrollSensitivity: number
   terminalFastScrollSensitivity: number
   terminalTuiScrollSensitivity: number
-  /** One-shot migration guard for moving inherited TUI wheel reports from 3 to 1. */
-  terminalTuiScrollSensitivityDefaultedToOne?: boolean
   /** Terminal renderer policy.
    *  - 'auto': try xterm WebGL and fall back to DOM when unsupported or risky.
    *  - 'on': always try xterm WebGL.
@@ -134,8 +131,6 @@ export type GlobalSettings = NativeChatGlobalSettings & {
    *  idle panes retain parser/decoder setup but no decoded image storage. */
   terminalInlineImages: boolean
   terminalCursorStyle: 'bar' | 'block' | 'underline'
-  /** One-shot migration guard for moving inherited cursor defaults to block. */
-  terminalCursorStyleDefaultedToBlock?: boolean
   terminalCursorBlink: boolean
   terminalThemeDark: string
   terminalCustomThemes?: TerminalCustomTheme[]
@@ -166,8 +161,6 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   showMenuBarIcon?: boolean
   /** Windows convention: right-click pastes; macOS/Linux keep the context menu. */
   terminalRightClickToPaste: boolean
-  /** One-shot guard distinguishing the old global true default from a per-platform choice. */
-  terminalRightClickToPasteDefaultedForPlatform?: boolean
   /** Windows-only: COMSPEC always points to cmd.exe, so this explicit shell (default 'powershell.exe') overrides it. */
   terminalWindowsShell: string
   /** Optional shell executable for new terminals on macOS and Linux. */
@@ -179,8 +172,6 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   /** Account/auth location; auto follows the global Windows runtime while host/wsl pin it. */
   localAccountRuntime: 'auto' | 'host' | 'wsl'
   localAccountWslDistro?: string | null
-  /** One-shot guard for migrating the legacy host default to auto. */
-  localAccountRuntimeDefaultedToAutoForAllUsers?: boolean
   /** Independent from the terminal shell so users can inspect Windows vs WSL agent PATH state without changing it. */
   localAgentRuntime?: 'host' | 'wsl'
   localAgentWslDistro?: string | null
@@ -195,8 +186,6 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   terminalCopyTrimsGutter: boolean
   /** Enables OSC 52 clipboard writes for TUIs (tmux/Zellij/nvim, incl. over SSH); default on. Clipboard *queries* stay blocked and payload size is capped, so this is write-only exposure. */
   terminalAllowOsc52Clipboard: boolean
-  /** One-shot stamp: profiles saved under the old off default get flipped on once, after which an explicit opt-out sticks. */
-  terminalAllowOsc52ClipboardDefaultedOnForAllUsers?: boolean
   /** Experimental Claude Agent Teams; native panes use a tmux-compatible shim so teammate output stays on the normal PTY path. */
   claudeAgentTeamsMode?: ClaudeAgentTeamsMode
   /** Where the repo setup script runs on workspace create; defaults to a background "Setup" tab to keep the main terminal usable. */
@@ -222,16 +211,18 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   terminalLinkClickBehavior?: 'actions' | 'open' | 'none'
   /** Middle mouse URL behavior; defaults to opening the primary routed destination. */
   terminalUrlMiddleClickBehavior?: 'open' | 'actions' | 'none'
-  /** New supported agent launches use structured Chat UI; off defaults to terminal UI. */
-  experimentalNativeChat?: boolean
   /** Opt-in: resume working structured chats automatically on the next launch. Off still offers
    *  the list, so the user sees exactly what would run before anything spends tokens. */
   nativeChatResumeWorkOnRestart?: boolean
+  /** Preferred view for each supported agent; false selects Terminal, otherwise Chat. */
+  nativeChatProviders?: Partial<Record<TuiAgent, boolean>>
   /** Chat-wide: hold a mid-turn send as an editable queued draft that goes when the turn ends
    *  (capable hosts only). Absent = on; off keeps mid-turn sends immediate. */
   nativeChatQueueFollowUps?: boolean
   /** Teach newly started native chats to create inline visuals; absent means on. */
   nativeChatInlineVisuals?: boolean
+  /** Hover previews follow the current chat preference; absent means on. */
+  nativeChatLinkPreviews?: boolean
   /** Structured chat only: Codex/Claude children inherit the whole login-shell environment.
    *  Off passes only `nativeChatShellEnvironmentVariables` (plus a PATH/locale baseline). */
   nativeChatInheritShellEnvironment?: boolean
@@ -239,8 +230,6 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   nativeChatShellEnvironmentVariables?: string[]
   /** Last explicit native-chat model + option selections; live panes need an applied/dispatched record before showing a value. */
   nativeChatSessionOptions?: PersistedNativeChatSessionOptions
-  /** New Claude and Codex chats' permission mode; seeded once from Agent Permissions. */
-  nativeChatPermissionMode?: AgentChatPermissionMode
   /** Extra launcher rows for the worktree "Open in" submenu. VS Code is always shown first. */
   openInApplications?: OpenInApplication[]
   /** Deprecated: migration/backward-compat only. Use PersistedUIState.rightSidebarOpen. */
@@ -259,8 +248,6 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   showTasksButton: boolean
   /** Only toggles the sidebar shortcut; Automations stay reachable from Settings/View menu. */
   showAutomationsButton?: boolean
-  /** Deprecated: Artifacts are always available. Use showArtifactsButton for sidebar visibility. */
-  artifactsEnabled?: boolean
   /** Capability gate for agent-driven publishing; off until granted, enforced in main, not just the UI. */
   artifactSharingEnabled?: boolean
   /** Capability gate for agent/CLI skill publishing; manual reviewed publishing remains available. */
@@ -273,6 +260,8 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   showArtifactsButton?: boolean
   /** Only toggles the sidebar shortcut; Skills stay reachable from Settings. */
   showSkillsButton?: boolean
+  /** Sidebar shortcut visibility; device connections remain available in Settings. */
+  showMobileButton?: boolean
   /** Pinned workspaces show in one sidebar location by default; opt in to also show them in their natural groups. */
   showPinnedWorktreesInGroups?: boolean
   /** How Ctrl+Tab picks the next visible tab; optional (older profiles), readers default to MRU. */
@@ -283,24 +272,20 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   floatingTerminalEnabled: boolean
   /** Main-side new-page kill switch for paired Electron client-hosted browser placement. */
   browserClientHostedRemoteEnabled?: boolean
+  browserProfileScope?: BrowserProfileScope
+  browserDefaultProfileIdByHostId?: Partial<Record<ExecutionHostId, string>>
   /** Routes SSH-workspace browser pages through the workspace's SSH host; off = plain local browsing. */
   browserSshWorkspaceRoutingEnabled?: boolean
   /** Per-target opt-outs recorded from the routing error card's "Browse from this device instead". */
   browserSshWorkspaceRoutingDisabledTargetIds?: string[]
   /** Targets whose forwarding preflight the user overrode via "Try anyway" (e.g. PermitOpen allows their sites); skips the probe, never changes egress. */
   browserSshWorkspaceRoutingProbeSkippedTargetIds?: string[]
-  /** One-shot migration flag for the floating-workspace default-on rollout; after migration an explicit off sticks. */
-  floatingTerminalDefaultedForAllUsers?: boolean
   /** Start dir for new floating-workspace terminal tabs; empty or '~' = home dir. */
   floatingTerminalCwd: string
   /** Picker-approved floating-workspace dirs reauthorized across restarts; renderer text alone must not populate this. */
   floatingTerminalTrustedCwds?: string[]
-  /** One-shot migration marker for legacy floating workspace cwd trust grants. */
-  floatingTerminalCwdMigratedToAppWorkspace?: boolean
   /** Where the Floating Workspace toggle is shown; defaults to the floating button for discoverability. */
   floatingTerminalTriggerLocation: FloatingTerminalTriggerLocation
-  /** Legacy keyboard-shortcut overrides; new writes go to ~/.orca/keybindings.json, migrated once when present. */
-  keybindings?: KeybindingOverrides
   diffDefaultView: 'inline' | 'side-by-side'
   diffWordWrap: boolean
   diffShowWhitespace: boolean
@@ -363,8 +348,6 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   pluginConsents: Record<string, string>
   /** Local directories loaded as dev-mode plugins (manifest hot-reload). */
   devPluginPaths: string[]
-  /** One-shot guard: start Claude Agent Teams hidden for existing profiles without overriding later opt-ins. */
-  claudeAgentTeamsDefaultDisabledMigrated?: boolean
   /** Why: worktree deletion is destructive (rm -rf of the working dir), so confirm by default. */
   skipDeleteWorktreeConfirm: boolean
   /** Opt-in: workspace deletion discards changes and may waive terminal-stop verification. */
@@ -383,8 +366,6 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   defaultTaskSource: TaskProvider
   /** Persisted visible task providers; hides unused providers from Tasks chrome and sidebar shortcuts. */
   visibleTaskProviders: TaskProvider[]
-  /** Why: one-shot guard to make Jira visible for existing profiles once, without re-adding after a later opt-out. */
-  visibleTaskProvidersDefaultedForJira: boolean
   /** Persisted repo selection (cross-repo tasks view). null = sticky-all (includes future-added repos);
    *  string[] = frozen curated subset (ineligible ids dropped on load; empty after drop is treated as null). */
   defaultRepoSelection: string[] | null
@@ -419,8 +400,6 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   agentDefaultArgs?: Partial<Record<TuiAgent, string>>
   /** Per-agent launch environment defaults used when yolo mode is exposed as env. */
   agentDefaultEnv?: Partial<Record<TuiAgent, Record<string, string>>>
-  /** One-shot guard for adding yolo-mode default args to untouched agent launch profiles. */
-  agentYoloDefaultsMigrated?: boolean
   /** Why: disabling must persist so startup doesn't reinstall global agent hook entries the user just removed. */
   agentStatusHooksEnabled: boolean
   /** A local agent-state-rules.json that replaces downloaded and bundled rules, for testing a rule
@@ -452,9 +431,6 @@ export type GlobalSettings = NativeChatGlobalSettings & {
    *  'false' = compose; 'true' = Meta on both Option keys; 'left'/'right' = only that key is Meta.
    *  See docs/terminal-option-key-layout-aware-default.md. */
   terminalMacOptionAsAlt: 'auto' | 'true' | 'false' | 'left' | 'right'
-  /** One-shot migration guard for the 'auto' rollout. Old default 'true' was ambiguous (explicit vs default);
-   *  on first upgrade launch, reset a persisted 'true' to 'auto' so non-US keyboards aren't broken by the stale default. */
-  terminalMacOptionAsAltMigrated: boolean
   /** Whether macOS terminal input maps the physical JIS Yen (¥) key to backslash, per common terminal expectation. */
   terminalJISYenToBackslash: boolean
   experimentalMobile: boolean
@@ -477,18 +453,10 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   /** Experimental: floating animated pet in the bottom-right corner. Opt-in cosmetic;
    *  off never mounts the overlay, and toggling takes effect instantly (renderer-side). */
   experimentalPet: boolean
-  /** Legacy persisted key from before the sidekick -> pet rename; read only during migration, new writes use experimentalPet. */
-  experimentalSidekick?: boolean
-  /** Experimental: left-sidebar Agents view — threaded feed of agent completions, blocking/unread state, worktree creation. */
-  experimentalActivity: boolean
   /** Set after the one-time legacy Agents tab introduction has been acknowledged. */
   agentsSidebarIntroShown?: boolean
-  /** True when the profile previously opted into the legacy Agents view. */
-  agentsSidebarMigratedFromExperimental?: boolean
   /** Includes stale quiet agents as a fourth Agent Dashboard column. */
   agentDashboardShowIdle?: boolean
-  /** One-shot migration guard for defaulting the Agents view off; later explicit opt-ins persist normally. */
-  experimentalActivityDefaultedOffForAllUsers?: boolean
   /** Experimental: persistent terminal-pane attention ring for bell + agent-completion events. Opt-in while tuning signal/noise. */
   experimentalTerminalAttention: boolean
   /** Experimental: automatically sleep completed, resumable background agent terminals. */
@@ -503,32 +471,20 @@ export type GlobalSettings = NativeChatGlobalSettings & {
   experimentalWslHosts?: boolean
   /** Compact worktree cards: hide the metadata row when title and branch say the same thing. */
   compactWorktreeCards: boolean
-  /** Legacy persisted key from the Experimental rollout; new writes use compactWorktreeCards. */
-  experimentalCompactWorktreeCards?: boolean
   /** Active non-local runtime environment for client-routed RPC; null keeps local desktop behavior. */
   activeRuntimeEnvironmentId?: string | null
   /** GitHub Project mode state (pinned/recent/active project, last view per project).
    *  Optional for pre-feature profiles; the persistence merge hydrates the default. */
   githubProjects?: GitHubProjectSettings
-  /** AI commit-message config (agent, model, per-model thinking, prompt suffix). Optional to avoid migrating existing profiles. */
-  commitMessageAi?: CommitMessageAiSettings
   /** Source-control AI generation settings for commit messages and hosted-review drafts. */
   sourceControlAi?: SourceControlAiSettings
   /** GitLab project preferences (pinned + recent paths). Optional for pre-GitLab profiles; persistence merge fills the default. */
   gitlabProjects?: GitLabProjectSettings
-  /** Anonymous product-telemetry state; optional until the one-shot Store.load() migration populates it.
-   *  Holds only consent + identity, not volatile counters — those would amplify the debounced settings write. */
-  telemetry?: {
-    /** New users: true at install. Existing users: null until they resolve the first-launch banner. */
-    optedIn: boolean | null
-    /** Anonymous UUID v4. Generated on first run. Stable across launches; not surfaced in the UI. */
-    installId: string
-    /** Cohort marker: true for pre-existing profiles (gates the opt-in banner), false for fresh installs. */
-    existedBeforeTelemetryRelease: boolean
+  /** Anonymous product-telemetry preferences and install identity, initialized at load.
+   *  Daily Dashboard cursors persist at most once per surface per UTC day. */
+  telemetry?: Omit<TelemetrySettings, 'existedBeforeTelemetryRelease'> & {
+    existedBeforeTelemetryRelease?: boolean
   }
-  /** One-shot cohort marker for the tab-switch keybinding swap. 'pending' =
-   *  pre-existing install (seed pins old chords, then flips to 'done'); 'done' = fresh install. */
-  tabSwitchKeybindingSeed?: 'pending' | 'done'
   /** Local voice/dictation config. Optional for pre-voice profiles; getDefaultSettings() hydrates defaults via the persistence merge. */
   voice?: VoiceSettings
   /** Transcript full-text search consent + retention. Absent means off; nothing indexes until the user opts in. */

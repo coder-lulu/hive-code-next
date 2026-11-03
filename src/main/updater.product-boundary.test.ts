@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProductUpdateSource } from './updater-test-harness'
+import { updaterMainWindow } from './updater-test-main-window'
+vi.mock('./updater/updater-wsl-move-install-hold', () => ({ wslMoveInstallHold: () => null }))
+vi.mock('./serve-update-handoff', () => ({
+  hasServeUpdateSupervisor: () => false,
+  getServeUpdateHandoffFailure: () => null,
+  failServeUpdateHandoff: vi.fn(),
+  requestServeUpdateHandoff: () => false
+}))
 
 const {
   autoUpdaterMock,
@@ -78,10 +86,11 @@ describe('updater product boundary', () => {
     productUpdateSourceState.value = configuredProductSource()
     const send = vi.fn()
     const { setupAutoUpdater, checkForUpdatesFromMenu } = await import('./updater')
-    setupAutoUpdater({ webContents: { send } } as never, {
+    setupAutoUpdater(updaterMainWindow(send), {
       getLastUpdateCheckAt: () => Date.now()
     })
     const message = 'Server rejected artifact "Orca report.zip" in /work/Orca Project'
+    fetchNewerReleaseTagsMock.mockResolvedValue({ tags: ['v1.0.52'], state: 'ready' })
     autoUpdaterMock.checkForUpdates.mockImplementation(() => {
       autoUpdaterMock.emit('checking-for-update')
       autoUpdaterMock.emit('error', new Error(message))
@@ -100,7 +109,7 @@ describe('updater product boundary', () => {
     productUpdateSourceState.value = configuredProductSource()
     const { setupAutoUpdater } = await import('./updater')
 
-    setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+    setupAutoUpdater(updaterMainWindow(vi.fn()), {
       getLastUpdateCheckAt: () => Date.now()
     })
 
@@ -115,7 +124,7 @@ describe('updater product boundary', () => {
     productUpdateSourceState.value = configuredProductSource()
     const { setupAutoUpdater } = await import('./updater')
 
-    setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+    setupAutoUpdater(updaterMainWindow(vi.fn()), {
       getLastUpdateCheckAt: () => Date.now()
     })
 
@@ -142,7 +151,7 @@ describe('updater product boundary', () => {
     }
     fetchNewerReleaseTagsMock.mockResolvedValue(['v1.0.52'])
     const { checkForUpdatesFromMenu, setupAutoUpdater } = await import('./updater')
-    setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+    setupAutoUpdater(updaterMainWindow(vi.fn()), {
       getLastUpdateCheckAt: () => Date.now()
     })
     autoUpdaterMock.setFeedURL.mockClear()
@@ -168,7 +177,7 @@ describe('updater product boundary', () => {
     const send = vi.fn()
     const { getRemoteServerUpdateSupport, setupAutoUpdater, checkForRemoteServerUpdate } =
       await import('./updater')
-    setupAutoUpdater({ webContents: { send } } as never, {
+    setupAutoUpdater(updaterMainWindow(send), {
       getLastUpdateCheckAt: () => null,
       localOnly: true
     })
@@ -208,7 +217,7 @@ describe('updater product boundary', () => {
       listAvailableReleaseBuilds,
       setupAutoUpdater
     } = await import('./updater')
-    setupAutoUpdater({ webContents: { send } } as never, {
+    setupAutoUpdater(updaterMainWindow(send), {
       getLastUpdateCheckAt: () => Date.now()
     })
 

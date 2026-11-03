@@ -58,7 +58,7 @@ test('publishes, updates, revokes, and deletes without losing local state', asyn
   const source = join(sourceRoot, '.agents', 'skills', SKILL_NAME)
   const home = await electronApp.evaluate(({ app }) => app.getPath('home'))
   const globalSkill = join(home, '.agents', 'skills', SKILL_NAME)
-  let packageId: string | null = null
+  let packageId: string | undefined
   let physicalEnvironmentId: string | null = null
   let pairedHost: HeadlessPairedRuntimeHost | null = null
   let sshTargetId: string | null = null
@@ -198,9 +198,6 @@ test('publishes, updates, revokes, and deletes without losing local state', asyn
       ).toMatchObject({ status: 'ok', value: { status: 'removed' } })
     }
 
-    if (!packageId) {
-      throw new Error('Published package ID missing')
-    }
     const removed = await orcaPage.evaluate(
       (name) => window.api.skills.removeInstall({ name, destination: { scope: 'global' } }),
       SKILL_NAME
@@ -208,12 +205,12 @@ test('publishes, updates, revokes, and deletes without losing local state', asyn
     expect(removed).toMatchObject({ status: 'ok', value: { status: 'removed' } })
     expect(existsSync(globalSkill)).toBe(false)
     expect(
-      await orcaPage.evaluate((id) => window.api.skills.getPackage(id), packageId)
+      await orcaPage.evaluate((id) => window.api.skills.getPackage(id), first.preview.packageId)
     ).toMatchObject({ status: 'ok' })
     expect(
-      await orcaPage.evaluate((id) => window.api.skills.deletePackage(id), packageId)
+      await orcaPage.evaluate((id) => window.api.skills.deletePackage(id), first.preview.packageId)
     ).toMatchObject({ status: 'ok' })
-    packageId = null
+    packageId = undefined
   } finally {
     for (const target of externalTargets(physicalEnvironmentId, sshTargetId)) {
       await orcaPage
@@ -442,6 +439,10 @@ async function expectManagedRemoteVersion(
   if (installs.status !== 'ok') {
     throw new Error(`physical host managed-install listing failed: ${installs.status}`)
   }
+  const sshConnectionId =
+    target.destination.scope === 'global' && target.destination.executionTarget?.kind === 'ssh'
+      ? target.destination.executionTarget.connectionId
+      : undefined
   const install = installs.value.find((candidate) => {
     if (target.kind === 'windows' || target.kind === 'paired-posix') {
       return candidate.destination.scope === 'global' && !candidate.destination.executionTarget
@@ -456,10 +457,7 @@ async function expectManagedRemoteVersion(
     return (
       candidate.destination.scope === 'global' &&
       candidate.destination.executionTarget?.kind === 'ssh' &&
-      candidate.destination.executionTarget.connectionId ===
-        (target.destination.scope === 'global' && target.destination.executionTarget?.kind === 'ssh'
-          ? target.destination.executionTarget.connectionId
-          : undefined)
+      candidate.destination.executionTarget.connectionId === sshConnectionId
     )
   })
   expect(install).toMatchObject({

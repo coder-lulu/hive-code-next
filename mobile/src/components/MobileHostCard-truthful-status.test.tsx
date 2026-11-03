@@ -1,20 +1,16 @@
+import { lightTheme } from '../theme/mobile-theme'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ConnectionVerdict } from '../transport/connection-health'
 import type { MobileConnectionPath } from '../transport/stable-logical-rpc-client'
-import type {
-  ConnectionState,
-  HostCatalogEntry,
-  HostCredentialStatus,
-  HostProfile
-} from '../transport/types'
+import type { ConnectionState, HostCredentialStatus, HostProfile } from '../transport/types'
 import {
   markHomeWorktreeCatalogUnavailable,
   type HostWorktreeInfo
 } from '../worktree/home-worktree-info'
 import { MobileHostCard } from './MobileHostCard'
-import { lightTheme } from '../theme/mobile-theme'
+import { findAllByHostType } from '../test-support/react-test-renderer-host-nodes'
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
@@ -57,14 +53,13 @@ describe('MobileHostCard', () => {
       verdict?: ConnectionVerdict
       path?: MobileConnectionPath
       credentialStatus?: HostCredentialStatus
-      host?: HostProfile | HostCatalogEntry
     }
   ): Promise<string[]> {
     await act(async () => {
       renderer = create(
         createElement(MobileHostCard, {
           theme: lightTheme,
-          host: overrides?.host ?? host,
+          host,
           state: overrides?.state ?? 'connected',
           verdict: overrides?.verdict ?? verdict,
           path: overrides?.path ?? 'lan',
@@ -76,49 +71,48 @@ describe('MobileHostCard', () => {
         })
       )
     })
-    return renderer!.root
-      .findAllByType('Text')
-      .flatMap((node) => node.children.filter((child) => typeof child === 'string'))
+    return findAllByHostType(renderer!.root, 'Text').flatMap((node) =>
+      node.children.filter((child) => typeof child === 'string')
+    )
   }
 
   it('renders the counts the host proved', async () => {
-    expect(await renderCard(loaded)).toContain('12 个工作区 · 2 个活跃')
+    expect(await renderCard(loaded)).toContain('12 worktrees · 2 active')
   })
 
   it('keeps rendering the last proven counts after a failed refresh', async () => {
-    // The regression this card shipped once: the caller dropped the counts the
-    // failure path deliberately preserved.
+    // Regress caller dropping counts deliberately preserved on failure.
     expect(await renderCard(markHomeWorktreeCatalogUnavailable(loaded, 'host-1'))).toContain(
-      '上次状态：12 个工作区 · 2 个活跃'
+      'Last known: 12 worktrees · 2 active'
     )
   })
 
   it('never asserts a count for a catalog that failed with nothing proven', async () => {
     expect(await renderCard(markHomeWorktreeCatalogUnavailable(undefined, 'host-1'))).toContain(
-      '工作区列表不可用'
+      'Worktree list unavailable'
     )
   })
 
   it('names the relay while the dial is still in flight', async () => {
     const lines = await renderCard(undefined, {
       state: 'connecting',
-      verdict: { kind: 'normal', label: 'Connecting via Relay…' },
+      verdict: { kind: 'normal', label: 'Connecting via Relay…', dialing: true },
       path: 'relay'
     })
 
-    expect(lines).toContain('正在通过安全中继连接…')
-    expect(lines).not.toContain(' · Orca 安全中继')
+    expect(lines).toContain('Connecting via Relay…')
+    expect(lines).not.toContain(' · Orca Relay')
   })
 
   it('names the relay while a failed direct dial is still retrying', async () => {
     const lines = await renderCard(undefined, {
       state: 'reconnecting',
-      verdict: { kind: 'normal', label: 'Connecting via Relay…' },
+      verdict: { kind: 'normal', label: 'Connecting via Relay…', dialing: true },
       path: 'relay'
     })
 
-    expect(lines).toContain('正在通过安全中继连接…')
-    expect(lines).not.toContain(' · Orca 安全中继')
+    expect(lines).toContain('Connecting via Relay…')
+    expect(lines).not.toContain(' · Orca Relay')
   })
 
   it('leaves an idle disconnected host unlabelled', async () => {
@@ -128,24 +122,24 @@ describe('MobileHostCard', () => {
       path: 'relay'
     })
 
-    expect(lines).not.toContain(' · Orca 安全中继')
+    expect(lines).not.toContain(' · Orca Relay')
   })
 
   it('does not guess a direct path before the dial resolves', async () => {
     const lines = await renderCard(undefined, {
       state: 'connecting',
-      verdict: { kind: 'normal', label: 'Connecting…' },
+      verdict: { kind: 'normal', label: 'Connecting…', dialing: true },
       path: 'lan'
     })
 
-    expect(lines).not.toContain(' · 直连 · 局域网')
+    expect(lines).not.toContain(' · Direct · LAN')
   })
 
   it('shows no worktree line before the first read lands', async () => {
     const lines = await renderCard(undefined)
 
-    expect(lines).not.toContain('0 个工作区')
-    expect(lines).not.toContain('工作区列表不可用')
+    expect(lines).not.toContain('0 worktrees')
+    expect(lines).not.toContain('Worktree list unavailable')
   })
 
   it('offers re-pairing when the credential is missing', async () => {
@@ -155,9 +149,9 @@ describe('MobileHostCard', () => {
       credentialStatus: 'missing'
     })
 
-    expect(lines).toContain('配对已失效')
-    expect(lines).toContain('点击与桌面端重新配对')
-    expect(lines).not.toContain('12 个工作区 · 2 个活跃')
+    expect(lines).toContain('Pairing invalid')
+    expect(lines).toContain('Tap to re-pair with your desktop')
+    expect(lines).not.toContain('12 worktrees · 2 active')
   })
 
   it('offers a retry without declaring a transient read failure invalid', async () => {
@@ -167,45 +161,8 @@ describe('MobileHostCard', () => {
       credentialStatus: 'temporarily-unavailable'
     })
 
-    expect(lines).toContain('配对凭据暂时不可用')
-    expect(lines).toContain('解锁手机后点击重试')
-    expect(lines).not.toContain('配对已失效')
-  })
-
-  it.each(['temporarily-unavailable', 'cloud-offline', 'cloud-unavailable'] as const)(
-    'keeps a proven live connection visible while directory status is %s',
-    async (credentialStatus) => {
-      const lines = await renderCard(loaded, {
-        state: 'connected',
-        verdict,
-        credentialStatus
-      })
-
-      expect(lines).toContain('已连接')
-      expect(lines).toContain(' · 直连 · 局域网')
-      expect(lines).toContain('12 个工作区 · 2 个活跃')
-      expect(lines).not.toContain('Runtime 离线')
-      expect(lines).not.toContain('云连接暂不可用')
-    }
-  )
-
-  it('shows account presence as online without claiming a phone connection', async () => {
-    const lines = await renderCard(undefined, {
-      state: 'disconnected',
-      verdict: { kind: 'normal', label: 'Disconnected' },
-      credentialStatus: 'ready',
-      host: {
-        ...host,
-        credentialStatus: 'ready',
-        profile: host,
-        accessSources: ['account-claimed'],
-        accountPresence: 'ONLINE'
-      }
-    })
-
-    expect(lines).toContain('在线')
-    expect(lines).not.toContain('未连接')
-    expect(lines).not.toContain(' · 直连 · 局域网')
-    expect(lines).not.toContain('12 个工作区 · 2 个活跃')
+    expect(lines).toContain('Pairing temporarily unavailable')
+    expect(lines).toContain('Unlock your phone, then tap to retry')
+    expect(lines).not.toContain('Pairing invalid')
   })
 })

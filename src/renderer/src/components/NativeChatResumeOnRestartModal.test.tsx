@@ -12,7 +12,7 @@ import { expect, it, vi, type Mock } from 'vitest'
 import { applyProductBranding } from '../../../shared/brand'
 import { useAppStore } from '../store'
 import { getDefaultSettings } from '../../../shared/constants'
-import { NativeChatResumeOnRestartModal } from './NativeChatResumeOnRestartModal'
+import { NativeChatResumeOnRestartModal } from './NativeChatResumeRuntimeModal'
 import { NativeChatResumeStatusSegment } from './status-bar/NativeChatResumeStatusSegment'
 import { lastToastShow } from './native-chat-resume-toast.test-support'
 import {
@@ -320,7 +320,6 @@ it('resumes and continues once when the launch begins opted in', async () => {
   useAppStore.setState({
     settings: {
       ...getDefaultSettings(''),
-      experimentalNativeChat: true,
       nativeChatResumeWorkOnRestart: true
     }
   })
@@ -336,8 +335,12 @@ it('resumes and continues once when the launch begins opted in', async () => {
   await act(async () =>
     useAppStore.getState().updateSettings({ nativeChatResumeWorkOnRestart: true })
   )
-  await act(async () => useAppStore.getState().updateSettings({ experimentalNativeChat: false }))
-  await act(async () => useAppStore.getState().updateSettings({ experimentalNativeChat: true }))
+  await act(async () =>
+    useAppStore
+      .getState()
+      .updateSettings({ nativeChatProviders: { claude: false, codex: false, pi: false } })
+  )
+  await act(async () => useAppStore.getState().updateSettings({ nativeChatProviders: {} }))
   // One bulk action, with its remaining list in the reply.
   expect(calls()).toEqual([
     ['agentSession.restartResumable', undefined],
@@ -354,7 +357,6 @@ it('shows an opted-in launch resume in the status bar while it runs', async () =
   useAppStore.setState({
     settings: {
       ...getDefaultSettings(''),
-      experimentalNativeChat: true,
       nativeChatResumeWorkOnRestart: true
     }
   })
@@ -375,7 +377,6 @@ it('reports chats an opted-in launch could not carry on in one toast and the sta
   useAppStore.setState({
     settings: {
       ...getDefaultSettings(''),
-      experimentalNativeChat: true,
       nativeChatResumeWorkOnRestart: true
     }
   })

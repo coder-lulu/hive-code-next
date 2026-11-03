@@ -1,3 +1,4 @@
+import { findAllByHostType, findByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -78,10 +79,10 @@ describe('Graphite common states and overlays', () => {
       )
     })
 
-    expect(renderer!.root.findByType('TriangleAlert').props.color).toBe(
+    expect(findByHostType(renderer!.root, 'TriangleAlert').props.color).toBe(
       mobileThemes.light.color.status.danger
     )
-    const buttons = renderer!.root.findAllByType('Pressable')
+    const buttons = findAllByHostType(renderer!.root, 'Pressable')
     expect(buttons.map((button) => button.props.accessibilityLabel)).toEqual([
       'Retry authentication',
       'Re-pair this computer',
@@ -106,7 +107,9 @@ describe('Graphite common states and overlays', () => {
     })
 
     expect(
-      renderer!.root.findAllByType('Pressable').map((button) => button.props.accessibilityLabel)
+      findAllByHostType(renderer!.root, 'Pressable').map(
+        (button) => button.props.accessibilityLabel
+      )
     ).toEqual(['Retry authentication', 'Re-pair this computer'])
   })
 
@@ -119,13 +122,13 @@ describe('Graphite common states and overlays', () => {
       )
     })
 
-    const banner = renderer!.root.findAllByType('View')[0]!
+    const banner = findAllByHostType(renderer!.root, 'View')[0]!
     expect(resolvedStyle(banner)).toMatchObject({
       minHeight: 56,
       backgroundColor: mobileThemes.dark.color.bg.surface,
       borderBottomColor: mobileThemes.dark.color.border.subtle
     })
-    const dismiss = renderer!.root.findByType('Pressable')
+    const dismiss = findByHostType(renderer!.root, 'Pressable')
     expect(resolvedStyle(dismiss)).toMatchObject({ width: 44, height: 44 })
     act(() => dismiss.props.onPress())
     expect(onDismiss).toHaveBeenCalledOnce()
@@ -137,15 +140,17 @@ describe('Graphite common states and overlays', () => {
       renderer = create(createElement(WorkspaceDetailPlaceholder))
     })
 
-    const container = renderer!.root.findAllByType('View')[0]!
+    const container = findAllByHostType(renderer!.root, 'View')[0]!
     expect(resolvedStyle(container).backgroundColor).toBe(mobileThemes.dark.color.bg.canvas)
-    expect(renderer!.root.findByType('SquareTerminal').props).toMatchObject({
+    expect(findByHostType(renderer!.root, 'SquareTerminal').props).toMatchObject({
       color: mobileThemes.dark.color.text.tertiary,
       size: 24,
       strokeWidth: 2
     })
     expect(
-      renderer!.root.findAllByType('Text').every((node) => node.props.maxFontSizeMultiplier === 1.3)
+      findAllByHostType(renderer!.root, 'Text').every(
+        (node) => node.props.maxFontSizeMultiplier === 1.3
+      )
     ).toBe(true)
   })
 
@@ -163,21 +168,21 @@ describe('Graphite common states and overlays', () => {
       )
     })
 
-    const submit = renderer!.root
-      .findAllByType('Pressable')
-      .find((node) => node.props.accessibilityLabel === 'Save')!
+    const submit = findAllByHostType(renderer!.root, 'Pressable').find(
+      (node) => node.props.accessibilityLabel === 'Save'
+    )!
     expect(submit.props.accessibilityState).toEqual({ disabled: true, busy: false })
     expect(resolvedStyle(submit).minHeight).toBe(44)
 
-    const input = renderer!.root.findByType('TextInput')
+    const input = findByHostType(renderer!.root, 'TextInput')
     act(() => input.props.onFocus())
-    expect(resolvedStyle(renderer!.root.findByType('TextInput')).borderColor).toBe(
+    expect(resolvedStyle(findByHostType(renderer!.root, 'TextInput')).borderColor).toBe(
       mobileThemes.light.color.brand.primary
     )
     act(() => input.props.onChangeText('  graphite  '))
-    const enabledSubmit = renderer!.root
-      .findAllByType('Pressable')
-      .find((node) => node.props.accessibilityLabel === 'Save')!
+    const enabledSubmit = findAllByHostType(renderer!.root, 'Pressable').find(
+      (node) => node.props.accessibilityLabel === 'Save'
+    )!
     expect(enabledSubmit.props.accessibilityState).toEqual({ disabled: false, busy: false })
     act(() => enabledSubmit.props.onPress())
     expect(onSubmit).toHaveBeenCalledWith('graphite')
@@ -198,12 +203,12 @@ describe('Graphite common states and overlays', () => {
       )
     })
 
-    expect(renderer!.root.findByType('SafeAreaView').props.edges).toEqual(['top', 'bottom'])
-    expect(renderer!.root.findByType('ScrollView').props.contentContainerStyle).toMatchObject({
+    expect(findByHostType(renderer!.root, 'SafeAreaView').props.edges).toEqual(['top', 'bottom'])
+    expect(findByHostType(renderer!.root, 'ScrollView').props.contentContainerStyle).toMatchObject({
       backgroundColor: mobileThemes.dark.color.bg.canvas,
       flexGrow: 1
     })
-    const back = renderer!.root.findByType('Pressable')
+    const back = findByHostType(renderer!.root, 'Pressable')
     expect(back.props.accessibilityLabel).toBe('Back to hosts')
     expect(resolvedStyle(back).minHeight).toBe(44)
     act(() => back.props.onPress())

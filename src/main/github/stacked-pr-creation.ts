@@ -22,12 +22,11 @@ import {
 import {
   parseGitHubStackPullRequests,
   parseGitHubStacks,
-  registeredStackNumber,
   type GitHubStack,
   type GitHubStackPullRequest,
   type NumberedHostedReviewSummary
 } from './github-stack-api-responses'
-import { APP_DISPLAY_NAME } from '../../shared/brand'
+import { stackedReviewFailure } from '../../shared/stacked-hosted-review-failure-copy'
 
 type StackedPullRequestPlan =
   | {
@@ -37,10 +36,6 @@ type StackedPullRequestPlan =
       currentReview: GitHubStackPullRequest | null
     }
   | Extract<CreateStackedHostedReviewResult, { ok: false }>
-
-function creationError(error: string): Extract<CreateStackedHostedReviewResult, { ok: false }> {
-  return { ok: false, code: 'validation', error }
-}
 
 function isStacksUnavailableError(error: unknown): boolean {
   const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase()
@@ -71,7 +66,8 @@ async function findOpenPullRequestsForBranch(
   base?: string
 ): Promise<GitHubStackPullRequest[]> {
   const head = encodeURIComponent(`${repository.owner}:${branch}`)
-  const endpoint = `repos/${repository.owner}/${repository.repo}/pulls?head=${head}${base ? `&base=${encodeURIComponent(base)}` : ''}&state=open&per_page=2`
+  const baseQuery = base ? `&base=${encodeURIComponent(base)}` : ''
+  const endpoint = `repos/${repository.owner}/${repository.repo}/pulls?head=${head}${baseQuery}&state=open&per_page=2`
   const { stdout } = await ghExecFileAsync(
     ['api', endpoint],
     ghOptions(repoPath, repository, connectionId, options)
@@ -99,19 +95,17 @@ function validateParentStack(
   stacks: GitHubStack[]
 ): Extract<CreateStackedHostedReviewResult, { ok: false }> | null {
   if (stacks.length > 1) {
-    return creationError('The selected parent pull request belongs to multiple stacks.')
+    return stackedReviewFailure('stack_parent_multiple_stacks')
   }
   const stack = stacks[0]
   if (!stack) {
     return null
   }
   if (!stack.open) {
-    return creationError('The selected parent belongs to a closed stack.')
+    return stackedReviewFailure('stack_parent_closed')
   }
   if (stack.pull_requests.at(-1)?.number !== parentReview.number) {
-    return creationError(
-      'Choose the top pull request in the stack as the base branch before adding another layer.'
-    )
+    return stackedReviewFailure('stack_parent_not_top')
   }
   return null
 }
@@ -123,7 +117,7 @@ export async function prepareGitHubStackedPullRequest(
   options: HostedReviewExecutionOptions = {}
 ): Promise<StackedPullRequestPlan> {
   if (input.provider !== 'github') {
-    return creationError('Stacked pull request creation is available only for GitHub repositories.')
+    return stackedReviewFailure('stack_github_only')
   }
   // `gh` runs on this client whatever the host; only the git reads under it are routed.
   const connectionId = hostedReviewSshConnectionId(executionHostId)
@@ -133,12 +127,12 @@ export async function prepareGitHubStackedPullRequest(
     getHostedReviewLocalGitOptions(options)
   )
   if (!repository || !isDefaultGitHubHost(repository.host)) {
-    return creationError('GitHub stacked pull requests are available only on GitHub.com.')
+    return stackedReviewFailure('stack_github_com_only')
   }
   const base = normalizeHostedReviewBaseRef(input.base).trim()
   const head = input.head ? normalizeHostedReviewHeadRef(input.head).trim() : ''
   if (!base || !head || base.toLowerCase() === head.toLowerCase()) {
-    return creationError('Choose a different parent branch before creating a stacked pull request.')
+    return stackedReviewFailure('stack_same_parent')
   }
 
   await acquire()
@@ -148,19 +142,13 @@ export async function prepareGitHubStackedPullRequest(
       findOpenPullRequestsForBranch(repoPath, repository, head, connectionId, options, base)
     ])
     if (parentPullRequests.length === 0) {
-      return creationError(
-        `The parent branch ${base} does not have an open pull request. Create that pull request first.`
-      )
+      return stackedReviewFailure('stack_parent_without_review', { base })
     }
     if (parentPullRequests.length !== 1) {
-      return creationError(
-        `${APP_DISPLAY_NAME} found multiple open pull requests for the parent branch ${base}.`
-      )
+      return stackedReviewFailure('stack_parent_ambiguous', { base })
     }
     if (currentPullRequests.length > 1) {
-      return creationError(
-        `${APP_DISPLAY_NAME} found multiple open pull requests for the current branch ${head}.`
-      )
+      return stackedReviewFailure('stack_head_ambiguous', { head })
     }
     const parentReview = parentPullRequests[0]
     const currentReview = currentPullRequests[0] ?? null
@@ -177,7 +165,7 @@ export async function prepareGitHubStackedPullRequest(
       return { ok: true, repository, parentReview, currentReview }
     }
     if (currentStacks.length > 0) {
-      return creationError('The pull request already belongs to a different GitHub stack.')
+      return stackedReviewFailure('stack_conflict')
     }
     const parentError = validateParentStack(parentReview, parentStacks)
     return (
@@ -190,16 +178,35 @@ export async function prepareGitHubStackedPullRequest(
     )
   } catch (error) {
     console.warn('GitHub stack creation preflight failed:', error)
-    return {
-      ok: false,
-      code: isStacksUnavailableError(error) ? 'validation' : 'unknown',
-      error: isStacksUnavailableError(error)
-        ? 'GitHub stacked pull requests are not available for this repository.'
-        : `${APP_DISPLAY_NAME} could not verify the parent pull request. Retry in a moment.`
-    }
+    return isStacksUnavailableError(error)
+      ? stackedReviewFailure('stacks_unavailable')
+      : stackedReviewFailure('stack_parent_unverified', {}, 'unknown')
   } finally {
     release()
   }
+}
+
+function registeredStackNumber(
+  parentReview: NumberedHostedReviewSummary,
+  currentReview: NumberedHostedReviewSummary,
+  parentStacks: GitHubStack[],
+  currentStacks: GitHubStack[]
+): number | null {
+  const parentStack = parentStacks[0]
+  const currentStack = currentStacks[0]
+  if (!parentStack || !currentStack || parentStack.number !== currentStack.number) {
+    return null
+  }
+  const parentPosition = parentStack.pull_requests.findIndex(
+    (pullRequest) => pullRequest.number === parentReview.number
+  )
+  // A missing parent gives -1; its successor index 0 must not look like an existing pair.
+  if (parentPosition === -1) {
+    return null
+  }
+  return parentStack.pull_requests[parentPosition + 1]?.number === currentReview.number
+    ? parentStack.number
+    : null
 }
 
 export async function registerGitHubStackedPullRequest(args: {
@@ -246,7 +253,7 @@ export async function registerGitHubStackedPullRequest(args: {
     }
     if (currentStacks.length > 0) {
       return {
-        ...creationError('The pull request already belongs to a different GitHub stack.'),
+        ...stackedReviewFailure('stack_conflict'),
         createdReview: args.currentReview
       }
     }
@@ -283,11 +290,9 @@ export async function registerGitHubStackedPullRequest(args: {
   } catch (error) {
     console.warn('GitHub stack registration failed:', error)
     return {
-      ok: false,
-      code: isStacksUnavailableError(error) ? 'validation' : 'unknown',
-      error: isStacksUnavailableError(error)
-        ? 'The pull request was created, but GitHub stacks are not available for this repository.'
-        : 'The pull request was created, but GitHub could not add it to the stack. Retry to finish stack registration.',
+      ...(isStacksUnavailableError(error)
+        ? stackedReviewFailure('stack_registration_unavailable')
+        : stackedReviewFailure('stack_registration_failed', {}, 'unknown')),
       createdReview: args.currentReview
     }
   } finally {

@@ -15,7 +15,10 @@ type TerminalTabLeadingIconProps = {
   agent: TerminalAgent | null
   activityStatus: TerminalTabActivityStatus
   shell: TerminalTab['shellOverride']
+  showUnreadActivity: boolean
   isActive: boolean
+  /** Program-reported 0–100 for the tab's live work; fills the state ring. */
+  progress?: number
 }
 
 type TerminalTabAgentIdentityIconProps = {
@@ -24,7 +27,6 @@ type TerminalTabAgentIdentityIconProps = {
   className?: string
 }
 
-/** Keep the provider glyph treatment identical across every terminal-tab state. */
 function TerminalTabAgentIdentityIcon({
   agent,
   isActive,
@@ -36,18 +38,19 @@ function TerminalTabAgentIdentityIcon({
       data-agent-icon={agent}
       aria-hidden
     >
-      <AgentIcon agent={agent} size={16} />
+      <AgentIcon agent={agent} size={12} />
     </span>
   )
 }
 
-export function TerminalTabActivityIndicator({
+export function TerminalTabLeadingIcon({
+  agent,
   activityStatus,
-  showUnreadActivity
-}: {
-  activityStatus: TerminalTabActivityStatus
-  showUnreadActivity: boolean
-}): React.JSX.Element | null {
+  shell,
+  showUnreadActivity,
+  isActive,
+  progress
+}: TerminalTabLeadingIconProps): React.JSX.Element {
   if (showUnreadActivity) {
     return (
       <span
@@ -56,53 +59,44 @@ export function TerminalTabActivityIndicator({
           'auto.components.tab.bar.TerminalTabLeadingIcon.7ab2964bea',
           'Unread agent completion'
         )}
-        className="inline-flex shrink-0 items-center"
+        className="mr-1 inline-flex shrink-0 items-center gap-1"
       >
-        <FilledBellIcon className="size-3 text-amber-500" />
+        <FilledBellIcon className="size-3 text-amber-500 drop-shadow-sm" />
+        {agent ? <TerminalTabAgentIdentityIcon agent={agent} isActive={isActive} /> : null}
       </span>
     )
   }
 
-  // Why: shared mapper with Cmd+J recent badges — working/permission/done only; active/inactive
-  // fall through to agent/shell identity.
+  // Share activity mapping with recent-tab badges; idle states retain agent/shell identity.
   const dotState = terminalTabActivityToAgentDotState(activityStatus)
   if (dotState) {
     return (
       <span
         data-testid="tab-agent-activity-indicator"
         data-agent-activity-status={activityStatus}
-        className="inline-flex shrink-0 items-center"
+        className="mr-1 inline-flex shrink-0 items-center gap-1"
       >
         {/* Why: the state glyph is self-describing and the tab title already has a tooltip; hover here stays quiet. */}
-        <AgentStateDot state={dotState} size="md" title={null} />
+        <AgentStateDot state={dotState} size="md" title={null} progress={progress} />
+        {/* Keep agent identity beside activity so parallel tabs remain distinguishable. */}
+        {agent ? <TerminalTabAgentIdentityIcon agent={agent} isActive={isActive} /> : null}
       </span>
     )
   }
 
-  return null
-}
-
-/** Keep agent or shell identity visible independently of the trailing activity state. */
-export function TerminalTabLeadingIcon({
-  agent,
-  shell,
-  isActive
-}: TerminalTabLeadingIconProps): React.JSX.Element {
   if (agent) {
     return (
       <TerminalTabAgentIdentityIcon agent={agent} isActive={isActive} className="mr-1 shrink-0" />
     )
   }
 
-  // Why: ShellIcon renders a colored brand-style tile for PowerShell, CMD,
-  // Git Bash, and WSL while retaining the generic terminal fallback elsewhere.
   return (
     <span
       className={`mr-1 inline-flex shrink-0 ${isActive ? '' : 'opacity-70'}`}
       data-shell-icon={shell ?? 'generic'}
       aria-hidden
     >
-      <ShellIcon shell={shell} size={16} />
+      <ShellIcon shell={shell} size={12} />
     </span>
   )
 }

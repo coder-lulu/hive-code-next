@@ -38,7 +38,7 @@ describe('web runtime environment identity', () => {
       result: {},
       _meta: { runtimeId: 'account-runtime' }
     }))
-    const client = { call, close: vi.fn(), subscribe: vi.fn() }
+    const client = { call, close: vi.fn(), subscribe: vi.fn(), connectionEpoch: 0 }
     installWebPreloadApi(undefined, {
       runtime: {
         runtimeRecordId: '11111111-1111-4111-8111-111111111111',

@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest'
 import { i18n, setRendererPluginLanguagePacks, translate } from '@/i18n/i18n'
-import { pluginLanguageResourceId } from '../../../../shared/plugins/plugin-language-pack-artifact'
+import { pluginLanguageResourceId } from '../../../../shared/plugins/artifacts/plugin-language-pack-artifact'
 import { getAgentsPaneSearchEntries } from './agents-search'
 import { matchesSettingsSearch } from './settings-search'
 
@@ -43,6 +43,7 @@ describe('agent settings localized search', () => {
       resourceLanguage: pluginLanguageResourceId(id),
       pluginKey: 'review.settings',
       locale: 'fr',
+      coverage: 100,
       catalog: { agentsSettings: { packageSource: 'Ancienne source' } }
     }
     setRendererPluginLanguagePacks([pack])

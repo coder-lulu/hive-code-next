@@ -3,6 +3,13 @@ import type { MobileE2EEPayloadKind } from './mobile-e2ee-v2-contract'
 
 export type MobileE2EEDirection = 'mobile-to-desktop' | 'desktop-to-mobile'
 
+/** NaCl secretbox open: null for a box that fails authentication. */
+export type SecretboxOpen = (
+  box: Uint8Array,
+  nonce: Uint8Array,
+  key: Uint8Array
+) => Uint8Array | null
+
 const NONCE_LENGTH = 24
 const SESSION_ID_LENGTH = 32
 const HEADER_LENGTH = SESSION_ID_LENGTH + 1 + 1 + 8
@@ -34,6 +41,7 @@ export function openMobileE2EEV2Frame(args: {
   direction: MobileE2EEDirection
   payloadKind: MobileE2EEPayloadKind
   expectedCounter: bigint
+  openSecretbox?: SecretboxOpen
 }): Uint8Array | null {
   validateFrameInputs(args.key, args.sessionId, args.expectedCounter)
   if (args.frame.length < MOBILE_E2EE_V2_FRAME_OVERHEAD_BYTES) {
@@ -50,7 +58,9 @@ export function openMobileE2EEV2Frame(args: {
     return null
   }
 
-  const plaintext = nacl.secretbox.open(args.frame.subarray(NONCE_LENGTH), nonce, args.key)
+  // The length check above must stay ahead of this: native libsodium crashes on a box shorter than its MAC.
+  const openSecretbox = args.openSecretbox ?? nacl.secretbox.open
+  const plaintext = openSecretbox(args.frame.subarray(NONCE_LENGTH), nonce, args.key)
   if (!plaintext) {
     return null
   }
@@ -82,8 +92,7 @@ function encodeNonce(args: {
   counter: bigint
 }): Uint8Array {
   const nonce = new Uint8Array(NONCE_LENGTH)
-  // Why: v2 keys/sessionId are fresh per socket; the fixed layout makes every
-  // direction/kind/counter nonce unique without relying on another RNG draw.
+  // Fresh per-socket keys/sessionId make this direction/kind/counter nonce layout unique without another RNG draw.
   nonce.set(args.sessionId.subarray(0, 12), 0)
   nonce[12] = FRAME_VERSION
   nonce[13] = directionByte(args.direction)

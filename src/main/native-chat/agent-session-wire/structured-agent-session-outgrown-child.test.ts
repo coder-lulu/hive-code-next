@@ -1,3 +1,4 @@
+import { AGENT_JOURNAL_THREAD_SCOPE } from '../../../shared/agent-session-journal-types'
 // A child the chat outgrew is replaced before the next send: one that reported it is not signed in,
 // so a sign-in made since reaches a new child, and one launched with a permission mode the chat no
 // longer has, so the new mode reaches a new child.
@@ -20,15 +21,13 @@ import {
 } from './structured-agent-session-outgrown-child'
 import { claudeAndCodexDeclared } from './structured-agent-session-adapter-router-test-support'
 import { structuredAgentSessionLaunchPermission } from './structured-agent-session-launch-permission'
-import type { AgentChatPermissionMode } from '../../../shared/agent-chat-permission-mode'
-import type { AgentSessionRecord } from '../../../shared/agent-session-record'
+import type { AgentChatPermissionChoice } from '../../../shared/agent-chat-permission-mode'
 import type { StructuredAgentSessionProviderChild } from './structured-agent-session-host-types'
 import type {
   AgentJournalItemBody,
   AgentJournalTurnLifecycle
 } from '../../../shared/agent-session-journal-types'
 import type { AgentChildWorkView } from '../../../shared/agent-status-child-work-view'
-import type { AgentSessionUnavailable } from '../../../shared/agent-session-availability'
 import type { JournalItemLinkageVisitor } from '../agent-session-journal/journal-store-contracts'
 import type { StructuredAgentSessionChildWorkReads } from './structured-agent-session-idle-sweep'
 
@@ -60,7 +59,7 @@ describe('a send after the agent said it is not signed in', () => {
 
     expect((await rig.host.send(CALLER, restTestSend('signed in now', fence()))).ok).toBe(true)
     await vi.waitFor(() => expect(rig.adapter.dispatch).toHaveBeenCalledTimes(3))
-    expect(rig.adapter.closeSession).toHaveBeenCalledWith(SESSION)
+    expect(rig.adapter.closeSession).toHaveBeenCalledWith(SESSION, undefined)
     expect(rig.adapter.acquire).toHaveBeenCalledTimes(2)
 
     // The earlier child's report does not follow the new one.
@@ -69,14 +68,22 @@ describe('a send after the agent said it is not signed in', () => {
     expect(rig.adapter.acquire).toHaveBeenCalledTimes(2)
   })
 
-  // A Pi that started with no model keeps a placeholder: a sign-in made since reaches a new Pi only.
   it('goes to a new agent when the running one started signed out', async () => {
     await foundRestTestChat(rig)
-    rig.adapter.startUnavailable.mockReturnValueOnce({ reason: 'notSignedIn' })
+    const events = rig.adapter.acquire.mock.calls[0]?.[0].events
+    if (!events) {
+      throw new Error('event sink missing')
+    }
+    events.appendItem(
+      { provider: 'orca', clientMessageId: 'signed-out-start' },
+      statusRow(fence(), 'notSignedIn').body,
+      { turnScope: AGENT_JOURNAL_THREAD_SCOPE }
+    )
+    await rig.host.flushStreamedEvents(SESSION)
     rig.adapter.closeSession.mockClear()
     expect((await rig.host.send(CALLER, restTestSend('signed in since', fence()))).ok).toBe(true)
     await vi.waitFor(() => expect(rig.adapter.dispatch).toHaveBeenCalledTimes(2))
-    expect(rig.adapter.closeSession).toHaveBeenCalledWith(SESSION)
+    expect(rig.adapter.closeSession).toHaveBeenCalledWith(SESSION, undefined)
     expect(rig.adapter.acquire).toHaveBeenCalledTimes(2)
   })
 
@@ -138,6 +145,7 @@ const conversation = (
   return {
     child: input.child === undefined ? childAt() : input.child,
     journal: {
+      itemBody: (id: string) => items.find((item) => item.itemId === id)?.body ?? null,
       submissions: () => input.submissions ?? [],
       visitItems: (visit: (itemId: string, sequence: number, body: AgentJournalItemBody) => void) =>
         items.forEach((item, index) => visit(item.itemId, index, item.body)),
@@ -179,12 +187,12 @@ describe('structuredAgentSessionChildReportedSignedOut', () => {
     expect(reported({ items, child: null })).toBe(false)
   })
 
-  it("reads the running child's own start, and only a signed-out one", () => {
-    const fromStart = (startUnavailable: AgentSessionUnavailable, child = childAt({})) =>
-      structuredAgentSessionChildReportedSignedOut(conversation({ child }), startUnavailable)
-    expect(fromStart({ reason: 'notSignedIn' })).toBe(true)
-    expect(fromStart({ reason: 'cliMissing' })).toBe(false)
-    expect(fromStart({ reason: 'notSignedIn' }, childAt({ phase: 'starting' }))).toBe(false)
+  it('uses journal sign-out evidence rather than unrelated startup errors', () => {
+    expect(reported({ items: [statusRow(2, 'notSignedIn')] })).toBe(true)
+    expect(reported({ items: [statusRow(2, 'providerExited')] })).toBe(false)
+    expect(
+      reported({ items: [statusRow(2, 'notSignedIn')], child: childAt({ phase: 'starting' }) })
+    ).toBe(false)
   })
 })
 
@@ -199,9 +207,12 @@ describe('retireOutgrownStructuredAgentSessionChild', () => {
     stoppable: false,
     invocation: { invocationId: 'spawn-subagent-1', generation: 1 }
   }
-  const idle: StructuredAgentSessionChildWorkReads = {
+  const idle: StructuredAgentSessionChildWorkReads & {
+    childWork: () => readonly AgentChildWorkView[]
+  } = {
     currentWork: () => ({ activeTurnId: () => null, hasActionablePrompt: () => false }),
     childWork: () => [],
+    childWorkOpen: () => false,
     hasOpenDispatch: () => false,
     providerHoldsDispatch: () => false
   }
@@ -213,11 +224,17 @@ describe('retireOutgrownStructuredAgentSessionChild', () => {
     input: Parameters<typeof conversation>[0],
     work: Partial<typeof idle> = {},
     stopAgent = vi.fn(async () => undefined),
-    launchPermission?: () => Promise<AgentChatPermissionMode | null>
+    launchPermission?: () => Promise<AgentChatPermissionChoice | null>
   ) => {
     const warn = vi.fn()
     await retireOutgrownStructuredAgentSessionChild('session', conversation(input), {
-      work: { ...idle, ...work },
+      work: {
+        ...idle,
+        ...work,
+        childWorkOpen:
+          work.childWorkOpen ??
+          (() => work.childWork?.().some((child) => child.membership === 'live') ?? false)
+      },
       ...(launchPermission ? { launchPermission } : {}),
       stopAgent,
       logger: { warn, error: vi.fn() }
@@ -276,8 +293,25 @@ describe('retireOutgrownStructuredAgentSessionChild', () => {
   })
 
   describe('a child launched with another permission mode', () => {
-    const now = (mode: AgentChatPermissionMode) => vi.fn(async () => mode)
+    const now = (mode: AgentChatPermissionChoice) => vi.fn(async () => mode)
     const askChild = { child: childAt({ permissionMode: 'ask' }) }
+
+    it.each([
+      ['own', 'ask', true],
+      ['ask', 'own', true],
+      ['own', 'own', false]
+    ] as const)(
+      'compares a child launched as %s with current %s',
+      async (launched, current, stops) => {
+        const { stopAgent } = await retire(
+          { child: childAt({ permissionMode: launched }) },
+          {},
+          undefined,
+          now(current)
+        )
+        expect(stopAgent).toHaveBeenCalledTimes(stops ? 1 : 0)
+      }
+    )
 
     it('is stopped once, and one launched with the current mode is kept', async () => {
       expect(
@@ -306,55 +340,30 @@ describe('retireOutgrownStructuredAgentSessionChild', () => {
 
     // The check reads the same mode a start launches with, so each start ends the restarts.
     describe('against the mode a start launches with', () => {
-      // The saved catalog the probe keeps from `claude` 2.1.280: the default row folded into the
-      // row it resolves to, every row but haiku listed as running auto.
-      const listed = [
-        { id: 'opus[1m]', isDefault: true, supportsAutoMode: true },
-        { id: 'sonnet', isDefault: false, supportsAutoMode: true },
-        { id: 'haiku', isDefault: false }
-      ]
-      const catalog = (rows: typeof listed) => ({
-        read: vi.fn(async () => ({
-          origin: 'probe' as const,
-          fetchedAt: 1,
-          models: rows.map((row) => ({ ...row, label: row.id, efforts: [] }))
-        })),
-        recordLiveListing: vi.fn(),
-        prewarm: vi.fn(async () => undefined),
-        stop: vi.fn(),
-        providerStarted: vi.fn()
-      })
-      const launch = ({ permissionMode, ...options }: Record<string, string>, rows = listed) => {
-        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the launch mode reads only the record's id, agent, options and mode.
-        const record = {
-          sessionId: 'session',
-          provider: 'claude',
-          options,
-          permissionMode
-        } as AgentSessionRecord
-        return () =>
+      const launch =
+        ({ permissionMode, ...options }: Record<string, string>) =>
+        () =>
           structuredAgentSessionLaunchPermission(
-            { agents: claudeAndCodexDeclared(), modelCatalog: catalog(rows) },
-            record
+            { agents: claudeAndCodexDeclared() },
+            { sessionId: 'session', provider: 'claude', options, permissionMode }
           )
-      }
       const stoppedAfterLaunch = async (
-        launched: AgentChatPermissionMode,
-        current: () => Promise<AgentChatPermissionMode | null>
+        launched: AgentChatPermissionChoice,
+        current: () => Promise<AgentChatPermissionChoice | null>
       ) =>
         (await retire({ child: childAt({ permissionMode: launched }) }, {}, undefined, current))
           .stopAgent.mock.calls.length > 0
 
-      it('restarts Full access or Accept edits into Ask when auto is not confirmed', async () => {
+      it('preserves explicit Auto without model-catalog inference', async () => {
         const unconfirmed = [
           launch({ model: 'haiku', permissionMode: 'auto' }),
-          launch({ permissionMode: 'auto' }, [{ id: 'opus[1m]', isDefault: true }])
+          launch({ permissionMode: 'auto' })
         ]
         for (const autoPick of unconfirmed) {
-          await expect(autoPick()).resolves.toBe('ask')
+          await expect(autoPick()).resolves.toBe('auto')
           expect(await stoppedAfterLaunch('full-access', autoPick)).toBe(true)
           expect(await stoppedAfterLaunch('accept-edits', autoPick)).toBe(true)
-          expect(await stoppedAfterLaunch('ask', autoPick)).toBe(false)
+          expect(await stoppedAfterLaunch('auto', autoPick)).toBe(false)
         }
       })
 
@@ -367,20 +376,19 @@ describe('retireOutgrownStructuredAgentSessionChild', () => {
           { model: 'haiku', permissionMode: 'auto' },
           { model: 'claude-opus-5-5[1m]', permissionMode: 'auto' }
         ]
-        const runsAuto = [true, true, true, true, false, false]
-        for (const [index, options] of records.entries()) {
+        for (const options of records) {
           const current = launch(options)
           const launched = await current()
-          expect(launched).toBe(runsAuto[index] ? 'auto' : 'ask')
+          expect(launched).toBe(options.permissionMode)
           expect(await stoppedAfterLaunch(launched!, current)).toBe(false)
         }
       })
 
       // A resolved id launches Ask; the start reports the listed alias, so one restart reaches auto.
-      it('settles after one restart once a resolved id is reported as its alias', async () => {
+      it('keeps a child when a model alias does not change its explicit permission', async () => {
         const first = await launch({ model: 'claude-opus-5-5[1m]', permissionMode: 'auto' })()
         const reported = launch({ model: 'opus[1m]', permissionMode: 'auto' })
-        expect(await stoppedAfterLaunch(first!, reported)).toBe(true)
+        expect(await stoppedAfterLaunch(first!, reported)).toBe(false)
         expect(await stoppedAfterLaunch((await reported())!, reported)).toBe(false)
       })
     })

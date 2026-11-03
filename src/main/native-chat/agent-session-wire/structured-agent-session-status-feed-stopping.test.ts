@@ -1,10 +1,4 @@
-import {
-  closeTestJournalHostDatabases,
-  createTrackedJournalOpener
-} from '../agent-session-journal/journal-host-database-test-support'
-// The status feed's Stopping is live state, like the child it rides beside: when the host lets go of
-// a session, nothing there is ending the work, so the retained summary no longer says Stopping.
-
+import { agentSessionConversationView } from '../../../shared/agent-session-conversation-view'
 import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -13,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { AGENT_JOURNAL_THREAD_SCOPE } from '../../../shared/agent-session-journal-types'
 import type { AgentSessionStatusSummary } from '../../../shared/agent-session-wire'
 import { agentSessionRecordFixture } from '../../../shared/agent-session-record.test-fixture'
+import { createTrackedJournalOpener } from '../agent-session-journal/journal-host-database-test-support'
 import { indexedStatusFeedSession } from './structured-agent-session-status-feed-test-session'
 import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
 import { StructuredAgentSessionStatusFeed } from './structured-agent-session-status-feed'
@@ -28,7 +23,6 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await journals.closeAll()
-  closeTestJournalHostDatabases()
   await rm(root, { recursive: true, force: true })
 })
 
@@ -54,7 +48,7 @@ describe("the status feed's Stopping", () => {
       logger: createStructuredAgentSessionLogger(),
       sessions: new Map([[SESSION, session]]),
       statusSink: () => ({ publish: (summary) => published.push(summary), forget: () => {} }),
-      getRecord: () => agentSessionRecordFixture(),
+      getConversation: () => agentSessionConversationView(agentSessionRecordFixture()),
       now: () => 1_000
     })
     await journal.appendItem(
@@ -92,7 +86,7 @@ describe("the status feed's Stopping", () => {
       logger: createStructuredAgentSessionLogger(),
       sessions: new Map([[SESSION, indexedStatusFeedSession({ journal })]]),
       statusSink: () => ({ publish: (summary) => published.push(summary), forget: () => {} }),
-      getRecord: () => agentSessionRecordFixture(),
+      getConversation: () => agentSessionConversationView(agentSessionRecordFixture()),
       now: () => 1_000
     })
     const turn = { provider: 'codex', threadId: 'thread-1', turnId: 'turn-1' } as const
@@ -137,7 +131,7 @@ describe("the status feed's Stopping", () => {
       logger: createStructuredAgentSessionLogger(),
       sessions: new Map([[SESSION, indexedStatusFeedSession({ journal })]]),
       statusSink: () => ({ publish: (summary) => published.push(summary), forget: () => {} }),
-      getRecord: () => agentSessionRecordFixture(),
+      getConversation: () => agentSessionConversationView(agentSessionRecordFixture()),
       now: () => 1_000
     })
     await journal.appendItem(

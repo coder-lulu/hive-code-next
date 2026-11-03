@@ -1,41 +1,46 @@
-import { productNameText } from '@/product-brand'
-import { useCallback, useEffect, useState } from 'react'
-import { ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Pressable, ScrollView, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { ChevronLeft, ChevronRight, Globe } from 'lucide-react-native'
 import { PickerModal, type PickerOption } from '../components/PickerModal'
-import {
-  MobileGroupedList,
-  MobileGroupedListRow,
-  MobileIconButton,
-  MobileScreenHeader
-} from '../components/ui'
+import type { Translate } from '../i18n/mobile-i18n'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import {
   loadTerminalLinkOpenMode,
   saveTerminalLinkOpenMode,
   type MobileTerminalLinkOpenMode
 } from '../storage/preferences'
-import type { MobileTheme } from '../theme/mobile-theme'
-import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import { themedStyleSheet } from '../theme/themed-styles'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 
-const LINK_MODE_OPTIONS: PickerOption<MobileTerminalLinkOpenMode>[] = [
-  {
-    value: 'orca-browser',
-    label: productNameText('Orca 桌面端浏览器'),
-    subtitle: '在已配对电脑的流式浏览器中打开。'
-  },
-  {
-    value: 'phone-browser',
-    label: '手机浏览器',
-    subtitle: '在此手机的 Safari、Chrome 或其他浏览器中打开。'
-  }
-]
+function linkModeOptions(t: Translate): PickerOption<MobileTerminalLinkOpenMode>[] {
+  return [
+    {
+      value: 'orca-browser',
+      label: t('settings.browserSettingsScreen.desktopBrowser', 'HiveCode browser on desktop'),
+      subtitle: t(
+        'settings.browserSettingsScreen.desktopBrowserDescription',
+        'Open in the streamed browser from your paired desktop.'
+      )
+    },
+    {
+      value: 'phone-browser',
+      label: t('settings.browserSettingsScreen.phoneBrowser', 'Phone browser'),
+      subtitle: t(
+        'settings.browserSettingsScreen.phoneBrowserDescription',
+        'Open in Safari, Chrome, or another browser on this phone.'
+      )
+    }
+  ]
+}
 
-function linkModeLabel(mode: MobileTerminalLinkOpenMode): string {
-  return (
-    LINK_MODE_OPTIONS.find((option) => option.value === mode)?.label ?? LINK_MODE_OPTIONS[0]!.label
-  )
+function linkModeLabel(
+  mode: MobileTerminalLinkOpenMode,
+  options: PickerOption<MobileTerminalLinkOpenMode>[]
+): string {
+  return options.find((option) => option.value === mode)?.label ?? options[0]!.label
 }
 
 export default function BrowserSettingsScreen({
@@ -43,25 +48,37 @@ export default function BrowserSettingsScreen({
 }: {
   onBack?: () => void
 }): React.JSX.Element {
+  const t = useMobileTranslation()
+  useMobileColorScheme()
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createStyles)
   const [linkMode, setLinkMode] = useState<MobileTerminalLinkOpenMode>('orca-browser')
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<'load' | 'save' | null>(null)
+  const options = linkModeOptions(t)
+  const selectionRevision = useRef(0)
+  const failedSelectionRevision = useRef<number | null>(null)
+  const savedMode = useRef<MobileTerminalLinkOpenMode>('orca-browser')
+  const hasSaved = useRef(false)
 
   useEffect(() => {
     let active = true
     void loadTerminalLinkOpenMode().then(
       (mode) => {
-        if (active) {
-          setLinkMode(mode)
+        if (!hasSaved.current) {
+          savedMode.current = mode
+        }
+        if (
+          active &&
+          (selectionRevision.current === 0 ||
+            failedSelectionRevision.current === selectionRevision.current)
+        ) {
+          setLinkMode(savedMode.current)
         }
       },
       () => {
         if (active) {
-          setError('无法加载浏览器偏好，请重试。')
+          setError('load')
         }
       }
     )
@@ -72,55 +89,86 @@ export default function BrowserSettingsScreen({
 
   const selectLinkMode = useCallback((mode: MobileTerminalLinkOpenMode) => {
     setError(null)
+    const revision = ++selectionRevision.current
     setLinkMode(mode)
-    void saveTerminalLinkOpenMode(mode).catch(() => setError('无法保存浏览器偏好，请重试。'))
+    void saveTerminalLinkOpenMode(mode).then(
+      () => {
+        savedMode.current = mode
+        hasSaved.current = true
+      },
+      () => {
+        if (revision === selectionRevision.current) {
+          failedSelectionRevision.current = revision
+          setLinkMode(savedMode.current)
+          setError('save')
+        }
+      }
+    )
   }, [])
 
   return (
-    <View style={styles.screen}>
-      <MobileScreenHeader
-        leading={
-          <MobileIconButton
-            accessibilityLabel="返回"
-            icon={ChevronLeft}
-            iconSize={24}
-            onPress={onBack ?? (() => router.back())}
-          />
-        }
-        title="浏览器"
-      />
+    <View style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
+      <View style={styles.topRow}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('common.back', 'Back')}
+          style={styles.backButton}
+          onPress={onBack ?? (() => router.back())}
+        >
+          <ChevronLeft size={22} color={colors.textSecondary} />
+        </Pressable>
+        <Text style={styles.heading}>{t('settings.browserSettingsScreen.title', 'Browser')}</Text>
+      </View>
 
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: insets.bottom + theme.spacing.space32 }
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        <Text maxFontSizeMultiplier={1.3} style={styles.description}>
-          选择在终端输出中点按 HTTP(S) 链接时的打开位置。
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <Text style={styles.groupHeading}>
+          {t('settings.browserSettingsScreen.linksHeading', 'LINKS')}
         </Text>
-        {error ? (
-          <Text accessibilityRole="alert" style={styles.description}>
-            {error}
+        <Text style={styles.groupDescription}>
+          {t(
+            'settings.browserSettingsScreen.linksDescription',
+            'Choose where HTTP(S) links tapped in terminal output open.'
+          )}
+        </Text>
+        {error && (
+          <Text accessibilityRole="alert" style={styles.groupDescription}>
+            {error === 'load'
+              ? t(
+                  'settings.browserSettingsScreen.loadFailed',
+                  'Could not load browser preferences. Try again.'
+                )
+              : t(
+                  'settings.browserSettingsScreen.saveFailed',
+                  'Could not save browser preferences. Try again.'
+                )}
           </Text>
-        ) : null}
-        <MobileGroupedList title="链接">
-          <MobileGroupedListRow
-            accessibilityLabel={`打开终端链接，当前为${linkModeLabel(linkMode)}`}
-            detail={linkModeLabel(linkMode)}
-            leading={<Globe color={theme.color.text.secondary} size={20} strokeWidth={2} />}
+        )}
+        <View style={[styles.section, styles.sectionTopGap]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t(
+              'settings.browserSettingsScreen.openTerminalLinks',
+              'Open terminal links'
+            )}
+            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
             onPress={() => setPickerOpen(true)}
-            title="打开终端链接"
-            trailing={<ChevronRight color={theme.color.text.tertiary} size={20} strokeWidth={2} />}
-          />
-        </MobileGroupedList>
+          >
+            <Globe size={16} color={colors.textSecondary} />
+            <View style={styles.rowContent}>
+              <Text style={styles.rowLabel}>
+                {t('settings.browserSettingsScreen.openTerminalLinks', 'Open terminal links')}
+              </Text>
+              <Text style={styles.rowSublabel}>{linkModeLabel(linkMode, options)}</Text>
+            </View>
+            <ChevronRight size={16} color={colors.textMuted} />
+          </Pressable>
+        </View>
       </ScrollView>
 
       <PickerModal<MobileTerminalLinkOpenMode>
         visible={pickerOpen}
-        title="打开终端链接"
-        options={LINK_MODE_OPTIONS}
+        title={t('settings.browserSettingsScreen.openTerminalLinks', 'Open terminal links')}
+        options={options}
         selected={linkMode}
         onSelect={selectLinkMode}
         onClose={() => setPickerOpen(false)}
@@ -129,14 +177,78 @@ export default function BrowserSettingsScreen({
   )
 }
 
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    screen: { flex: 1, backgroundColor: theme.color.bg.canvas },
-    content: {
-      gap: theme.spacing.space16,
-      paddingHorizontal: theme.spacing.space20,
-      paddingTop: theme.spacing.space20
-    },
-    description: { ...theme.typography.body, color: theme.color.text.secondary }
-  })
-}
+const styles = themedStyleSheet(() => ({
+  container: {
+    flex: 1,
+    backgroundColor: colors.bgBase,
+    paddingHorizontal: spacing.lg,
+    paddingTop: 0
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm
+  },
+  heading: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.textPrimary
+  },
+  scrollContent: {
+    paddingBottom: spacing.xl
+  },
+  groupHeading: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textMuted,
+    letterSpacing: 0.5,
+    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.xs
+  },
+  groupDescription: {
+    fontSize: typography.bodySize - 1,
+    color: colors.textSecondary,
+    lineHeight: 20,
+    paddingHorizontal: spacing.xs
+  },
+  section: {
+    backgroundColor: colors.bgPanel,
+    borderRadius: radii.card,
+    overflow: 'hidden'
+  },
+  sectionTopGap: {
+    marginTop: spacing.sm
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md + 2
+  },
+  rowPressed: {
+    backgroundColor: colors.bgRaised
+  },
+  rowContent: {
+    flex: 1
+  },
+  rowLabel: {
+    fontSize: typography.bodySize,
+    fontWeight: '500',
+    color: colors.textPrimary
+  },
+  rowSublabel: {
+    fontSize: typography.bodySize - 2,
+    color: colors.textSecondary,
+    marginTop: 2
+  }
+}))

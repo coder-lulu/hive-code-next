@@ -1,15 +1,34 @@
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defaultExclude, defineConfig } from 'vitest/config'
 import { UNIT_INCLUDE, UNIT_EXCLUDE } from './scripts/ci-unit-files.mjs'
 import TimingSequencer from './scripts/ci-unit-sequencer.mjs'
 import RuntimeSequencer from './scripts/vitest-runtime-sequencer.mjs'
-import { NODE_RUNTIME_INCLUDE } from './scripts/vitest-node-runtime-files.mjs'
+import { getNodeRuntimeInclude } from './scripts/vitest-node-runtime-files.mjs'
 import { nodeRuntimePool } from './scripts/vitest-node-runtime-pool'
 import { createWorkspaceSourceResolver } from './scripts/workspace-source-exports.mjs'
 
+import { readRunFilters } from './scripts/vitest-run-filters.mjs'
+
+const NODE_RUNTIME_INCLUDE = process.versions.bun
+  ? getNodeRuntimeInclude({ filters: readRunFilters() })
+  : []
 const balancedShards = process.env.ORCA_BALANCE_UNIT_SHARDS === '1'
 const measurementFile = 'src/main/foreign-sqlite-readers/foreign-sqlite-reader-event-loop.test.ts'
 const transforms = {
+  plugins: [
+    {
+      name: 'unit-locale-catalog-assets',
+      enforce: 'pre' as const,
+      load(id: string) {
+        if (!/\/i18n\/locales\/[A-Za-z-]+\.json\?url$/.test(id)) {
+          return null
+        }
+        const bytes = readFileSync(id.slice(0, -4))
+        return `export default ${JSON.stringify(`data:application/json;base64,${bytes.toString('base64')}`)}`
+      }
+    }
+  ],
   define: {
     ORCA_FEATURE_WALL_ENABLED: 'true',
     // Why: tests only interpolate it; they must not depend on the checkout's HEAD.

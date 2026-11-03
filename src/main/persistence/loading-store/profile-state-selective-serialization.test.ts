@@ -19,6 +19,30 @@ function previousReplacements(state: Record<string, unknown>, domains: ReadonlyS
 afterEach(() => vi.restoreAllMocks())
 
 describe('selective profile domain serialization', () => {
+  it('writes current settings without resurrecting retired settings or sealed credential fields', () => {
+    const state = getDefaultPersistedState('/synthetic-profile')
+    state.settings.agentPermissionDefault = 'own'
+    state.settings.agentDefaultArgs = { claude: '--verbose' }
+    Reflect.set(state.settings, 'retiredFixtureSecret', ['retired', 'fixture'].join('-'))
+    Reflect.set(state.settings, 'opencodeGoApiKey', ['retired', 'input'].join('-'))
+    const protectedSecrets = new ProtectedSecretPersistence()
+    protectedSecrets.retainSealed('settings.opencodeGoApiKey', ['retired', 'sealed'].join('-'))
+    const serialization = new StateSerializationSecretHandlingOperations({
+      state,
+      protectedSecrets
+    })
+    const full = JSON.parse(serialization.buildStateToSave().payload.toString('utf8')).settings
+    const settingsDomain = serialization.buildStateDomainsToSave(new Set(['settings']))
+      ?.replacements[0]
+    const selective = JSON.parse(settingsDomain?.payload ?? 'null')
+
+    expect(full).not.toHaveProperty('retiredFixtureSecret')
+    expect(full).not.toHaveProperty('opencodeGoApiKey')
+    expect(full.agentPermissionDefault).toBe('own')
+    expect(full.agentDefaultArgs).toEqual({ claude: '--verbose' })
+    expect(selective).toEqual(full)
+  })
+
   it('preserves deletion, JSON null, primitive roots, and escaped property values', () => {
     const escapedDomain = '雪"\\\ud800'
     const state = Object.fromEntries([

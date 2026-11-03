@@ -53,7 +53,10 @@ export function requireStructuredAgentAudience(ctx: RpcContext, agent: string): 
  */
 export function requireStructuredCreateSupportAdmission(ctx: RpcContext, agent?: string): void {
   requireStructuredAgentAudience(ctx, agent ?? '')
-  if (createSupportFollowsHostSetting(ctx) && !isStructuredNativeChatEnabled(ctx.runtime)) {
+  if (
+    createSupportFollowsHostSetting(ctx) &&
+    !isStructuredNativeChatEnabled(ctx.runtime, agent ?? '')
+  ) {
     throw agentSessionRefusalError('structured_agent_session_unsupported', {
       reason: 'clientCapabilityMissing'
     })

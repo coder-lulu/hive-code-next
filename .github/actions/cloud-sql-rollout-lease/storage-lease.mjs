@@ -1,9 +1,4 @@
-// Compare-and-swap lease over a single Cloud Storage object.
-//
-// This action stays self-contained so a deployment checkout can acquire a lease without loading
-// application code. Cloud Storage generations make acquire, renew, and release conditional; an
-// unreadable live record or conflicting writer fails closed. Actions obtains its access token via
-// gcloud rather than a workload-specific metadata endpoint.
+// Ported CAS algorithm from relay-fence-broker/mutation-lease.ts: keep repo-local imports out of this duplicated action. Broker metadata-server tokens cannot work on Actions runners; use generation-matched writes/deletes, 412 conflicts and expiry.
 
 export const LEASE_TTL_MS = 35 * 60 * 1_000
 export const RENEW_INTERVAL_MS = 5 * 60 * 1_000

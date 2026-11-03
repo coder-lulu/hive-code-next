@@ -21,16 +21,23 @@ import {
   trustFloatingWorkspaceDirectory,
   resolveFloatingTerminalCwd
 } from './floating-workspace-directory'
-import { isMarkdownDocumentName, markdownDocumentFromFilePath } from './markdown-documents'
+import { isMarkdownDocumentName, markdownDocumentFromFilePath } from '../../shared/markdown-document-paths'
 import { registerMacSymbolicHotkeysProbeHandler } from './macos-symbolic-hotkeys-probe'
-import { registerRendererShutdownCheckpointHandler } from './renderer-shutdown-checkpoint'
+import { registerRendererShutdownCheckpointHandler, type QuitResumeRecordsFor } from './renderer-shutdown-checkpoint'
+import type { ReconnectFactsFor } from '../persistence/window-save-view'
 import { readMacKeyboardLayoutSnapshot } from './macos-keyboard-layout-snapshot'
 import { registerMacKeyboardLayoutChangeNotifications } from './macos-keyboard-layout-change-notifications'
 import { isProfileStateSaveDelayed } from '../startup/profile-state-save-delay'
 import { readCommandStdout, readKeyboardInputSourceId } from './macos-keyboard-input-source'
 import { getWindowsAdministratorStatus } from '../windows/windows-administrator-status'
+import { getSystemLanguageDetection } from '../i18n/system-language'
+import { setMainUiLanguage } from '../i18n/main-i18n'
+import { rebuildAppMenu } from '../menu/register-app-menu'
+import { rebuildSystemTrayMenu } from '../tray/system-tray'
 
 type RegisterAppHandlersOptions = {
+  quitResumeRecordsFor?: QuitResumeRecordsFor
+  reconnectFactsFor?: ReconnectFactsFor
   onBeforeRelaunch?: () => void | Promise<void>
   /** Only for app:relaunch, whose app.exit(0) is committed and skips will-quit. */
   onBeforeRelaunchExit?: () => void | Promise<void>
@@ -108,7 +115,26 @@ function resolveDevFeatureWallAssetDir(): string {
 }
 
 export function registerAppHandlers(store: Store, options: RegisterAppHandlersOptions = {}): void {
-  registerRendererShutdownCheckpointHandler(store)
+  ipcMain.handle('app:getSystemLanguageDetection', (_event, preferences: unknown) => {
+    const previous = getSystemLanguageDetection()
+    const detection = getSystemLanguageDetection(
+      Array.isArray(preferences) &&
+        preferences.length <= 32 &&
+        preferences.every((tag) => typeof tag === 'string' && tag.length <= 128)
+        ? preferences
+        : undefined
+    )
+    if (detection !== previous && store.getSettings().uiLanguage === 'system') {
+      void setMainUiLanguage('system')
+        .then(() => {
+          rebuildAppMenu()
+          rebuildSystemTrayMenu()
+        })
+        .catch((error) => console.warn('[app] failed to refresh system language menus:', error))
+    }
+    return detection
+  })
+  registerRendererShutdownCheckpointHandler(store, options.quitResumeRecordsFor, options.reconnectFactsFor)
   registerMacKeyboardLayoutChangeNotifications()
   ipcMain.handle('app:isProfileStateSaveDelayed', isProfileStateSaveDelayed)
   ipcMain.handle('app:getWindowsAdministratorStatus', getWindowsAdministratorStatus)

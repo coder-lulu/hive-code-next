@@ -12,7 +12,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import { getIntlLocale, translate } from '@/i18n/i18n'
+import { translate } from '@/i18n/i18n'
+import { formatClipboardFilePath } from '@/lib/clipboard-file-path'
+import type { ExecutionHostId } from '../../../../shared/execution-host'
 import type { DiscoveredSkill, SkillProvider } from '../../../../shared/skills'
 import { sourceKindLabel } from './skill-display-labels'
 import {
@@ -20,7 +22,7 @@ import {
   SkillRowDropdownActions,
   type SkillRowAction
 } from './SkillRowActions'
-import { createLocalizedCatalog } from '@/i18n/localized-catalog'
+import { uiDateTimeFormat } from '@/i18n/ui-intl-formatters'
 
 const providerLabels: Record<SkillProvider, string> = {
   codex: 'Codex',
@@ -28,17 +30,14 @@ const providerLabels: Record<SkillProvider, string> = {
   'agent-skills': 'Agent Skills'
 }
 
-const getDateFormatter = createLocalizedCatalog(
-  () =>
-    new Intl.DateTimeFormat(getIntlLocale(), {
-      month: 'short',
-      day: 'numeric'
-    })
-)
+const DATE_OPTIONS: Intl.DateTimeFormatOptions = {
+  month: 'short',
+  day: 'numeric'
+}
 
 function formatUpdatedAt(value: number | null): string {
   return value
-    ? getDateFormatter().format(new Date(value))
+    ? uiDateTimeFormat(DATE_OPTIONS).format(new Date(value))
     : translate('auto.components.skills.SkillRow.updatedUnknown', 'No date')
 }
 
@@ -58,6 +57,7 @@ export function SkillRow({
   onShare,
   onDelete,
   onReveal,
+  ownerHostId,
   onFocus,
   onKeyDown
 }: {
@@ -69,11 +69,9 @@ export function SkillRow({
   deletable: boolean
   /** Shown on the `Delete…` item itself, so it reads outside selection mode too. */
   deleteDisabledReason: string | null
-  /** Mode-dependent: a delete-ineligible row and a share-ineligible row need
-   *  different copy in the same visual slot. */
+  /** Use mode-specific copy for delete versus share ineligibility. */
   disabledLabel: string
-  /** Row-specific explanation only; page-wide causes are stated once above the
-   *  list instead of once per row. */
+  /** Show only row-specific causes; page-wide restrictions belong above the list. */
   disabledReason: string | null
   focusable: boolean
   onOpenDetail: () => void
@@ -81,18 +79,21 @@ export function SkillRow({
   onShare: () => void
   onDelete: () => void
   onReveal: () => void
+  /** Host the skill file lives on. */
+  ownerHostId: ExecutionHostId
   onFocus: () => void
   onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void
 }): React.JSX.Element {
   const reasonId = useId()
-  // Why: Radix's checkbox callback carries no event, so the modifier has to be
-  // captured from the pointer press that produced it.
+  // Capture the pointer modifier because Radix’s checkbox callback provides no event.
   const rangeRef = useRef(false)
   const selectionBlocked = selectionMode && !selectable
   const showReason = selectionBlocked && disabledReason !== null
 
   const copyPath = async (): Promise<void> => {
-    await window.api.ui.writeClipboardText(skill.skillFilePath)
+    await window.api.ui.writeClipboardText(
+      formatClipboardFilePath(skill.skillFilePath, ownerHostId)
+    )
     toast.success(translate('auto.components.skills.SkillRow.pathCopied', 'Path copied'))
   }
 
@@ -189,8 +190,7 @@ export function SkillRow({
               />
             </span>
           ) : null}
-          {/* Why: metadata is its own grid column, so the description truncates
-              where that column starts instead of at the window edge. */}
+          {/* Reserve a metadata column so descriptions truncate before metadata rather than at the window edge. */}
           <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3">
             <div className="flex min-w-0 items-baseline gap-2">
               <span className="min-w-0 truncate text-sm font-medium" data-skill-name>

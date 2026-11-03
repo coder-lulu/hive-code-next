@@ -1,5 +1,4 @@
-import { APP_DISPLAY_NAME } from '../product-brand'
-import type { JiraSite, JiraSiteSelection } from '../../../src/shared/jira-types'
+import type { JiraSite, JiraSiteSelection } from '../../../src/shared/jira/jira-types'
 import type { RpcOperationSender } from '../transport/rpc-operation-sender'
 import type { RpcResponse } from '../transport/types'
 import { jiraConnectionStatusSchema } from './jira-reply-schema'
@@ -24,10 +23,7 @@ const DISCONNECTED: MobileJiraConnection = {
 export function extractJiraConnection(result: unknown): MobileJiraConnection {
   const decoded = jiraConnectionStatusSchema.safeParse(result)
   if (!decoded.success) {
-    return {
-      ...DISCONNECTED,
-      unavailableReason: `Update ${APP_DISPLAY_NAME} desktop to browse Jira on mobile.`
-    }
+    return { ...DISCONNECTED, unavailableReason: 'Update Orca desktop to browse Jira on mobile.' }
   }
   const status = decoded.data
   const credentialError = status.credentialError?.trim() || null

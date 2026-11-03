@@ -9,17 +9,15 @@ import {
   type ProfileStateStoreFactoryOptions,
   type ProfileStateStoreFactoryResult
 } from './profile-state-store-factory'
-import { ProfileStateWorkerAuthority } from './profile-state-worker-authority'
+import {
+  ProfileStateWorkerAuthority,
+  type ProfileStateWorkerAuthorityOptions
+} from './profile-state-worker-authority'
 
-/** Publish live state only after its exact bootstrap revision has a worker owner. */
+/** Publish state only after a worker owns its exact bootstrap revision. */
 export async function createLiveProfileStateStore(
   options: ProfileStateStoreFactoryOptions,
-  workerOptions: {
-    workerPath?: string
-    backupWorkerPath?: string
-    onFailure?: (error: Error) => void
-    onSaveDelayChanged?: (delayed: boolean) => void
-  } = {}
+  workerOptions: ProfileStateWorkerAuthorityOptions = {}
 ): Promise<ProfileStateStoreFactoryResult> {
   // Back up before bootstrap opens/migrates SQLite or Store normalizes and schedules writes.
   // A fresh/JSON-only profile has no SQLite state yet; its import owns source preservation.
@@ -50,7 +48,7 @@ export async function createLiveProfileStateStore(
   }
   const { initialState: initial, ...prepared } = prepareProfileStateStore(options)
 
-  // Consume before retirement: the bootstrap snapshot carries the original revision fence.
+  // Consume before retirement to preserve the bootstrap revision fence.
   const parsed = initial.takeParsedState?.()
   const serializedState = initial.serializedState
   const authority = new ProfileStateWorkerAuthority(

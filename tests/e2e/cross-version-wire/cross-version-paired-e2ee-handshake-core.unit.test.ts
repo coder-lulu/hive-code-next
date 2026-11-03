@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { E2EEChannel as CurrentChannel } from '../../../src/main/runtime/rpc/e2ee-channel'
 import { createPairedE2EEClientHandshake } from '../../../src/shared/paired-e2ee-client-handshake'
 import { NODE_PAIRED_E2EE_PRIMITIVES } from '../../../src/shared/paired-e2ee-node-primitives'
-import { remoteRuntimeClientCapabilities } from '../../../src/shared/remote-runtime-client-capabilities'
+import { remoteRuntimeClientCapabilities } from '../../../src/shared/remote-runtime/remote-runtime-client-capabilities'
 import type { MOBILE_E2EE_LEGACY_FIXTURE } from '../../../src/shared/mobile-e2ee-legacy-fixtures'
 import {
   importReleaseCheckoutModule,
@@ -11,11 +11,7 @@ import {
   resolveBaselineReleaseRef
 } from './release-checkout'
 
-/**
- * Preserve historical release wire evidence while proving that the current Hive
- * host refuses those retired pairing credentials. Current Hive session acceptance
- * is covered by the runtime E2EE/current-wire security suites.
- */
+// Shared handshake-core refactoring must preserve authentication in both directions against real released peers.
 const SUITE_TIMEOUT_MS = 180_000
 
 type ChannelLike = {
@@ -168,57 +164,45 @@ describe('cross-version: shared paired E2EE handshake core', () => {
     await coreClientRoundTrip(ReleasedChannel, 'v2')
   })
 
-  it('authenticates current v2 framing through the explicit device owner', async () => {
+  it('authenticates against this host with both framings', async () => {
+    await coreClientRoundTrip(CurrentChannelConstructor, 'legacy')
     await coreClientRoundTrip(CurrentChannelConstructor, 'v2')
   })
 
-  it('refuses legacy framing on the current Hive host', () => {
-    const { channel, sent, onReady, onError } = hostChannel(CurrentChannelConstructor)
-    try {
-      const handshake = createPairedE2EEClientHandshake({
-        primitives: NODE_PAIRED_E2EE_PRIMITIVES,
-        hostPublicKeyB64,
-        framing: 'legacy',
-        transport: 'direct'
-      })
-      channel.handleRawMessage(handshake.helloText())
-      expect(sent).toEqual([])
-      expect(onReady).not.toHaveBeenCalled()
-      expect(onError).toHaveBeenCalledWith(4001, 'Invalid E2EE handshake')
-    } finally {
-      channel.destroy()
-    }
-  })
-
-  it('refuses a released runtime client instead of falling back to its credentials', () => {
+  it('keeps the released runtime client authenticating against this host', () => {
     const { channel, sent, onReady, onError } = hostChannel(CurrentChannelConstructor)
     const client = releasedCrypto.generateKeyPair()
     const sharedKey = releasedCrypto.deriveSharedKey(client.secretKey, host.publicKey)
-    try {
-      channel.handleRawMessage(
+    // The released runtime transports wrote exactly this hello and auth.
+    channel.handleRawMessage(
+      JSON.stringify({
+        type: 'e2ee_hello',
+        publicKeyB64: Buffer.from(client.publicKey).toString('base64')
+      })
+    )
+    expect(JSON.parse(String(sent[0]))).toEqual({ type: 'e2ee_ready' })
+    channel.handleRawMessage(
+      releasedCrypto.encrypt(
         JSON.stringify({
-          type: 'e2ee_hello',
-          publicKeyB64: Buffer.from(client.publicKey).toString('base64')
-        })
+          type: 'e2ee_auth',
+          deviceToken: 'device-token',
+          clientCapabilities: remoteRuntimeClientCapabilities()
+        }),
+        sharedKey
       )
-      channel.handleRawMessage(
-        releasedCrypto.encrypt(
-          JSON.stringify({
-            type: 'e2ee_auth',
-            deviceToken: 'device-token',
-            clientCapabilities: remoteRuntimeClientCapabilities()
-          }),
-          sharedKey
-        )
-      )
-      channel.handleRawMessage(
-        releasedCrypto.encrypt(JSON.stringify({ id: 'r1', method: 'status.get' }), sharedKey)
-      )
-      expect(sent).toEqual([])
-      expect(onReady).not.toHaveBeenCalled()
-      expect(onError).toHaveBeenCalledWith(4001, 'Invalid E2EE handshake')
-    } finally {
-      channel.destroy()
-    }
+    )
+    expect(onError).not.toHaveBeenCalled()
+    expect(onReady).toHaveBeenCalledOnce()
+    expect(JSON.parse(releasedCrypto.decrypt(String(sent[1]), sharedKey)!)).toEqual({
+      type: 'e2ee_authenticated'
+    })
+    channel.handleRawMessage(
+      releasedCrypto.encrypt(JSON.stringify({ id: 'r1', method: 'status.get' }), sharedKey)
+    )
+    expect(JSON.parse(releasedCrypto.decrypt(String(sent[2]), sharedKey)!)).toMatchObject({
+      id: 'r1',
+      ok: true
+    })
+    channel.destroy()
   })
 })

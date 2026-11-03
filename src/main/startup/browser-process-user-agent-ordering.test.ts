@@ -1,30 +1,18 @@
-import { beforeAll, describe, expect, it, vi } from 'vitest'
-import { APP_DISPLAY_NAME } from '../../shared/brand'
+import { describe, expect, it, vi } from 'vitest'
+import { runMainProcessPreflight } from './main-process-preflight'
 
-const mocks = await vi.hoisted(async () => {
-  const { APP_DISPLAY_NAME } = await import('../../shared/brand')
-  const appName = `${APP_DISPLAY_NAME} Development`
-  let currentName: string = APP_DISPLAY_NAME
-  const paths = new Map([
-    ['appData', 'C:\\Users\\fixture\\AppData\\Roaming'],
-    ['userData', '/canonical-user-data']
-  ])
+const mocks = vi.hoisted(() => {
   const events: string[] = []
-  // Why a multi-word app token: this file sets the configured dev app name, and Electron
-  // builds the app token from that name. A single-token fixture could not exhibit the multi-word
-  // leak the cleaner exists to handle, so it disagreed with the scenario it set up.
-  // Why the engine comment: a real app.userAgentFallback always carries it, and the cleaner only
-  // touches identities that do — a fixture without it models a string Electron cannot produce.
-  let userAgent = `Mozilla/5.0 (Test) AppleWebKit/537.36 (KHTML, like Gecko) ${appName}/0.0.0 Chrome/150.0.0.0 Electron/43.0.0 Safari/537.36`
+  // Use a two-word app token to expose partial removal; retain the engine identity required by the real cleaner.
+  let userAgent =
+    'Mozilla/5.0 (Test) AppleWebKit/537.36 (KHTML, like Gecko) Orca Development/0.0.0 Chrome/150.0.0.0 Electron/43.0.0 Safari/537.36'
   const app = {
     isPackaged: false,
     exit: vi.fn(),
-    // Real `app` always carries this; preflight reads it to decide the Linux keyring backend.
+    // Preflight reads commandLine to select the Linux keyring backend.
     commandLine: { hasSwitch: vi.fn(() => false), appendSwitch: vi.fn() },
     getVersion: vi.fn(() => '1.0.0'),
-    getPath: vi.fn((name: string) => paths.get(name) ?? '/canonical-user-data'),
-    setPath: vi.fn((name: string, value: string) => paths.set(name, value)),
-    getName: vi.fn(() => currentName),
+    getPath: vi.fn(() => '/canonical-user-data'),
     get userAgentFallback(): string {
       events.push('read-user-agent')
       return userAgent
@@ -39,13 +27,11 @@ const mocks = await vi.hoisted(async () => {
     }),
     whenReady: vi.fn(() => Promise.resolve()),
     setName: vi.fn((name: string) => {
-      currentName = name
       events.push(`set-name:${name}`)
     })
   }
   return {
     app,
-    appName,
     events,
     userAgent: () => userAgent,
     showErrorBox: vi.fn(),
@@ -70,7 +56,6 @@ vi.mock('electron', () => ({
 vi.mock('../window/foreground-activation-policy', () => ({
   isBackgroundLaunch: mocks.backgroundLaunch
 }))
-vi.mock('@electron-toolkit/utils', () => ({ is: { dev: true } }))
 vi.mock('./cli-launch-redirect', () => ({
   maybeRedirectCliLaunch: () => ({ redirected: false, status: 0 })
 }))
@@ -97,8 +82,6 @@ vi.mock('./main-process-error-guards', () => ({
 }))
 vi.mock('./hydrate-shell-path')
 vi.mock('../runtime/remote-server-updater', () => ({ configureRemoteServerUpdater: vi.fn() }))
-// This scenario never calls the updater callback; keep its window/IPC graph out of preflight.
-vi.mock('../window/attach-main-window-services', () => ({ ensureAutoUpdaterConfigured: vi.fn() }))
 vi.mock('../updater', () => ({
   getRemoteServerUpdaterSnapshot: vi.fn(),
   checkForRemoteServerUpdate: vi.fn(),
@@ -109,7 +92,7 @@ vi.mock('../updater', () => ({
 vi.mock('./dev-instance-identity', () => ({
   getDevInstanceIdentity: () => ({
     isDev: true,
-    appName: mocks.appName,
+    appName: 'Orca Development',
     appUserModelId: 'com.orca.development'
   }),
   shouldApplyPreReadyAppName: () => true
@@ -152,7 +135,7 @@ vi.mock('../../shared/secret-store', () => ({
   }
 }))
 vi.mock('../host/electron-secret-store')
-vi.mock('../ipc/pty-host-bindings')
+vi.mock('../ipc/pty/pty-host-bindings')
 vi.mock('../host/electron-runtime-desktop-surface')
 vi.mock('../runtime/runtime-desktop-surface')
 vi.mock('../host/electron-browser-commands')
@@ -162,7 +145,13 @@ vi.mock('../network/http-client')
 vi.mock('../host/electron-speech-services')
 vi.mock('../speech/speech-runtime-service')
 vi.mock('../ipc/worktree-watcher-removal')
-vi.mock('../ipc/filesystem-watcher')
+vi.mock('../ipc/filesystem/watchers/filesystem-watcher', () => ({
+  desktopWorktreeWatcherRemoval: {
+    closeLocal: vi.fn(),
+    restoreLocal: vi.fn(),
+    forgetLocal: vi.fn()
+  }
+}))
 vi.mock('../network/proxy-settings')
 vi.mock('../persistence', () => ({
   initDataPath: () => mocks.events.push('init-data-path'),
@@ -218,14 +207,8 @@ vi.mock('../browser/browser-identity-mode-store', () => ({
   }
 }))
 
-beforeAll(async () => {
-  // Load the production graph within setup; admission tests keep their original runtime budget.
-  await import('./main-process-preflight')
-})
-
 describe('browser process user-agent startup ordering', () => {
   it('explains admission refusal before a desktop launch exits', async () => {
-    const { runMainProcessPreflight } = await import('./main-process-preflight')
     const platform = vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
     mocks.backgroundLaunch.mockReturnValueOnce(false)
     mocks.admission.mockImplementationOnce(() => {
@@ -237,7 +220,7 @@ describe('browser process user-agent startup ordering', () => {
         runMainProcessPreflight({ focusExistingWindow: vi.fn(), requestDesktopActivation: vi.fn() })
       ).toBe(false)
       expect(mocks.showErrorBox).toHaveBeenCalledWith(
-        `${APP_DISPLAY_NAME} could not start`,
+        'Orca could not start',
         expect.stringContaining('Stop Orca and orcad before retrying profile recovery')
       )
       expect(mocks.app.isReady).not.toHaveBeenCalled()
@@ -250,7 +233,6 @@ describe('browser process user-agent startup ordering', () => {
   })
 
   it('explains an orcad holding the profile instead of exiting silently', async () => {
-    const { runMainProcessPreflight } = await import('./main-process-preflight')
     const platform = vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
     mocks.backgroundLaunch.mockReturnValueOnce(false)
     mocks.profileLock.mockReturnValueOnce({ state: 'held', message: 'Another orcad (pid 7)' })
@@ -262,7 +244,7 @@ describe('browser process user-agent startup ordering', () => {
         runMainProcessPreflight({ focusExistingWindow: vi.fn(), requestDesktopActivation: vi.fn() })
       ).toBe(false)
       expect(mocks.showErrorBox).toHaveBeenCalledWith(
-        `${APP_DISPLAY_NAME} could not start`,
+        'Orca could not start',
         'Another orcad (pid 7)'
       )
       expect(mocks.app.exit.mock.calls).toEqual([[3]])
@@ -277,7 +259,6 @@ describe('browser process user-agent startup ordering', () => {
   })
 
   it('does not acquire profile admission for a duplicate launch', async () => {
-    const { runMainProcessPreflight } = await import('./main-process-preflight')
     mocks.events.length = 0
     mocks.lock.mockReturnValueOnce(false)
     expect(
@@ -292,7 +273,6 @@ describe('browser process user-agent startup ordering', () => {
   it('executes after the dev app name and before later preflight work', async () => {
     const { getBrowserProcessUserAgentIdentity } =
       await import('../browser/browser-process-user-agent')
-    const { runMainProcessPreflight } = await import('./main-process-preflight')
 
     expect(
       runMainProcessPreflight({
@@ -301,7 +281,7 @@ describe('browser process user-agent startup ordering', () => {
       })
     ).toBe(false)
 
-    const nameIndex = mocks.events.indexOf(`set-name:${mocks.appName}`)
+    const nameIndex = mocks.events.indexOf('set-name:Orca Development')
     const modeIndex = mocks.events.indexOf('read-mode:/canonical-user-data')
     const writeIndex = mocks.events.indexOf('write-user-agent')
     const continuationIndex = mocks.events.indexOf('continued-after-browser-identity')
@@ -317,14 +297,11 @@ describe('browser process user-agent startup ordering', () => {
       mode: 'clean',
       userAgent: mocks.userAgent()
     })
-    // Every app-name word must be gone; a single \S+ would leave the configured product name.
     expect(mocks.userAgent()).not.toMatch(/Electron/)
     expect(mocks.userAgent()).not.toMatch(/Orca|Development/)
-    expect(mocks.userAgent()).not.toContain(APP_DISPLAY_NAME)
   })
 
   it('exits without reading profile state or revealing a window when recovery holds admission', async () => {
-    const { runMainProcessPreflight } = await import('./main-process-preflight')
     mocks.events.length = 0
     mocks.admission.mockImplementationOnce(() => {
       throw new Error('Profile recovery is in progress')
@@ -337,7 +314,7 @@ describe('browser process user-agent startup ordering', () => {
       expect(mocks.app.exit).toHaveBeenCalledWith(1)
       expect(mocks.events).toEqual([
         'init-data-path',
-        `set-name:${mocks.appName}`,
+        'set-name:Orca Development',
         'single-instance-lock',
         'admission:/canonical-user-data'
       ])
@@ -360,7 +337,6 @@ it('exits and releases admission after pending profile move recovery fails', asy
   mocks.recoverMoves.mockImplementationOnce(() => {
     throw new Error('unreadable move journal')
   })
-  const { runMainProcessPreflight } = await import('./main-process-preflight')
   expect(
     runMainProcessPreflight({ focusExistingWindow: vi.fn(), requestDesktopActivation: vi.fn() })
   ).toBe(false)
@@ -370,7 +346,6 @@ it('exits and releases admission after pending profile move recovery fails', asy
 })
 
 it('defers a Linux desktop startup failure until Electron is ready', async () => {
-  const { runMainProcessPreflight } = await import('./main-process-preflight')
   const { resetBrowserProcessUserAgentForTests } =
     await import('../browser/browser-process-user-agent')
   resetBrowserProcessUserAgentForTests()
@@ -400,9 +375,10 @@ it('defers a Linux desktop startup failure until Electron is ready', async () =>
 
     resolveReady?.()
     await ready
-    await Promise.resolve()
+    // The dialog waits for the async system-language catalog after ready.
+    await vi.waitFor(() => expect(mocks.app.exit).toHaveBeenCalled())
     expect(mocks.showErrorBox).toHaveBeenCalledWith(
-      `${APP_DISPLAY_NAME} could not start`,
+      'Orca could not start',
       expect.stringContaining('Linux pre-ready failure')
     )
     expect(mocks.app.exit).toHaveBeenCalledWith(1)
@@ -414,7 +390,6 @@ it('defers a Linux desktop startup failure until Electron is ready', async () =>
 })
 
 it('exits after a Linux desktop readiness rejection without showing a dialog', async () => {
-  const { runMainProcessPreflight } = await import('./main-process-preflight')
   const { resetBrowserProcessUserAgentForTests } =
     await import('../browser/browser-process-user-agent')
   resetBrowserProcessUserAgentForTests()
@@ -451,7 +426,6 @@ it('exits after a Linux desktop readiness rejection without showing a dialog', a
 })
 
 it('keeps Linux background startup failures console-only and immediate', async () => {
-  const { runMainProcessPreflight } = await import('./main-process-preflight')
   const { resetBrowserProcessUserAgentForTests } =
     await import('../browser/browser-process-user-agent')
   resetBrowserProcessUserAgentForTests()
@@ -481,7 +455,6 @@ it('keeps Linux background startup failures console-only and immediate', async (
 })
 
 it('keeps Linux serve startup failures console-only and immediate', async () => {
-  const { runMainProcessPreflight } = await import('./main-process-preflight')
   const { resetBrowserProcessUserAgentForTests } =
     await import('../browser/browser-process-user-agent')
   resetBrowserProcessUserAgentForTests()

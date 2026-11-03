@@ -9,6 +9,8 @@ export type WslRelayDistroState = {
   guestHome?: string
   codexHomePath?: string
   guestEndpointFilePath?: string
+  claudeAgentViewDir?: string
+  claudeConfigDir?: string
   opencodeOverlayDir?: string
   opencode2OverlayDir?: string
   piAgentDir?: string
@@ -26,3 +28,15 @@ export type WslRelayDistroState = {
   lastAttemptOpenCodeSettings?: string
   lastInstallMux?: SshChannelMultiplexer
 }
+
+/** The config a relay served, kept across a stopped-distro drop so its restart brings it all back. */
+export type WslRelayRestartSetup = Pick<
+  WslRelayDistroState,
+  | 'codexHomePath'
+  | 'claudeAgentViewDir'
+  | 'claudeConfigDir'
+  | 'opencodeOverlayDir'
+  | 'opencode2OverlayDir'
+  | 'piAgentDir'
+  | 'ompStatusExtension'
+> & { launchKinds: readonly ('pi' | 'omp')[] }

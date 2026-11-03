@@ -50,7 +50,7 @@ it('publishes the provider child startup phase, not which child it is', async ()
   const feed = new StructuredAgentSessionStatusFeed({
     logger: createStructuredAgentSessionLogger(),
     sessions,
-    getRecord: () => null,
+    getConversation: () => null,
     now: () => 1
   })
   const dispose = feed.subscribe({ id: 'list-1', emit: (event) => events.push(event) })
@@ -61,7 +61,6 @@ it('publishes the provider child startup phase, not which child it is', async ()
   const published = events.length
   setChild({ phase: 'starting', generation: 'child-2', fence: 2 })
   feed.publish(SESSION, journal)
-  // A replacement child no session list can tell apart is not re-sent to every subscriber.
   expect(events).toHaveLength(published)
   setChild({ phase: 'ready', generation: 'child-2', fence: 2 })
   feed.publish(SESSION, journal)

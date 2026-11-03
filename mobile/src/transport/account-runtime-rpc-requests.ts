@@ -1,5 +1,5 @@
 import type { HiveAccountRelayPool } from '../../../src/shared/hive-account-relay-pool'
-import { serializeRemoteRuntimePayload } from '../../../src/shared/remote-runtime-memory-limits'
+import { serializeRemoteRuntimePayload } from '../../../src/shared/remote-runtime/remote-runtime-memory-limits'
 import type { AccountRuntimeStream } from './account-runtime-rpc-stream'
 import type { RpcResponse } from './types'
 import { markRpcDeliveryUnknown } from './rpc-delivery-ambiguity'

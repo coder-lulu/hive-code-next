@@ -5,9 +5,9 @@ import {
   writeDataFile,
   readDataFile,
   collectPropertyPaths,
-  makeRepo,
-  makeTerminalTab
-} from './persistence-test-harness'
+  makeRepo
+} from './persistence/persistence-test-harness'
+import { makeTerminalTab } from './persistence/persistence-session-fixtures'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { writeFileSync, rmSync, mkdtempSync } from 'node:fs'
 import { join } from 'node:path'
@@ -262,7 +262,7 @@ describe('Store', () => {
     expect(persisted.settings).not.toHaveProperty('terminalScrollbackBytes')
   })
 
-  it('migrates legacy terminal scrollback byte presets by intent', async () => {
+  it('ignores retired byte presets and persists the current row default', async () => {
     writeDataFile({
       settings: {
         terminalScrollbackBytes: 25_000_000
@@ -271,11 +271,11 @@ describe('Store', () => {
 
     const store = await createStore()
 
-    expect(store.getSettings().terminalScrollbackRows).toBe(10_000)
+    expect(store.getSettings().terminalScrollbackRows).toBe(5_000)
 
     store.flush()
     const persisted = readDataFile() as { settings?: Record<string, unknown> }
-    expect(persisted.settings?.terminalScrollbackRows).toBe(10_000)
+    expect(persisted.settings?.terminalScrollbackRows).toBe(5_000)
     expect(persisted.settings).not.toHaveProperty('terminalScrollbackBytes')
   })
 
@@ -345,7 +345,7 @@ describe('Store', () => {
     expect(persisted.settings).not.toHaveProperty('terminalScrollbackBytes')
   })
 
-  it('retires the persisted GitHub attribution setting without dropping unknown settings', async () => {
+  it('retires the persisted GitHub attribution setting and unknown fields outside the current schema', async () => {
     const settledStore = await createStore()
     settledStore.flush()
     const settled = readDataFile() as { settings: Record<string, unknown> }
@@ -358,7 +358,7 @@ describe('Store', () => {
       const store = await createStore()
 
       expect(store.getSettings()).not.toHaveProperty('enableGitHubAttribution')
-      expect(store.getSettings()).toHaveProperty('futureSetting', { enabled: true })
+      expect(store.getSettings()).not.toHaveProperty('futureSetting')
       vi.advanceTimersByTime(5_000)
       await store.waitForPendingWrite()
     } finally {
@@ -366,7 +366,7 @@ describe('Store', () => {
     }
     const persisted = readDataFile() as { settings?: Record<string, unknown> }
     expect(persisted.settings).not.toHaveProperty('enableGitHubAttribution')
-    expect(persisted.settings).toHaveProperty('futureSetting', { enabled: true })
+    expect(persisted.settings).not.toHaveProperty('futureSetting')
   })
 
   it('ignores retired GitHub attribution updates and strips stale in-memory values on save', async () => {
@@ -380,13 +380,13 @@ describe('Store', () => {
 
     expect(updated).not.toHaveProperty('enableGitHubAttribution')
     expect(listener).not.toHaveBeenCalled()
-    const settings = store.getSettings() as GlobalSettings & Record<string, unknown>
-    settings.enableGitHubAttribution = false
-    settings.futureSetting = 'kept'
+    const settings = store.getSettings()
+    Reflect.set(settings, 'enableGitHubAttribution', false)
+    Reflect.set(settings, 'futureSetting', 'dropped')
     store.flush()
     const persisted = readDataFile() as { settings?: Record<string, unknown> }
     expect(persisted.settings).not.toHaveProperty('enableGitHubAttribution')
-    expect(persisted.settings?.futureSetting).toBe('kept')
+    expect(persisted.settings).not.toHaveProperty('futureSetting')
   })
 
   it('normalizes terminal cursor style before persistence and listener broadcasts', async () => {
@@ -401,7 +401,7 @@ describe('Store', () => {
     )
 
     expect(invalid.terminalCursorStyle).toBe('block')
-    expect(invalid.terminalCursorStyleDefaultedToBlock).toBe(true)
+    expect(Object.hasOwn(invalid, 'terminalCursorStyleDefaultedToBlock')).toBe(false)
     expect(listener).toHaveBeenCalledWith(
       {
         terminalCursorStyle: 'block'
@@ -436,7 +436,7 @@ describe('Store', () => {
     )
     const store = await createStore()
 
-    expect(store.getSettings().disabledTuiAgents).toEqual(['codex', 'claude', 'claude-agent-teams'])
+    expect(store.getSettings().disabledTuiAgents).toEqual(['codex', 'claude'])
 
     const updated = store.updateSettings({
       disabledTuiAgents: ['gemini', 'not-real', 'gemini', 'opencode'] as never
@@ -448,48 +448,9 @@ describe('Store', () => {
     const store = await createStore()
 
     expect(store.getSettings().disabledTuiAgents).toEqual([])
-    expect(store.getSettings().claudeAgentTeamsDefaultDisabledMigrated).toBe(true)
-  })
-
-  it('migrates yolo default args onto untouched agent launch settings', async () => {
-    writeFileSync(
-      join(testState.dir, 'orca-data.json'),
-      JSON.stringify({
-        settings: {
-          agentCmdOverrides: {}
-        }
-      })
+    expect(Object.hasOwn(store.getSettings(), 'claudeAgentTeamsDefaultDisabledMigrated')).toBe(
+      false
     )
-    const store = await createStore()
-
-    expect(store.getSettings().agentDefaultArgs).toMatchObject({
-      claude: '--dangerously-skip-permissions',
-      codex: '--dangerously-bypass-approvals-and-sandbox',
-      cursor: '--yolo'
-    })
-    expect(store.getSettings().agentDefaultEnv).toMatchObject({
-      goose: { GOOSE_MODE: 'auto' }
-    })
-    expect(store.getSettings().agentYoloDefaultsMigrated).toBe(true)
-  })
-
-  it('does not add yolo defaults for legacy agents with command overrides', async () => {
-    writeFileSync(
-      join(testState.dir, 'orca-data.json'),
-      JSON.stringify({
-        settings: {
-          agentCmdOverrides: {
-            codex: 'codex --profile work',
-            goose: 'goose'
-          }
-        }
-      })
-    )
-    const store = await createStore()
-
-    expect(store.getSettings().agentDefaultArgs?.codex).toBe('')
-    expect(store.getSettings().agentDefaultEnv?.goose).toEqual({})
-    expect(store.getSettings().agentDefaultArgs?.claude).toBe('--dangerously-skip-permissions')
   })
 
   it('removes unsupported TUI skip-permissions args from migrated profiles', async () => {
@@ -538,7 +499,7 @@ describe('Store', () => {
     expect(store.updateSettings({ appIcon: 'not-real' as never }).appIcon).toBe('classic')
   })
 
-  it('updateSettings keeps the legacy commit-message AI projection in sync', async () => {
+  it('updateSettings persists current source-control instructions and model choices without a retired projection', async () => {
     const store = await createStore()
     const current = store.getSettings().sourceControlAi!
 
@@ -557,47 +518,38 @@ describe('Store', () => {
       }
     })
 
-    expect(updated.commitMessageAi).toMatchObject({
+    expect(updated.sourceControlAi).toMatchObject({
       enabled: true,
       agentId: 'codex',
       selectedModelByAgent: { codex: 'gpt-5.4' },
       selectedThinkingByModel: { 'gpt-5.4': 'high' },
-      customPrompt: 'Write concise commit messages.',
+      instructionsByOperation: {
+        commitMessage: 'Write concise commit messages.',
+        pullRequest: 'Write release-note-ready PR details.'
+      },
       customAgentCommand: ''
     })
+    expect(Object.hasOwn(updated, 'commitMessageAi')).toBe(false)
+    store.flush()
+    const reopened = await createStore()
+    expect(reopened.getSettings().sourceControlAi).toEqual(updated.sourceControlAi)
   })
 
-  it('updateSettings keeps source-control AI in sync for legacy commit-message updates', async () => {
+  it('ignores retired source-control updates while persisting a current user choice', async () => {
     const store = await createStore()
-    const current = store.getSettings().commitMessageAi!
-
-    const updated = store.updateSettings({
-      commitMessageAi: {
-        ...current,
-        enabled: false,
-        agentId: 'claude',
-        selectedModelByAgent: { claude: 'sonnet' },
-        selectedThinkingByModel: { sonnet: 'medium' },
-        customPrompt: 'Legacy settings update',
-        customAgentCommand: 'claude'
-      }
-    })
-
-    expect(updated.sourceControlAi).toMatchObject({
-      enabled: false,
-      agentId: 'claude',
-      selectedModelByAgent: {},
-      selectedThinkingByModel: {},
-      customAgentCommand: 'claude',
-      instructionsByOperation: {
-        commitMessage: 'Legacy settings update',
-        branchName: 'Legacy settings update'
-      }
-    })
-    expect(updated.sourceControlAi?.modelOverridesByOperation?.commitMessage).toEqual({
-      selectedModelByAgent: { claude: 'sonnet' },
-      selectedThinkingByModel: { sonnet: 'medium' }
-    })
+    const current = store.getSettings().sourceControlAi
+    const rawUpdate = {
+      theme: 'dark' as const,
+      commitMessageAi: { enabled: false, agentId: 'claude', customPrompt: 'Retired prompt' }
+    }
+    const updated = store.updateSettings(rawUpdate)
+    expect(updated.theme).toBe('dark')
+    expect(updated.sourceControlAi).toEqual(current)
+    expect(Object.hasOwn(updated, 'commitMessageAi')).toBe(false)
+    store.flush()
+    const reopened = await createStore()
+    expect(reopened.getSettings().sourceControlAi).toEqual(current)
+    expect(Object.hasOwn(reopened.getSettings(), 'commitMessageAi')).toBe(false)
   })
 
   it('updateSettings normalizes open-in applications', async () => {

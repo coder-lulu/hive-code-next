@@ -1,37 +1,16 @@
-import type { HostSectionRow } from '../../host-section-rows'
-import { getFolderWorkspaceHostId } from '../../folder-workspace-host-id'
-import { composeWorktreeHostIdentity } from '../../../../../../shared/worktree/host-qualified-identity'
-import { folderWorkspaceKey } from '../../../../../../shared/workspace-scope'
-import {
-  LOCAL_EXECUTION_HOST_ID,
-  type ExecutionHostId
-} from '../../../../../../shared/execution-host'
+import type { HostSectionRow } from '../../../../../../shared/sidebar-list/host-section-rows'
 
 type WorktreeItemRow = Extract<HostSectionRow, { type: 'item' }>
 export type RenderRow =
   | HostSectionRow
   | { type: 'lineage-group'; key: string; rows: WorktreeItemRow[] }
 
-export function getFolderWorkspaceSidebarRowKey(
-  row: Extract<HostSectionRow, { type: 'folder-workspace' }>,
-  defaultHostId: ExecutionHostId
-): string {
-  return composeWorktreeHostIdentity(
-    getFolderWorkspaceHostId(row.folderWorkspace, row.projectGroup, defaultHostId),
-    folderWorkspaceKey(row.folderWorkspace.id)
-  )
-}
-
-export function getRenderRowKey(
-  row: RenderRow,
-  defaultHostId: ExecutionHostId = LOCAL_EXECUTION_HOST_ID
-): string {
+export function getRenderRowKey(row: RenderRow): string {
   if (row.type === 'host-header') {
     return `host:${row.hostId}`
   }
   if (row.type === 'header') {
-    const key = row.renderKey ?? row.key
-    return row.hostId ? `hdr:${row.hostId}:${key}` : `hdr:${key}`
+    return row.hostId ? `hdr:${row.hostId}:${row.key}` : `hdr:${row.key}`
   }
   if (row.type === 'lineage-group') {
     return `lineage-group:${row.key}`
@@ -46,7 +25,7 @@ export function getRenderRowKey(
     return `pending:${row.creationId}`
   }
   if (row.type === 'folder-workspace') {
-    return `folder-workspace:${getFolderWorkspaceSidebarRowKey(row, defaultHostId)}`
+    return row.key
   }
   return `wt:${row.rowKey}`
 }

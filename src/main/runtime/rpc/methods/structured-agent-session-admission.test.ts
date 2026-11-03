@@ -31,8 +31,8 @@ afterEach(() => {
   clearStructuredHostStub()
 })
 
-const SETTING_OFF = { getClientSettings: () => ({ experimentalNativeChat: false }) }
-const SETTING_ON = { getClientSettings: () => ({ experimentalNativeChat: true }) }
+const SETTING_OFF = { getClientSettings: () => ({ nativeChatProviders: { codex: false } }) }
+const SETTING_ON = { getClientSettings: () => ({ nativeChatProviders: {} }) }
 // A client that picks each launch's mode itself, as the desktop does.
 const MODE_CHOOSING_CLIENT = {
   ...STRUCTURED_CLIENT,
@@ -224,4 +224,32 @@ describe("createSupport's launch seed", () => {
     expect(response).not.toMatchObject({ result: { seedOptions: expect.anything() } })
     expect(seedOptions).not.toHaveBeenCalled()
   })
+})
+
+// The legacy picker must ask for the requested provider, not a global switch.
+describe('current provider preference admission', () => {
+  it.each([
+    [{}, true],
+    [{ nativeChatProviders: { codex: false } }, false],
+    [{ nativeChatProviders: { claude: false } }, true],
+    [null, false],
+    [undefined, false],
+    [false, false],
+    [[], false],
+    [{ nativeChatProviders: false }, false],
+    [{ nativeChatProviders: { codex: 'false' } }, false]
+  ])(
+    'reads known settings %j without inventing a default for unknown state',
+    async (settings, admitted) => {
+      const response = await call(CREATE_SUPPORT.method, CREATE_SUPPORT.params, RELEASED_PHONE, {
+        getClientSettings: () => settings
+      })
+      expect(response).toMatchObject(
+        admitted ? { ok: true, result: { supported: true } } : { ok: false, error: UNSUPPORTED }
+      )
+      expect(runtimeCalls.getStructuredAgentSessionCreateSupport).toHaveBeenCalledTimes(
+        admitted ? 1 : 0
+      )
+    }
+  )
 })

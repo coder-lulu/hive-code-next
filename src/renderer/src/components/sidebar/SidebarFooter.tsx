@@ -89,7 +89,7 @@ const SidebarFooter = React.memo(function SidebarFooter() {
   const updateCheckModifiersRef = React.useRef(NO_UPDATE_CHECK_MODIFIERS)
   const showActivity = shouldShowAgentsButton(settings)
   const showMobile = shouldShowMobileButton(accountState)
-  const notificationUnreadCount = useActivityUnreadCount(showActivity, 'sidebar-badge')
+  const notificationUnreadCount = useActivityUnreadCount()
   const mobileOnboardingBadge = useMobileSidebarOnboardingBadge(showMobile)
   const connected = accountState?.status === 'signed-in'
   React.useEffect(() => {
@@ -432,7 +432,7 @@ const SidebarFooter = React.memo(function SidebarFooter() {
           ? error.code === 'STEP_UP_REQUIRED'
             ? translate(
                 'components.sidebarAccount.runtimeClaimStepUp',
-                'Verify your account again before claiming this computer.'
+                'Re-authenticate your account before claiming this computer.'
               )
             : error.code === 'ACCOUNT_CHANGED'
               ? translate(
@@ -441,11 +441,11 @@ const SidebarFooter = React.memo(function SidebarFooter() {
                 )
               : translate(
                   'components.sidebarAccount.runtimeClaimFailed',
-                  "Couldn't claim this computer. Try again from this device."
+                  "Couldn't claim this computer. Try again on this computer."
                 )
           : translate(
               'components.sidebarAccount.runtimeClaimFailed',
-              "Couldn't claim this computer. Try again from this device."
+              "Couldn't claim this computer. Try again on this computer."
             )
       setClaimErrorMessage(message)
       toast.error(message)

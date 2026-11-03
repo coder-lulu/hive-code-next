@@ -23,7 +23,6 @@ type MockState = {
   activeContextualTourId: string | null
   settings?: {
     agentsSidebarIntroShown?: boolean
-    agentsSidebarMigratedFromExperimental?: boolean
   }
 }
 
@@ -112,7 +111,7 @@ describe('SidebarHeader', () => {
     })
 
     expect(container.querySelector('[aria-label="New workspace"]')).toBeNull()
-    expect(container.querySelector('[aria-label="Add Project"]')).toBeNull()
+    expect(container.querySelector('[aria-label="Add project"]')).toBeNull()
   })
 
   it('opens agent activity from the bell button', () => {
@@ -132,16 +131,7 @@ describe('SidebarHeader', () => {
     expect(mockState.setSidebarBody).toHaveBeenCalledWith('agents')
   })
 
-  it('shows the Agents introduction only for migrated users and never offers a hide action', () => {
-    mockState.settings = { agentsSidebarMigratedFromExperimental: true }
-    act(() => {
-      root.render(<SidebarHeader onWorkspaceBoardMenuOpenChange={vi.fn()} />)
-    })
-
-    expect(container.querySelector('[data-intro-open]')).toBeTruthy()
-    expect(container.textContent).toContain('Agents are easier to find')
-    expect(container.textContent).not.toContain('Hide Agents')
-
+  it('does not show the retired Agents migration introduction', () => {
     mockState.settings = {}
     act(() => {
       root.render(<SidebarHeader onWorkspaceBoardMenuOpenChange={vi.fn()} />)
@@ -194,7 +184,7 @@ describe('SidebarHeader', () => {
     expect(container.querySelector('[aria-label="Turn off activity view"]')).toBeTruthy()
     expect(container.querySelector('[aria-label="New workspace"]')).toBeNull()
     expect(container.querySelector('[aria-label="Workspace options"]')).toBeNull()
-    expect(container.querySelector('[aria-label="Add Project"]')).toBeNull()
+    expect(container.querySelector('[aria-label="Add project"]')).toBeNull()
   })
 
   it('keeps the activity bell and actions on one row at the default sidebar width', () => {
@@ -207,20 +197,20 @@ describe('SidebarHeader', () => {
     expect(headerClasses.has('flex-wrap')).toBe(false)
     expect(headerClasses.has('h-8')).toBe(true)
     expect(container.querySelector('[aria-label="View activity"]')).toBeTruthy()
-    expect(container.querySelector('[aria-label="Add Project"]')).toBeNull()
+    expect(container.querySelector('[aria-label="Add project"]')).toBeNull()
     expect(container.querySelector('[aria-label="New workspace"]')).toBeNull()
   })
 
-  it('keeps workspace filters in the more menu at compact width', () => {
+  it('keeps workspace filters accessible at compact width', () => {
     mockState.sidebarWidth = 220
     act(() => {
       root.render(<SidebarHeader onWorkspaceBoardMenuOpenChange={vi.fn()} />)
     })
 
-    expect(container.querySelector('[aria-label="Add Project"]')).toBeNull()
+    expect(container.querySelector('[aria-label="Add project"]')).toBeNull()
     expect(container.querySelector('[aria-label="View activity"]')).toBeTruthy()
     expect(container.querySelector('[aria-label="New workspace"]')).toBeNull()
-    expect(container.querySelector('[aria-label="More workspace actions"]')).toBeTruthy()
+    expect(container.querySelector('[aria-label="Workspace options"]')).toBeTruthy()
   })
 
   it('does not reset a persisted agents body before settings hydrate', () => {
@@ -243,18 +233,18 @@ describe('SidebarHeader', () => {
     expect(container.querySelector('[aria-label="Open full Agents view"]')).toBeNull()
   })
 
-  it('switches to compact actions only below the wide-layout breakpoint', () => {
+  it('keeps the two navigation actions available across the former wide-layout breakpoint', () => {
     mockState.sidebarWidth = 234
     act(() => {
       root.render(<SidebarHeader onWorkspaceBoardMenuOpenChange={vi.fn()} />)
     })
-    expect(container.querySelector('[aria-label="More workspace actions"]')).toBeTruthy()
+    expect(container.querySelector('[aria-label="Workspace options"]')).toBeTruthy()
 
     mockState.sidebarWidth = 235
     act(() => {
       root.render(<SidebarHeader onWorkspaceBoardMenuOpenChange={vi.fn()} />)
     })
-    expect(container.querySelector('[aria-label="More workspace actions"]')).toBeNull()
-    expect(container.querySelector('[aria-label="Add Project"]')).toBeNull()
+    expect(container.querySelector('[aria-label="Workspace options"]')).toBeTruthy()
+    expect(container.querySelector('[aria-label="Add project"]')).toBeNull()
   })
 })

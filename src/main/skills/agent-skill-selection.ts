@@ -4,45 +4,49 @@ import {
   AgentSkillSharingError
 } from '../../shared/agent-skill-sharing-contract'
 import type { DiscoveredSkill } from '../../shared/skills'
-import { PRIMARY_CLI_COMMAND } from '../../shared/brand'
 
 export function selectDiscoveredSkills(
   skills: readonly DiscoveredSkill[],
   selectors: readonly string[]
 ): DiscoveredSkill[] {
-  const ids = new Map<string, DiscoveredSkill>()
-  const names = new Map<string, DiscoveredSkill[]>()
+  const selected = new Map<string, DiscoveredSkill>()
+  // Index only requested selectors: discovery may be huge while typical requests select one or two.
+  const requested = new Set(selectors)
+  const byId = new Map<string, DiscoveredSkill>()
+  const discoveredByName = new Map<string, DiscoveredSkill[]>()
   for (const skill of skills) {
-    if (!ids.has(skill.id)) {
-      ids.set(skill.id, skill)
+    // Retain first-match semantics for duplicate ids.
+    if (requested.has(skill.id) && !byId.has(skill.id)) {
+      byId.set(skill.id, skill)
     }
-    const name = skill.name
-    const matches = names.get(name)
-    if (matches) {
-      matches.push(skill)
+    if (!requested.has(skill.name)) {
+      continue
+    }
+    const named = discoveredByName.get(skill.name)
+    if (named) {
+      named.push(skill)
     } else {
-      names.set(name, [skill])
+      discoveredByName.set(skill.name, [skill])
     }
   }
-  const selected = new Map<string, DiscoveredSkill>()
   for (const selector of selectors) {
-    const exactId = ids.get(selector)
+    const exactId = byId.get(selector)
     if (exactId) {
       selected.set(exactId.id, exactId)
       continue
     }
-    const named = names.get(selector) ?? []
+    const named = discoveredByName.get(selector) ?? []
     if (named.length === 0) {
       throw new AgentSkillSharingError(
         AGENT_SKILL_SELECTOR_NOT_FOUND_CODE,
-        `Installed skill "${selector}" was not found. Run \`${PRIMARY_CLI_COMMAND} skills installed\` to list valid selectors.`,
+        `Installed skill "${selector}" was not found. Run \`orca skills installed\` to list valid selectors.`,
         { selector }
       )
     }
     if (named.length > 1) {
       throw new AgentSkillSharingError(
         AGENT_SKILL_SELECTOR_AMBIGUOUS_CODE,
-        `More than one installed skill is named "${selector}". Use its discovery ID from \`${PRIMARY_CLI_COMMAND} skills installed\`.`,
+        `More than one installed skill is named "${selector}". Use its discovery ID from \`orca skills installed\`.`,
         { selector, matchingIds: named.map((skill) => skill.id) }
       )
     }
@@ -51,12 +55,11 @@ export function selectDiscoveredSkills(
   const values = [...selected.values()]
   const byName = new Map<string, DiscoveredSkill[]>()
   for (const skill of values) {
-    const name = skill.name
-    const matches = byName.get(name)
-    if (matches) {
-      matches.push(skill)
+    const named = byName.get(skill.name)
+    if (named) {
+      named.push(skill)
     } else {
-      byName.set(name, [skill])
+      byName.set(skill.name, [skill])
     }
   }
   const collision = [...byName.entries()].find(([, named]) => named.length > 1)

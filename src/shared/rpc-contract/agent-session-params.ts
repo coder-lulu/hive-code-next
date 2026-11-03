@@ -130,13 +130,15 @@ export const AutomaticEnsure = z
 export const ExplicitEnsure = z
   .object({
     kind: z.literal('explicit'),
+    // Saved-session metadata; host ownership and admission remain independently validated.
+    resumeOrigin: z.literal('saved').optional(),
     worktree: WorktreeSelector,
     agent: z.enum(RESUMABLE_TUI_AGENTS),
     providerSession: ProviderSession,
     ompResumeFilePath: OmpResumeFilePath.optional(),
     terminalKittyKeyboardProtocol: z.boolean().optional(),
     agentArgs: AgentArgs.optional(),
-    agentPermissionMode: z.enum(['manual', 'yolo']).optional(),
+    agentPermissionMode: z.enum(['manual', 'yolo', 'auto']).optional(),
     launchPreferences: LaunchPreferences.optional(),
     presentation: Presentation.optional(),
     placement: Placement.optional(),
@@ -192,7 +194,7 @@ export const CreateAgentSessionParams: z.ZodType<RuntimeCreateAgentSessionReques
       .optional(),
     promptDelivery: PromptDelivery.optional(),
     agentArgs: AgentArgs.optional(),
-    agentPermissionMode: z.enum(['manual', 'yolo']).optional(),
+    agentPermissionMode: z.enum(['manual', 'yolo', 'auto']).optional(),
     launchPreferences: LaunchPreferences.optional(),
     startupCwd: z.string().min(1).max(MAX_WORKTREE_SELECTOR_LENGTH).optional(),
     presentation: Presentation.optional(),

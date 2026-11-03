@@ -2,7 +2,13 @@
 // it, so resolver tests exercise the shared launch path rather than a copy of it.
 
 import type { AgentSessionJournalIdentity } from '../../shared/agent-session-journal-types'
-import type { AgentChatPermissionMode } from '../../shared/agent-chat-permission-mode'
+import type { AgentSessionRecord } from '../../shared/agent-session-record'
+import {
+  requireWritableAgentSessionRecord,
+  selectWritableAgentSessionRecord,
+  type AgentSessionStoreState
+} from './agent-session-store-state'
+import type { AgentChatPermissionChoice } from '../../shared/agent-chat-permission-mode'
 import type { AcpLaunchSpec } from '../acp/acp-launch-specs'
 import { acpStructuredAgentDefinition } from '../acp/acp-structured-agent-definitions'
 import {
@@ -33,6 +39,30 @@ import {
 } from './structured-agent-launch-composition'
 
 export const TEST_SPAWN_TOKEN = 'test-spawn-token'
+
+/** Exercise production writable admission over the launch test's shared record fixture. */
+export function launchRecordStore(
+  readRecord: (sessionId: string) => AgentSessionRecord | null,
+  pinLaunchDirectory: StructuredAgentLaunchSources['store']['pinLaunchDirectory']
+): StructuredAgentLaunchSources['store'] {
+  const state = (sessionId: string): AgentSessionStoreState => {
+    const record = readRecord(sessionId)
+    return {
+      records: new Map(record ? [[record.sessionId, record]] : []),
+      operations: new Map(),
+      retiredClaimKeys: [],
+      unreadableRecords: new Map(),
+      sessionTabs: null
+    }
+  }
+  return {
+    selectWritableRecord: (sessionId) =>
+      selectWritableAgentSessionRecord(state(sessionId), sessionId),
+    requireWritableRecord: (sessionId) =>
+      requireWritableAgentSessionRecord(state(sessionId), sessionId),
+    pinLaunchDirectory
+  }
+}
 
 export type LaunchTestSources = Pick<StructuredAgentLaunchSources, 'store'> & {
   resolveWorkspacePath?: (workspaceId: string) => Promise<string>
@@ -82,7 +112,7 @@ function withTestSpawnToken<L>(
   return (input: {
     identity: AgentSessionJournalIdentity
     spawnToken?: string | null
-    permissionMode?: AgentChatPermissionMode
+    permissionMode?: AgentChatPermissionChoice
   }) => {
     const spawnToken = input.spawnToken === undefined ? defaultToken : input.spawnToken
     return spawnToken === null

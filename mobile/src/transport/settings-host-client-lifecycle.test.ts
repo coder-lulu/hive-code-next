@@ -1,26 +1,20 @@
+vi.mock('../notifications/push-registration', () => ({
+  attachPushRegistration: () => () => {}
+}))
 import { createElement, Fragment, useEffect } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAllHostClients } from './use-all-host-clients'
 import { useFocusedSettingsHostClients } from './settings-host-client-connections'
-import {
-  RpcClientProvider,
-  useHostClient,
-  usePrimeHosts,
-  useRpcClientContext,
-  type RpcClientContextValue
-} from './client-context'
+import { RpcClientProvider, useRpcClientContext } from './client-context'
+import { useHostClient, usePrimeHosts } from './host-client-hooks'
 import {
   HOME_AUTO_CONNECT_CONCURRENCY,
   selectHomeAutoConnectHostIds
 } from './home-host-auto-connect'
+import type { RpcClientContextValue } from './rpc-client-context-contract'
 import type { RpcClient } from './rpc-client'
 import type { ConnectionState, HostProfile } from './types'
-
-vi.mock('./runtime-random', async () => {
-  const { randomBytes } = await import('node:crypto')
-  return { mobileRuntimeRandomBytes: randomBytes }
-})
 
 const connectMock = vi.fn()
 const loadHostsMock = vi.fn()
@@ -29,7 +23,7 @@ const routeFocus = vi.hoisted(() => ({
 }))
 
 // Why: the opener starts a descriptor status probe per connection; these fakes have no RPC surface.
-const descriptorProbe = vi.hoisted(() => ({ start: vi.fn(() => vi.fn()) }))
+const descriptorProbe = vi.hoisted(() => ({ start: vi.fn((..._args: unknown[]) => vi.fn()) }))
 vi.mock('./runtime-status-probe', () => ({
   startRuntimeStatusProbe: (...args: unknown[]) => descriptorProbe.start(...args)
 }))
@@ -91,7 +85,7 @@ function host(id: string, lastConnected: number, extra: Partial<HostProfile> = {
 
 const HOSTS = [
   host('direct-recent', 50),
-  host('relay-recent', 40, { relayHostId: 'AbCdEf0123_-xyZ9' }),
+  host('paired-recent', 40),
   host('ssh-provider-recent', 30),
   host('folder-workspace-host', 20),
   host('offline-host', 10)
@@ -203,10 +197,7 @@ function activeHostIds(): string[] {
     .sort()
 }
 
-afterEach(() => vi.useRealTimers())
-
 beforeEach(() => {
-  vi.useFakeTimers()
   context = null
   routeFocus.effect = null
   connectMock.mockReset()
@@ -214,59 +205,7 @@ beforeEach(() => {
 })
 
 describe('settings host client lifecycle', () => {
-  it('reuses healthy clients across quick navigation and expires unused clients after 20 seconds', async () => {
-    const clients: FakeClient[] = []
-    connectMock.mockImplementation(() => {
-      const client = makeFakeClient('connected')
-      clients.push(client)
-      return client
-    })
-    loadHostsMock.mockResolvedValue(HOSTS)
-    const renderer = await renderScreen('settings')
-    await navigate(renderer, 'empty')
-    act(() => {
-      vi.advanceTimersByTime(19_999)
-    })
-    expect(clients.every((client) => client.closeMock.mock.calls.length === 0)).toBe(true)
-    await navigate(renderer, 'settings')
-    act(() => {
-      vi.advanceTimersByTime(20_000)
-    })
-    expect(connectMock).toHaveBeenCalledTimes(HOSTS.length)
-    expect(activeHostIds()).toEqual([...HOST_IDS].sort())
-    expect(clients.every((client) => client.closeMock.mock.calls.length === 0)).toBe(true)
-    await navigate(renderer, 'empty')
-    act(() => {
-      vi.advanceTimersByTime(20_000)
-    })
-    expect(activeHostIds()).toEqual([])
-    expect(clients.every((client) => client.closeMock.mock.calls.length === 1)).toBe(true)
-    act(() => renderer.unmount())
-  })
-
-  it('forgets a cached connection immediately and cancels its idle timer', async () => {
-    const clients: FakeClient[] = []
-    connectMock.mockImplementation(() => {
-      const client = makeFakeClient('connected')
-      clients.push(client)
-      return client
-    })
-    loadHostsMock.mockResolvedValue(HOSTS)
-    const renderer = await renderScreen('settings')
-    await navigate(renderer, 'empty')
-    act(() => context!.forgetHostClient(HOST_IDS[0]!))
-    expect(clients[0]!.closeMock).toHaveBeenCalledOnce()
-    await navigate(renderer, 'settings')
-    act(() => {
-      vi.advanceTimersByTime(20_000)
-    })
-    expect(connectMock).toHaveBeenCalledTimes(HOSTS.length + 1)
-    expect(clients.at(-1)!.closeMock).not.toHaveBeenCalled()
-    act(() => renderer.unmount())
-    expect(vi.getTimerCount()).toBe(0)
-  })
-
-  it('closes settings-only clients while a mounted Home owner keeps its initial batch', async () => {
+  it('closes settings-only clients while a mounted Home owner keeps its bounded set', async () => {
     const clients = new Map<string, FakeClient[]>()
     connectMock.mockImplementation((profile: HostProfile) => {
       const client = makeFakeClient(profile.id === 'offline-host' ? 'reconnecting' : 'connected')
@@ -298,9 +237,6 @@ describe('settings host client lifecycle', () => {
     if (!renderer) {
       throw new Error('navigation stack harness did not render')
     }
-    act(() => {
-      vi.advanceTimersByTime(20_000)
-    })
     expect(activeHostIds()).toEqual([...HOME_HOST_IDS].sort())
     expect(connectMock).toHaveBeenCalledTimes(3)
 
@@ -315,9 +251,6 @@ describe('settings host client lifecycle', () => {
 
     await act(async () => {
       renderer?.update(createElement(NavigationStack, { settingsVisible: false }))
-    })
-    act(() => {
-      vi.advanceTimersByTime(20_000)
     })
     expect(activeHostIds()).toEqual([...HOME_HOST_IDS].sort())
     for (const hostId of HOME_HOST_IDS) {
@@ -337,9 +270,6 @@ describe('settings host client lifecycle', () => {
     await act(async () => {
       renderer?.update(createElement(NavigationStack, { settingsVisible: false }))
     })
-    act(() => {
-      vi.advanceTimersByTime(20_000)
-    })
     expect(activeHostIds()).toEqual([...HOME_HOST_IDS].sort())
     for (const hostId of HOME_HOST_IDS) {
       expect(clients.get(hostId)).toHaveLength(1)
@@ -351,7 +281,7 @@ describe('settings host client lifecycle', () => {
       )
     }
 
-    act(() => renderer.unmount())
+    act(() => renderer?.unmount())
   })
 
   it('leaves no zero-reference clients after repeated settings navigation', async () => {
@@ -395,7 +325,7 @@ describe('settings host client lifecycle', () => {
     loadHostsMock.mockResolvedValue(HOSTS)
 
     const retainedHostId = 'direct-recent'
-    const sharedHostId = 'relay-recent'
+    const sharedHostId = 'paired-recent'
     const removedHostId = 'folder-workspace-host'
     const addedHostId = 'offline-host'
     function HostListApp({ settingsHostIds }: { settingsHostIds: string[] }) {
@@ -443,7 +373,7 @@ describe('settings host client lifecycle', () => {
     expect(clients.get(removedHostId)?.closeMock).toHaveBeenCalledOnce()
     expect(clients.get(addedHostId)?.closeMock).not.toHaveBeenCalled()
 
-    act(() => renderer.unmount())
+    act(() => renderer?.unmount())
     expect(clients.get(retainedHostId)?.closeMock).toHaveBeenCalledOnce()
     expect(clients.get(sharedHostId)?.closeMock).toHaveBeenCalledOnce()
     expect(clients.get(addedHostId)?.closeMock).toHaveBeenCalledOnce()
@@ -461,9 +391,6 @@ describe('settings host client lifecycle', () => {
     const detailHostId = 'folder-workspace-host'
     const renderer = await renderScreen('settings', detailHostId)
     await navigate(renderer, 'home', detailHostId)
-    act(() => {
-      vi.advanceTimersByTime(20_000)
-    })
 
     expect(activeHostIds()).toEqual([...HOME_HOST_IDS, detailHostId].sort())
     expect(clients.get(detailHostId)?.closeMock).not.toHaveBeenCalled()
@@ -518,7 +445,7 @@ describe('settings host client lifecycle', () => {
       resolveInitial?.([retryHost])
       await initialLookup
     })
-    if (!context) {
+    if (!context?.forceReconnect) {
       throw new Error('client context was not captured')
     }
 
@@ -664,9 +591,6 @@ describe('settings host client lifecycle', () => {
       )
     )
 
-    act(() => {
-      vi.advanceTimersByTime(20_000)
-    })
     expect(activeHostIds()).toEqual([...HOME_HOST_IDS].sort())
     expect(replacementClient?.closeMock).not.toHaveBeenCalled()
     act(() => renderer?.unmount())
@@ -674,7 +598,7 @@ describe('settings host client lifecycle', () => {
   })
 
   it('releases a manual host after Home demotes or stops tracking it', async () => {
-    const manualHost = host('manual-relay-host', 1, { relayHostId: 'AbCdEf0123_-xyZ9' })
+    const manualHost = host('manual-paired-host', 1)
     const clients: FakeClient[] = []
     connectMock.mockImplementation(() => {
       const client = makeFakeClient('reconnecting')
@@ -717,7 +641,7 @@ describe('settings host client lifecycle', () => {
       throw new Error('manual connection harness did not initialize')
     }
     await act(async () => {
-      await context?.forceReconnect(manualHost.id)
+      await context?.forceReconnect?.(manualHost.id)
     })
     expect(activeHostIds()).toEqual([manualHost.id])
 
@@ -736,7 +660,7 @@ describe('settings host client lifecycle', () => {
     expect(clients[0]?.closeMock).toHaveBeenCalledOnce()
 
     await act(async () => {
-      await context?.forceReconnect(manualHost.id)
+      await context?.forceReconnect?.(manualHost.id)
     })
     expect(activeHostIds()).toEqual([manualHost.id])
     expect(clients).toHaveLength(2)

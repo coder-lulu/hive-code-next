@@ -1,25 +1,14 @@
-// Live (real-socket, real-timer) repro harness for issue #5049: Android
-// remote sessions that appear connected but stop responding until the app
-// is reopened. Unlike rpc-client.test.ts (fake timers, mocked e2ee), this
-// runs the REAL rpc-client with real E2EE v2 against an in-process
-// ws server, simulating the Tailscale failure modes behind the report.
-//
-// Opt-in because the quick scenario takes ~15s wall-clock and the full
-// parked-loop scenario ~8 minutes:
-//   ORCA_MOBILE_LIVE_REPRO=1 pnpm vitest run src/transport/rpc-client-live-recovery.test.ts
-//   ORCA_MOBILE_LIVE_REPRO_FULL=1 ... (adds the 8-minute parked-loop case)
+// Exercise authenticated v2 framing with real sockets and timers against half-open paths (#5049).
+// ORCA_MOBILE_LIVE_REPRO=1 enables the short case; ORCA_MOBILE_LIVE_REPRO_FULL=1 adds the roughly eight-minute recovery loop.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { randomBytes } from 'node:crypto'
-import type { AddressInfo } from 'node:net'
 import nacl from 'tweetnacl'
 import { WebSocketServer, type WebSocket as ServerSocket } from 'ws'
 import { connect, type RpcClient } from './rpc-client'
 import { DesktopMobileE2EEV2Session } from '../../../src/shared/runtime-e2ee-server-session'
 import { authenticateMobileE2EE } from '../../../src/main/runtime/rpc/mobile-e2ee-auth-validation'
 
-// Why: expo-crypto only exists inside a React Native runtime; Node's CSPRNG
-// is equivalent for the harness. Everything else (tweetnacl, the wire
-// protocol) is the real production path.
+// Use Node secure randomness in place of Expo; keep production crypto/framing for the harness.
 vi.mock('expo-crypto', () => ({
   getRandomBytes: (n: number) => new Uint8Array(randomBytes(n))
 }))
@@ -37,9 +26,6 @@ const serverPublicKeyB64 = Buffer.from(serverKeyPair.publicKey).toString('base64
 // half-open link where TCP looks alive but the path is dead.
 let blackhole = false
 
-// Why: port 0 lets the OS assign a free port so the opt-in harness can't
-// fail with EADDRINUSE; the full scenario restarts on the captured port
-// because the client keeps reconnecting to its original URL.
 function startServer(port = 0): Promise<WebSocketServer> {
   // host must match the 127.0.0.1 clients dial: a wildcard bind lets a foreign loopback listener claim the port and answer here.
   const wss = new WebSocketServer({ host: '127.0.0.1', port })
@@ -90,7 +76,15 @@ function startServer(port = 0): Promise<WebSocketServer> {
         }
         return
       }
-      const request = JSON.parse(plaintext) as { id: string }
+      const request: unknown = JSON.parse(plaintext)
+      if (
+        !request ||
+        typeof request !== 'object' ||
+        !('id' in request) ||
+        typeof request.id !== 'string'
+      ) {
+        return
+      }
       ws.send(session.sealText(JSON.stringify({ id: request.id, ok: true, result: { up: true } })))
     })
   })
@@ -98,7 +92,11 @@ function startServer(port = 0): Promise<WebSocketServer> {
 }
 
 function serverPort(wss: WebSocketServer): number {
-  return (wss.address() as AddressInfo).port
+  const address = wss.address()
+  if (!address || typeof address === 'string') {
+    throw new Error('Expected an assigned loopback port')
+  }
+  return address.port
 }
 
 function stopServer(wss: WebSocketServer): Promise<void> {
@@ -139,10 +137,10 @@ describe.runIf(RUN_LIVE)('live foreground recovery (issue #5049)', () => {
     }
   })
 
-  it(
-    'reaps a half-open link via the foreground probe and recovers',
+  it.each(['focus', 'app-resume', 'network-change'] as const)(
+    'reaps a half-open link via %s and recovers',
     { timeout: 60_000 },
-    async () => {
+    async (reason) => {
       wss = await startServer()
       client = connect(`ws://127.0.0.1:${serverPort(wss)}`, AUTH_TOKEN, serverPublicKeyB64)
       const c = client
@@ -152,14 +150,14 @@ describe.runIf(RUN_LIVE)('live foreground recovery (issue #5049)', () => {
       // Half-open: server keeps TCP up but stops answering, then the app
       // comes back to the foreground.
       blackhole = true
-      c.notifyForeground()
-      // Three fair probe windows tolerate transient mobile/Tailscale stalls.
+      c.notifyForeground(reason)
       const detectMs = await waitFor(
         'half-open detected',
         32_000,
         () => c.getState() !== 'connected'
       )
-      expect(detectMs).toBeLessThan(30_000)
+      console.log('[direct-revival-capture]', { reason, detectMs })
+      expect(detectMs).toBeLessThan(reason === 'focus' ? 30_000 : 6_000)
 
       blackhole = false
       await waitFor('recovered after link healed', 15_000, () => c.getState() === 'connected')
@@ -168,7 +166,7 @@ describe.runIf(RUN_LIVE)('live foreground recovery (issue #5049)', () => {
   )
 
   it.runIf(RUN_FULL)(
-    'repro: parked retry loop stays stuck until the foreground nudge',
+    'foreground nudge accelerates recovery while the trickle retry is pending',
     { timeout: 600_000 },
     async () => {
       wss = await startServer()
@@ -180,15 +178,12 @@ describe.runIf(RUN_LIVE)('live foreground recovery (issue #5049)', () => {
       await stopServer(wss)
       wss = null
       await waitFor('retry cap scheduled (~5 min)', 480_000, () => c.getReconnectAttempt() >= 12)
-      // The attempt counter hits 12 when the final attempt is *scheduled*;
-      // its 60s backoff timer is still pending. Let it fire and fail while
-      // the server is still down so the loop truly parks.
+      // Wait for the final scheduled retry to fire while the server is still down, beyond the count reaching its cap.
       await sleep(65_000)
       expect(c.getState()).toBe('reconnecting')
 
       wss = await startServer(port)
-      // Pre-fix behavior: even with the server back, a parked loop never
-      // recovers — the user had to restart the app.
+      // The next 90-second trickle retry is still pending during this observation.
       await sleep(70_000)
       expect(c.getState()).not.toBe('connected')
 

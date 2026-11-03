@@ -110,7 +110,7 @@ describe('deleteSkills', () => {
     const result = await run(home, stateDirectory, await request(file))
     expect(result.skills[0].status).toBe('deleted')
     expect(await exists(join(aliasDirectory, 'SKILL.md'))).toBe(false)
-    // "Not shared with another placement" is not "contains nothing else".
+    // Unshared alias directories may still hold unrelated files.
     expect(await exists(join(aliasDirectory, 'notes.md'))).toBe(true)
   })
 
@@ -126,8 +126,7 @@ describe('deleteSkills', () => {
 
   it('takes the lock an install of the same destination directory would take', async () => {
     const { home, stateDirectory, canonicalDirectory, file } = await fixture()
-    // Keyed on the placement's literal directory path, which is what install
-    // hashes — not the realpath'd file identity's dirname.
+    // Use install's literal placement-directory lock key, never canonical-file realpath.
     const release = await acquireSkillInstallLock({
       path: skillInstallLockPath(stateDirectory, canonicalDirectory)
     })
@@ -178,7 +177,6 @@ describe('deleteSkills', () => {
       ...nativeSkillInstallFilesystem,
       rename: async (source, target) => {
         renames += 1
-        // Fail the canonical stage, which runs last.
         if (renames === 2) {
           throw new Error('EBUSY')
         }
@@ -214,8 +212,7 @@ describe('deleteSkills', () => {
     }
 
     const result = await run(home, stateDirectory, await request(file), filesystem)
-    // Neither restored nor removed — reported as `partial`, never folded into
-    // `failed`, which would wrongly imply nothing changed.
+    // Partial means neither restored nor removed; failed would falsely imply no change.
     expect(result.skills[0].status).toBe('partial')
     expect(result.skills[0].stagedPaths?.length).toBe(1)
   })
@@ -267,7 +264,6 @@ describe('deleteSkills', () => {
     const result = await run(home, stateDirectory, await request(join(link, 'SKILL.md')))
     expect(result.skills[0].status).toBe('deleted')
     expect(await exists(link)).toBe(false)
-    // The whole point: Orca removed its own pointer, not the tool's content.
     expect(await exists(join(managedElsewhere, 'SKILL.md'))).toBe(true)
   })
 

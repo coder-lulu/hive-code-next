@@ -1,17 +1,18 @@
 import { Stack } from 'expo-router'
-import { useMobileTheme } from '../theme/mobile-theme-provider'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
+import { colors } from '../theme/mobile-theme'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 import { HOST_STACK_SCREENS, type HostStackAnimation } from './host-stack-screens'
 
 export function HostStack({ animation }: { animation: HostStackAnimation }) {
-  const theme = useMobileTheme()
+  useMobileTranslation()
+  useMobileColorScheme()
   return (
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: theme.color.bg.canvas },
-        // In the tablet split view the detail pane should swap instantly like
-        // a desktop master-detail; the default slide animates the outgoing
-        // screen and briefly reveals the one beneath it. Phones keep the slide.
+        contentStyle: { backgroundColor: colors.bgBase },
+        // Swap tablet detail panes instantly so slides cannot reveal the outgoing pane’s underlying screen; phones retain native slides.
         animation
       }}
     >

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { GitPullRequestArrow, Link2, RefreshCw } from 'lucide-react-native'
-import { useMobileTheme, useMobileThemeStyles } from '../../theme/mobile-theme-provider'
+import { colors } from '../../theme/mobile-theme'
+import { useMobileColorScheme } from '../../theme/use-mobile-color-scheme'
+import { useMobileTranslation } from '../../i18n/use-mobile-translation'
 import type { RpcClient } from '../../transport/rpc-client'
 import type { ConnectionState } from '../../transport/types'
 import type { MobileGitStatusResult } from '../../source-control/mobile-git-status'
@@ -20,7 +22,7 @@ import {
 import { fetchWorktreeLinkedPR } from '../../source-control/mobile-pr-link'
 import { openMobilePrUrl } from '../mobile-pr-url'
 import { MobileLinkPrForm } from './MobileLinkPrForm'
-import { createPrCreateEmptyStateStyles } from './pr-create-empty-state-styles'
+import { prCreateEmptyStateStyles as styles } from './pr-create-empty-state-styles'
 
 type Props = {
   client: RpcClient | null
@@ -36,9 +38,7 @@ type Props = {
 
 type Mode = 'choose' | 'link'
 
-// Empty state for a branch with no PR: create a new PR, or link an existing one
-// (the no-PR surface is the natural home for linking — desktop's link entry lives
-// on its PR card, but on mobile this is where a user lands with nothing linked).
+// Offer create or link when branch has no PR; empty state is mobile’s linking entry point.
 export function PrSidebarCreateEmptyState({
   client,
   worktreeId,
@@ -48,15 +48,14 @@ export function PrSidebarCreateEmptyState({
   workspaceLabel,
   onCreated
 }: Props) {
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createPrCreateEmptyStateStyles)
+  useMobileColorScheme()
+  const t = useMobileTranslation()
   const [mode, setMode] = useState<Mode>('choose')
   const [loading, setLoading] = useState(false)
   const [createWarning, setCreateWarning] = useState<string | null>(null)
   const [commitFailureRecovery, setCommitFailureRecovery] =
     useState<MobileCommitFailureRecovery | null>(null)
-  // A persisted linkedPR while the branch shows no PR means the linked PR could
-  // not be resolved. Mention it while still allowing the user to relink.
+  // Persisted linkedPR with no resolved PR warrants notice while preserving relink action.
   const [orphanLinkedPR, setOrphanLinkedPR] = useState<number | null>(null)
   const commitFailureRecoveryAction = useMobileCommitFailureRecovery({
     client,
@@ -79,9 +78,9 @@ export function PrSidebarCreateEmptyState({
       return
     }
     void fetchWorktreeLinkedPR(client, worktreeId)
-      .then((n) => {
+      .then((link) => {
         if (!cancelled) {
-          setOrphanLinkedPR(n)
+          setOrphanLinkedPR(link)
         }
       })
       .catch(() => {
@@ -103,11 +102,15 @@ export function PrSidebarCreateEmptyState({
     setLoading(true)
     try {
       if (!gitBranch) {
-        setCreateWarning('请先切换到一个分支，再创建拉取请求。')
+        setCreateWarning(
+          t(
+            'pullRequest.prSidebarCreateEmptyState.branchRequired',
+            'Check out a branch before creating a pull request.'
+          )
+        )
         return
       }
-      // Why: mobile skips the local compose step here and runs the hosted create
-      // flow directly so PR creation matches the automated hosted-review path.
+      // Skip local compose and use hosted create flow to match automated review path.
       let progress: MobileHostedReviewCreateIntentProgress | null = null
       const outcome = await runMobileHostedReviewCreateIntent(client, worktreeId, {
         branch: gitBranch,
@@ -137,7 +140,14 @@ export function PrSidebarCreateEmptyState({
       openMobilePrUrl(outcome.url)
       onCreated()
     } catch (err) {
-      setCreateWarning(err instanceof Error ? err.message : '创建拉取请求失败。')
+      setCreateWarning(
+        err instanceof Error
+          ? err.message
+          : t(
+              'pullRequest.prSidebarCreateEmptyState.createFailed',
+              'Failed to create pull request.'
+            )
+      )
     } finally {
       setLoading(false)
     }
@@ -165,45 +175,71 @@ export function PrSidebarCreateEmptyState({
     <View style={styles.section}>
       <View style={styles.header}>
         <View style={styles.headerTitle}>
-          <GitPullRequestArrow size={14} color={theme.color.text.secondary} strokeWidth={2.2} />
-          <Text style={styles.headerLabel}>拉取请求</Text>
+          <GitPullRequestArrow size={14} color={colors.textSecondary} strokeWidth={2.2} />
+          <Text style={styles.headerLabel}>
+            {t('pullRequest.prSidebarCreateEmptyState.title', 'Pull request')}
+          </Text>
         </View>
         <View style={styles.headerActions}>
           <Pressable
             style={({ pressed }) => [styles.iconButton, pressed && styles.iconButtonPressed]}
             onPress={refreshPrState}
             accessibilityRole="button"
-            accessibilityLabel="刷新拉取请求"
+            accessibilityLabel={t(
+              'pullRequest.prSidebarCreateEmptyState.refreshPullRequest',
+              'Refresh pull request'
+            )}
             hitSlop={6}
           >
-            <RefreshCw size={16} color={theme.color.text.secondary} strokeWidth={2.2} />
+            <RefreshCw size={16} color={colors.textSecondary} strokeWidth={2.2} />
           </Pressable>
           <Pressable
             style={[styles.createButton, (!canCreate || loading) && styles.createButtonDisabled]}
             onPress={() => void openComposer()}
             disabled={!canCreate || loading}
             accessibilityRole="button"
-            accessibilityLabel="创建拉取请求"
+            accessibilityLabel={t(
+              'pullRequest.prSidebarCreateEmptyState.createPullRequest',
+              'Create pull request'
+            )}
           >
             {loading ? (
-              <ActivityIndicator color={theme.color.text.inverse} />
+              <ActivityIndicator color={colors.bgBase} />
             ) : (
-              <GitPullRequestArrow size={14} color={theme.color.text.inverse} strokeWidth={2.2} />
+              <GitPullRequestArrow size={14} color={colors.bgBase} strokeWidth={2.2} />
             )}
-            <Text style={styles.createButtonText}>创建 PR</Text>
+            <Text style={styles.createButtonText}>
+              {t('pullRequest.prSidebarCreateEmptyState.createPr', 'Create PR')}
+            </Text>
           </Pressable>
         </View>
       </View>
       <View style={styles.body}>
         <Text style={styles.bodyTitle}>
-          {orphanLinkedPR ? `无法获取已关联的 PR #${orphanLinkedPR}` : '没有打开的拉取请求'}
+          {orphanLinkedPR
+            ? t(
+                'pullRequest.prSidebarCreateEmptyState.linkedPrUnavailable',
+                'Linked PR #{{number}} unavailable',
+                { number: orphanLinkedPR }
+              )
+            : t('pullRequest.prSidebarCreateEmptyState.noOpenPullRequest', 'No open pull request')}
         </Text>
         <Text style={styles.bodyText}>
           {orphanLinkedPR
-            ? '刷新后重试，或为此分支创建新的 PR。'
+            ? t(
+                'pullRequest.prSidebarCreateEmptyState.refreshOrCreate',
+                'Refresh to check again, or create a new PR for this branch.'
+              )
             : gitBranch
-              ? `${gitBranch} 尚未关联打开的 PR。`
-              : '当前分支尚未关联打开的 PR。'}
+              ? t(
+                  'pullRequest.prSidebarCreateEmptyState.branchNotLinked',
+                  '{{branch}} is not linked to an open PR.',
+                  { branch: gitBranch }
+                )
+              : t(
+                  'pullRequest.prSidebarCreateEmptyState.currentBranchNotLinked',
+                  'The current branch is not linked to an open PR.'
+                )}
         </Text>
         {commitFailureRecovery ? (
           <MobileCommitFailurePanel
@@ -222,16 +258,21 @@ export function PrSidebarCreateEmptyState({
           onPress={() => setMode('link')}
           disabled={!client}
           accessibilityRole="button"
-          accessibilityLabel="关联现有拉取请求"
+          accessibilityLabel={t(
+            'pullRequest.prSidebarCreateEmptyState.linkExistingPullRequest',
+            'Link an existing pull request'
+          )}
           accessibilityState={{ disabled: !client }}
           hitSlop={6}
         >
           <Link2
             size={14}
-            color={client ? theme.color.text.secondary : theme.color.text.tertiary}
+            color={client ? colors.textSecondary : colors.textMuted}
             strokeWidth={2.2}
           />
-          <Text style={styles.linkButtonText}>关联现有 PR</Text>
+          <Text style={styles.linkButtonText}>
+            {t('pullRequest.prSidebarCreateEmptyState.linkExistingPr', 'Link an existing PR')}
+          </Text>
         </Pressable>
       </View>
     </View>

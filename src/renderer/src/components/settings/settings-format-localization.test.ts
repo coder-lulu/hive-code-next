@@ -1,6 +1,6 @@
 import { afterEach, expect, it } from 'vitest'
 import { i18n, setRendererPluginLanguagePacks } from '@/i18n/i18n'
-import { pluginLanguageResourceId } from '../../../../shared/plugins/plugin-language-pack-artifact'
+import { pluginLanguageResourceId } from '../../../../shared/plugins/artifacts/plugin-language-pack-artifact'
 import { formatAccountTimestamp } from './accounts-pane-runtime'
 import { formatSessionCount, formatMessageCount } from './session-search-count-format'
 import { formatSparsePresetUpdatedAt } from './sparse-preset-date'
@@ -42,7 +42,14 @@ it('uses a plugin locale instead of passing its synthetic language ID to Intl', 
   const id = 'plugin:review.formatting/fr-FR' as const
   const resourceLanguage = pluginLanguageResourceId(id)
   setRendererPluginLanguagePacks([
-    { id, resourceLanguage, pluginKey: 'review.formatting', locale: 'fr-FR', catalog: {} }
+    {
+      id,
+      resourceLanguage,
+      pluginKey: 'review.formatting',
+      locale: 'fr-FR',
+      coverage: 100,
+      catalog: {}
+    }
   ])
   await i18n.changeLanguage(resourceLanguage)
   expect(formatSessionCount(1234)).toBe(new Intl.NumberFormat('fr-FR').format(1234))

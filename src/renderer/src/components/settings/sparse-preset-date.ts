@@ -1,5 +1,4 @@
 import { getIntlLocale } from '@/i18n/i18n'
-
 export function formatSparsePresetUpdatedAt(timestamp: number): string | null {
   if (!Number.isFinite(timestamp)) {
     return null

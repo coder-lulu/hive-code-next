@@ -4,7 +4,7 @@ import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
 import { OrcaRuntimeService } from '../../orca-runtime'
 import type { ResolvedWorktree } from '../../runtime-worktree-path-identity'
 import { AGENT_LAUNCH_METHODS } from './agent-launch'
-import { CAPABLE_CLIENT, methodNamed, STRUCTURED_PREFERENCE } from './agent-launch.test-fixture'
+import { CAPABLE_CLIENT, methodNamed } from './agent-launch.test-fixture'
 
 const createStructuredSession = vi.hoisted(() =>
   vi.fn(async (args: { envelope: { sessionId: string } }) => ({
@@ -87,12 +87,12 @@ describe('agent.launch with the real floating workspace resolver', () => {
   describe.each([true, false])('structured preference %s', (structuredPreference) => {
     it.each(selectors)('routes %s by preference, not by workspace kind', async (selector) => {
       const runtime = new OrcaRuntimeService()
+      const settings: Partial<ReturnType<OrcaRuntimeService['getClientSettings']>> = {
+        nativeChatProviders: { codex: structuredPreference, claude: structuredPreference }
+      }
       vi.spyOn(runtime, 'getClientSettings').mockReturnValue(
         // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the launch reads only these preferences and optional agentCmdOverrides; no other settings consumer runs because terminal creation is stubbed.
-        {
-          ...STRUCTURED_PREFERENCE,
-          experimentalNativeChat: structuredPreference
-        } as ReturnType<OrcaRuntimeService['getClientSettings']>
+        settings as ReturnType<OrcaRuntimeService['getClientSettings']>
       )
       const scope = vi.spyOn(runtime, 'showTerminalWorkspaceLaunchScope')
       const createSupport = vi.spyOn(runtime, 'getStructuredAgentSessionCreateSupport')

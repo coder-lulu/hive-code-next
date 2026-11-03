@@ -26,6 +26,10 @@ vi.mock('@/components/ui/tooltip', () => ({
 
 vi.mock('@/components/ui/dropdown-menu', async () => {
   const React = await import('react')
+  const RadioGroupContext = React.createContext<{
+    value?: string
+    onValueChange?: (value: string) => void
+  }>({})
   return {
     DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     DropdownMenuTrigger: ({
@@ -53,45 +57,43 @@ vi.mock('@/components/ui/dropdown-menu', async () => {
       onValueChange?: (value: string) => void
       'aria-label'?: string
     }) => (
-      <div role="radiogroup" aria-label={ariaLabel}>
-        {React.Children.map(children, (child) => {
-          if (
-            !React.isValidElement<{
-              value?: string
-              disabled?: boolean
-              children?: React.ReactNode
-              onSelect?: () => void
-            }>(child)
-          ) {
-            return child
-          }
-          const props = child.props
-          return (
-            <button
-              role="radio"
-              aria-checked={props.value === value}
-              disabled={props.disabled}
-              data-value={props.value}
-              onClick={() => {
-                props.onSelect?.()
-                if (props.value !== undefined) {
-                  onValueChange?.(props.value)
-                }
-              }}
-            >
-              {props.children}
-            </button>
-          )
-        })}
-      </div>
+      <RadioGroupContext.Provider value={{ value, onValueChange }}>
+        <div role="radiogroup" aria-label={ariaLabel}>
+          {children}
+        </div>
+      </RadioGroupContext.Provider>
     ),
-    DropdownMenuRadioItem: ({ children }: { children: React.ReactNode; value: string }) => (
-      <span>{children}</span>
-    )
+    DropdownMenuRadioItem: ({
+      children,
+      value,
+      disabled,
+      onSelect
+    }: {
+      children: React.ReactNode
+      value: string
+      disabled?: boolean
+      onSelect?: () => void
+    }) => {
+      const group = React.useContext(RadioGroupContext)
+      return (
+        <button
+          role="radio"
+          aria-checked={value === group.value}
+          disabled={disabled}
+          data-value={value}
+          onClick={() => {
+            onSelect?.()
+            group.onValueChange?.(value)
+          }}
+        >
+          {children}
+        </button>
+      )
+    }
   }
 })
 
-import type { SessionOptionDescriptor } from '../../../../shared/native-chat-session-options'
+import type { SessionOptionDescriptor } from '../../../../shared/native-chat/input/native-chat-session-options'
 import {
   NativeChatComposerPermissionPicker,
   NativeChatPermissionModePicker,
@@ -249,4 +251,17 @@ describe('NativeChatComposerPermissionPicker', () => {
     )
     expect(screen.getByTestId('permission-trigger').getAttribute('data-disabled')).toBe('true')
   })
+})
+
+it('offers Own as a real profile choice', () => {
+  const onSelect = vi.fn()
+  render(
+    <NativeChatPermissionModePicker
+      current="ask"
+      modes={['own', 'ask', 'full-access']}
+      onSelect={onSelect}
+    />
+  )
+  fireEvent.click(screen.getByRole('radio', { name: /Own settings/ }))
+  expect(onSelect).toHaveBeenCalledExactlyOnceWith('own')
 })

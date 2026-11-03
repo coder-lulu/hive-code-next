@@ -2,10 +2,11 @@ import { HiveAccountRelayStreams } from './hive-account-relay-streams'
 import { HiveAccountRelayChannel } from './hive-account-relay-channel'
 import { disposeHiveAccountRelayMaterial } from './hive-account-relay-material'
 import type { RuntimeOrchestrationEnvelope, RuntimeRpcResponse } from './runtime-rpc-envelope'
-import { RemoteRuntimeClientError } from './remote-runtime-client-error'
-import { serializeRemoteRuntimePayload } from './remote-runtime-memory-limits'
+import { RemoteRuntimeClientError } from './remote-runtime/remote-runtime-client-error'
+import { serializeRemoteRuntimePayload } from './remote-runtime/remote-runtime-memory-limits'
 import { classifyHiveAccountRelayError } from './hive-account-relay-errors'
 import { acquireHiveAccountRelayBeforeTimeout } from './hive-account-relay-deadline'
+import { HiveAccountRelayStatusReceipt } from './hive-account-relay-status-receipt'
 
 import type {
   HiveAccountRelayPoolState,
@@ -32,7 +33,7 @@ export class HiveAccountRelayPool {
     isClosed: () => this.state === 'closed'
   })
   private main: Promise<HiveAccountRelayChannel> | null = null
-  private statusReceiptChannel: HiveAccountRelayChannel | null = null
+  private statusReceipt = new HiveAccountRelayStatusReceipt()
   private pending = 0
   private sequence = 0
   private activeRequests = 0
@@ -48,31 +49,29 @@ export class HiveAccountRelayPool {
 
   getState = (): HiveAccountRelayPoolState => this.state
   getLastError = (): unknown => this.lastError
+  get connectionEpoch(): number {
+    return this.statusReceipt.epoch
+  }
   async connect(): Promise<void> {
     await this.getMain()
   }
 
-  async requestStatus(signal: AbortSignal): Promise<RuntimeRpcResponse<unknown>> {
-    signal.throwIfAborted()
+  async requestStatus(
+    signal?: AbortSignal,
+    timeoutMs = 15_000
+  ): Promise<RuntimeRpcResponse<unknown>> {
+    signal?.throwIfAborted()
     this.clearIdle()
     try {
       const { value: channel, remainingMs } = await acquireHiveAccountRelayBeforeTimeout(
-        () => [...this.channels].find((candidate) => candidate.isReady) ?? this.getMain(),
-        15_000,
+        () =>
+          this.statusReceipt.readyChannel ??
+          [...this.channels].find((candidate) => candidate.isReady) ??
+          this.getMain(),
+        timeoutMs,
         signal
       )
-      const response = await channel.request(
-        { id: this.nextId(), method: 'status.get' },
-        remainingMs,
-        signal
-      )
-      if (signal.aborted || channel.isClosed) {
-        throw unavailable()
-      }
-      if (response.ok) {
-        this.statusReceiptChannel = channel
-      }
-      return response
+      return await this.statusReceipt.request(channel, this.nextId(), remainingMs, signal)
     } finally {
       this.scheduleIdle()
     }
@@ -83,7 +82,8 @@ export class HiveAccountRelayPool {
     params: unknown,
     timeoutMs = 30_000,
     envelope?: RuntimeOrchestrationEnvelope,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    expectedConnectionEpoch?: number
   ): Promise<RuntimeRpcResponse<unknown>> {
     signal?.throwIfAborted()
     if (this.activeRequests >= 64) {
@@ -100,15 +100,18 @@ export class HiveAccountRelayPool {
     this.clearIdle()
     try {
       const { value: channel, remainingMs } = await acquireHiveAccountRelayBeforeTimeout(
-        () => this.getMain(),
+        () =>
+          expectedConnectionEpoch === undefined
+            ? this.getMain()
+            : this.statusReceipt.require(expectedConnectionEpoch),
         timeoutMs,
         signal
       )
-      return await channel.request(
-        { ...envelope, id: this.nextId(), method, params },
-        remainingMs,
-        signal
-      )
+      if (expectedConnectionEpoch !== undefined) {
+        this.statusReceipt.require(expectedConnectionEpoch)
+      }
+      const request = { ...envelope, id: this.nextId(), method, params }
+      return await channel.request(request, remainingMs, signal)
     } finally {
       this.activeRequests--
       this.requestBytes -= payloadBytes
@@ -242,8 +245,7 @@ export class HiveAccountRelayPool {
           if (this.state !== 'closed') {
             this.setState(this.hasReadyChannel() ? 'ready' : 'idle')
           }
-          if (this.statusReceiptChannel === channel) {
-            this.statusReceiptChannel = null
+          if (this.statusReceipt.release(channel)) {
             this.options.onStatusReceiptLost?.()
           }
           if (this.state !== 'closed' && connected && !intentional && !this.hasReadyChannel()) {

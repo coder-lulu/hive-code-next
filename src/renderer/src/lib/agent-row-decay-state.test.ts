@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { agentNoUpdateLabel } from './agent-row-decay-state'
+import { agentNoUpdateLabel } from '../../../shared/agent-row-decay-state'
 
 const NOW = Date.parse('2026-10-15T00:00:00Z')
 

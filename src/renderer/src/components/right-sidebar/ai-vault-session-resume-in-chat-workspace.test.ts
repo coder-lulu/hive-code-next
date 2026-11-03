@@ -42,7 +42,6 @@ function resumeInChat() {
     activeWorkspaceId: PAIRED_WORKSPACE,
     targetState: { folderWorkspaces: [], projectGroups: [], repos: [], worktreesByRepo: {} },
     settings: {
-      experimentalNativeChat: true
     }
   })
 }

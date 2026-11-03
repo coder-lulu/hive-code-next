@@ -229,7 +229,7 @@ describe('selectTabAgentTypesByTabId', () => {
 
     for (let consumer = 0; consumer < 100; consumer++) {
       select({
-        settings: { experimentalNativeChat: true },
+        settings: { nativeChatProviders: {} },
         agentStatusByPaneKey: statuses,
         terminalLayoutsByTabId: layouts
       })
@@ -256,7 +256,7 @@ describe('selectTabAgentTypesByTabId', () => {
     }
 
     const first = select({
-      settings: { experimentalNativeChat: true },
+      settings: { nativeChatProviders: {} },
       agentStatusByPaneKey: working,
       terminalLayoutsByTabId: split
     })
@@ -265,7 +265,7 @@ describe('selectTabAgentTypesByTabId', () => {
       'tab-1:leaf-b': entry({ agentType: 'codex', state: 'done' })
     }
     const afterStatus = select({
-      settings: { experimentalNativeChat: true },
+      settings: { nativeChatProviders: {} },
       agentStatusByPaneKey: done,
       terminalLayoutsByTabId: split
     })
@@ -283,7 +283,7 @@ describe('selectTabAgentTypesByTabId', () => {
       }
     }
     const afterLayout = select({
-      settings: { experimentalNativeChat: true },
+      settings: { nativeChatProviders: {} },
       agentStatusByPaneKey: done,
       terminalLayoutsByTabId: singleLeaf
     })
@@ -302,9 +302,9 @@ describe('selectTabAgentTypesByTabId', () => {
   it('normalizes missing maps to shared empty inputs', () => {
     const select = createTabBarAgentProjectionSelector()
 
-    const first = select({ settings: { experimentalNativeChat: true } })
+    const first = select({ settings: { nativeChatProviders: {} } })
 
-    expect(select({ settings: { experimentalNativeChat: true } })).toBe(first)
+    expect(select({ settings: { nativeChatProviders: {} } })).toBe(first)
   })
 
   it('keeps agent evidence available for explicit chat toggles while the default is off', () => {
@@ -317,17 +317,21 @@ describe('selectTabAgentTypesByTabId', () => {
       onUnsafeLayoutVisited
     })
     const state = {
-      settings: { experimentalNativeChat: true },
+      settings: { nativeChatProviders: {} },
       agentStatusByPaneKey: { 'tab-1:leaf-a': entry({ agentType: 'claude' }) },
       terminalLayoutsByTabId: { 'tab-1': splitLayout('leaf-a') }
     }
 
     const first = select(state)
-    const disabled = select({ ...state, settings: { experimentalNativeChat: false } })
+    expect(first).not.toHaveProperty('nativeChatEnabled')
+    const disabled = select({ ...state, settings: { nativeChatProviders: { claude: false } } })
     const afterReenable = select(state)
 
     expect(disabled.tabAgentTypesByTabId).toEqual({ 'tab-1': 'claude' })
-    expect(afterReenable).not.toBe(first)
+    expect(afterReenable).toBe(first)
+    expect(disabled).toBe(first)
+    expect(select({ ...state, settings: null })).toBe(first)
+    expect(select({ ...state, settings: undefined })).toBe(first)
     expect(onStatusEntryVisited).toHaveBeenCalledTimes(1)
     expect(onAgentTypeLayoutVisited).toHaveBeenCalledTimes(1)
     expect(onUnsafeLayoutVisited).toHaveBeenCalledTimes(1)
@@ -355,7 +359,7 @@ describe('selectTabAgentTypesByTabId', () => {
       }
     )
     const disabledState = {
-      settings: { experimentalNativeChat: false },
+      settings: { nativeChatProviders: { claude: false } },
       agentStatusByPaneKey: statuses,
       terminalLayoutsByTabId: layouts
     }
@@ -369,7 +373,7 @@ describe('selectTabAgentTypesByTabId', () => {
 
     const enabledState = {
       ...disabledState,
-      settings: { experimentalNativeChat: true }
+      settings: { nativeChatProviders: {} }
     }
     const enabled = selectTabBarAgentProjections(enabledState)
     for (let consumer = 0; consumer < 100; consumer++) {

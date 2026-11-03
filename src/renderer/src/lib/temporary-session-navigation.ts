@@ -7,7 +7,8 @@ import {
 } from '../../../shared/worktree/host-qualified-identity'
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store/types'
-import { activateStructuredAgentSessionTab } from './structured-agent-session-tab-activation'
+import { activateStructuredAgentSessionTab } from './agent-session/structured-agent-session-tab-activation'
+import { structuredAgentSessionTargetForHost } from '@/runtime/structured-agent-session-owner'
 import { CLOSE_FLOATING_TERMINAL_EVENT, isFloatingTerminalWorkspaceId } from './floating-terminal'
 
 type TemporarySessionNavigationState = Pick<
@@ -224,6 +225,8 @@ export function activateTemporarySessionInMain(
     return false
   }
   if (refreshedOwner.structured && refreshedOwner.unifiedTabId) {
+    const sessionTarget = structuredAgentSessionTargetForHost(refreshedOwner.executionHostId)
+    if (!sessionTarget) return false
     const rawWorktreeId = isWorktreeHostIdentity(owner.bucketKey)
       ? getWorktreeIdFromHostIdentity(owner.bucketKey)
       : owner.bucketKey
@@ -231,7 +234,7 @@ export function activateTemporarySessionInMain(
       activateStructuredAgentSessionTab({
         worktreeId: rawWorktreeId,
         tabId: refreshedOwner.unifiedTabId,
-        executionHostId: refreshedOwner.executionHostId
+        target: sessionTarget
       })
     ) {
       return true

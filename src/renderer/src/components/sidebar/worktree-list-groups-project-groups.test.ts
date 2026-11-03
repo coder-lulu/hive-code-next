@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildRows } from './worktree-list/grouping/build-rows'
+import { buildRows } from './worktree-list/grouping/build-rows.test-fixture'
 import { repo, worktree, repoMap } from './worktree-list-groups-test-fixtures'
 import type { ProjectGroup } from '../../../../shared/project-group-types'
 import type { Repo } from '../../../../shared/repo-types'
@@ -46,7 +46,7 @@ describe('project groups', () => {
     ])
   })
 
-  it('aggregates descendant counts and repository sources once for parent groups', () => {
+  it('aggregates descendant workspace counts once for parent groups', () => {
     const parent: ProjectGroup = {
       id: 'parent',
       name: 'Platform',
@@ -87,14 +87,12 @@ describe('project groups', () => {
     expect(
       rows.find((row) => row.type === 'header' && row.key === 'project-group:parent')
     ).toMatchObject({
-      count: 1,
-      hasRepositorySource: true
+      count: 1
     })
     expect(
       rows.find((row) => row.type === 'header' && row.key === 'project-group:child')
     ).toMatchObject({
-      count: 1,
-      hasRepositorySource: true
+      count: 1
     })
   })
 
@@ -175,12 +173,11 @@ describe('project groups', () => {
     expect(rows.filter((row) => row.type === 'header').map((row) => row.key)).toEqual([
       'project-group:group-1'
     ])
-    expect(rows[0]).toMatchObject({ label: 'Platform', hasRepositorySource: true })
+    expect(rows[0]).toMatchObject({ label: 'Platform', count: 0, projectGroup: group })
   })
 
   it('keeps sleep-filtered Project Group members as empty project headers', () => {
-    // Why: #8865 — Hide sleeping removes workspace cards; membership placeholders
-    // must still project the grouped project header so the group count stays honest.
+    // Hide sleeping removes cards, but placeholders must retain project headers and accurate group counts.
     const group: ProjectGroup = {
       id: 'group-1',
       name: 'Platform',
@@ -237,7 +234,6 @@ describe('project groups', () => {
       key: 'project-group:group-1',
       count: 2
     })
-    // Why: empty/placeholder projects sort after projects with visible activity.
     expect(rows.filter((row) => row.type === 'header').map((row) => row.key)).toEqual([
       'project-group:group-1',
       `repo:${awakeRepo.id}`,
@@ -281,7 +277,7 @@ describe('project groups', () => {
     ])
   })
 
-  it('can wrap ungrouped repos in the derived space used by the Spaces sidebar', () => {
+  it('keeps ungrouped project rows at the root when a repository filter is supplied', () => {
     const group: ProjectGroup = {
       id: 'group-1',
       name: 'Platform',
@@ -318,25 +314,16 @@ describe('project groups', () => {
       undefined,
       undefined,
       undefined,
-      true
+      [repo.id]
     )
 
     const headerRows = rows.filter(
       (row): row is Extract<typeof row, { type: 'header' }> => row.type === 'header'
     )
-    expect(headerRows.map((row) => row.key)).toEqual([
-      'project-group:group-1',
-      'project-group:ungrouped',
-      'repo:repo-1'
-    ])
-    expect(headerRows.find((row) => row.key === 'project-group:ungrouped')).toMatchObject({
-      label: 'Ungrouped',
-      count: 1,
-      projectGroup: { id: null },
-      projectGroupDepth: 0
-    })
+    expect(headerRows.map((row) => row.key)).toEqual(['project-group:group-1', 'repo:repo-1'])
+    expect(headerRows.some((row) => row.key === 'project-group:ungrouped')).toBe(false)
     expect(rows.find((row) => row.type === 'item')).toMatchObject({
-      groupDepth: 1,
+      groupDepth: 0,
       sectionKey: 'repo:repo-1'
     })
   })

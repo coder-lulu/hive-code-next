@@ -1,3 +1,4 @@
+import { assertPortNotShadowingListener } from './shadowed-port-probe'
 // WebSocket transport letting mobile clients reach the Orca runtime over LAN (wss:// with TLS, else ws://); auth is per-device tokens, independent of transport encryption.
 import { createServer as createHttpsServer, type Server as HttpsServer } from 'node:https'
 import { createServer as createHttpServer, type Server as HttpServer } from 'node:http'
@@ -51,6 +52,7 @@ export type WebSocketTransportOptions = {
   // Why: devices paired while the fallback port was active point at it, so it must bind first on later launches or those pairings strand (STA-1511).
   fallbackPort?: number
   // Why: serve --port clients dial the pinned port; prefer it first so a stale fallback can't steal the pin (issue #8535). Default keeps fallback-first (STA-1511).
+  requirePinnedPort?: boolean
   preferPinnedPort?: boolean
   // Why: deterministic ports tried before an OS-assigned one, so a fallback stays stable across reboots.
   fallbackLadder?: readonly number[]
@@ -66,6 +68,7 @@ export class WebSocketTransport implements RpcTransport {
   private readonly staticRoot: string | undefined
   private readonly httpRouteHandler: WebSocketHttpRouteHandler | undefined
   private readonly fallbackPort: number | undefined
+  private readonly requirePinnedPort: boolean
   private readonly preferPinnedPort: boolean
   private readonly fallbackLadder: readonly number[]
   private persistedFallbackBindFailed = false
@@ -92,8 +95,10 @@ export class WebSocketTransport implements RpcTransport {
     httpRouteHandler,
     fallbackPort,
     preferPinnedPort,
+    requirePinnedPort,
     fallbackLadder
   }: WebSocketTransportOptions) {
+    this.requirePinnedPort = requirePinnedPort ?? false
     this.host = host
     this.port = port
     this.tlsCert = tlsCert
@@ -170,6 +175,14 @@ export class WebSocketTransport implements RpcTransport {
       return
     }
     // Why: bind a persisted fallback first so devices paired to it aren't stranded (STA-1511); serve --port flips to pinned-first (issue #8535); then the deterministic ladder, and only then an OS-assigned port 0.
+    if (this.requirePinnedPort) {
+      await this.tryListen(this.port).catch((error: unknown) => {
+        throw isWebSocketPortFallbackError(error, this.port)
+          ? new PinnedPortUnavailableError(this.host, this.port, error)
+          : error
+      })
+      return
+    }
     const persistedFallbackPort =
       this.fallbackPort !== undefined && this.fallbackPort !== 0 && this.fallbackPort !== this.port
         ? this.fallbackPort
@@ -220,6 +233,7 @@ export class WebSocketTransport implements RpcTransport {
 
   // Why: attach the WSS only after listen succeeds; earlier it re-emits httpServer's EADDRINUSE as an uncatchable exception and breaks the fallback.
   private async tryListen(port: number): Promise<void> {
+    await assertPortNotShadowingListener(this.host, port)
     const httpServer = this.createHttpServer()
 
     await new Promise<void>((resolve, reject) => {
@@ -282,5 +296,18 @@ export class WebSocketTransport implements RpcTransport {
       getMessageHandler: () => this.messageHandler,
       getConnectionCloseHandler: () => this.connectionCloseHandler
     })
+  }
+}
+
+export class PinnedPortUnavailableError extends Error {
+  readonly code = 'pinned_port_unavailable'
+
+  constructor(host: string, port: number, cause: unknown) {
+    const reason = cause instanceof Error && 'code' in cause ? String(cause.code) : 'unavailable'
+    super(
+      `Port ${port} on ${host} is unavailable (${reason}). Stop whatever is using it, or pass a different --port.`,
+      { cause }
+    )
+    this.name = 'PinnedPortUnavailableError'
   }
 }

@@ -1,3 +1,11 @@
+import { updaterMainWindow } from './updater-test-main-window'
+vi.mock('./updater/updater-wsl-move-install-hold', () => ({ wslMoveInstallHold: () => null }))
+vi.mock('./serve-update-handoff', () => ({
+  hasServeUpdateSupervisor: () => false,
+  getServeUpdateHandoffFailure: () => null,
+  failServeUpdateHandoff: vi.fn(),
+  requestServeUpdateHandoff: () => false
+}))
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as UpdaterModule from './updater'
 
@@ -60,7 +68,7 @@ describe('updater candidate fencing', () => {
   it('rejects quitAndInstall when no downloaded update or recovery exists', async () => {
     vi.useFakeTimers()
     const { setupAutoUpdater, quitAndInstall } = await import('./updater')
-    setupAutoUpdater({ webContents: { send: vi.fn() } } as never)
+    setupAutoUpdater(updaterMainWindow(vi.fn()))
 
     quitAndInstall()
     await vi.advanceTimersByTimeAsync(100)
@@ -78,7 +86,7 @@ describe('updater candidate fencing', () => {
     })
     const send = vi.fn()
     const { checkForUpdatesFromMenu, setupAutoUpdater } = await import('./updater')
-    setupAutoUpdater({ webContents: { send } } as never, {
+    setupAutoUpdater(updaterMainWindow(send), {
       getLastUpdateCheckAt: () => Date.now()
     })
 
@@ -99,7 +107,7 @@ describe('updater candidate fencing', () => {
 
   it('revokes an available candidate when its repository or channel changes', async () => {
     const updater = await import('./updater')
-    updater.setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+    updater.setupAutoUpdater(updaterMainWindow(vi.fn()), {
       getLastUpdateCheckAt: () => Date.now()
     })
     await reachVerifiedAvailableUpdate(updater, '1.0.52')
@@ -122,7 +130,7 @@ describe('updater candidate fencing', () => {
 
   it('rejects a downloaded version that differs from the available candidate', async () => {
     const updater = await import('./updater')
-    updater.setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+    updater.setupAutoUpdater(updaterMainWindow(vi.fn()), {
       getLastUpdateCheckAt: () => Date.now()
     })
     await reachVerifiedAvailableUpdate(updater, '1.0.52')
@@ -138,7 +146,7 @@ describe('updater candidate fencing', () => {
 
   it('does not let a late downloaded event from an older generation arm install', async () => {
     const updater = await import('./updater')
-    updater.setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+    updater.setupAutoUpdater(updaterMainWindow(vi.fn()), {
       getLastUpdateCheckAt: () => Date.now()
     })
     await reachVerifiedAvailableUpdate(updater, '1.0.52')
@@ -158,7 +166,7 @@ describe('updater candidate fencing', () => {
 
   it('does not install a downloaded candidate after its source is revoked', async () => {
     const updater = await import('./updater')
-    updater.setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+    updater.setupAutoUpdater(updaterMainWindow(vi.fn()), {
       getLastUpdateCheckAt: () => Date.now()
     })
     await reachVerifiedAvailableUpdate(updater, '1.0.52')

@@ -11,7 +11,7 @@ import {
   openMobileE2EEV2Frame,
   sealMobileE2EEV2Frame
 } from '../../../shared/mobile-e2ee-v2-framing'
-import { deriveSharedKey } from './e2ee-crypto'
+import { deriveSharedKey } from '../../../shared/e2ee-crypto'
 import { E2EEChannel, type E2EEChannelOptions } from './e2ee-channel'
 import type {
   E2EEAuthenticatedAccountSession,

@@ -4,7 +4,6 @@ import '@testing-library/jest-dom/vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { APP_DISPLAY_NAME } from '../../../../shared/brand'
 import { getDefaultSettings } from '../../../../shared/constants'
 
 const mocks = vi.hoisted(() => ({
@@ -20,15 +19,9 @@ const mocks = vi.hoisted(() => ({
   }
 }))
 
-vi.mock('@/i18n/i18n', async () => {
-  const { applyProductCliBranding } = await import('../../../../shared/brand')
-  return {
-    translate: (_key: string, fallback: string, options?: Record<string, unknown>) =>
-      applyProductCliBranding(fallback).replace(/\{\{(\w+)\}\}/g, (placeholder, key: string) =>
-        options?.[key] === undefined ? placeholder : String(options[key])
-      )
-  }
-})
+vi.mock('@/i18n/i18n', () => ({
+  translate: (_key: string, fallback: string) => fallback
+}))
 
 vi.mock('@/lib/web-client-location', () => ({
   isWebClientLocation: () => mocks.state.isWebClient
@@ -57,7 +50,7 @@ describe('ArtifactsSettingsPane', () => {
 
   afterEach(cleanup)
 
-  it('explains the complete sharing workflow', () => {
+  it('hides sign-in for a connected profile', () => {
     render(
       <ArtifactsSettingsPane
         settings={{ ...getDefaultSettings('/tmp'), showArtifactsButton: true }}
@@ -65,26 +58,7 @@ describe('ArtifactsSettingsPane', () => {
       />
     )
 
-    expect(screen.getByText('How to use Artifacts')).toBeInTheDocument()
-    expect(screen.getByText('Choose a file to share')).toBeInTheDocument()
-    expect(
-      screen.getByText(
-        'Open an HTML or Markdown file and select Share as artifact, or ask an agent to share it.'
-      )
-    ).toBeInTheDocument()
-    expect(screen.getByText('Copy the public link')).toBeInTheDocument()
-    expect(
-      screen.getByText('After publishing, copy the link and send it to your team.')
-    ).toBeInTheDocument()
-    expect(screen.getByText(`Manage it in ${APP_DISPLAY_NAME}`)).toBeInTheDocument()
-    expect(
-      screen.getByText('Preview, copy, and manage links shared through your account.')
-    ).toBeInTheDocument()
-    expect(
-      screen.queryByText('Uploads require sign-in; public links do not.')
-    ).not.toBeInTheDocument()
-    expect(screen.queryByText(`${APP_DISPLAY_NAME} account`)).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Sign in to HiveCloud' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Sign in to Orca' })).not.toBeInTheDocument()
   })
 
   it('offers sign in for a local profile', async () => {
@@ -93,7 +67,7 @@ describe('ArtifactsSettingsPane', () => {
     render(<ArtifactsSettingsPane settings={getDefaultSettings('/tmp')} updateSettings={vi.fn()} />)
 
     expect(screen.getByText('Sign in to share artifacts')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Sign in to HiveCloud' }))
+    await user.click(screen.getByRole('button', { name: 'Sign in to Orca' }))
     expect(mocks.connect).toHaveBeenCalledOnce()
   })
 
@@ -109,7 +83,7 @@ describe('ArtifactsSettingsPane', () => {
     render(<ArtifactsSettingsPane settings={getDefaultSettings('/tmp')} updateSettings={vi.fn()} />)
 
     expect(mocks.fetchAuthStatus).toHaveBeenCalledOnce()
-    expect(screen.getByRole('button', { name: 'Sign in to HiveCloud' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Sign in to Orca' })).toBeDisabled()
   })
 
   it('controls only sidebar visibility and always allows opening Artifacts', async () => {
@@ -134,17 +108,6 @@ describe('ArtifactsSettingsPane', () => {
     expect(openButton).toBeEnabled()
     await user.click(openButton)
     expect(mocks.openArtifactsPage).toHaveBeenCalledOnce()
-  })
-
-  it('describes public publishing and existing-link retention', () => {
-    render(<ArtifactsSettingsPane settings={getDefaultSettings('/tmp')} updateSettings={vi.fn()} />)
-
-    expect(
-      screen.getByRole('switch', { name: 'Allow publishing public artifact links' })
-    ).toHaveAttribute('aria-checked', 'false')
-    expect(screen.getByText(/Publish HTML and Markdown files as links/)).toBeInTheDocument()
-    expect(screen.getByText(/Existing links remain until you delete them/)).toBeInTheDocument()
-    expect(screen.queryByText(/Off by default/)).not.toBeInTheDocument()
   })
 
   it('grants and revokes the publish capability through the toggle', async () => {
@@ -172,7 +135,7 @@ describe('ArtifactsSettingsPane', () => {
     expect(updateSettings).toHaveBeenLastCalledWith({ artifactSharingEnabled: false })
   })
 
-  it('makes the capability read-only on web, where the grant never reaches the host', async () => {
+  it('disables the publish toggle on web without updating settings', async () => {
     const user = userEvent.setup()
     const updateSettings = vi.fn()
     mocks.state.isWebClient = true
@@ -197,6 +160,9 @@ describe('ArtifactsSettingsPane', () => {
       <ArtifactsSettingsPane settings={getDefaultSettings('/tmp')} updateSettings={vi.fn()} />
     )
 
+    expect(
+      screen.getByRole('switch', { name: 'Allow publishing public artifact links' })
+    ).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByText('Enable artifact sharing')).toBeInTheDocument()
     expect(
       screen.getByText('Turn on “Allow publishing public artifact links” above.')
@@ -218,9 +184,7 @@ describe('ArtifactsSettingsPane', () => {
     render(<ArtifactsSettingsPane settings={getDefaultSettings('/tmp')} updateSettings={vi.fn()} />)
 
     expect(
-      screen.getByText(
-        `Open Settings → Artifacts in the ${APP_DISPLAY_NAME} desktop app on the host device and enable publishing.`
-      )
+      screen.getByText(/Open Settings → Artifacts in the Orca desktop app on the host device/)
     ).toBeInTheDocument()
   })
 })

@@ -1,3 +1,4 @@
+import { launchRecordStore } from '../runtime/structured-agent-launch-composition.test-support'
 import { createClaudeStructuredLaunchResolver } from '../runtime/structured-agent-launch-composition.test-support'
 import { chmodSync, mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -60,9 +61,9 @@ function resolverFor(
   attachmentDirectory?: string
 ) {
   return createClaudeStructuredLaunchResolver({
-    store: { getRecord: () => value, pinLaunchDirectory: vi.fn() },
+    store: launchRecordStore(() => value, vi.fn()),
     resolveWorkspacePath: async (id) => `/repos/${id}`,
-    resolveCommand: () => '/usr/local/bin/claude',
+    resolveCommand: () => ({ command: '/usr/local/bin/claude', prefixArgs: [] }),
     resolveAuthPolicy: () => ({ account }),
     hasTranscript,
     resolveLaunchArgs: resolveLaunchArgs ?? (() => value?.launchArgs ?? []),
@@ -277,6 +278,13 @@ describe('claude structured launch resolution', () => {
     })
   })
 
+  it('leaves a provider-own chat without injected permission settings or bypass flags', async () => {
+    const launch = await resolverFor(record())({ identity: IDENTITY, permissionMode: 'own' })
+    expect(launch.options).not.toHaveProperty('permissionMode')
+    expect(launch.options).not.toHaveProperty('allowDangerouslySkipPermissions')
+    expect(launch.options.extraArgs).toEqual({ 'replay-user-messages': null })
+  })
+
   // Full access is the owned bypass flag, never the SDK's typed option older binaries reject.
   it('starts a Full access chat with the bypass flag and no permission mode', async () => {
     const launch = await resolverFor(record())({
@@ -433,9 +441,9 @@ describe('claude structured launch resolution', () => {
   it('builds on the supplied inherited env instead of Orca process env', async () => {
     const launch = await createClaudeStructuredLaunchResolver({
       resolveLaunchArgs: () => [],
-      store: { getRecord: () => record(), pinLaunchDirectory: vi.fn() },
+      store: launchRecordStore(() => record(), vi.fn()),
       resolveWorkspacePath: async (id) => `/repos/${id}`,
-      resolveCommand: () => '/usr/local/bin/claude',
+      resolveCommand: () => ({ command: '/usr/local/bin/claude', prefixArgs: [] }),
       resolveAuthPolicy: () => ({ account: 'system' }),
       resolveInheritedEnv: async () => ({ PATH: '/shell/bin', SHELL_ONLY_MARKER: 'from-shell' })
     })({ identity: IDENTITY })
@@ -446,9 +454,9 @@ describe('claude structured launch resolution', () => {
   it('drops an inherited CLAUDE_CONFIG_DIR so the record stays the only Claude home the pin sees', async () => {
     const launch = await createClaudeStructuredLaunchResolver({
       resolveLaunchArgs: () => [],
-      store: { getRecord: () => record(), pinLaunchDirectory: vi.fn() },
+      store: launchRecordStore(() => record(), vi.fn()),
       resolveWorkspacePath: async (id) => `/repos/${id}`,
-      resolveCommand: () => '/usr/local/bin/claude',
+      resolveCommand: () => ({ command: '/usr/local/bin/claude', prefixArgs: [] }),
       resolveAuthPolicy: () => ({ account: 'system' }),
       resolveInheritedEnv: async () => ({
         PATH: '/shell/bin',
@@ -465,9 +473,9 @@ describe('claude structured launch resolution', () => {
   it('keeps a configured overlay CLAUDE_CONFIG_DIR over the dropped inherited one', async () => {
     const launch = await createClaudeStructuredLaunchResolver({
       resolveLaunchArgs: () => [],
-      store: { getRecord: () => record(), pinLaunchDirectory: vi.fn() },
+      store: launchRecordStore(() => record(), vi.fn()),
       resolveWorkspacePath: async (id) => `/repos/${id}`,
-      resolveCommand: () => '/usr/local/bin/claude',
+      resolveCommand: () => ({ command: '/usr/local/bin/claude', prefixArgs: [] }),
       resolveAuthPolicy: () => ({ account: 'system' }),
       resolveEnv: () => ({ CLAUDE_CONFIG_DIR: '/accounts/selected/home' }),
       resolveInheritedEnv: async () => ({ PATH: '/shell/bin', CLAUDE_CONFIG_DIR: '/shell/claude' })
@@ -476,12 +484,12 @@ describe('claude structured launch resolution', () => {
     expect(launch.env?.CLAUDE_CONFIG_DIR).toBe('/accounts/selected/home')
   })
 
-  it("strips inherited auth under a managed account while retaining its proxy address", async () => {
+  it('strips inherited auth under a managed account while retaining its proxy address', async () => {
     const launch = await createClaudeStructuredLaunchResolver({
       resolveLaunchArgs: () => [],
-      store: { getRecord: () => record(), pinLaunchDirectory: vi.fn() },
+      store: launchRecordStore(() => record(), vi.fn()),
       resolveWorkspacePath: async (id) => `/repos/${id}`,
-      resolveCommand: () => '/usr/local/bin/claude',
+      resolveCommand: () => ({ command: '/usr/local/bin/claude', prefixArgs: [] }),
       resolveAuthPolicy: () => ({ account: 'managed' }),
       resolveInheritedEnv: async () => ({
         PATH: '/shell/bin',
@@ -522,9 +530,9 @@ describe('claude structured launch resolution', () => {
 
     const launch = await createClaudeStructuredLaunchResolver({
       resolveLaunchArgs: () => [],
-      store: { getRecord: () => record(), pinLaunchDirectory: vi.fn() },
+      store: launchRecordStore(() => record(), vi.fn()),
       resolveWorkspacePath: async (id) => `/repos/${id}`,
-      resolveCommand: () => claudeCommand,
+      resolveCommand: () => ({ command: claudeCommand, prefixArgs: [] }),
       resolveAuthPolicy: () => ({ account: 'system' }),
       resolveEnv: () => ({
         PATH: '/usr/bin',
@@ -532,7 +540,10 @@ describe('claude structured launch resolution', () => {
       })
     })({ identity: IDENTITY })
 
-    expect((launch.env?.PATH ?? launch.env?.Path)?.split(delimiter)[0]).toBe(binDir)
+    const cliDir = launch.env?.ORCA_CLI_COMMAND ? dirname(launch.env.ORCA_CLI_COMMAND) : null
+    expect(
+      (launch.env?.PATH ?? launch.env?.Path)?.split(delimiter).find((dir) => dir !== cliDir)
+    ).toBe(binDir)
   })
 
   it('refuses other hosts, WSL, providers, and account-home variables', async () => {
@@ -566,10 +577,10 @@ describe('readable Claude thinking', () => {
     launchArgs: string[] = []
   ) =>
     createClaudeStructuredLaunchResolver({
-      store: { getRecord: () => record(), pinLaunchDirectory: vi.fn() },
+      store: launchRecordStore(() => record(), vi.fn()),
       resolveWorkspacePath: async (id) => `/repos/${id}`,
       resolveLaunchArgs: () => launchArgs,
-      resolveCommand: () => command,
+      resolveCommand: () => ({ command: command, prefixArgs: [] }),
       resolveAuthPolicy: () => ({ account: 'system' }),
       resolveEnv: () => ({ PROJECT_SHIM: '1', ANTHROPIC_API_KEY: 'sk-user' }),
       hasTranscript: async () => false,
@@ -584,11 +595,11 @@ describe('readable Claude thinking', () => {
   ])(
     'probes the CLI the launch runs, on its PATH and shims, without its credentials (%s)',
     async (_, sibling) => {
-      const supports = vi.fn(
+      const check = vi.fn(
         async (
           _flag: ClaudeCliFlag,
           _launch: { command: string; cwd: string; env: Record<string, string> }
-        ) => true
+        ) => 'supported' as const
       )
       const binDir = join(mkdtempSync(join(tmpdir(), 'orca-claude-probe-')), 'bin')
       const command = join(binDir, process.platform === 'win32' ? 'claude.cmd' : 'claude')
@@ -596,8 +607,8 @@ describe('readable Claude thinking', () => {
       if (sibling) {
         makeExecutable(join(binDir, process.platform === 'win32' ? 'node.cmd' : 'node'))
       }
-      const launch = await launchWith({ supports }, command)
-      const asked = supports.mock.calls[0]?.[1]
+      const launch = await launchWith({ check }, command)
+      const asked = check.mock.calls[0]?.[1]
       expect(asked).toMatchObject({ command, cwd: '/repos/workspace-1' })
       const segments = (env: Record<string, string> | undefined) =>
         (env?.PATH ?? env?.Path ?? '').split(delimiter)
@@ -619,14 +630,16 @@ describe('readable Claude thinking', () => {
   )
 
   it('passes nothing when the CLI is not known to take the flag, or nothing can say', async () => {
-    const launch = await launchWith({ supports: async () => false })
+    const launch = await launchWith({ check: async () => 'unsupported' })
     expect(launch.options.extraArgs).toEqual({ 'replay-user-messages': null })
     expect((await launchWith()).options.extraArgs).toEqual({ 'replay-user-messages': null })
   })
 
   it('keeps saved Arguments beside readable thinking, with the display left to Orca', async () => {
     const launch = await launchWith(
-      { supports: async (flag) => flag === CLAUDE_THINKING_DISPLAY_FLAG },
+      {
+        check: async (flag) => (flag === CLAUDE_THINKING_DISPLAY_FLAG ? 'supported' : 'unsupported')
+      },
       undefined,
       ['--effort', 'high', '--thinking-display', 'omitted']
     )

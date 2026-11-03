@@ -3,8 +3,8 @@ import { View, Text, Pressable, StyleSheet } from 'react-native'
 import { useClipboardWriter } from '../platform/clipboard'
 import { triggerError } from '../platform/haptics'
 import { Check, Copy, Pencil, Play, Trash2 } from 'lucide-react-native'
-import type { MobileTheme } from '../theme/mobile-theme'
-import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { colors, spacing, typography } from '../theme/mobile-theme'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 import { MobileAgentIcon } from '../components/MobileAgentIcon'
 import type { TerminalQuickCommand } from '../../../src/shared/terminal-quick-command-types'
 import {
@@ -12,6 +12,8 @@ import {
   getTerminalQuickCommandBody,
   isAgentQuickCommand
 } from '../terminal/quick-commands'
+import { themedStyleSheet } from '../theme/themed-styles'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 
 type QuickCommandRowProps = {
   command: TerminalQuickCommand
@@ -35,8 +37,8 @@ export function QuickCommandRow({
   onDelete,
   disabled
 }: QuickCommandRowProps) {
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createStyles)
+  useMobileColorScheme()
+  const t = useMobileTranslation()
   const clipboard = useClipboardWriter()
   const isAgent = isAgentQuickCommand(command)
   const body = getTerminalQuickCommandBody(command)
@@ -78,13 +80,10 @@ export function QuickCommandRow({
       }
       setFeedback({ body, status: 'copied' })
     } catch {
-      // The guard first: a row unmounted before the refusal arrives has nothing to explain a buzz
-      // with, and the feedback it would set is read by a component that is gone.
+      // Ignore late refusal after unmount; there is no row left to explain the haptic.
       if (!mountedRef.current) {
         return
       }
-      // The row says so on its own control rather than in a toast; the buzz is the part a thumb
-      // resting on the button it just pressed can notice without looking.
       triggerError()
       setFeedback({ body, status: 'failed' })
     }
@@ -102,18 +101,18 @@ export function QuickCommandRow({
   const copyDisabled = disabled || !canCopy
   const copyLabel =
     copyStatus === 'copied'
-      ? '已复制'
+      ? t('common.copied', 'Copied')
       : copyStatus === 'failed'
-        ? '无法复制'
+        ? t('session.quickCommandRow.copyFailed', "Couldn't copy")
         : canCopy
-          ? `复制 ${command.label}`
-          : '无可复制内容'
+          ? t('session.quickCommandRow.copyCommand', 'Copy {{label}}', { label: command.label })
+          : t('session.quickCommandRow.nothingToCopy', 'Nothing to copy')
   const copyIconColor =
     copyStatus === 'copied'
-      ? theme.color.status.success
+      ? colors.statusGreen
       : copyStatus === 'failed'
-        ? theme.color.status.danger
-        : theme.color.text.secondary
+        ? colors.statusRed
+        : colors.textSecondary
 
   return (
     <View style={[styles.row, !first && styles.rowBorder, disabled && styles.disabled]}>
@@ -122,13 +121,15 @@ export function QuickCommandRow({
         disabled={disabled}
         onPress={() => onLaunch(command)}
         accessibilityRole="button"
-        accessibilityLabel={`运行 ${command.label}`}
+        accessibilityLabel={t('session.quickCommandRow.runCommand', 'Run {{label}}', {
+          label: command.label
+        })}
       >
         <View style={styles.rowIcon}>
           {isAgent ? (
             <MobileAgentIcon agentId={command.agent} size={16} />
           ) : (
-            <Play size={16} color={theme.color.text.primary} fill={theme.color.text.primary} />
+            <Play size={14} color={colors.textPrimary} fill={colors.textPrimary} />
           )}
         </View>
         <View style={styles.rowText}>
@@ -163,62 +164,51 @@ export function QuickCommandRow({
         style={({ pressed }) => [styles.rowAction, pressed && !disabled && styles.pressed]}
         disabled={disabled}
         onPress={() => onEdit(command)}
-        accessibilityLabel={`编辑 ${command.label}`}
+        accessibilityLabel={t('session.quickCommandRow.editCommand', 'Edit {{label}}', {
+          label: command.label
+        })}
       >
-        <Pencil size={16} color={theme.color.text.secondary} />
+        <Pencil size={15} color={colors.textSecondary} />
       </Pressable>
       <Pressable
         style={({ pressed }) => [styles.rowAction, pressed && !disabled && styles.pressed]}
         disabled={disabled}
         onPress={() => onDelete(command)}
-        accessibilityLabel={`删除 ${command.label}`}
+        accessibilityLabel={t('session.quickCommandRow.deleteCommand', 'Delete {{label}}', {
+          label: command.label
+        })}
       >
-        <Trash2 size={16} color={theme.color.status.danger} />
+        <Trash2 size={15} color={colors.statusRed} />
       </Pressable>
     </View>
   )
 }
 
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    pressed: { backgroundColor: theme.color.bg.subtle },
-    disabled: { opacity: 0.45 },
-    row: { flexDirection: 'row', alignItems: 'center' },
-    rowBorder: {
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.color.border.subtle
-    },
-    rowMain: {
-      minHeight: theme.size.groupedListRowMinHeight,
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.space12,
-      paddingVertical: theme.spacing.space12,
-      paddingLeft: theme.spacing.space12,
-      minWidth: 0
-    },
-    rowIcon: {
-      width: theme.spacing.space32,
-      height: theme.spacing.space32,
-      borderRadius: theme.radii.control,
-      backgroundColor: theme.color.bg.subtle,
-      alignItems: 'center',
-      justifyContent: 'center'
-    },
-    rowText: { flex: 1, minWidth: 0 },
-    rowLabel: { ...theme.typography.label, fontWeight: '600', color: theme.color.text.primary },
-    rowPreview: {
-      ...theme.typography.caption,
-      color: theme.color.text.secondary,
-      marginTop: theme.spacing.space4
-    },
-    mono: { ...theme.typography.code },
-    rowAction: {
-      width: theme.size.minimumTouchTarget,
-      height: theme.size.groupedListRowMinHeight,
-      alignItems: 'center',
-      justifyContent: 'center'
-    }
-  })
-}
+const styles = themedStyleSheet(() => ({
+  pressed: { backgroundColor: colors.bgRaised },
+  disabled: { opacity: 0.45 },
+  row: { flexDirection: 'row', alignItems: 'center' },
+  rowBorder: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.borderSubtle },
+  rowMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    paddingLeft: spacing.md,
+    minWidth: 0
+  },
+  rowIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 6,
+    backgroundColor: colors.bgRaised,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  rowText: { flex: 1, minWidth: 0 },
+  rowLabel: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+  rowPreview: { fontSize: 12, color: colors.textSecondary, marginTop: 1 },
+  mono: { fontFamily: typography.monoFamily },
+  rowAction: { width: 40, height: 44, alignItems: 'center', justifyContent: 'center' }
+}))

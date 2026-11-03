@@ -17,7 +17,6 @@ import type {
 import { DISPATCH_REJECTED_CANCELLED } from '../../../shared/structured-agent-session-dispatch-rejection'
 import {
   agentSessionFailureFact,
-  type AgentSessionFailureFact,
   type SubmissionRejectionFact
 } from '../../../shared/agent-session-failure'
 import { agentSessionFailureWords } from '../../../shared/agent-session-failure-words'
@@ -26,9 +25,12 @@ import { openAgentSessionJournal } from '../agent-session-journal/journal-store-
 import type { AgentSessionRecordStore } from '../../runtime/agent-session-record-store'
 import { openTestAgentSessionRecordStore } from '../../runtime/agent-session-record-store-test-harness'
 import type { StructuredAgentSessionAdapter } from './structured-agent-session-adapter'
-import { ensureStructuredAgentSessionAgent } from './structured-agent-session-agent-start'
+import { startStructuredAgentSessionAgentForOperation } from './structured-agent-session-agent-start'
 import { StructuredAgentSessionHost } from './structured-agent-session-host'
-import { stopStructuredAgentSessionAgentUnderSerialize } from './structured-agent-session-host-lifetime'
+import {
+  holdClosedStructuredAgentSessionSends,
+  stopStructuredAgentSessionAgentUnderSerialize
+} from './structured-agent-session-host-lifetime'
 import { structuredAgentSessionConversationFence } from './structured-agent-session-provider-child'
 import { structuredQueuePauses } from './structured-agent-session-queued-pause'
 import {
@@ -65,9 +67,7 @@ function eventually(assertion: () => void | Promise<void>): Promise<void> {
   return vi.waitFor(assertion, { timeout: 10_000 })
 }
 
-function generation(): string {
-  return `generation-${acquire.mock.calls.length}`
-}
+const generation = (): string => `generation-${acquire.mock.calls.length}`
 
 const spawnChild: StructuredAgentSessionAdapter['acquire'] = async ({ fence, spawnToken }) => ({
   process: { hostId: 'local', pid: 4242, processStartTimeMs: 1_700_000_000_000, spawnToken },
@@ -83,11 +83,15 @@ const spawnChild: StructuredAgentSessionAdapter['acquire'] = async ({ fence, spa
   }
 })
 
-/** A Claude-shaped child: published at spawn, so it is `starting` until `started`. */
-const spawnStartingChild: StructuredAgentSessionAdapter['acquire'] = async (input) => ({
-  ...(await spawnChild(input)),
-  providerChildPhase: 'starting' as const
-})
+const heldOpen = new Set<string>()
+const finishOpen = new Map<string, () => void>()
+const failOpen = new Map<string, (error: Error) => void>()
+/** Keep protocol opening pending until the test supplies startup evidence. */
+const spawnStartingChild: StructuredAgentSessionAdapter['acquire'] = async (input) => {
+  const child = await spawnChild(input)
+  heldOpen.add(child.acquisitionGeneration)
+  return child
+}
 
 function startHost(): void {
   host = new StructuredAgentSessionHost({
@@ -95,6 +99,15 @@ function startHost(): void {
     logger: createStructuredAgentSessionLogger(),
     store,
     adapter: {
+      open: ({ acquisitionGeneration }) =>
+        heldOpen.has(acquisitionGeneration)
+          ? new Promise((resolve, reject) => {
+              failOpen.set(acquisitionGeneration, reject)
+              finishOpen.set(acquisitionGeneration, () =>
+                resolve({ reportedOptions: { model: 'default' } })
+              )
+            })
+          : Promise.resolve({ reportedOptions: {} }),
       acquire,
       dispatch,
       closeSession: vi.fn(async () => true),
@@ -119,6 +132,9 @@ async function restartHost(): Promise<void> {
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'orca-child-record-'))
   resetHostTestOperationIds()
+  heldOpen.clear()
+  finishOpen.clear()
+  failOpen.clear()
   adapterExtras = {}
   acquire = vi.fn(spawnChild)
   dispatch = vi.fn(async (input) => ({
@@ -189,14 +205,7 @@ async function submission(id: string): Promise<AgentJournalSubmission | undefine
   )
 }
 
-async function statusRows(): Promise<
-  {
-    itemId: string
-    text: string
-    tone?: string
-    failure?: AgentSessionFailureFact
-  }[]
-> {
+async function statusRows() {
   return (await host.journalSnapshot(SESSION)).items.flatMap((item) =>
     item.body.kind === 'status'
       ? [
@@ -221,28 +230,46 @@ function currentChild() {
 }
 
 /** The current child proves its start, as a publish-first provider's `started` event does. */
-function prove(): Promise<void> {
-  const { acquisitionGeneration, ...child } = currentChild()
-  return host.handleAdapterEvent({
-    type: 'started',
-    ...child,
-    acquisitionGeneration,
-    reportedOptions: { model: 'default' },
-    restoreSkippedOptions: [],
-    optionRevision: host.collaboratorsForTests().runtimeState.optionRevisions.current(SESSION)
-  })
+async function prove(): Promise<void> {
+  const { acquisitionGeneration } = currentChild()
+  await eventually(() => expect(finishOpen.has(acquisitionGeneration)).toBe(true))
+  failOpen.delete(acquisitionGeneration)
+  finishOpen.get(acquisitionGeneration)!()
+  await eventually(() => expect(conversation()?.child?.phase).toBe('ready'))
 }
 
-function exit(child: ReturnType<typeof currentChild>, reason: string, startupUnproven?: true) {
-  return host.handleAdapterEvent({
+async function exit(
+  child: ReturnType<typeof currentChild>,
+  reason: string,
+  startupUnanswered?: true
+) {
+  if (startupUnanswered) {
+    await eventually(() => expect(failOpen.has(child.acquisitionGeneration)).toBe(true))
+  }
+  await host.handleAdapterEvent({
     type: 'ended',
     ...child,
     reason,
     // As an adapter reports it: the exit's stderr as a log detail.
     failure: { kind: 'providerExited', detail: { text: reason, audience: 'log' } },
     cause: 'unexpected-exit',
-    ...(startupUnproven ? { startupUnproven } : {})
+    ...(startupUnanswered ? { startupUnanswered } : {})
   })
+  failOpen.get(child.acquisitionGeneration)?.(new Error(reason))
+}
+
+/** Exhaust the real five-attempt retry policy with observed child deaths. */
+async function exhaustStartup(child = currentChild()) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await exit(child, START_EXIT, true)
+    if (attempt < 4) {
+      const previous = child.acquisitionGeneration
+      await eventually(() => expect(conversation()?.child?.generation).not.toBe(previous))
+      await eventually(() => expect(conversation()?.child?.phase).toBe('starting'))
+      child = currentChild()
+    }
+  }
+  return child
 }
 
 function rejectedIn(events: AgentSessionSubscribeEvent[], id: string): boolean {
@@ -283,14 +310,6 @@ function watchStatus(): AgentSessionStatusSummary[] {
   return frames
 }
 
-function deferred<T>() {
-  let resolve!: (value: T) => void
-  const promise = new Promise<T>((next) => {
-    resolve = next
-  })
-  return { promise, resolve }
-}
-
 describe('Stop on a child still proving its start', () => {
   it('ends the child and keeps the conversation and its readers (R1)', async () => {
     adapterExtras = { closeSession: vi.fn(async () => true) }
@@ -316,8 +335,10 @@ describe('Stop on a child still proving its start', () => {
       dispatchState: 'rejected',
       reason: DISPATCH_REJECTED_CANCELLED
     })
-    // A Stop is not a failure: no row, and the loop is gone.
-    expect(await statusRows()).toEqual([])
+    // Stop publishes its cancellation acknowledgement, never an error.
+    expect(await statusRows()).toEqual([
+      { itemId: 'orca:stop%3Aturn-none', text: 'Cancellation requested.' }
+    ])
     await eventually(() => expect(host['conversationDelivery'].loop.isRunning(SESSION)).toBe(false))
 
     const next = await accept('after stop')
@@ -397,10 +418,9 @@ const START_FAILURE: SubmissionRejectionFact = {
 }
 
 describe('a published child that dies while it proves its start', () => {
-  const EXIT = START_EXIT
   const TEXT = START_TEXT
 
-  it('leaves one error row keyed by the start, and every message held for it rejected with it (R2)', async () => {
+  it('leaves one error row keyed by the start, and rejects only the message that requested it (R2)', async () => {
     await restartHost()
     acquire.mockImplementation(spawnStartingChild)
     // Both are held for the starting child, which never proves its start.
@@ -408,11 +428,9 @@ describe('a published child that dies while it proves its start', () => {
     const events = await subscribe()
     const second = await accept('second')
     await eventually(() => expect(conversation()?.child?.phase).toBe('starting'))
-    const child = currentChild()
+    const child = await exhaustStartup()
 
-    await exit(child, EXIT, true)
-
-    await eventually(async () => expect((await submission(second))?.dispatchState).toBe('rejected'))
+    await eventually(async () => expect((await submission(first))?.dispatchState).toBe('rejected'))
     expect(await statusRows()).toEqual([
       {
         itemId: `orca:${encodeURIComponent(`start-failure:${child.acquisitionGeneration}`)}`,
@@ -421,31 +439,39 @@ describe('a published child that dies while it proves its start', () => {
         failure: START_FAILURE
       }
     ])
-    for (const id of [first, second]) {
+    for (const id of [first]) {
       expect(await submission(id)).toMatchObject({
         dispatchState: 'rejected',
         reason: TEXT,
         rejection: START_FAILURE
       })
     }
-    expect(rejectedIn(events, second)).toBe(true)
-    expect(acquire).toHaveBeenCalledTimes(2)
+    expect(rejectedIn(events, first)).toBe(true)
+    expect(rejectedIn(events, second)).toBe(false)
+    await eventually(() => expect(conversation()?.child?.phase).toBe('starting'))
     expect(dispatch).not.toHaveBeenCalled()
+    await prove()
+    await eventually(async () => expect((await submission(second))?.dispatchState).toBe('accepted'))
+    expect(acquire).toHaveBeenCalledTimes(7)
+    expect(dispatch.mock.calls.map(([input]) => input.clientMessageId)).toEqual([second])
   })
 })
 
 /** A start by an operation that needs the agent, such as a goal change, outside the loop. */
-function startForOperation() {
-  return host['serialize'](SESSION, () =>
-    ensureStructuredAgentSessionAgent(host['attachContext'](), SESSION)
-  )
+async function startForOperation() {
+  const previous = conversation()?.child
+  void startStructuredAgentSessionAgentForOperation(host['attachContext'](), SESSION)
+  await eventually(() => {
+    expect(conversation()?.child).toBeTruthy()
+    expect(conversation()?.child).not.toBe(previous)
+  })
 }
 
 describe('a start another operation made that dies while a sent message waits on it', () => {
   const EXIT = START_EXIT
   const TEXT = START_TEXT
 
-  it("is the message's own failed start: one error row, the message rejected, no second start (R2)", async () => {
+  it('records the operation failure once and gives the queued message its own start (R2)', async () => {
     await restartHost()
     acquire.mockImplementation(spawnStartingChild)
     // An operation that needs the agent starts a child that has not proven its start.
@@ -456,42 +482,45 @@ describe('a start another operation made that dies while a sent message waits on
 
     // Accepted first; that child's exit is settled before the loop's first step.
     const sent = host.send(CALLER, params)
-    const exited = exit(operationChild, EXIT, true)
+    const exited = exhaustStartup(operationChild)
     expect(await sent).toMatchObject({
       ok: true,
       value: { submission: { dispatchState: 'pending' } }
     })
-    await exited
+    const finalChild = await exited
     const id = params.envelope.clientOperationId
 
-    await eventually(async () => expect((await submission(id))?.dispatchState).toBe('rejected'))
-    await settleLoop()
-    expect((await submission(id))?.reason).toBe(TEXT)
+    await eventually(async () => expect(await statusRows()).toHaveLength(1))
+    await eventually(() => expect(conversation()?.child?.phase).toBe('starting'))
+    expect((await submission(id))?.dispatchState).toBe('pending')
+    await prove()
+    await eventually(async () => expect((await submission(id))?.dispatchState).toBe('accepted'))
     expect(await statusRows()).toEqual([
       {
-        itemId: `orca:${encodeURIComponent(`start-failure:${operationChild.acquisitionGeneration}`)}`,
+        itemId: `orca:${encodeURIComponent(`start-failure:${finalChild.acquisitionGeneration}`)}`,
         text: TEXT,
         tone: 'error',
         failure: START_FAILURE
       }
     ])
-    expect(rejectedIn(events, id)).toBe(true)
-    // The setup's child and the operation's: nothing started again into the same failure.
-    expect(acquire).toHaveBeenCalledTimes(2)
-    expect(dispatch).not.toHaveBeenCalled()
+    expect(rejectedIn(events, id)).toBe(false)
+    // One setup child and the bounded five-attempt operation flight.
+    expect(acquire).toHaveBeenCalledTimes(7)
+    expect(dispatch.mock.calls.map(([input]) => input.clientMessageId)).toEqual([id])
   })
 
   it('leaves a message sent after that start failed to a fresh start (R2)', async () => {
     await restartHost()
-    acquire.mockImplementationOnce(spawnStartingChild)
+    acquire.mockImplementation(spawnStartingChild)
     await startForOperation()
-    await exit(currentChild(), EXIT, true)
-    expect(await statusRows()).toHaveLength(1)
+    await exhaustStartup()
+    acquire.mockImplementation(spawnChild)
+    await eventually(async () => expect(await statusRows()).toHaveLength(1))
 
     const id = await accept('after the failure')
 
     await eventually(async () => expect((await submission(id))?.dispatchState).toBe('accepted'))
-    expect(acquire).toHaveBeenCalledTimes(3)
+    expect(acquire).toHaveBeenCalledTimes(7)
   })
 
   it('starts again for a message whose proven child crashed: only a failed start settles it (R2)', async () => {
@@ -533,7 +562,7 @@ describe('a start another operation made that dies while a sent message waits on
 })
 
 describe('a child that ends before its message is handed over', () => {
-  it('starts one child for the message, then rejects it and stops (R2)', async () => {
+  it('retries five failed starts, then rejects the message and stops (R2)', async () => {
     await restartHost()
     // The child the loop starts exits as its start step returns: that exit, asked for on the lane
     // then, lands before the handover step.
@@ -550,7 +579,7 @@ describe('a child that ends before its message is handed over', () => {
         acquisitionGeneration,
         reason: 'codex app-server crashed',
         failure: {
-          kind: 'providerExited',
+          kind: 'providerStartFailed',
           detail: { text: 'codex app-server crashed', audience: 'log' }
         },
         cause: 'unexpected-exit'
@@ -563,11 +592,11 @@ describe('a child that ends before its message is handed over', () => {
     await eventually(async () => expect((await submission(id))?.dispatchState).toBe('rejected'))
     // The exit's stderr rides beside the sentence, never in it.
     const failure = {
-      kind: 'providerExited',
+      kind: 'providerStartFailed',
       detail: { text: 'codex app-server crashed', audience: 'log' }
     }
     expect(await submission(id)).toMatchObject({
-      reason: 'Codex stopped before this message was sent.',
+      reason: START_TEXT,
       rejection: failure
     })
     expect(await statusRows()).toEqual([
@@ -575,7 +604,7 @@ describe('a child that ends before its message is handed over', () => {
     ])
     expect(rejectedIn(events, id)).toBe(true)
     await eventually(() => expect(host['conversationDelivery'].loop.isRunning(SESSION)).toBe(false))
-    expect(acquire).toHaveBeenCalledTimes(2)
+    expect(acquire).toHaveBeenCalledTimes(6)
     expect(dispatch).not.toHaveBeenCalled()
   })
 })
@@ -591,13 +620,10 @@ describe('another child indexed after a Stop ended the starting one', () => {
     const stopped = currentChild()
     expect(await stop()).toMatchObject({ ok: true })
     // An operation that needs the agent starts its own child before the second message is sent.
-    await host['serialize'](SESSION, () =>
-      ensureStructuredAgentSessionAgent(host['attachContext'](), SESSION)
-    )
+    await startForOperation()
     const replacement = currentChild()
     expect(replacement.acquisitionGeneration).not.toBe(stopped.acquisitionGeneration)
     const secondId = await accept('second')
-    await settleLoop()
     expect((await submission(secondId))?.handedOverAt).toBeUndefined()
 
     await prove()
@@ -656,7 +682,7 @@ describe('a quit with a message still queued', () => {
   })
 
   it('stops a start already in flight before it launches a child (R2)', async () => {
-    const starting = deferred<void>()
+    const starting = Promise.withResolvers<void>()
     const closeSession = vi.fn(async () => true)
     adapterExtras = { closeSession }
     await restartHost()
@@ -670,6 +696,7 @@ describe('a quit with a message still queued', () => {
     const id = await accept('hello', { person: true })
     await eventually(() => expect(recovering).toHaveBeenCalled())
     const acquiresBefore = acquire.mock.calls.length
+    const leaseBeforeQuit = structuredClone(store.getRecord(SESSION)?.lease)
 
     const quit = host.flushAllStreamedEvents()
     starting.resolve()
@@ -678,11 +705,7 @@ describe('a quit with a message still queued', () => {
     // Quit aborts the start, so nothing is launched behind it and nothing is left to stop.
     expect(acquire).toHaveBeenCalledTimes(acquiresBefore)
     expect(closeSession).not.toHaveBeenCalled()
-    expect(store.getRecord(SESSION)?.lease).toMatchObject({
-      claimStatus: 'released',
-      ownerProcess: null,
-      deathEvidence: { detail: 'reservation failed before spawn' }
-    })
+    expect(store.getRecord(SESSION)?.lease).toEqual(leaseBeforeQuit)
     expect(dispatch).not.toHaveBeenCalled()
     expect(await afterRelaunch(id)).toMatchObject({ dispatchState: 'rejected', ...HOST_RESTARTED })
     expect(await keptCards()).toEqual([id])
@@ -742,41 +765,36 @@ describe('how a stopped child ends the start its loop was waiting on', () => {
 
     await eventually(async () => expect((await submission(second))?.dispatchState).toBe('accepted'))
     expect(conversation()?.lastEndedChild).toMatchObject({ cause: 'user-stop', reason: null })
-    expect(await statusRows()).toEqual([])
+    expect(await statusRows()).toEqual([
+      { itemId: 'orca:stop%3Aturn-none', text: 'Cancellation requested.' }
+    ])
   })
 
   /** The close's stop alone: a close that aborts after it leaves the conversation indexed. */
   function closeStopOnly() {
-    return host['serialize'](SESSION, () =>
-      stopStructuredAgentSessionAgentUnderSerialize(host['lifetimeContext'](), SESSION, {
-        cause: 'user-close'
-      })
-    )
-  }
-
-  /** A message queued for a starting child when the close's stop cut it: asked for during the
-   *  start step, the stop runs before the handover. `beforeStart` runs after the stop and before
-   *  the loop looks again. */
-  async function closedWhileStarting(beforeStart: () => void = () => undefined) {
-    const start = deferred<void>()
-    adapterExtras = { closeSession: vi.fn(async () => true) }
-    await restartHost()
-    acquire.mockImplementationOnce(async (input) => {
-      await start.promise
-      return spawnStartingChild(input)
-    })
-    const first = await accept('first')
-    await eventually(() => expect(acquire).toHaveBeenCalledTimes(2))
-    let starts = 0
-    const closed = host['serialize'](SESSION, async () => {
+    host['runtimeState'].acquireAborts.abort(SESSION, 'closed while starting')
+    return host['serialize'](SESSION, async () => {
+      await holdClosedStructuredAgentSessionSends(
+        host['lifetimeContext']().deps,
+        SESSION,
+        conversation()!.journal,
+        { mark: 'always' }
+      )
       await stopStructuredAgentSessionAgentUnderSerialize(host['lifetimeContext'](), SESSION, {
         cause: 'user-close'
       })
-      starts = acquire.mock.calls.length
-      beforeStart()
     })
-    start.resolve()
-    await closed
+  }
+
+  async function closedWhileStarting(beforeStart: () => void = () => undefined) {
+    adapterExtras = { closeSession: vi.fn(async () => true) }
+    await restartHost()
+    acquire.mockImplementationOnce(spawnStartingChild)
+    const first = await accept('first')
+    await eventually(() => expect(conversation()?.child?.phase).toBe('starting'))
+    beforeStart()
+    await closeStopOnly()
+    const starts = acquire.mock.calls.length
     await settleLoop()
     return { first, starts }
   }
@@ -794,7 +812,7 @@ describe('how a stopped child ends the start its loop was waiting on', () => {
   })
 
   it('keeps a person’s message the user closed as a waiting card, and starts no child for it', async () => {
-    const start = deferred<void>()
+    const start = Promise.withResolvers<void>()
     adapterExtras = { closeSession: vi.fn(async () => true) }
     await restartHost()
     // The start step holds the queue: the message is still queued when the close's stop runs.
@@ -829,12 +847,12 @@ describe('how a stopped child ends the start its loop was waiting on', () => {
   })
 
   it('starts no child when closing what was queued fails, and closes it on the next wake', async () => {
+    let writable = false
     const { first, starts } = await closedWhileStarting(() => {
       const journal = conversation()!.journal
       const resolve = journal.resolveDispatch.bind(journal)
       vi.spyOn(journal, 'resolveDispatch').mockImplementation(async (...args) => {
-        if (args[0].state === 'rejected' && args[0].rejection?.kind === 'chatClosed') {
-          vi.mocked(journal.resolveDispatch).mockImplementation(resolve)
+        if (!writable && args[0].state === 'rejected' && args[0].rejection?.kind === 'chatClosed') {
           throw new Error('disk full')
         }
         return resolve(...args)
@@ -845,6 +863,7 @@ describe('how a stopped child ends the start its loop was waiting on', () => {
     expect(acquire).toHaveBeenCalledTimes(starts)
     expect(dispatch).not.toHaveBeenCalled()
 
+    writable = true
     const second = await accept('second')
     await eventually(async () => expect((await submission(second))?.dispatchState).toBe('accepted'))
     expect(await submission(first)).toMatchObject({

@@ -1,8 +1,10 @@
 import { applyProductBranding } from '../../shared/brand'
 import type { CommandSpec } from '../args'
 import { GLOBAL_FLAGS } from '../args'
+import { withBrowserPageTarget } from './browser-page-target'
+import { BROWSER_WAIT_DEFAULT_TIMEOUT_MS } from '../../shared/browser-wait-timeout'
 
-export const BROWSER_BASIC_COMMAND_SPECS: CommandSpec[] = [
+export const BROWSER_BASIC_COMMAND_SPECS: CommandSpec[] = withBrowserPageTarget([
   {
     path: ['browser', 'identity', 'get'],
     summary: applyProductBranding('Show the browser identity configured on this Orca host'),
@@ -103,6 +105,9 @@ export const BROWSER_BASIC_COMMAND_SPECS: CommandSpec[] = [
       'fn',
       'state',
       'worktree'
+    ],
+    notes: [
+      `With a condition, --timeout is how long to wait for it (default ${BROWSER_WAIT_DEFAULT_TIMEOUT_MS} ms). Without one, --timeout is a plain pause.`
     ]
   },
   {
@@ -257,4 +262,4 @@ export const BROWSER_BASIC_COMMAND_SPECS: CommandSpec[] = [
     usage: 'hive exec --command "<agent-browser command>" [--worktree <selector>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'command', 'worktree']
   }
-]
+])

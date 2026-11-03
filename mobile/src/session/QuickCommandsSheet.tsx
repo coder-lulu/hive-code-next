@@ -1,16 +1,13 @@
-import { useMemo, useRef, useState } from 'react'
-import { Alert, View, Text, Pressable, StyleSheet } from 'react-native'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Alert, View, Text, Pressable } from 'react-native'
 import { ChevronLeft } from 'lucide-react-native'
-import type { MobileTheme } from '../theme/mobile-theme'
-import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { colors, spacing } from '../theme/mobile-theme'
+import { themedStyleSheet } from '../theme/themed-styles'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 import { BottomDrawer } from '../components/BottomDrawer'
 import type { RpcClient } from '../transport/rpc-client'
 import type { TerminalQuickCommand } from '../../../src/shared/terminal-quick-command-types'
-import {
-  getQuickCommandPreview,
-  MAX_QUICK_COMMANDS,
-  quickCommandMatchesRepo
-} from '../terminal/quick-commands'
+import { getQuickCommandPreview, quickCommandMatchesRepo } from '../terminal/quick-commands'
 import { useQuickCommands } from './use-quick-commands'
 import { QuickCommandEditorForm } from './QuickCommandEditorForm'
 import { QuickCommandAgentPicker, QuickCommandsList } from './QuickCommandsList'
@@ -20,6 +17,7 @@ import {
   quickCommandToDraft,
   type QuickCommandDraft
 } from './quick-command-draft'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 
 type Props = {
   visible: boolean
@@ -27,6 +25,7 @@ type Props = {
   client: RpcClient | null
   repoId: string | null
   repoName: string | null
+  agentPromptMaxLength: number | null
   onLaunch: (command: TerminalQuickCommand) => boolean
 }
 
@@ -38,10 +37,11 @@ export function QuickCommandsSheet({
   client,
   repoId,
   repoName,
+  agentPromptMaxLength,
   onLaunch
 }: Props) {
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createStyles)
+  useMobileColorScheme()
+  const t = useMobileTranslation()
   const { commands, loading, ready, error, persist } = useQuickCommands({
     client,
     enabled: visible
@@ -50,19 +50,31 @@ export function QuickCommandsSheet({
   const [query, setQuery] = useState('')
   const [draft, setDraft] = useState<QuickCommandDraft | null>(null)
   const [saving, setSaving] = useState(false)
-  const savingRef = useRef(false)
+  const saveOwnerRef = useRef<symbol | null>(null)
+  const draftRevisionRef = useRef(0)
+  const editorGenerationRef = useRef(0)
 
-  const [wasVisible, setWasVisible] = useState(visible)
-  if (visible !== wasVisible) {
-    setWasVisible(visible)
-    if (visible) {
-      setView('list')
-      setQuery('')
-      setDraft(null)
+  const previousSurface = useRef({ visible, client, repoId })
+  useLayoutEffect(() => {
+    const contextChanged =
+      previousSurface.current.client !== client || previousSurface.current.repoId !== repoId
+    if (visible !== previousSurface.current.visible || contextChanged) {
+      draftRevisionRef.current += 1
+      editorGenerationRef.current += 1
+      previousSurface.current = { visible, client, repoId }
+      if (contextChanged) {
+        saveOwnerRef.current = null
+        setSaving(false)
+      }
+      if (visible || contextChanged) {
+        setView('list')
+        setQuery('')
+        setDraft(null)
+      }
     }
-  }
+  }, [visible, client, repoId])
 
-  // Why: prompt bodies can total ~240 KB. Lowercase them once per settings
+  // Why: prompt bodies can total megabytes. Lowercase them once per settings
   // update instead of allocating the same search text on every keystroke.
   const searchableCommands = useMemo(() => {
     return commands
@@ -84,11 +96,8 @@ export function QuickCommandsSheet({
   const globalCommands = visibleCommands.filter((command) => command.scope?.type !== 'repo')
 
   const openEditor = (command?: TerminalQuickCommand) => {
-    // Why: the host rejects full-list updates above this cap; existing rows
-    // must remain editable/deletable when creation is no longer possible.
-    if (!command && commands.length >= MAX_QUICK_COMMANDS) {
-      return
-    }
+    draftRevisionRef.current += 1
+    editorGenerationRef.current += 1
     setDraft(
       command
         ? quickCommandToDraft(command)
@@ -106,49 +115,65 @@ export function QuickCommandsSheet({
   const handleDelete = (command: TerminalQuickCommand) => {
     // Why: quick commands sync with desktop, so an accidental one-tap delete
     // removes shared data rather than only dismissing a local row.
-    Alert.alert(`删除“${command.label || '未命名'}”？`, '此快捷命令将从已保存列表中移除。', [
-      { text: '取消', style: 'cancel' },
-      {
-        text: '删除',
-        style: 'destructive',
-        onPress: () => {
-          void persist({ type: 'delete', id: command.id })
+    Alert.alert(
+      t('session.quickCommandsSheet.deleteConfirmTitle', 'Delete "{{label}}"?', {
+        label: command.label || t('session.quickCommandsSheet.untitled', 'Untitled')
+      }),
+      t(
+        'session.quickCommandsSheet.deleteConfirmMessage',
+        'This quick command will be removed from your saved list.'
+      ),
+      [
+        { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+        {
+          text: t('common.delete', 'Delete'),
+          style: 'destructive',
+          onPress: () => {
+            void persist({ type: 'delete', id: command.id })
+          }
         }
-      }
-    ])
+      ]
+    )
   }
 
   const handleSave = async () => {
-    if (!draft || savingRef.current) {
+    if (!draft || saveOwnerRef.current !== null) {
       return
     }
-    const built = draftToQuickCommand(draft)
+    const built = draftToQuickCommand(draft, agentPromptMaxLength)
     if (!built) {
       return
     }
     // Why: state cannot lock out a second tap until React commits the disabled UI.
-    savingRef.current = true
+    const saveOwner = Symbol()
+    saveOwnerRef.current = saveOwner
     setSaving(true)
+    const savedRevision = draftRevisionRef.current
+    const savedEditor = editorGenerationRef.current
     try {
       const ok = await persist({ type: 'upsert', command: built })
-      if (ok) {
+      if (ok && draftRevisionRef.current === savedRevision) {
         setView('list')
         setDraft(null)
+      } else if (ok && editorGenerationRef.current === savedEditor) {
+        setDraft((current) => (current ? { ...current, id: built.id } : current))
       }
     } finally {
-      savingRef.current = false
-      setSaving(false)
+      if (saveOwnerRef.current === saveOwner) {
+        saveOwnerRef.current = null
+        setSaving(false)
+      }
     }
   }
 
   const title =
     view === 'editor'
       ? draft?.id
-        ? '编辑快捷命令'
-        : '添加快捷命令'
+        ? t('session.quickCommandsSheet.editTitle', 'Edit Quick Command')
+        : t('session.quickCommandsSheet.addTitle', 'Add Quick Command')
       : view === 'agent'
-        ? '选择 Agent'
-        : '快捷命令'
+        ? t('session.quickCommandsSheet.chooseAgentTitle', 'Choose Agent')
+        : t('session.quickCommandsSheet.title', 'Quick Commands')
 
   return (
     <BottomDrawer visible={visible} onClose={onClose}>
@@ -158,11 +183,14 @@ export function QuickCommandsSheet({
         ) : (
           <Pressable
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-            onPress={() => setView(view === 'agent' ? 'editor' : 'list')}
+            onPress={() => {
+              draftRevisionRef.current += 1
+              setView(view === 'agent' ? 'editor' : 'list')
+            }}
             accessibilityRole="button"
-            accessibilityLabel="返回"
+            accessibilityLabel={t('common.back', 'Back')}
           >
-            <ChevronLeft size={20} color={theme.color.text.secondary} />
+            <ChevronLeft size={18} color={colors.textSecondary} />
           </Pressable>
         )}
         <Text style={styles.title}>{title}</Text>
@@ -171,7 +199,12 @@ export function QuickCommandsSheet({
 
       {view === 'editor' && draft ? (
         <View style={styles.editorDesc}>
-          <Text style={styles.descText}>保存常用终端命令或 Agent 提示词，方便快速调用。</Text>
+          <Text style={styles.descText}>
+            {t(
+              'session.quickCommandsSheet.editorDescription',
+              'Save terminal commands or agent prompts for quick access.'
+            )}
+          </Text>
         </View>
       ) : null}
 
@@ -183,7 +216,6 @@ export function QuickCommandsSheet({
           query={query}
           loading={loading}
           disabled={!ready}
-          canAdd={commands.length < MAX_QUICK_COMMANDS}
           error={error}
           onQueryChange={setQuery}
           onLaunch={handleLaunch}
@@ -201,11 +233,17 @@ export function QuickCommandsSheet({
           error={error}
           repoId={repoId}
           repoName={repoName}
-          onChange={(patch) =>
+          agentPromptMaxLength={agentPromptMaxLength}
+          onChange={(patch) => {
+            draftRevisionRef.current += 1
             setDraft((current) => (current ? { ...current, ...patch } : current))
-          }
-          onOpenAgentPicker={() => setView('agent')}
+          }}
+          onOpenAgentPicker={() => {
+            draftRevisionRef.current += 1
+            setView('agent')
+          }}
           onCancel={() => {
+            draftRevisionRef.current += 1
             setView('list')
             setDraft(null)
           }}
@@ -217,6 +255,7 @@ export function QuickCommandsSheet({
         <QuickCommandAgentPicker
           selected={draft.agent}
           onSelect={(agent) => {
+            draftRevisionRef.current += 1
             setDraft((current) => (current ? { ...current, agent } : current))
             setView('editor')
           }}
@@ -226,34 +265,24 @@ export function QuickCommandsSheet({
   )
 }
 
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    header: {
-      minHeight: theme.size.navigationBarHeight,
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingBottom: theme.spacing.space8
-    },
-    backButton: {
-      width: theme.size.minimumTouchTarget,
-      height: theme.size.minimumTouchTarget,
-      borderRadius: theme.radii.circle,
-      alignItems: 'center',
-      justifyContent: 'center'
-    },
-    backSpacer: { width: theme.size.minimumTouchTarget },
-    title: {
-      ...theme.typography.sectionTitle,
-      flex: 1,
-      fontWeight: '600',
-      color: theme.color.text.primary,
-      textAlign: 'center'
-    },
-    pressed: { backgroundColor: theme.color.bg.subtle },
-    editorDesc: {
-      paddingHorizontal: theme.spacing.space4,
-      paddingBottom: theme.spacing.space8
-    },
-    descText: { ...theme.typography.caption, color: theme.color.text.tertiary }
-  })
-}
+const styles = themedStyleSheet(() => ({
+  header: { flexDirection: 'row', alignItems: 'center', paddingBottom: spacing.sm },
+  backButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  backSpacer: { width: 30 },
+  title: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    textAlign: 'center'
+  },
+  pressed: { backgroundColor: colors.bgRaised },
+  editorDesc: { paddingHorizontal: spacing.xs, paddingBottom: spacing.sm },
+  descText: { fontSize: 12, color: colors.textMuted }
+}))

@@ -1,7 +1,8 @@
 import type { ComponentType } from 'react'
-import { Pressable, StyleSheet } from 'react-native'
-import type { MobileTheme } from '../theme/mobile-theme'
-import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { Pressable } from 'react-native'
+import { colors } from '../theme/mobile-theme'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
+import { styles } from './mobile-session-styles'
 
 type HeaderIconProps = {
   size?: number
@@ -11,6 +12,7 @@ type HeaderIconProps = {
 
 type MobileSessionHeaderIconButtonProps = {
   active?: boolean
+  disabled?: boolean
   accessibilityLabel: string
   icon: ComponentType<HeaderIconProps>
   onPress: () => void
@@ -18,46 +20,27 @@ type MobileSessionHeaderIconButtonProps = {
 
 export function MobileSessionHeaderIconButton({
   active = false,
+  disabled = false,
   accessibilityLabel,
   icon: Icon,
   onPress
 }: MobileSessionHeaderIconButtonProps) {
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createStyles)
-
+  useMobileColorScheme()
   return (
     <Pressable
       style={({ pressed }) => [
-        styles.button,
-        active && styles.buttonActive,
-        pressed && styles.buttonPressed
+        styles.headerButton,
+        pressed && styles.headerButtonPressed,
+        active && styles.headerButtonActive,
+        disabled && styles.headerButtonDisabled
       ]}
+      disabled={disabled}
       onPress={onPress}
-      hitSlop={theme.spacing.space4}
+      hitSlop={4}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ selected: active }}
     >
-      <Icon
-        size={theme.spacing.space20}
-        color={active ? theme.color.text.inverse : theme.color.text.secondary}
-        strokeWidth={2}
-      />
+      <Icon size={18} color={colors.textSecondary} strokeWidth={2.1} />
     </Pressable>
   )
-}
-
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    button: {
-      minWidth: theme.size.minimumTouchTarget,
-      minHeight: theme.size.minimumTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginLeft: theme.spacing.space4,
-      borderRadius: theme.radii.control
-    },
-    buttonActive: { backgroundColor: theme.color.bg.selected },
-    buttonPressed: { opacity: 0.72 }
-  })
 }

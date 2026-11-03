@@ -12,7 +12,6 @@ vi.mock('./client', () => ({
 
 import { resolveGitHubPrStartPoint } from './pr-start-point'
 import { reviewHeadRemoteRefComponent } from '../../shared/review-head-tracking-ref'
-import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 const ORIGIN_URL = 'git@github.com:acme/orca.git'
 const ORIGIN_COMPONENT = reviewHeadRemoteRefComponent('origin', ORIGIN_URL)
@@ -29,7 +28,6 @@ describe('resolveGitHubPrStartPoint', () => {
     getPullRequestPushTargetMock.mockReset()
     getWorkItemMock.mockReset()
     fetchPullRequestHeadRefMock.mockReset()
-    // Why: success path rev-parses the path the fetch returns (writer-authoritative).
     fetchPullRequestHeadRefMock.mockImplementation(async (_remote: string, prNumber: number) =>
       durablePrLocalRef(prNumber)
     )
@@ -167,14 +165,13 @@ describe('resolveGitHubPrStartPoint', () => {
   })
 
   it('prefers the pull-head error when the branch miss triggered a failing fallback', async () => {
-    // Why: the branch fetch missed and we fell back to refs/pull/<N>/head; the
-    // fallback failure is the actionable one, not the original branch miss.
+    // Surface the failed pull-head fallback, rather than the earlier branch miss.
     const fetchRemoteTrackingRef = vi.fn(async () => {
       throw new Error('fatal: could not find remote ref refs/heads/feature/fix')
     })
     fetchPullRequestHeadRefMock.mockRejectedValue(
       new Error(
-        `This SSH host is running an older ${APP_DISPLAY_NAME} relay that cannot fetch pull request heads.`
+        'This SSH host is running an older Orca relay that cannot fetch pull request heads.'
       )
     )
     const gitExec = vi.fn(async () => ({ stdout: '', stderr: '' }))
@@ -189,16 +186,16 @@ describe('resolveGitHubPrStartPoint', () => {
       resolveRemote: async () => 'origin'
     })
 
-    expect(result).toEqual({
-      error: `Failed to fetch refs/pull/77/head: This SSH host is running an older ${APP_DISPLAY_NAME} relay that cannot fetch pull request heads.`
+    expect(result).toMatchObject({
+      error:
+        'Failed to fetch refs/pull/77/head: This SSH host is running an older Orca relay that cannot fetch pull request heads.'
     })
   })
 
   it('captures the fork PR head from a dedicated ref, not the shared FETCH_HEAD', async () => {
     getPullRequestPushTargetMock.mockRejectedValue(new Error('head repo is unavailable'))
     const fetchRemoteTrackingRef = vi.fn(async () => {})
-    // Why: simulate a concurrent `git fetch origin` clobbering FETCH_HEAD with the
-    // default-branch tip. The resolved start-point must come from the durable Orca ref.
+    // Concurrent fetches can clobber FETCH_HEAD; the durable Orca ref must remain authoritative.
     const gitExec = vi.fn(async (args: string[]) => {
       if (args[0] === 'rev-parse') {
         const ref = args.at(-1)
@@ -225,7 +222,6 @@ describe('resolveGitHubPrStartPoint', () => {
     })
 
     expect(fetchPullRequestHeadRefMock).toHaveBeenCalledWith('origin', 1849)
-    // Success path must not re-hash remote identity after the fetch returns a path.
     expect(gitExec).not.toHaveBeenCalledWith(['remote', 'get-url', 'origin'])
     expect(gitExec).not.toHaveBeenCalledWith(['rev-parse', '--verify', 'FETCH_HEAD'])
     expect(result).toEqual({
@@ -236,8 +232,7 @@ describe('resolveGitHubPrStartPoint', () => {
   })
 
   it('keeps the durable PR head when the head fetch fails but the local ref resolves', async () => {
-    // Why: mirror compare-base soft-keep — a transient fetch failure must not
-    // fail the resolve when a prior fetch already pinned refs/orca/pull/<N>.
+    // A prior durable fetch can survive transient transport failure.
     getPullRequestPushTargetMock.mockRejectedValue(new Error('head repo is unavailable'))
     fetchPullRequestHeadRefMock.mockRejectedValue(
       new Error('fatal: unable to access repo: Could not resolve host: github.com')
@@ -286,12 +281,11 @@ describe('resolveGitHubPrStartPoint', () => {
     ["fatal: couldn't find remote ref refs/pull/1849/head", 'deleted PR / cleaned fork'],
     ['Authentication failed. Check your remote credentials.', 'auth failure'],
     [
-      `This SSH host is running an older ${APP_DISPLAY_NAME} relay that cannot fetch pull request heads. Reconnect to deploy the latest relay, then try again.`,
+      'This SSH host is running an older Orca relay that cannot fetch pull request heads. Reconnect to deploy the latest relay, then try again.',
       'stale relay'
     ]
   ])('fails hard instead of soft-keeping the durable PR head on: %s', async (message) => {
-    // Why: soft-keep on a non-transient failure would check out a dead or
-    // unauthorized tip (or mask the reconnect prompt) with a success UX.
+    // Auth/deleted-ref/stale-relay failures must not return a dead or unauthorized cached tip.
     getPullRequestPushTargetMock.mockRejectedValue(new Error('head repo is unavailable'))
     fetchPullRequestHeadRefMock.mockRejectedValue(new Error(message))
     const fetchRemoteTrackingRef = vi.fn(async () => {})
@@ -318,8 +312,11 @@ describe('resolveGitHubPrStartPoint', () => {
       resolveRemote: async () => 'origin'
     })
 
-    expect(result).toEqual({
-      error: `Failed to fetch refs/pull/1849/head: ${message}`
+    expect(result).toMatchObject({
+      error: `Failed to fetch refs/pull/1849/head: ${message}`,
+      errorCode: 'fetchFailed',
+      errorParams: { ref: 'refs/pull/1849/head' },
+      errorDetail: message
     })
     expect(gitExec).not.toHaveBeenCalledWith(['rev-parse', '--verify', durablePrRev(1849)])
   })

@@ -1,3 +1,4 @@
+import { launchRecordStore } from '../runtime/structured-agent-launch-composition.test-support'
 import {
   createClaudeStructuredLaunchResolver,
   createCodexStructuredLaunchResolver
@@ -9,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import { CLAUDE_PLUGIN_DIR_FLAG, type ClaudeCliFlag } from '../claude/claude-cli-flag-support'
 import {
+  acquireReadyCodexForTest,
   adapterFor,
   fakeCodex,
   identityFor
@@ -44,19 +46,19 @@ describe('inline visuals launch preference', () => {
   it('starts Claude without visuals while preserving configured plugins, user folders and attachment access', async () => {
     const sessionId = 'claude-disabled'
     const { stateDirectory, prepareVisuals } = delivery(() => false)
-    const supports = vi.fn(async (_flag: ClaudeCliFlag) => true)
+    const check = vi.fn(async (_flag: ClaudeCliFlag) => 'supported' as const)
     const record = agentSessionRecordFixture({ sessionId })
     const launch = await createClaudeStructuredLaunchResolver({
-      store: { getRecord: () => record, pinLaunchDirectory: vi.fn() },
+      store: launchRecordStore(() => record, vi.fn()),
       resolveWorkspacePath: async () => '/repo',
-      resolveCommand: () => '/bin/claude',
+      resolveCommand: () => ({ command: '/bin/claude', prefixArgs: [] }),
       resolveAuthPolicy: () => ({ account: 'system' }),
       resolveLaunchArgs: () => ['--add-dir', '/user/notes', '--plugin-dir', '/user/plugin'],
       resolveEnv: () => ({ [NATIVE_CHAT_SCRATCH_DIR_ENV]: '/inherited', KEEP: 'yes' }),
       resolveInheritedEnv: async () => ({ PATH: '/bin' }),
       attachmentDirectory: '/state/agent-session-attachments',
       hasTranscript: async () => false,
-      cliFlags: { supports },
+      cliFlags: { check },
       prepareVisuals
     })({ identity: { ...identityFor(sessionId), agent: 'claude', providerHandle: null } })
     expect(launch.options).not.toHaveProperty('plugins')
@@ -67,7 +69,7 @@ describe('inline visuals launch preference', () => {
     ])
     expect(launch.env).not.toHaveProperty(NATIVE_CHAT_SCRATCH_DIR_ENV)
     expect(launch.env?.KEEP).toBe('yes')
-    expect(supports.mock.calls.map(([flag]) => flag)).not.toContain(CLAUDE_PLUGIN_DIR_FLAG)
+    expect(check.mock.calls.map(([flag]) => flag)).not.toContain(CLAUDE_PLUGIN_DIR_FLAG)
     expect(existsSync(nativeChatScratchFolderFor(stateDirectory, sessionId))).toBe(false)
   })
 
@@ -80,17 +82,17 @@ describe('inline visuals launch preference', () => {
       })
     })
     const resolveLaunch = createCodexStructuredLaunchResolver({
-      store: {
-        getRecord: (sessionId) =>
+      store: launchRecordStore(
+        (sessionId) =>
           agentSessionRecordFixture({
             sessionId,
             provider: 'codex',
             accountHome: { variable: 'CODEX_HOME', path: '/home/codex' }
           }),
-        pinLaunchDirectory: vi.fn()
-      },
+        vi.fn()
+      ),
       resolveWorkspacePath: async () => '/repo',
-      resolveCommand: () => '/bin/codex',
+      resolveCommand: () => ({ command: '/bin/codex', prefixArgs: [] }),
       resolveLaunchArgs: () => [],
       resolveEnvironment: async () => ({
         [NATIVE_CHAT_SCRATCH_DIR_ENV]: '/inherited',
@@ -100,7 +102,7 @@ describe('inline visuals launch preference', () => {
     })
     const adapter = adapterFor(codex, {}, [], { resolveLaunch })
     const start = (sessionId: string) =>
-      adapter.acquire({
+      acquireReadyCodexForTest(adapter, {
         identity: {
           ...identityFor(sessionId),
           hostId: LOCAL_EXECUTION_HOST_ID,
@@ -129,9 +131,12 @@ describe('inline visuals launch preference', () => {
       expect(disabled.calls.slice(0, openIndex).map(({ method }) => method)).not.toContain(
         'config/read'
       )
-      expect(
-        disabled.calls.find(({ method }) => method === 'thread/start')?.params
-      ).not.toHaveProperty('config')
+      const disabledOpen = disabled.calls.find(({ method }) => method === 'thread/start')
+      const scratchDirOverride = `shell_environment_policy.set.${NATIVE_CHAT_SCRATCH_DIR_ENV}`
+      expect(disabledOpen?.params?.config ?? {}).not.toHaveProperty([
+        'sandbox_workspace_write.writable_roots'
+      ])
+      expect(disabledOpen?.params?.config ?? {}).not.toHaveProperty([scratchDirOverride])
       expect(existsSync(nativeChatScratchFolderFor(stateDirectory, 'disabled'))).toBe(false)
       expect(first.closed).toBe(false)
       expect(first.calls).toEqual(firstCalls)

@@ -5,17 +5,16 @@ import {
   ExternalLink,
   Github,
   Keyboard,
+  Loader2,
   MessageSquareText,
+  RefreshCw,
+  RotateCw,
   School,
   ScrollText,
   Settings
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { PRODUCT_LOGO_URL as logo } from '@/product-brand'
-import {
-  PRODUCT_CHANGELOG_URL,
-  PRODUCT_PUBLIC_LINKS,
-  PRODUCT_SOURCE_REPOSITORY_URL
-} from '@/product-links'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -26,18 +25,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import { useMountedRef } from '@/hooks/useMountedRef'
 import { useShortcutKeyDetails } from '@/hooks/useShortcutLabel'
 import { ShortcutKeyCombo } from '@/components/ShortcutKeyCombo'
 import { showOnboardingFromRenderer } from '../onboarding/show-onboarding-event'
 import { SetupGuideProgressRing } from '../setup-guide/SetupGuideProgressRing'
-import { useSetupGuideProgressSnapshot } from '../setup-guide/setup-guide-progress-snapshot'
+import { useSetupGuideProgress } from '../setup-guide/use-setup-guide-progress'
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
 import type * as SidebarFeedbackDialogModule from './SidebarFeedbackDialog'
 import { translate } from '@/i18n/i18n'
+import { getUpdateCheckClickOptions, getUpdateCheckHint } from '@/lib/update-check-click-options'
+import { openAppHttpLink } from '@/lib/app-http-link-open'
 
-// Why lazy: the feedback form is only reachable from this menu's own item, so it does not
-// belong on the renderer boot graph. Shared with the menu-open warm below so both hit the
-// same module-map entry.
+// Keep feedback off the boot graph; menu warming and selection share the same lazy module entry.
 const loadSidebarFeedbackDialog = (): Promise<typeof SidebarFeedbackDialogModule> =>
   import('./SidebarFeedbackDialog')
 
@@ -46,8 +46,16 @@ const SidebarFeedbackDialog = lazyWithRetry(
   { reloadKey: 'sidebar-feedback-dialog' }
 )
 
-function openExternalUrl(url: string): void {
-  void window.api.shell.openUrl(url)
+const DOCS_URL = 'https://www.onorca.dev/docs'
+const CHANGELOG_URL = 'https://onorca.dev/changelog'
+const GITHUB_URL = 'https://github.com/stablyai/orca'
+const DISCORD_URL = 'https://discord.gg/fzjDKHxv8Q'
+const X_URL = 'https://x.com/orca_build'
+const NO_UPDATE_CHECK_MODIFIERS = {
+  altKey: false,
+  ctrlKey: false,
+  metaKey: false,
+  shiftKey: false
 }
 
 function DiscordIcon(): React.JSX.Element {
@@ -76,7 +84,7 @@ function ExternalMenuItem({
   icon: React.ReactNode
 }): React.JSX.Element {
   return (
-    <DropdownMenuItem onSelect={() => openExternalUrl(url)}>
+    <DropdownMenuItem onSelect={() => openAppHttpLink(url)}>
       {icon}
       {label}
       <ExternalLink className="ml-auto size-3 text-muted-foreground" />
@@ -88,30 +96,28 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
   const openModal = useAppStore((s) => s.openModal)
   const openSettingsPage = useAppStore((s) => s.openSettingsPage)
   const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
-  const setupProgress = useSetupGuideProgressSnapshot()
+  const updateStatus = useAppStore((s) => s.updateStatus)
+  const setupProgress = useSetupGuideProgress(true, false, false)
 
   const settingsShortcut = useShortcutKeyDetails('app.settings')
   const [menuOpen, setMenuOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
-  // Why sticky: the dialog animates itself closed off `open`, so unmounting on close cuts that short.
+  // Retain the mounted dialog through its closing animation.
   const [feedbackDialogMounted, setFeedbackDialogMounted] = useState(false)
+  const [isRestartingOrca, setIsRestartingOrca] = useState(false)
   const lastShowOnboardingAtRef = React.useRef(0)
-  const hasPublicLinks = Boolean(
-    PRODUCT_PUBLIC_LINKS.documentation ||
-    PRODUCT_CHANGELOG_URL ||
-    PRODUCT_SOURCE_REPOSITORY_URL ||
-    PRODUCT_PUBLIC_LINKS.community ||
-    PRODUCT_PUBLIC_LINKS.social
-  )
+  const updateCheckModifiersRef = React.useRef(NO_UPDATE_CHECK_MODIFIERS)
+  const mountedRef = useMountedRef()
+  const updateCheckHint = getUpdateCheckHint()
 
   const showMilestones =
     setupProgress.ready && setupProgress.coreDoneCount < setupProgress.coreTotal
 
   const handleMenuOpenChange = (open: boolean): void => {
     setMenuOpen(open)
+    updateCheckModifiersRef.current = NO_UPDATE_CHECK_MODIFIERS
     if (open) {
-      // Warm on the precursor: reading the menu and clicking Send Feedback takes hundreds of ms,
-      // so the chunk is already in the module map by the time the item is selected.
+      // Warm while users read the menu so feedback is loaded before selection.
       void loadSidebarFeedbackDialog().catch(() => {})
     }
   }
@@ -130,9 +136,48 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
     void showOnboardingFromRenderer()
   }
 
+  const handleRestartOrca = (): void => {
+    if (isRestartingOrca) {
+      return
+    }
+    setIsRestartingOrca(true)
+    toast.info(
+      translate('auto.components.sidebar.SidebarSettingsHelpMenu.5161eef55d', 'Restarting Orca…')
+    )
+    void window.api.app.restart().catch((error) => {
+      if (mountedRef.current) {
+        setIsRestartingOrca(false)
+        toast.error(
+          translate(
+            'auto.components.sidebar.SidebarSettingsHelpMenu.4e8f5710d3',
+            "Couldn't restart Orca."
+          ),
+          {
+            description: error instanceof Error ? error.message : undefined
+          }
+        )
+      }
+    })
+  }
+
   const openShortcutsSettings = (): void => {
     openSettingsTarget({ pane: 'shortcuts', repoId: null })
     openSettingsPage()
+  }
+
+  const handleCheckForUpdatesPointerDown = (event: React.PointerEvent): void => {
+    updateCheckModifiersRef.current = {
+      altKey: event.altKey,
+      ctrlKey: event.ctrlKey,
+      metaKey: event.metaKey,
+      shiftKey: event.shiftKey
+    }
+  }
+
+  const handleCheckForUpdates = (): void => {
+    const modifiers = updateCheckModifiersRef.current
+    updateCheckModifiersRef.current = NO_UPDATE_CHECK_MODIFIERS
+    void window.api.updater.check(getUpdateCheckClickOptions(modifiers))
   }
 
   const openMilestones = (): void => {
@@ -141,7 +186,7 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
 
   return (
     <>
-      <div className="right-sidebar-header-no-drag settings-help-controls mr-1 flex min-w-0 items-center gap-0.5">
+      <div className="flex items-center gap-1">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -158,7 +203,7 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
               <Settings className="size-3.5" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom" sideOffset={6} className="flex items-center gap-1.5">
+          <TooltipContent side="top" sideOffset={4} className="flex items-center gap-1.5">
             {translate('auto.components.sidebar.SidebarSettingsHelpMenu.a428c25998', 'Settings')}
             {settingsShortcut.keys.length > 0 ? (
               <ShortcutKeyCombo
@@ -189,11 +234,11 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
                 </Button>
               </DropdownMenuTrigger>
             </TooltipTrigger>
-            <TooltipContent side="bottom" sideOffset={6}>
+            <TooltipContent side="top" sideOffset={4}>
               {translate('auto.components.sidebar.SidebarSettingsHelpMenu.2991a0106c', 'Help')}
             </TooltipContent>
           </Tooltip>
-          <DropdownMenuContent side="bottom" align="end" sideOffset={8} className="w-52">
+          <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-52">
             <DropdownMenuItem onSelect={openShortcutsSettings}>
               <Keyboard className="size-3.5" />
               {translate(
@@ -215,7 +260,7 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
                   src={logo}
                   alt=""
                   aria-hidden="true"
-                  className="size-3.5 rounded-sm object-contain opacity-70"
+                  className="size-3.5 rounded-sm object-contain opacity-55"
                 />
                 {translate(
                   'auto.components.sidebar.SidebarSettingsHelpMenu.f8a2c91d4e',
@@ -240,56 +285,66 @@ export function SidebarSettingsHelpMenu(): React.JSX.Element {
                 'Onboarding'
               )}
             </DropdownMenuItem>
-            {PRODUCT_PUBLIC_LINKS.documentation ? (
-              <ExternalMenuItem
-                label={translate(
-                  'auto.components.sidebar.SidebarSettingsHelpMenu.cdc87f897e',
-                  'Docs'
-                )}
-                url={PRODUCT_PUBLIC_LINKS.documentation}
-                icon={<BookOpen className="size-3.5" />}
-              />
-            ) : null}
-            {PRODUCT_CHANGELOG_URL ? (
-              <ExternalMenuItem
-                label={translate(
-                  'auto.components.sidebar.SidebarSettingsHelpMenu.5f83d86d92',
-                  'Changelog'
-                )}
-                url={PRODUCT_CHANGELOG_URL}
-                icon={<ScrollText className="size-3.5" />}
-              />
-            ) : null}
-            {PRODUCT_SOURCE_REPOSITORY_URL ||
-            PRODUCT_PUBLIC_LINKS.community ||
-            PRODUCT_PUBLIC_LINKS.social ? (
-              <DropdownMenuSeparator />
-            ) : null}
-            {PRODUCT_SOURCE_REPOSITORY_URL ? (
-              <ExternalMenuItem
-                label={translate(
-                  'auto.components.sidebar.SidebarSettingsHelpMenu.5687ab246a',
-                  'GitHub'
-                )}
-                url={PRODUCT_SOURCE_REPOSITORY_URL}
-                icon={<Github className="size-3.5" />}
-              />
-            ) : null}
-            {PRODUCT_PUBLIC_LINKS.community ? (
-              <DropdownMenuItem onSelect={() => openExternalUrl(PRODUCT_PUBLIC_LINKS.community!)}>
-                <DiscordIcon />
-                {translate('auto.components.sidebar.SidebarSettingsHelpMenu.eb9884e55b', 'Discord')}
-                <ExternalLink className="ml-auto size-3 text-muted-foreground" />
-              </DropdownMenuItem>
-            ) : null}
-            {PRODUCT_PUBLIC_LINKS.social ? (
-              <DropdownMenuItem onSelect={() => openExternalUrl(PRODUCT_PUBLIC_LINKS.social!)}>
-                <XIcon />
-                {translate('auto.components.sidebar.SidebarSettingsHelpMenu.c4f8e1b72a', 'X')}
-                <ExternalLink className="ml-auto size-3 text-muted-foreground" />
-              </DropdownMenuItem>
-            ) : null}
-            {hasPublicLinks ? <DropdownMenuSeparator /> : null}
+            <ExternalMenuItem
+              label={translate(
+                'auto.components.sidebar.SidebarSettingsHelpMenu.cdc87f897e',
+                'Docs'
+              )}
+              url={DOCS_URL}
+              icon={<BookOpen className="size-3.5" />}
+            />
+            <ExternalMenuItem
+              label={translate(
+                'auto.components.sidebar.SidebarSettingsHelpMenu.5f83d86d92',
+                'Changelog'
+              )}
+              url={CHANGELOG_URL}
+              icon={<ScrollText className="size-3.5" />}
+            />
+            <DropdownMenuSeparator />
+            <ExternalMenuItem
+              label={translate(
+                'auto.components.sidebar.SidebarSettingsHelpMenu.5687ab246a',
+                'GitHub'
+              )}
+              url={GITHUB_URL}
+              icon={<Github className="size-3.5" />}
+            />
+            <DropdownMenuItem onSelect={() => openAppHttpLink(DISCORD_URL)}>
+              <DiscordIcon />
+              {translate('auto.components.sidebar.SidebarSettingsHelpMenu.eb9884e55b', 'Discord')}
+              <ExternalLink className="ml-auto size-3 text-muted-foreground" />
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => openAppHttpLink(X_URL)}>
+              <XIcon />
+              {translate('auto.components.sidebar.SidebarSettingsHelpMenu.c4f8e1b72a', 'X')}
+              <ExternalLink className="ml-auto size-3 text-muted-foreground" />
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              disabled={updateStatus.state === 'checking' || updateStatus.state === 'downloading'}
+              onPointerDown={handleCheckForUpdatesPointerDown}
+              onSelect={handleCheckForUpdates}
+              title={updateCheckHint}
+            >
+              {updateStatus.state === 'checking' ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="size-3.5" />
+              )}
+              {translate(
+                'auto.components.sidebar.SidebarSettingsHelpMenu.29c56f30ee',
+                'Check for Updates'
+              )}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={handleRestartOrca} disabled={isRestartingOrca}>
+              <RotateCw className="size-3.5" />
+              {translate(
+                'auto.components.sidebar.SidebarSettingsHelpMenu.ad3d3ed7f1',
+                'Restart Orca'
+              )}
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

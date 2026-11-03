@@ -53,7 +53,7 @@ describe('setOptIn()', () => {
     expect(order).toEqual(['capture called', 'sdk enqueue', 'optOut'])
   })
 
-  it('fires telemetry_opted_in after posthog.optIn without app_opened for settings opt-in', async () => {
+  it('opens the app after SDK opt-in before recording the consent change', async () => {
     state.settings.telemetry!.optedIn = false
     const order: string[] = []
     mock.optIn.mockImplementation(async () => order.push('optIn'))
@@ -61,7 +61,7 @@ describe('setOptIn()', () => {
       order.push(`capture:${message.event}`)
     })
     await setOptIn('settings', true)
-    expect(order).toEqual(['optIn', 'capture:telemetry_opted_in'])
+    expect(order).toEqual(['optIn', 'capture:app_opened', 'capture:telemetry_opted_in'])
   })
 
   it('drops telemetry_opted_in silently in non-official builds', async () => {
@@ -78,8 +78,7 @@ describe('setOptIn()', () => {
   it('fires app_opened once after pending-banner opt-in enables the SDK', async () => {
     state.settings.telemetry = {
       optedIn: null,
-      installId: BASE_COMMON.install_id,
-      existedBeforeTelemetryRelease: true
+      installId: BASE_COMMON.install_id
     }
     const order: string[] = []
     mock.optIn.mockImplementation(async () => order.push('optIn'))
@@ -100,8 +99,7 @@ describe('persistBannerAcknowledgeWithoutEmitting()', () => {
   beforeEach(() => {
     state = setupTelemetryClientTest({
       optedIn: null,
-      installId: BASE_COMMON.install_id,
-      existedBeforeTelemetryRelease: true
+      installId: BASE_COMMON.install_id
     })
     mock = state.mock
   })

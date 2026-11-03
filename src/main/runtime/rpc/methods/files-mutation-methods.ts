@@ -8,6 +8,7 @@ import {
   FileUntitledPlaceholderLease,
   FileRename,
   FileWrite,
+  FileWriteIfUnchanged,
   FileWriteBase64,
   FileWriteBase64Chunk
 } from '../../../../shared/rpc-contract/files-mutation-params'
@@ -106,6 +107,21 @@ export const FILE_MUTATION_METHODS = [
         params.relativePath,
         params.content,
         ...sshMutationArguments(params)
+      )
+  }),
+  defineMethod({
+    name: 'files.writeIfUnchanged',
+    permission: 'workspace',
+    params: FileWriteIfUnchanged,
+    handler: async (params, { runtime }) =>
+      runtime.writeFileExplorerFile(
+        params.worktree,
+        params.relativePath,
+        params.content,
+        params.expectedSshConnectionGeneration,
+        params.expectedSshTargetId,
+        params.expectedExecutionHostId,
+        params.diskPrecondition
       )
   }),
   defineMethod({

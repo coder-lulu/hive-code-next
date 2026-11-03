@@ -8,10 +8,24 @@ import { SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY } from '../../../src/shared
 import type { RuntimeMobileSessionTabsSnapshot } from '../../../src/shared/runtime-types'
 import { createDesktopDiscoveredDaemonRouter } from './daemon-generation-desktop-discovery'
 import { createDaemonGenerationProfileStore } from './daemon-generation-profile-store'
-import type {
-  LegacyCloseFixtureConfig as FixtureConfig,
-  LegacyCloseFixtureSession as FixtureSession
-} from './daemon-generation-fixture-contract'
+
+type FixtureSession = {
+  protocolVersion: number
+  sessionId: string
+  rootPid: number
+  worktreeId: string
+  tabId: string
+  closeContract: 'capable' | 'legacy'
+}
+
+type FixtureConfig = {
+  generations: { protocolVersion: number; socketPath: string; tokenPath: string }[]
+  currentProtocolVersion: number
+  daemonDir: string
+  historyDir: string
+  cwd: string
+  sessions: FixtureSession[]
+}
 
 async function waitFor(description: string, predicate: () => boolean): Promise<void> {
   const deadline = Date.now() + 10_000
@@ -148,12 +162,7 @@ async function main(): Promise<void> {
         return true
       },
       kill: () => false,
-      listProcesses: (connectionId) => {
-        if (connectionId) {
-          throw new Error('Local daemon fixture cannot enumerate a remote host')
-        }
-        return router.listProcesses()
-      },
+      listProcesses: (_hostId, options) => router.listProcesses(options),
       hasPty: (ptyId) => router.hasPty(ptyId),
       getForegroundProcess: (ptyId) => router.getForegroundProcess(ptyId)
     })
@@ -178,45 +187,45 @@ async function main(): Promise<void> {
     } as never)
     runtime.attachWindow(1)
 
-    const snapshots = config.sessions.map((session, index) => {
+    const viewers = config.sessions.map((session, index) => {
       const leafId = `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`
-      return {
+      const tab = {
+        type: 'terminal' as const,
+        id: `${session.tabId}::${leafId}`,
+        parentTabId: session.tabId,
+        leafId,
+        ptyId: session.sessionId,
+        title: session.tabId,
+        isActive: true
+      }
+      const snapshot: RuntimeMobileSessionTabsSnapshot = {
         worktree: session.worktreeId,
         publicationEpoch: `legacy-viewer-${index + 1}`,
         snapshotVersion: 1,
         activeGroupId: null,
-        activeTabId: `${session.tabId}::${leafId}`,
+        activeTabId: tab.id,
         activeTabType: 'terminal',
-        tabs: [
-          {
-            type: 'terminal',
-            id: `${session.tabId}::${leafId}`,
-            parentTabId: session.tabId,
-            leafId,
-            ptyId: session.sessionId,
-            title: session.tabId,
-            isActive: true
-          }
-        ]
-      } satisfies RuntimeMobileSessionTabsSnapshot
+        tabs: [tab]
+      }
+      return { session, tab, snapshot }
     })
     runtime.syncWindowGraph(1, {
-      tabs: snapshots.map((snapshot) => ({
-        tabId: snapshot.tabs[0]!.parentTabId,
-        worktreeId: snapshot.worktree,
-        title: snapshot.tabs[0]!.title,
-        activeLeafId: snapshot.tabs[0]!.leafId,
+      tabs: viewers.map(({ session, tab }) => ({
+        tabId: tab.parentTabId,
+        worktreeId: session.worktreeId,
+        title: tab.title,
+        activeLeafId: tab.leafId,
         layout: null
       })),
-      leaves: snapshots.map((snapshot, index) => ({
-        tabId: snapshot.tabs[0]!.parentTabId,
-        worktreeId: snapshot.worktree,
-        leafId: snapshot.tabs[0]!.leafId,
+      leaves: viewers.map(({ session, tab }, index) => ({
+        tabId: tab.parentTabId,
+        worktreeId: session.worktreeId,
+        leafId: tab.leafId,
         paneRuntimeId: index + 1,
-        ptyId: config.sessions[index]!.sessionId,
-        paneTitle: snapshot.tabs[0]!.title
+        ptyId: session.sessionId,
+        paneTitle: tab.title
       })),
-      mobileSessionTabs: snapshots
+      mobileSessionTabs: viewers.map(({ snapshot }) => snapshot)
     })
 
     const dispatcher = new RpcDispatcher({ runtime, methods: SESSION_TAB_METHODS })

@@ -1,5 +1,3 @@
-// The one place an orchestration address becomes a party, so no two sites can disagree on who it names.
-import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import {
   formatOrcaSessionAddress,
   isOrcaSessionId,
@@ -13,6 +11,7 @@ import {
   resolveStructuredWorkerIdentityForRoot
 } from '../structured-worker-authority'
 import { canonicalOrcaSessionId } from './canonical-orca-session-id'
+import type { AgentSessionRecordReader } from './structured-session-lineage'
 import type { OrchestrationDb } from './db'
 import { mailboxAddressOf, type OrchestrationCallerIdentity } from './orchestration-caller-identity'
 import { OrchestrationError } from './orchestration-error'
@@ -42,12 +41,13 @@ export const ORCHESTRATION_TARGET_PARAM: Readonly<
 /** The party an Orca session id names. Throws when it is a worker this host lost the identity of. */
 export function resolveOrcaSessionParty(
   orcaSessionId: OrcaSessionId,
-  db: OrchestrationDb | null | undefined
+  db: OrchestrationDb | null | undefined,
+  store?: Pick<AgentSessionRecordReader, 'listRecords'> | null
 ): OrchestrationSessionParty {
-  const id = canonicalOrcaSessionId(orcaSessionId)
+  const id = canonicalOrcaSessionId(orcaSessionId, store)
   const worker = resolveStructuredWorkerIdentityForRoot(id, db)
   if (!worker && db && isRecordedStructuredWorkerSession(id, db)) {
-    // Why: handle-less, it would split one worker into two parties and bind like a chat.
+    // Without its handle, one worker would split into two parties and bind as a chat.
     throw new OrchestrationError(
       CODES.notLive,
       `Agent session ${id} is a structured worker whose worker identity this host no longer has, so orchestration cannot address it. No effects were applied.`,
@@ -99,17 +99,14 @@ export function resolveDeclaredCallerParty(
   if (party.terminalHandle === null) {
     throw new OrchestrationError(
       CODES.chatNotDeclarable,
-      `Agent session ${party.orcaSessionId} is a chat, and a chat is identified only by the ${APP_DISPLAY_NAME} session ID its own environment sends, never by naming it. No effects were applied.`,
+      `Agent session ${party.orcaSessionId} is a chat, and a chat is identified only by the Orca session ID its own environment sends, never by naming it. No effects were applied.`,
       NO_EFFECTS
     )
   }
   return party
 }
 
-/**
- * A Dispatch assignee: a terminal, a structured worker, or a chat named by its Orca session ID. A
- * chat's party is its `/clear` root address, which its own session id resolves to when it reports.
- */
+/** Resolve terminals, workers and chats; chat assignments use the /clear root address for later reports. */
 export function resolveDispatchAssigneeParty(
   address: string,
   db: OrchestrationDb | null | undefined

@@ -12,7 +12,7 @@ import {
   COMPUTER_USE_SKILL_NAME,
   LINEAR_AGENT_SKILL_NAMES,
   ORCHESTRATION_SKILL_NAME
-} from '@/lib/agent-feature-install-commands'
+} from '@/lib/agent-feature-skill-names'
 import {
   GLOBAL_AGENT_SKILL_SOURCE_KINDS,
   useInstalledAgentSkill,
@@ -24,11 +24,7 @@ import { useSkillFreshness } from '@/hooks/useSkillFreshness'
 import { getFallbackTerminalFonts, mergeFontSuggestions } from './SettingsConstants'
 import { useGhosttyImport } from './useGhosttyImport'
 import { useWarpThemeImport } from './useWarpThemeImport'
-import {
-  getInitialMountedSectionIds,
-  shouldLoadSettingsSkillRuntime
-} from './settings-load-performance'
-import { getSettingsSectionId } from './settings-navigation-foundations'
+import { getInitialMountedSectionIds } from './settings-load-performance'
 import {
   buildRepoIdToHostSelection,
   buildRepoIdToRepresentative,
@@ -38,6 +34,10 @@ import {
 import { resolveSettingsHostScope } from './settings-host-scope'
 import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import { defaultScopeHost } from '@/lib/default-creation-host'
+import {
+  blockRemovalForUnsavedFiles,
+  projectRemovalTargets
+} from '@/components/sidebar/removal-unsaved-files'
 
 export function useSettingsStoreModel() {
   const settings = useAppStore((s) => s.settings)
@@ -69,7 +69,7 @@ export function useSettingsStoreModel() {
   const runtimeEnvironmentCatalogHydrated = useAppStore((s) => s.runtimeEnvironmentCatalogHydrated)
 
   const projectHostSetupProjection = useProjectHostSetupProjection()
-  // Why: same inputs as nav metadata so both lists agree — the source of truth for the pane list.
+  // Use navigation’s grouping inputs so pane and navigation lists agree.
   const settingsProjectList = useMemo(
     () =>
       buildSettingsProjectList(repos, {
@@ -82,70 +82,58 @@ export function useSettingsStoreModel() {
     () => buildRepoIdToRepresentative(settingsProjectList),
     [settingsProjectList]
   )
-  // Why: lets a deep-link's repoId select the owning project's host so host-specific subsection anchors exist.
+  // Deep links must choose the repo’s host before host-specific anchors render.
   const repoIdToHostSelection = useMemo(
     () => buildRepoIdToHostSelection(settingsProjectList),
     [settingsProjectList]
   )
-  // Why: removes the entry on every host, not just the selected one; an entry of a split project holds only its own part (clones keep their own entries).
+  // Remove the entry’s setups on every host; split clones own separate entries.
   const removeProjectAllHosts = useCallback(
-    (setups: readonly ProjectHostSetup[]): Promise<void> =>
-      removeSettingsProjectFromAllHosts(setups, removeProject),
+    async (setups: readonly ProjectHostSetup[]): Promise<void> => {
+      // Block dirty removals because this confirmation cannot list files and leaves folders on disk.
+      const targets = projectRemovalTargets(
+        useAppStore.getState(),
+        setups.map((setup) => ({ repoId: setup.repoId, hostId: setup.hostId }))
+      )
+      const name = setups[0]?.displayName ?? ''
+      if (!blockRemovalForUnsavedFiles(useAppStore.getState, targets, name)) {
+        await removeSettingsProjectFromAllHosts(setups, removeProject)
+      }
+    },
     [removeProject]
   )
 
   const [repoHooksMap, setRepoHooksMap] = useState<
     Record<string, { hasHooks: boolean; hooks: OrcaHooks | null; mayNeedUpdate: boolean }>
   >({})
-  const initialNavigationSectionId = settingsNavigationTarget
-    ? getSettingsSectionId(
-        settingsNavigationTarget.pane,
-        settingsNavigationTarget.repoId,
-        repoIdToRepresentative
-      )
-    : null
-  const [activeSectionId, setActiveSectionId] = useState('general')
-  const [mountedSectionIds, setMountedSectionIds] = useState<Set<string>>(() =>
-    getInitialMountedSectionIds(initialNavigationSectionId)
-  )
   const systemPrefersDark = useSystemPrefersDark()
   const isWindows = isWindowsUserAgent()
   const isMac = isMacUserAgent()
   const isWebClient = isWebClientLocation()
   const showDesktopOnlySettings = !isWebClient
-  // Why: mirror the nav registry's gate so the Linear sidebar entry and section appear/disappear together.
+  // Match navigation’s gate so the Linear entry and pane appear together.
   const linearConnected = useLinearProviderConnected()
-  const activeSkillRuntime = useActiveProjectSkillRuntime(
-    shouldLoadSettingsSkillRuntime(mountedSectionIds)
-  )
+  const activeSkillRuntime = useActiveProjectSkillRuntime()
   const orchestrationSkill = useInstalledAgentSkill(ORCHESTRATION_SKILL_NAME, {
-    enabled: mountedSectionIds.has('agent-capabilities'),
-    readCachedWhenDisabled: true,
     discoveryTarget: activeSkillRuntime.discoveryTarget,
     sourceKinds: GLOBAL_AGENT_SKILL_SOURCE_KINDS
   })
   const linearSkill = useInstalledAgentSkillNames(LINEAR_AGENT_SKILL_NAMES, {
-    enabled: linearConnected && mountedSectionIds.has('linear'),
-    readCachedWhenDisabled: true,
+    enabled: linearConnected,
     discoveryTarget: activeSkillRuntime.discoveryTarget,
     sourceKinds: GLOBAL_AGENT_SKILL_SOURCE_KINDS
   })
   const computerUseSkill = useInstalledAgentSkill(COMPUTER_USE_SKILL_NAME, {
-    enabled: showDesktopOnlySettings && mountedSectionIds.has('agent-capabilities'),
-    readCachedWhenDisabled: true,
+    enabled: showDesktopOnlySettings,
     discoveryTarget: activeSkillRuntime.discoveryTarget,
     sourceKinds: GLOBAL_AGENT_SKILL_SOURCE_KINDS
   })
-  const skillFreshnessApplies =
-    activeSkillRuntime.canUseLocalSkillFreshness &&
-    ['agent-capabilities', 'linear'].some((sectionId) => mountedSectionIds.has(sectionId))
-  const { inventory: skillFreshnessInventory } = useSkillFreshness(skillFreshnessApplies)
+  const skillFreshnessApplies = activeSkillRuntime.bundledSkillTarget !== null
+  const { plan: skillPlan } = useSkillFreshness(activeSkillRuntime.bundledSkillTarget)
   const [voiceModelStatesLoading, setVoiceModelStatesLoading] = useState(false)
-  const shouldLoadVoiceModelStates = showDesktopOnlySettings && mountedSectionIds.has('voice')
-  // Why: trim platform-only Terminal entries from the shared search index so search never reveals hidden controls.
   const [scrollbackMode, setScrollbackMode] = useState<'preset' | 'custom'>('preset')
   const [prevScrollbackRows, setPrevScrollbackRows] = useState(settings?.terminalScrollbackRows)
-  // Why: keep Ghostty import state at Settings level so the modal survives section remounts.
+  // Keep import state above sections so remounts cannot close the modal.
   const ghostty = useGhosttyImport(updateSettings, settings)
   const warpThemes = useWarpThemeImport(updateSettings, settings)
   const [fontSuggestions, setFontSuggestions] = useState<string[]>(
@@ -155,6 +143,11 @@ export function useSettingsStoreModel() {
     () => fontSuggestions.filter((font) => font !== DEFAULT_APP_FONT_FAMILY),
     [fontSuggestions]
   )
+  const [activeSectionId, setActiveSectionId] = useState('general')
+  const [mountedSectionIds, setMountedSectionIds] = useState<Set<string>>(
+    getInitialMountedSectionIds
+  )
+  const shouldLoadVoiceModelStates = showDesktopOnlySettings && mountedSectionIds.has('voice')
   const [pendingNavRequestTick, setPendingNavRequestTick] = useState(0)
   const [highlightedSettingsTargetId, setHighlightedSettingsTargetId] = useState<string | null>(
     null
@@ -167,15 +160,15 @@ export function useSettingsStoreModel() {
   const [hasUnsavedChatPromptChanges, setHasUnsavedChatPromptChanges] = useState(false)
   const [sourceControlAiPromptDiscardSignal, setSourceControlAiPromptDiscardSignal] = useState(0)
   const confirm = useConfirmationDialog()
-  // Why: session-only (deliberately not persisted) unlock — Option-click the Experimental page title reveals the hidden group.
+  // Option-click unlocks hidden experiments for this session only.
   const [hiddenExperimentalUnlocked, setHiddenExperimentalUnlocked] = useState(false)
   const [settingsHostChoice, setSettingsHostChoice] = useState<RuntimeClientTarget | null>(null)
   const defaultScope = defaultScopeHost(settings)
   const defaultRuntimeEnvironmentId =
     defaultScope.kind === 'environment' ? defaultScope.environmentId : null
-  // Why: keyed on ids so status-only catalog updates keep the scope (and its loads) stable.
+  // Key by IDs so status-only catalog changes cannot restart host-scoped loads.
   const savedEnvironmentIdsKey = runtimeEnvironments.map((environment) => environment.id).join('\n')
-  // Why: the web client's only host is its server, so it never offers a choice.
+  // Web clients use their serving host and cannot offer host selection.
   const settingsHostScope = useMemo(
     () =>
       resolveSettingsHostScope({
@@ -232,10 +225,10 @@ export function useSettingsStoreModel() {
     linearSkill,
     computerUseSkill,
     skillFreshnessApplies,
-    skillFreshnessInventory,
+    skillPlan,
     voiceModelStatesLoading,
-    setVoiceModelStatesLoading,
     shouldLoadVoiceModelStates,
+    setVoiceModelStatesLoading,
     scrollbackMode,
     setScrollbackMode,
     prevScrollbackRows,
@@ -247,7 +240,6 @@ export function useSettingsStoreModel() {
     terminalFontSuggestions,
     activeSectionId,
     setActiveSectionId,
-    initialNavigationSectionId,
     mountedSectionIds,
     setMountedSectionIds,
     pendingNavRequestTick,

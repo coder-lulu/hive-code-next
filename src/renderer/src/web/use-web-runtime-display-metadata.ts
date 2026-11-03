@@ -5,9 +5,9 @@ import type { CloudLaunchBootstrap } from './cloud-launch-bootstrap'
 import {
   captureWebRuntimeDisplayOwner,
   clearWebRuntimeDisplayProjection,
-  isCurrentWebRuntimeDisplayOwner,
-  WebRuntimeDisplayMetadataError
+  isCurrentWebRuntimeDisplayOwner
 } from './preload-api/web-runtime-session'
+import { WebRuntimeDisplayMetadataError } from './preload-api/web-runtime-display-projection'
 import {
   metadataRetryAfterMs,
   refreshWebRuntimeDisplayMetadata

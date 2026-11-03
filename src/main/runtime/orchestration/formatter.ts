@@ -1,6 +1,5 @@
 import type { MessageRow } from './types'
 import { ORCHESTRATION_LEGACY_RUN_ID } from '../../../shared/orchestration-rpc-contract'
-import { PRIMARY_CLI_COMMAND } from '../../../shared/brand'
 import type { OrchestrationCliCommand } from './cli-command'
 
 const BANNER_WIDTH = 60
@@ -92,17 +91,14 @@ export function formatMessageBanner(
       msg.to_handle.startsWith('run:') || msg.to_handle.startsWith('dispatch:')
         ? ''
         : ` --from ${msg.to_handle}`
-    lines.push(
-      `[Reply: ${PRIMARY_CLI_COMMAND} orchestration reply --id ${msg.id}${explicitFrom} --body "..."]`
-    )
+    lines.push(`[Reply: orca orchestration reply --id ${msg.id}${explicitFrom} --body "..."]`)
   }
   lines.push(SEPARATOR)
 
   return lines.join('\n')
 }
 
-// Why: grouping multiple banners under a single wrapper line lets agents detect
-// the message block boundary and parse each banner individually.
+// One wrapper marks the message block boundary while leaving each banner independently parseable.
 export function formatMessagesForInjection(messages: MessageRow[]): string {
   if (messages.length === 0) {
     return ''
@@ -115,11 +111,15 @@ export function formatMessagesForInjection(messages: MessageRow[]): string {
 export function formatMessagePointer(
   count: number,
   mailboxHandle?: string,
-  cliCommand: OrchestrationCliCommand = PRIMARY_CLI_COMMAND
+  cliCommand: OrchestrationCliCommand = 'orca',
+  heldDeliveryId?: string
 ): string {
   const noun = count === 1 ? 'message' : 'messages'
   const runFlag = mailboxHandle?.startsWith('run:')
     ? ` --run ${mailboxHandle.slice('run:'.length)}`
     : ''
+  if (heldDeliveryId) {
+    return `\nYou have ${count} new orchestration ${noun} after delivery ${heldDeliveryId}, which you have not acknowledged. If you no longer have it, run \`${cliCommand} orchestration check${runFlag}\` to see it again; once it is handled, run \`${cliCommand} orchestration check${runFlag} --ack ${heldDeliveryId}\`.\n`
+  }
   return `\nYou have ${count} orchestration ${noun}. Run \`${cliCommand} orchestration check${runFlag}\`.\n`
 }

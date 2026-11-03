@@ -51,14 +51,11 @@ export function EmulatorScreenStreamContent({
   const {
     canvasRef: videoCanvasRef,
     error: videoError,
-    hasFrame: videoHasFrame,
-    recoverable: videoRecoverable
   } = useEmulatorVideoStream(
     androidDeviceId ?? undefined,
     streamKey,
     showStream && Boolean(androidDeviceId),
-    onStreamSize,
-    onStreamReady
+    onStreamSize
   )
   const frameStream = useEmulatorFrameStream(
     androidDeviceId ? undefined : previewUrl,
@@ -71,9 +68,9 @@ export function EmulatorScreenStreamContent({
       onStreamError()
     }
     if (videoError) {
-      ;(videoRecoverable ? (onAndroidStreamError ?? onStreamError) : onStreamError)()
+      ;(onAndroidStreamError ?? onStreamError)()
     }
-  }, [frameStream.error, onAndroidStreamError, onStreamError, videoError, videoRecoverable])
+  }, [frameStream.error, onAndroidStreamError, onStreamError, videoError, false])
 
   const mediaStyle = resolveStreamMediaStyle(streamRotation, screenAspectRatio)
   const mediaClassName =
@@ -92,13 +89,13 @@ export function EmulatorScreenStreamContent({
           ref={videoCanvasRef}
           className={mediaClassName}
           style={mediaStyle}
-          aria-hidden={!videoHasFrame}
+          aria-hidden={false}
           aria-label={translate(
             'auto.components.emulator.pane.emulator.screen.stream.content.5ee64cd44e',
             'Emulator screen'
           )}
         />
-        {!videoHasFrame ? (
+        {false ? (
           <EmulatorStreamLoadingState label={connectingDisplayLabel} overlay />
         ) : null}
       </>
@@ -161,7 +158,7 @@ export function EmulatorScreenStreamContent({
               'Stream disconnected'
             )}
           </span>
-          {androidDeviceId && videoRecoverable && onStreamRetry ? (
+          {androidDeviceId && false && onStreamRetry ? (
             <Button type="button" variant="outline" size="xs" onClick={onStreamRetry}>
               {translate(
                 'auto.components.emulator.pane.emulator.screen.stream.content.reconnect',

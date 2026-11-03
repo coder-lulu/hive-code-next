@@ -3,7 +3,12 @@ import {
   authenticateCloudManagedE2EE,
   type CloudManagedE2EEAuth
 } from './cloud-managed-e2ee-auth-validation'
-import { authenticateMobileE2EE } from './mobile-e2ee-auth-validation'
+import {
+  authenticateMobileE2EE,
+  describeMobileE2EEAuthFailure,
+  type DeviceKeyResolution,
+  type MobileE2EEAuthFailureCode
+} from './mobile-e2ee-auth-validation'
 import type { DesktopMobileE2EEV2Session } from './mobile-e2ee-v2-desktop-session'
 import { parseRuntimeClientCapabilities } from './runtime-client-capabilities'
 
@@ -11,7 +16,7 @@ type E2EEPrincipalKind = 'paired_device' | 'cloud_managed_web_session'
 
 export type E2EEAuthenticatedDevice = {
   deviceId: string
-  deviceToken: string
+  deviceToken?: string
   credentialRevision?: number
   clientId?: string
   scope: 'mobile' | 'runtime'
@@ -44,13 +49,15 @@ type AuthenticationResult =
   | {
       ok: false
       principalKind: 'paired_device' | 'cloud_managed_web_session'
-      code: 'bad_auth' | 'unauthorized' | 'insecure_origin'
+      code: MobileE2EEAuthFailureCode
+      deviceId?: string
     }
 
 export function authenticateE2EEChannel(args: {
   plaintext: string
   v2Session: DesktopMobileE2EEV2Session | null
   resolveDevice: (token: string) => E2EEAuthenticatedDevice | { refused: 'insecure_origin' } | null
+  resolveDeviceKey?: (deviceId: string) => DeviceKeyResolution<E2EEAuthenticatedDevice>
   resolveCloudSession?: E2EECloudManagedSessionResolver
 }): AuthenticationResult {
   if (args.resolveCloudSession) {
@@ -79,26 +86,29 @@ export function authenticateE2EEChannel(args: {
   const paired = authenticateMobileE2EE({
     plaintext: args.plaintext,
     v2Session: args.v2Session,
-    resolveDevice: args.resolveDevice
+    resolveDevice: args.resolveDevice,
+    resolveDeviceKey: args.resolveDeviceKey
   })
   return paired.ok
     ? {
         ok: true,
         principalKind: 'paired_device',
         principal: paired.device,
-        clientCapabilities: parseRuntimeClientCapabilities(paired.auth.clientCapabilities)
+        clientCapabilities: parseRuntimeClientCapabilities(paired.clientCapabilities)
       }
-    : { ok: false, principalKind: 'paired_device', code: paired.code }
+    : { ok: false, principalKind: 'paired_device', code: paired.code, deviceId: paired.deviceId }
 }
 
 export function rejectE2EEAuthentication(
-  code: 'bad_auth' | 'unauthorized' | 'insecure_origin',
+  code: MobileE2EEAuthFailureCode,
   principalKind: E2EEPrincipalKind,
   send: (message: unknown) => void,
-  close: (code: number, reason: string, principalKind?: E2EEPrincipalKind) => void
+  close: (code: number, reason: string, principalKind?: E2EEPrincipalKind) => void,
+  deviceId?: string
 ): void {
-  send({ type: 'e2ee_error', error: { code } })
-  const reason = code === 'bad_auth' ? 'Invalid e2ee_auth' : code === 'insecure_origin' ? 'Insecure web origin' : 'Unauthorized'
+  const failure = describeMobileE2EEAuthFailure({ code, deviceId })
+  send(failure.sealedError)
+  const reason = code === 'insecure_origin' ? 'Insecure web origin' : failure.closeReason
   if (principalKind === 'cloud_managed_web_session') {
     close(4001, reason, principalKind)
   } else {

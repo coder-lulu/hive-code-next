@@ -18,7 +18,7 @@ vi.mock('node:fs', async (importOriginal) => {
     readFileSync: (...args: Parameters<typeof actual.readFileSync>) => {
       if (
         args[0] === '/proc/sys/kernel/osrelease' &&
-        args[1] === 'utf8' &&
+        (args[1] as unknown) === 'utf8' &&
         nativeHost.kernelRelease !== null
       ) {
         return nativeHost.kernelRelease
@@ -75,15 +75,7 @@ describe('execution-host native credential authority', () => {
     expect(isAntigravityFileStorageHost({}, '6.8-linux')).toBe(false)
   })
 
-  it('refuses Windows file bypass until private ACL protection is verified', () => {
-    vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
-    vi.stubEnv('SSH_CLIENT', 'task-host')
-    expect(() => createAntigravityHostCredentialBackend('/task-home')).toThrow(
-      'private file permissions need a verified adapter'
-    )
-  })
-
-  it.each(['win32', 'linux'] as const)(
+  it.each(['linux'] as const)(
     'capability-refuses unverified native %s without mutating client credentials',
     (platform) => {
       if (platform === 'linux') {

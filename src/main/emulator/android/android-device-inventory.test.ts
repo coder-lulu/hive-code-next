@@ -4,6 +4,7 @@ import type { AndroidSdkPaths } from './android-sdk-discovery'
 import {
   findRunningAvdSerial,
   listAndroidDevices,
+  listConfirmedAdbSerials,
   mergeAndroidDevices
 } from './android-device-inventory'
 import { parseAdbDevices } from './adb-devices'
@@ -182,6 +183,19 @@ describe('listAndroidDevices', () => {
     expect(devices[0]).toEqual(
       expect.objectContaining({ id: 'emulator-5554', state: 'unresponsive' })
     )
+  })
+})
+
+describe('listConfirmedAdbSerials', () => {
+  it('lists every attached serial, and null when adb itself fails', async () => {
+    const answering: AndroidCommandRunner = async () =>
+      ok('List of devices attached\nemulator-5554\tdevice\nemulator-5556\toffline')
+    expect(await listConfirmedAdbSerials(answering, SDK)).toEqual([
+      'emulator-5554',
+      'emulator-5556'
+    ])
+    const failing: AndroidCommandRunner = async () => ({ stdout: '', stderr: 'boom', code: 1 })
+    expect(await listConfirmedAdbSerials(failing, SDK)).toBeNull()
   })
 })
 

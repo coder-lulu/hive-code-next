@@ -15,7 +15,6 @@ import { join, resolve } from 'node:path'
 import { runProcessSync } from '@orca/process-host'
 import { describeProcessFailure } from './process-failure-message.mjs'
 import { isDirectInvocation } from './script-entry-detection.mjs'
-import { releaseJavascriptSupport } from './release-javascript-support.mjs'
 import { DESKTOP_RC_TAG, DESKTOP_STABLE_TAG } from './release-tag-patterns.mjs'
 import { getTarProgram } from './zip-extractor-command.mjs'
 
@@ -25,19 +24,13 @@ const REQUIRED_FILES = [
   'preload/index.js',
   'renderer/index.html',
   'renderer/.vite/manifest.json',
+  'renderer/.orca-web-client-files.json',
   'web/web-index.html',
   'mobile-web/manifest.json',
   'package.json'
 ]
 const NATIVE_FILE = /\.(?:node|exe|dll|dylib|so(?:\.\d+)*|a)$/i
 const ARCHIVE_NAME = 'release-javascript.tar.gz'
-const RETIRED_RUNTIME_OUTPUTS = [
-  'native-pi',
-  'managed-pi',
-  'paperclip-service',
-  'paperclip-adapter',
-  'paperclip-runtime'
-]
 
 function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex')
@@ -50,12 +43,7 @@ function command(program, args, cwd) {
 }
 
 export function releaseBuildIdentity(tag) {
-  // HiveCode beta releases retain the existing rc compile-time telemetry identity.
-  // Their version and published update channel remain beta.
-  if (
-    DESKTOP_RC_TAG.test(tag) ||
-    /^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)-beta\.(?:0|[1-9]\d*)$/.test(tag)
-  ) {
+  if (DESKTOP_RC_TAG.test(tag)) {
     return 'rc'
   }
   if (DESKTOP_STABLE_TAG.test(tag)) {
@@ -75,46 +63,36 @@ export function releaseJavascriptConfiguration(root, env = process.env) {
     )
   }
   const { version, packageManager } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
-  const identity = releaseBuildIdentity(`v${version}`)
-  assert.equal(env.ORCA_BUILD_IDENTITY, identity, 'Release build identity differs from version')
-  const { endpoints } = JSON.parse(
-    readFileSync(join(root, 'config', 'product', 'hivecode.product.json'), 'utf8')
-  )
-  const diagnosticsTokenUrl = endpoints.diagnostics ?? null
-  const telemetryEndpoint = endpoints.telemetry ?? null
-  assert.equal(
-    env.ORCA_DIAGNOSTICS_TOKEN_URL?.trim() || null,
-    diagnosticsTokenUrl,
-    'Release diagnostics URL differs from product configuration'
-  )
-  const telemetryKey = env.ORCA_POSTHOG_WRITE_KEY?.trim() || null
-  assert(!telemetryEndpoint || telemetryKey, 'Missing configured product telemetry key')
-  assert(telemetryEndpoint || !telemetryKey, 'Product telemetry is disabled')
+  const requestedIdentity = env.ORCA_RELEASE_JAVASCRIPT_BUILD_IDENTITY
+  const identity = requestedIdentity === 'dev' ? 'dev' : releaseBuildIdentity(`v${version}`)
+  if (requestedIdentity) {
+    assert.equal(requestedIdentity, identity, 'Invalid JavaScript build identity')
+  }
+  if (identity === 'dev') {
+    assert(!env.ORCA_BUILD_IDENTITY, 'Development bundle must not set an official build identity')
+    assert(!env.ORCA_POSTHOG_WRITE_KEY, 'Development bundle must not set a release telemetry key')
+  } else {
+    assert.equal(env.ORCA_BUILD_IDENTITY, identity, 'Release build identity differs from version')
+    assert(env.ORCA_POSTHOG_WRITE_KEY, 'Missing release telemetry key')
+  }
+  assert(env.ORCA_DIAGNOSTICS_TOKEN_URL, 'Missing release diagnostics URL')
   return {
     sourceSha,
     version,
     packageManager,
     identity,
-    diagnosticsTokenUrl,
-    telemetryEndpoint,
-    telemetryKeySha256: telemetryKey ? sha256(telemetryKey) : null
+    diagnosticsTokenUrl: env.ORCA_DIAGNOSTICS_TOKEN_URL,
+    telemetryKeySha256: identity === 'dev' ? null : sha256(env.ORCA_POSTHOG_WRITE_KEY)
   }
 }
 
-export function javascriptInventory(
-  directory,
-  prefix = '',
-  { excludeHostOutput = false, excludeRetiredRuntimeOutput = false } = {}
-) {
+export function javascriptInventory(directory, prefix = '', { excludeHostOutput = false } = {}) {
   return readdirSync(directory, { withFileTypes: true })
     .sort((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0))
     .flatMap((entry) => {
       const name = prefix ? `${prefix}/${entry.name}` : entry.name
-      const root = name.split('/')[0]
-      const retiredRuntime = RETIRED_RUNTIME_OUTPUTS.includes(root.toLowerCase())
-      const hostOutput =
-        retiredRuntime || ['relay', 'orcad-template', 'orcad-prebuilds'].includes(root)
-      if ((excludeHostOutput && hostOutput) || (excludeRetiredRuntimeOutput && retiredRuntime)) {
+      const hostOutput = ['relay', 'orcad-template', 'orcad-prebuilds'].includes(name.split('/')[0])
+      if (excludeHostOutput && hostOutput) {
         return []
       }
       assert(!entry.isSymbolicLink(), `JavaScript artifact contains a symlink: ${name}`)
@@ -122,7 +100,7 @@ export function javascriptInventory(
       assert(!hostOutput, `JavaScript artifact contains host output: ${name}`)
       const file = join(directory, entry.name)
       if (entry.isDirectory()) {
-        return javascriptInventory(file, name, { excludeHostOutput, excludeRetiredRuntimeOutput })
+        return javascriptInventory(file, name, { excludeHostOutput })
       }
       assert(entry.isFile(), `JavaScript artifact contains a special file: ${name}`)
       const bytes = readFileSync(file)
@@ -138,29 +116,13 @@ function verifyRequiredFiles(files) {
 }
 
 export function packReleaseJavascript({ root = process.cwd(), artifactDir, configuration }) {
-  const support = releaseJavascriptSupport(root)
-  assert(support.supported, support.reason)
   configuration ??= releaseJavascriptConfiguration(root)
   const out = join(root, 'out')
-  const files = javascriptInventory(out, '', { excludeRetiredRuntimeOutput: true })
+  const files = javascriptInventory(out)
   verifyRequiredFiles(files)
   mkdirSync(artifactDir, { recursive: true })
   const archive = join(artifactDir, ARCHIVE_NAME)
-  const retiredOutputNames = readdirSync(out).filter((name) =>
-    RETIRED_RUNTIME_OUTPUTS.includes(name.toLowerCase())
-  )
-  command(
-    getTarProgram(),
-    [
-      ...retiredOutputNames.map((name) => `--exclude=out/${name}`),
-      '-czf',
-      archive,
-      '-C',
-      root,
-      'out'
-    ],
-    root
-  )
+  command(getTarProgram(), ['-czf', archive, '-C', root, 'out'], root)
   const manifest = {
     schema: 1,
     configuration,
@@ -173,8 +135,6 @@ export function packReleaseJavascript({ root = process.cwd(), artifactDir, confi
 }
 
 export function restoreReleaseJavascript({ root = process.cwd(), artifactDir, configuration }) {
-  const support = releaseJavascriptSupport(root)
-  assert(support.supported, support.reason)
   configuration ??= releaseJavascriptConfiguration(root)
   const manifest = JSON.parse(readFileSync(join(artifactDir, 'manifest.json'), 'utf8'))
   assert.equal(manifest.schema, 1, 'Unsupported JavaScript artifact schema')
@@ -184,10 +144,6 @@ export function restoreReleaseJavascript({ root = process.cwd(), artifactDir, co
   const entries = command(getTarProgram(), ['-tzf', archive], root).split(/\r?\n/)
   for (const entry of entries) {
     assert(entry === 'out/' || entry.startsWith('out/'), `Unexpected archive entry: ${entry}`)
-    assert(
-      !RETIRED_RUNTIME_OUTPUTS.includes(entry.split('/')[1]?.toLowerCase()),
-      `JavaScript archive contains retired runtime output: ${entry}`
-    )
     assert(
       !entry.includes('\\') && !entry.split('/').includes('..'),
       `Unsafe archive entry: ${entry}`

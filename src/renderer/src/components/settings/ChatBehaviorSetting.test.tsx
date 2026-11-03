@@ -227,14 +227,14 @@ describe('ChatBehaviorSetting resume after restart', () => {
 
 describe('ChatBehaviorSetting permissions', () => {
   it('shows the new-chat permission picker as the first Behavior row', () => {
-    const { container } = renderSetting({ nativeChatPermissionMode: 'full-access' })
+    const { container } = renderSetting({ agentPermissionDefault: 'full-access' })
     const rows = container.querySelectorAll('.divide-y > *')
     expect(rows[0]?.id).toBe('chat-permissions')
     expect(container.querySelector('button[aria-label="Permissions Full access"]')).not.toBeNull()
   })
 
-  it('leaves the row out when the host has no value', () => {
-    const { container } = renderSetting({ nativeChatPermissionMode: undefined })
-    expect(container.querySelector('#chat-permissions')).toBeNull()
+  it('shows the default Own row when known host settings have no explicit choice', () => {
+    const { container } = renderSetting({ agentPermissionDefault: undefined })
+    expect(container.querySelector('#chat-permissions')).not.toBeNull()
   })
 })

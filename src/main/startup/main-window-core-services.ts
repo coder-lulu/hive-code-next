@@ -3,6 +3,7 @@ import { registerCoreHandlers } from '../ipc/register-core-handlers/register-cor
 import { attachMainWindowServices } from '../window/attach-main-window-services'
 import { initTccPromptNotice } from '../macos-tcc-prompt-notice'
 import { resolveUpdateInstallMode } from '../updater'
+import { desktopConnectorCloud } from './main-process-connector-startup'
 import { mainProcessState as state } from './main-process-state'
 import { prepareCodexAiVaultSessionResume } from '../codex/codex-ai-vault-session-resume'
 import { resolveHostCodexSessionSourceHome } from '../codex/codex-session-source-home'
@@ -20,6 +21,7 @@ import {
   prepareCodexSessionResumeForLaunch
 } from './codex-session-resume-launch'
 import { isRecoveryReloadInFlight } from './main-window-lifecycle-flags'
+import { holdLaunchReconnectOptOuts } from '../ipc/ssh/ssh-host-user-disconnect'
 
 export function attachMainWindowCoreServices(
   window: BrowserWindow,
@@ -60,6 +62,8 @@ export function attachMainWindowCoreServices(
   ) {
     throw new Error('Main window services must be initialized before attaching')
   }
+  // Server status probes start inside registerCoreHandlers; held hosts must be marked first.
+  holdLaunchReconnectOptOuts(store.getSshTargets())
   registerCoreHandlers(
     store,
     runtime,
@@ -107,16 +111,24 @@ export function attachMainWindowCoreServices(
         state.isQuitting = true
         state.runtimeCloudPresence?.setRuntimeReady(false)
         state.runtimeCloudPresence?.setAuthorization(null)
-        await preserveAgentAuthBeforeRestart({
-          codexRuntimeHome,
-          claudeRuntimeAuth,
-          store
-        })
-      }
+        desktopConnectorCloud()?.fence()
+        await preserveAgentAuthBeforeRestart({ codexRuntimeHome, store })
+      },
+      onOrcaProfileAuthMutation: () => {
+        desktopConnectorCloud()?.accountChanged()
+      },
+      onBeforeOrcaProfileSignOut: () => {
+        desktopConnectorCloud()?.signOutStarted()
+      },
+      onAfterOrcaProfileSignOut: () => desktopConnectorCloud()?.signOutFinished()
     },
     state.pluginService ?? undefined,
     state.pluginMarketplaceService && state.pluginMarketplaceInstaller
-      ? { marketplace: state.pluginMarketplaceService, installer: state.pluginMarketplaceInstaller }
+      ? {
+          marketplace: state.pluginMarketplaceService,
+          installer: state.pluginMarketplaceInstaller,
+          ...(state.pluginAutoUpdater ? { autoUpdater: state.pluginAutoUpdater } : {})
+        }
       : undefined
   )
   automations.setWebContents(window.webContents)
@@ -137,23 +149,23 @@ export function attachMainWindowCoreServices(
         }
         deps.recordRendererReload(ignoreCache)
       },
-      // Why: let the PTY layer skip its orphan sweep on the recovery reload that re-fires did-finish-load, so live local sessions survive (#5787).
+      // Recovery did-finish-load must skip orphan sweeping to preserve live PTYs (#5787).
       isRecoveryReloadInFlight,
       onCodexHomePtySpawned: handleCodexHomePtySpawned,
       onPtyExit: handlePtyExit,
       onBeforeUpdateQuit: async () => {
         state.runtimeCloudPresence?.setRuntimeReady(false)
         state.runtimeCloudPresence?.setAuthorization(null)
-        await preserveStateBeforeUpdateRestart({ codexRuntimeHome, claudeRuntimeAuth, store })
+        await preserveStateBeforeUpdateRestart({ codexRuntimeHome, store })
       },
       onBeforeUpdateQuitFailure: 'abort',
       updateInstallMode: resolveUpdateInstallMode(state.isServeMode),
       onWorktreeLifecycle: emitPluginWorktreeLifecycle
     }
   )
-  // Why: attach the durable renderer pull now, but launch the diagnostic process after first paint.
+  // Attach durable diagnostic pulls now, defer process launch past first paint.
   initTccPromptNotice(window, { deferWatchUntilReadyToShow: true })
   rateLimits.attach(window)
-  // Why: quota probes spawn CLIs and hit network, so don't fetch immediately and compete with first paint; show/focus listeners refresh later.
+  // Quota probes spawn CLIs/use network; defer to show/focus refresh so they do not compete with first paint.
   rateLimits.start({ fetchImmediately: false })
 }

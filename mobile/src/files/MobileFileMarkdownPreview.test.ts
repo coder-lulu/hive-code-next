@@ -2,7 +2,7 @@ import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MobileFileMarkdownPreview } from './MobileFileMarkdownPreview'
-import { lightTheme, type MobileTheme } from '../theme/mobile-theme'
+import { findAllByHostType } from '../test-support/react-test-renderer-host-nodes'
 
 vi.mock('react-native', () => ({
   Alert: { alert },
@@ -24,6 +24,10 @@ vi.mock('lucide-react-native', () => ({
 const { writeText, alert } = vi.hoisted(() => ({ writeText: vi.fn(), alert: vi.fn() }))
 vi.mock('../platform/clipboard', () => ({ useClipboardWriter: () => ({ writeText }) }))
 
+vi.mock('./MobileMarkdownPreviewImage', () => ({
+  MobileMarkdownPreviewImage: 'MobileMarkdownPreviewImage'
+}))
+
 vi.mock('../components/MobileMarkdown', () => ({
   MobileMarkdown: 'MobileMarkdown'
 }))
@@ -33,13 +37,17 @@ vi.mock('./MobileFilePreviewSourceText', () => ({
   MobileFilePreviewTruncatedNote: 'MobileFilePreviewTruncatedNote'
 }))
 
-vi.mock('../theme/mobile-theme-provider', () => ({
-  useMobileTheme: () => lightTheme,
-  useMobileThemeStyles: (factory: (theme: MobileTheme) => unknown) => factory(lightTheme)
+vi.mock('../theme/mobile-theme', () => ({
+  colors: { textPrimary: '#fff', textSecondary: '#999' },
+  spacing: { xs: 4, sm: 8 },
+  radii: { button: 6 },
+  typography: { metaSize: 12 },
+  getMobileColorScheme: () => 'dark',
+  subscribeMobileColorScheme: () => () => {}
 }))
 
 vi.mock('./mobile-file-preview-styles', () => ({
-  createFilePreviewStyles: () => ({})
+  filePreviewStyles: {}
 }))
 
 type PreviewProps = Parameters<typeof MobileFileMarkdownPreview>[0]
@@ -62,9 +70,9 @@ async function updatePreview(renderer: ReactTestRenderer, props: PreviewProps): 
 }
 
 function modeToggle(renderer: ReactTestRenderer, label: string) {
-  const toggle = renderer.root
-    .findAllByType('Pressable')
-    .find((node) => node.props.accessibilityLabel === label)
+  const toggle = findAllByHostType(renderer.root, 'Pressable').find(
+    (node) => node.props.accessibilityLabel === label
+  )
   if (!toggle) {
     throw new Error(`Missing ${label} toggle`)
   }
@@ -96,7 +104,7 @@ describe('MobileFileMarkdownPreview', () => {
     vi.restoreAllMocks()
   })
 
-  it.each(['查看 Markdown 预览', '查看 Markdown 源码'])(
+  it.each(['View rendered Markdown preview', 'View Markdown source'])(
     'copies loaded source in %s mode after content updates',
     async (mode) => {
       const baseProps: PreviewProps = {
@@ -111,15 +119,8 @@ describe('MobileFileMarkdownPreview', () => {
       await updatePreview(renderer, { ...baseProps, content: source })
       const copy = modeToggle(renderer, 'Copy Markdown source')
       expect(copy.props.accessibilityRole).toBe('button')
-      expect(copy.findAllByType('Text')).toHaveLength(0)
-      expect(copy.props.style({ pressed: false })[0]).toMatchObject({
-        minWidth: lightTheme.size.minimumTouchTarget,
-        minHeight: lightTheme.size.minimumTouchTarget
-      })
       await act(async () => copy.props.onPress())
       expect(writeText.mock.calls).toEqual([[source]])
-      expect(modeToggle(renderer, 'Copy Markdown source').findAllByType('Text')).toHaveLength(0)
-      expect(renderer.root.findAllByType('Check')).toHaveLength(1)
     }
   )
 
@@ -133,11 +134,11 @@ describe('MobileFileMarkdownPreview', () => {
     })
     const copy = modeToggle(renderer, 'Copy loaded Markdown source')
     expect(
-      renderer.root.findAllByType('Text').some((node) => node.props.children === 'Copy loaded')
+      findAllByHostType(renderer.root, 'Text').some((node) => node.props.children === 'Copy loaded')
     ).toBe(true)
     await act(async () => copy.props.onPress())
     expect(writeText.mock.calls).toEqual([[source]])
-    await selectMode(renderer, '查看 Markdown 源码')
+    await selectMode(renderer, 'View Markdown source')
     expect(modeToggle(renderer, 'Copy loaded Markdown source')).toBeDefined()
   })
 
@@ -170,18 +171,18 @@ describe('MobileFileMarkdownPreview', () => {
     }
     renderer = await renderPreview(baseProps)
 
-    expect(isSelected(renderer, '查看 Markdown 预览')).toBe(true)
-    await selectMode(renderer, '查看 Markdown 源码')
-    expect(isSelected(renderer, '查看 Markdown 源码')).toBe(true)
+    expect(isSelected(renderer, 'View rendered Markdown preview')).toBe(true)
+    await selectMode(renderer, 'View Markdown source')
+    expect(isSelected(renderer, 'View Markdown source')).toBe(true)
 
     // Content updates alone preserve the user's explicitly selected mode.
     await updatePreview(renderer, { ...baseProps, content: '# First updated' })
-    expect(isSelected(renderer, '查看 Markdown 源码')).toBe(true)
+    expect(isSelected(renderer, 'View Markdown source')).toBe(true)
 
     await updatePreview(renderer, { ...baseProps, relativePath: 'notes/second.md' })
-    expect(isSelected(renderer, '查看 Markdown 预览')).toBe(true)
+    expect(isSelected(renderer, 'View rendered Markdown preview')).toBe(true)
 
     await updatePreview(renderer, { ...baseProps, relativePath: 'notes/second.md', initialLine: 8 })
-    expect(isSelected(renderer, '查看 Markdown 源码')).toBe(true)
+    expect(isSelected(renderer, 'View Markdown source')).toBe(true)
   })
 })

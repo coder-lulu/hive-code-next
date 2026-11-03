@@ -1,15 +1,19 @@
+import { createPreflightApi as createCurrentPreflightApi } from './web-preflight-api'
 import type { PreloadApi } from '../../../../preload/api-types'
 import type {
   ComputerUsePermissionSetupResult,
   ComputerUsePermissionStatusResult
 } from '../../../../shared/computer-use-permissions-types'
-import type { SkillFreshnessInventory } from '../../../../shared/skill-freshness'
 import type { SkillDiscoveryResult } from '../../../../shared/skills'
 import type { SkillDeletePlan, SkillDeleteResult } from '../../../../shared/skill-delete-contract'
 import { SKILL_DELETE_CAPABILITY } from '../../../../shared/skill-install-capability'
 import { callRuntimeResult, getRemoteRuntimeStatus } from './web-runtime-calls'
+import { requireActiveEnvironmentOrNull } from './web-runtime-session'
 import { getBrowserPlatform } from './web-storage'
-import { APP_DISPLAY_NAME } from '@/product-brand'
+
+export function createPreflightApi(): NonNullable<Partial<PreloadApi>['preflight']> {
+  return createCurrentPreflightApi({ callRuntimeResult, requireActiveEnvironmentOrNull })
+}
 
 export function createDeveloperPermissionsApi(): NonNullable<
   Partial<PreloadApi>['developerPermissions']
@@ -45,13 +49,19 @@ export function createComputerUsePermissionsApi(): NonNullable<
         'computer.permissions',
         args ?? {},
         15_000
-      ).catch(() => ({
-        platform: getBrowserPlatform(),
-        helperAppPath: null,
-        openedSettings: false,
-        launchedHelper: false,
-        nextStep: `Computer-use permissions are managed on the ${APP_DISPLAY_NAME} server.`
-      })),
+      ).catch((error: unknown) => {
+        // Only a host without this method falls back; real failures (e.g. a cancelled Open) must surface.
+        if (!(error instanceof Error && 'code' in error && error.code === 'method_not_found')) {
+          throw error
+        }
+        return {
+          platform: getBrowserPlatform(),
+          helperAppPath: null,
+          openedSettings: false,
+          launchedHelper: false,
+          nextStep: 'Computer-use permissions are managed on the Orca server.'
+        }
+      }),
     reset: () =>
       Promise.resolve({
         platform: getBrowserPlatform(),
@@ -67,21 +77,10 @@ export function createSkillsApi(): NonNullable<Partial<PreloadApi>['skills']> {
   return {
     discover: (target) =>
       callRuntimeResult<SkillDiscoveryResult>('skills.discover', target, 15_000),
-    // Why: browser clients have no local skill homes; remote-host freshness stays off until its update rail covers it.
-    freshnessInventory: (): Promise<SkillFreshnessInventory> =>
-      Promise.resolve({
-        schemaVersion: 1,
-        installations: [],
-        eligibleUpdateNames: [],
-        scanIssues: [],
-        scannedAt: Date.now()
-      }),
-    // Why: with no local skill homes there is nothing to update, so the run rail
-    // reports a permanently idle state rather than spawning anything.
-    startUpdateRun: () => Promise.resolve({ started: false as const, reason: 'invalid-names' }),
-    cancelUpdateRun: () => Promise.resolve(),
-    acknowledgeUpdateRun: () => Promise.resolve(),
-    getUpdateRun: () => Promise.resolve({ state: 'idle' as const }),
+    // Why: browser clients have no local skill homes; remote hosts plan their own (not here).
+    bundledPlan: () => Promise.reject(new Error('Updating Orca skills requires the desktop app.')),
+    bundledExecute: () =>
+      Promise.reject(new Error('Updating Orca skills requires the desktop app.')),
     prepareShare: () => Promise.reject(new Error('Skill publishing requires the desktop app.')),
     publishShare: () => Promise.reject(new Error('Skill publishing requires the desktop app.')),
     cancelShare: () => Promise.resolve(),
@@ -114,13 +113,10 @@ export function createSkillsApi(): NonNullable<Partial<PreloadApi>['skills']> {
       Promise.reject(new Error('Skill package management requires the desktop app.')),
     revokeShare: () =>
       Promise.reject(new Error('Skill package management requires the desktop app.')),
-    deletePackageVersion: () =>
-      Promise.reject(new Error('Skill package management requires the desktop app.')),
     deletePackage: () =>
       Promise.reject(new Error('Skill package management requires the desktop app.')),
     listWslDistros: () => Promise.resolve([]),
     onInstallProgress: () => () => {},
-    onShareProgress: () => () => {},
-    onUpdateRun: () => () => {}
+    onShareProgress: () => () => {}
   }
 }

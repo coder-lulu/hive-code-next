@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { KnownRuntimeEnvironment } from '../../shared/runtime-environments'
 import type { HiveAccountRuntimeDirectoryEntry } from '../../shared/hive-runtime-cloud'
 import { REMOTE_RUNTIME_SHARED_CONTROL_CAPABILITY } from '../../shared/protocol-version'
-import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
+import { RemoteRuntimeClientError } from '../../shared/remote-runtime/remote-runtime-client-error'
 
 const mocks = vi.hoisted(() => ({
   direct: vi.fn(),
@@ -15,29 +15,31 @@ const mocks = vi.hoisted(() => ({
   managed: vi.fn()
 }))
 vi.mock('electron', () => ({ BrowserWindow: { getAllWindows: () => [] } }))
-vi.mock('../../shared/remote-runtime-client', () => ({ sendRemoteRuntimeRequest: mocks.direct }))
+vi.mock('../../shared/remote-runtime/remote-runtime-client', () => ({
+  sendRemoteRuntimeRequest: mocks.direct
+}))
 vi.mock('../hive-runtime-cloud/hive-account-runtime-access', () => ({
   getHiveAccountRuntimeAccess: () => ({
     directory: { getState: mocks.state },
     transport: { call: mocks.relay }
   })
 }))
-vi.mock('./runtime-environment-capability-evidence', () => ({
+vi.mock('./runtime-environments/runtime-environment-capability-evidence', () => ({
   captureRuntimeEnvironmentCapabilityEvidence: vi.fn(() => ({})),
   applyRuntimeEnvironmentCapabilityVerdict: mocks.verdict,
   getAcceptedRuntimeEnvironmentCapabilityOutcome: vi.fn(() => null),
   getRuntimeEnvironmentCapabilityIncarnation: mocks.incarnation
 }))
-vi.mock('./runtime-environment-usage-record', () => ({
+vi.mock('./runtime-environments/runtime-environment-usage-record', () => ({
   recordRuntimeEnvironmentUsage: mocks.usage
 }))
-vi.mock('./runtime-environment-manual-disconnect', () => ({
+vi.mock('./runtime-environments/runtime-environment-manual-disconnect', () => ({
   isRuntimeEnvironmentManuallyDisconnected: mocks.disconnected
 }))
-vi.mock('./runtime-environment-managed-tunnel', () => ({
+vi.mock('./runtime-environments/runtime-environment-managed-tunnel', () => ({
   resolveManagedRuntimeEnvironment: mocks.managed
 }))
-import { createRuntimeEnvironmentStatusOwner } from './runtime-environment-status-owner'
+import { createRuntimeEnvironmentStatusOwner } from './runtime-environments/runtime-environment-status-owner'
 
 const runtime: HiveAccountRuntimeDirectoryEntry = {
   runtimeRecordId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',

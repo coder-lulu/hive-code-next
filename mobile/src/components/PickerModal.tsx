@@ -1,8 +1,9 @@
-import { useMemo, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { View, Text, Pressable, StyleSheet } from 'react-native'
 import { Check } from 'lucide-react-native'
-import type { MobileTheme } from '../theme/mobile-theme'
-import { useMobileTheme } from '../theme/mobile-theme-provider'
+import { colors, spacing, typography } from '../theme/mobile-theme'
+import { themedStyleSheet } from '../theme/themed-styles'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 import { BottomDrawer } from './BottomDrawer'
 
 export type PickerOption<T extends string = string> = {
@@ -29,10 +30,7 @@ type Props<T extends string = string> = {
 type PickerModalContentProps<T extends string = string> = Pick<
   Props<T>,
   'options' | 'selected' | 'onSelect' | 'onLongSelect' | 'onClose'
-> & {
-  readonly theme: MobileTheme
-  readonly styles: ReturnType<typeof createPickerModalStyles>
-}
+>
 
 export function PickerModal<T extends string = string>({
   visible,
@@ -46,9 +44,7 @@ export function PickerModal<T extends string = string>({
   onAfterClose,
   zIndex
 }: Props<T>) {
-  const theme = useMobileTheme()
-  const styles = useMemo(() => createPickerModalStyles(theme), [theme])
-
+  useMobileColorScheme()
   return (
     <BottomDrawer visible={visible} onClose={onClose} onAfterClose={onAfterClose} zIndex={zIndex}>
       <View style={styles.header}>
@@ -62,8 +58,6 @@ export function PickerModal<T extends string = string>({
         onSelect={onSelect}
         onLongSelect={onLongSelect}
         onClose={onClose}
-        theme={theme}
-        styles={styles}
       />
     </BottomDrawer>
   )
@@ -74,12 +68,10 @@ function PickerModalContent<T extends string = string>({
   selected,
   onSelect,
   onLongSelect,
-  onClose,
-  theme,
-  styles
+  onClose
 }: PickerModalContentProps<T>) {
-  // Why: closed BottomDrawer instances return null, so keeping option rows in
-  // this child avoids rebuilding hidden picker contents on every parent render.
+  useMobileColorScheme()
+  // Put option rows in shown child; closed BottomDrawer returns null, avoiding hidden-content rebuilds on parent renders.
   return (
     <View style={styles.group}>
       {options.map((opt, i) => {
@@ -125,7 +117,7 @@ function PickerModalContent<T extends string = string>({
                 </Text>
                 {opt.subtitle ? <Text style={styles.rowSubtitle}>{opt.subtitle}</Text> : null}
               </View>
-              {isSelected && <Check size={18} color={theme.color.text.primary} strokeWidth={2} />}
+              {isSelected && <Check size={16} color={colors.textPrimary} />}
             </Pressable>
           </View>
         )
@@ -134,67 +126,62 @@ function PickerModalContent<T extends string = string>({
   )
 }
 
-export function createPickerModalStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    header: {
-      paddingHorizontal: theme.spacing.space4,
-      paddingBottom: theme.spacing.space12
-    },
-    title: {
-      ...theme.typography.meta,
-      fontWeight: '500',
-      color: theme.color.text.secondary
-    },
-    subtitle: {
-      ...theme.typography.caption,
-      color: theme.color.text.secondary,
-      marginTop: theme.spacing.space4
-    },
-    group: {
-      overflow: 'hidden',
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.color.border.default,
-      borderRadius: theme.radii.card,
-      backgroundColor: theme.color.bg.surface
-    },
-    separator: {
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: theme.color.border.subtle,
-      marginHorizontal: theme.spacing.space16
-    },
-    row: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      minHeight: theme.size.groupedListRowMinHeight,
-      paddingVertical: theme.spacing.space12,
-      paddingHorizontal: theme.spacing.space16
-    },
-    rowPressed: {
-      backgroundColor: theme.color.bg.subtle
-    },
-    rowDisabled: {
-      opacity: 0.45
-    },
-    rowContent: {
-      flex: 1,
-      minWidth: 0
-    },
-    rowIcon: {
-      width: 22,
-      alignItems: 'center',
-      marginRight: theme.spacing.space8
-    },
-    rowLabel: {
-      ...theme.typography.label,
-      color: theme.color.text.primary
-    },
-    rowLabelSelected: {
-      fontWeight: '600'
-    },
-    rowSubtitle: {
-      ...theme.typography.caption,
-      color: theme.color.text.secondary,
-      marginTop: theme.spacing.space4
-    }
-  })
-}
+const styles = themedStyleSheet(() => ({
+  header: {
+    paddingHorizontal: spacing.xs,
+    paddingBottom: spacing.sm
+  },
+  title: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.textMuted
+  },
+  subtitle: {
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 2
+  },
+  group: {
+    backgroundColor: colors.bgPanel,
+    borderRadius: 12,
+    overflow: 'hidden'
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.borderSubtle,
+    marginHorizontal: spacing.md
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md + 2
+  },
+  rowPressed: {
+    backgroundColor: colors.bgRaised
+  },
+  rowDisabled: {
+    opacity: 0.45
+  },
+  rowContent: {
+    flex: 1,
+    minWidth: 0
+  },
+  rowIcon: {
+    width: 22,
+    alignItems: 'center',
+    marginRight: spacing.sm
+  },
+  rowLabel: {
+    fontSize: typography.bodySize,
+    color: colors.textPrimary
+  },
+  rowLabelSelected: {
+    fontWeight: '600'
+  },
+  rowSubtitle: {
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 1
+  }
+}))

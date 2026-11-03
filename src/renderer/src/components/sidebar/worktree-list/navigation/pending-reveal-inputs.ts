@@ -1,9 +1,11 @@
+import { rowKeyMatchesRenderRow } from './render-row-lookup'
+import { OFFLINE_RUNTIME_GROUP_KEY } from '../grouping/group-keys'
 import { getWorktreeExecutionHostId } from '../../../../../../shared/execution-host'
 import {
-  getHostScopedWorktreeLineageInputs,
-  getWorktreeLineageAncestors
-} from '../../worktree-lineage-projection'
-import { getWorktreeRevealCollapsedGroupKeys } from './worktree-reveal-group-keys'
+  isOfflineRuntimeOwner,
+  getProjectSetupRuntimeOwnerEnvironmentId
+} from '@/lib/runtime-offline-directory'
+import type { WorktreeOccurrencePlan } from '../../../../../../shared/worktree-occurrence-plan'
 import type React from 'react'
 import type { Virtualizer } from '@tanstack/react-virtual'
 import type { AppState } from '@/store/types'
@@ -15,52 +17,19 @@ import type { WorkspaceStatusDefinition, Worktree } from '../../../../../../shar
 import type { WorktreeLineage } from '../../../../../../shared/worktree/lineage-types'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import type { RenderRow } from '../listing/render-row'
-import { OFFLINE_RUNTIME_GROUP_KEY, getWorktreeLineageGroupKey } from '../grouping/group-keys'
-import {
-  getProjectSetupRuntimeOwnerEnvironmentId,
-  isOfflineRuntimeOwner
-} from '@/lib/runtime-offline-directory'
-import type { ProjectGroupingModel } from '../grouping/project-grouping'
-import type { PinnedWorktreeDisplayPolicy, WorktreeGroupBy } from '../grouping/row-types'
+import type { ProjectGroupingModel } from '../../../../../../shared/project-section-grouping'
+import type {
+  PinnedWorktreeDisplayPolicy,
+  WorktreeGroupBy
+} from '../../../../../../shared/sidebar-list/row-types'
 import { getFolderWorkspaceRevealGroupKeys } from './folder-reveal'
-import { getSidebarRowRevealAncestorKeys } from './reveal-ancestors'
-import { rowKeyMatchesRenderRow } from './render-row-lookup'
+import { getWorktreeRevealCollapsedGroupKeys } from './worktree-reveal-group-keys'
 
 export const MAX_REVEAL_RETRIES = 8
 
-export function expandGroupsForSidebarRowReveal(
-  args: PendingSidebarRevealArgs,
-  rowKey: string
-): boolean {
-  const ancestorKeys = getSidebarRowRevealAncestorKeys({
-    rowKey,
-    repoMap: args.repoMap,
-    projectGroups: args.projectGroups,
-    projectGrouping: args.projectGrouping,
-    offlineRuntimeEnvironmentIds: args.offlineRuntimeEnvironmentIds
-  })
-  let toggledAncestor = false
-  for (const groupKey of ancestorKeys) {
-    if (groupKey !== OFFLINE_RUNTIME_GROUP_KEY && args.collapsedGroups.has(groupKey)) {
-      args.toggleGroup(groupKey)
-      toggledAncestor = true
-    }
-  }
-  if (toggledAncestor) {
-    return true
-  }
-  if (
-    ancestorKeys.includes(OFFLINE_RUNTIME_GROUP_KEY) &&
-    args.collapsedGroups.has(OFFLINE_RUNTIME_GROUP_KEY) &&
-    !args.renderRows.some((row) => rowKeyMatchesRenderRow(row, rowKey))
-  ) {
-    args.toggleGroup(OFFLINE_RUNTIME_GROUP_KEY)
-    return true
-  }
-  return false
-}
-
 export type PendingSidebarRevealArgs = {
+  offlineRuntimeEnvironmentIds?: ReadonlySet<string>
+  occurrencePlan?: WorktreeOccurrencePlan<Worktree>
   pendingRevealWorktree: PendingSidebarWorktreeReveal | null
   pendingRevealSidebarRow: PendingSidebarRowReveal | null
   clearPendingRevealWorktreeId: () => void
@@ -84,21 +53,23 @@ export type PendingSidebarRevealArgs = {
   settings: AppState['settings']
   projectGroups: readonly ProjectGroup[]
   projectGrouping?: ProjectGroupingModel
-  offlineRuntimeEnvironmentIds: ReadonlySet<string>
   flashRevealedRow: (rowKey: string) => void
   markRevealScroll: (targetTop: number) => void
   schedulePendingRevealFrame: (callback: FrameRequestCallback) => void
   cancelPendingRevealFrames: () => void
 }
 
-// Expand whatever collapsed section hides the reveal target, then scroll to it.
 export function expandGroupsForWorktreeReveal(
   args: PendingSidebarRevealArgs,
   worktreeId: string,
   executionHostId?: ExecutionHostId
 ): void {
   const hostScopedGroups = args.renderRows.some(
-    (row) => row.type === 'host-header' || (row.type === 'header' && row.collapseKey !== undefined)
+    (row) =>
+      row.type === 'host-header' ||
+      (row.type === 'header' &&
+        row.collapseKey !== undefined &&
+        !row.key.startsWith(`${OFFLINE_RUNTIME_GROUP_KEY}:`))
   )
   const folderGroupKeys = getFolderWorkspaceRevealGroupKeys(
     worktreeId,
@@ -108,9 +79,9 @@ export function expandGroupsForWorktreeReveal(
       groupBy: args.groupBy,
       workspaceStatuses: args.workspaceStatuses,
       defaultHostId: args.defaultHostId,
+      hostScopedGroups,
       executionHostId,
-      offlineRuntimeEnvironmentIds: args.offlineRuntimeEnvironmentIds,
-      hostScopedGroups
+      offlineRuntimeEnvironmentIds: args.offlineRuntimeEnvironmentIds
     }
   )
   if (folderGroupKeys.length > 0) {
@@ -129,52 +100,29 @@ export function expandGroupsForWorktreeReveal(
   if (!targetWorktree) {
     return
   }
-  const targetRepo = args.repoMap.get(targetWorktree.repoId)
-  const targetHostId = getWorktreeExecutionHostId(targetWorktree, targetRepo, args.defaultHostId)
   const setup = args.projectGrouping?.projectHostSetups.find(
     (setup) => setup.repoId === targetWorktree.repoId
   )
   if (
     args.collapsedGroups.has(OFFLINE_RUNTIME_GROUP_KEY) &&
     isOfflineRuntimeOwner(
-      targetHostId,
-      args.offlineRuntimeEnvironmentIds,
+      getWorktreeExecutionHostId(
+        targetWorktree,
+        args.repoMap.get(targetWorktree.repoId),
+        args.defaultHostId
+      ),
+      args.offlineRuntimeEnvironmentIds ?? new Set(),
       targetWorktree.runtimeOwnerEnvironmentId ?? getProjectSetupRuntimeOwnerEnvironmentId(setup)
     )
   ) {
     args.toggleGroup(OFFLINE_RUNTIME_GROUP_KEY)
   }
-  const hostGroupKey = `host:${targetHostId}`
-  if (args.collapsedGroups.has(hostGroupKey)) {
-    args.toggleGroup(hostGroupKey)
-  }
-
-  const hostLineage = getHostScopedWorktreeLineageInputs(
-    args.worktrees,
-    args.worktreeLineageById,
-    executionHostId
-  )
-  for (const parent of getWorktreeLineageAncestors(
-    targetWorktree,
-    hostLineage.lineageById,
-    hostLineage.worktreeMap
-  )) {
-    const lineageGroupKey = getWorktreeLineageGroupKey(parent)
-    if (args.collapsedGroups.has(lineageGroupKey)) {
-      args.toggleGroup(lineageGroupKey)
-    }
-  }
-
-  const groupKeys = getWorktreeRevealCollapsedGroupKeys({
+  for (const groupKey of getWorktreeRevealCollapsedGroupKeys({
     ...args,
     worktree: targetWorktree,
     hostScopedGroups
-  })
-  for (const groupKey of groupKeys) {
-    const collapseKey = groupKey
-    if (args.collapsedGroups.has(collapseKey)) {
-      args.toggleGroup(collapseKey)
-    }
+  })) {
+    args.toggleGroup(groupKey)
   }
 }
 
@@ -186,4 +134,46 @@ export function resolvePendingSidebarReveal(args: {
     return 'scroll-and-clear'
   }
   return args.targetWorktreeStillExists ? 'keep-pending' : 'clear'
+}
+
+export function expandGroupsForSidebarRowReveal(
+  args: PendingSidebarRevealArgs,
+  rowKey: string
+): boolean {
+  const explicit = rowKey.startsWith(`${OFFLINE_RUNTIME_GROUP_KEY}:`)
+  if (!explicit) {
+    if (args.renderRows.some((row) => rowKeyMatchesRenderRow(row, rowKey))) {
+      return false
+    }
+    const repoIds = rowKey.startsWith('repo:')
+      ? [rowKey.slice(5)]
+      : rowKey.startsWith('project:')
+        ? (args.projectGrouping?.projectHostSetups
+            .filter((setup) => setup.projectId === rowKey.slice(8))
+            .map((setup) => setup.repoId) ?? [])
+        : []
+    const offlineTarget = repoIds.some((repoId) => {
+      const repo = args.repoMap.get(repoId)
+      const setup = args.projectGrouping?.projectHostSetups.find((entry) => entry.repoId === repoId)
+      return isOfflineRuntimeOwner(
+        repo?.executionHostId,
+        args.offlineRuntimeEnvironmentIds ?? new Set(),
+        getProjectSetupRuntimeOwnerEnvironmentId(setup)
+      )
+    })
+    if (!offlineTarget) {
+      return false
+    }
+  }
+  let expanded = false
+  for (const key of [
+    OFFLINE_RUNTIME_GROUP_KEY,
+    explicit ? rowKey.slice(OFFLINE_RUNTIME_GROUP_KEY.length + 1) : rowKey
+  ]) {
+    if (args.collapsedGroups.has(key)) {
+      args.toggleGroup(key)
+      expanded = true
+    }
+  }
+  return expanded
 }

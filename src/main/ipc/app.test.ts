@@ -14,7 +14,11 @@ const {
   trustFloatingWorkspaceDirectoryMock,
   registerRendererShutdownCheckpointHandlerMock,
   registerMacKeyboardLayoutChangeNotificationsMock,
-  prepareWindowsAdministratorRestartMock
+  prepareWindowsAdministratorRestartMock,
+  getSystemLanguageDetectionMock,
+  setMainUiLanguageMock,
+  rebuildAppMenuMock,
+  rebuildSystemTrayMenuMock
 } = vi.hoisted(() => ({
   handlers: new Map<string, (_event: unknown, args?: unknown) => unknown>(),
   appExitMock: vi.fn(),
@@ -27,7 +31,11 @@ const {
   trustFloatingWorkspaceDirectoryMock: vi.fn(),
   registerRendererShutdownCheckpointHandlerMock: vi.fn(),
   registerMacKeyboardLayoutChangeNotificationsMock: vi.fn(),
-  prepareWindowsAdministratorRestartMock: vi.fn()
+  prepareWindowsAdministratorRestartMock: vi.fn(),
+  getSystemLanguageDetectionMock: vi.fn(),
+  setMainUiLanguageMock: vi.fn(),
+  rebuildAppMenuMock: vi.fn(),
+  rebuildSystemTrayMenuMock: vi.fn()
 }))
 
 vi.mock('node:child_process', () => ({
@@ -97,8 +105,15 @@ vi.mock('@electron-toolkit/utils', () => ({
 }))
 
 vi.mock('../tray/system-tray', () => ({
-  destroySystemTray: destroySystemTrayMock
+  destroySystemTray: destroySystemTrayMock,
+  rebuildSystemTrayMenu: rebuildSystemTrayMenuMock
 }))
+
+vi.mock('../i18n/system-language', () => ({
+  getSystemLanguageDetection: getSystemLanguageDetectionMock
+}))
+vi.mock('../i18n/main-i18n', () => ({ setMainUiLanguage: setMainUiLanguageMock }))
+vi.mock('../menu/register-app-menu', () => ({ rebuildAppMenu: rebuildAppMenuMock }))
 
 vi.mock('../app-relaunch', async (importOriginal) => ({
   ...(await importOriginal<typeof AppRelaunch>()),
@@ -158,6 +173,10 @@ describe('registerAppHandlers', () => {
     appRelaunchMock.mockReset()
     spawnMock.mockReset()
     destroySystemTrayMock.mockReset()
+    getSystemLanguageDetectionMock.mockReset()
+    setMainUiLanguageMock.mockReset().mockResolvedValue(undefined)
+    rebuildAppMenuMock.mockReset()
+    rebuildSystemTrayMenuMock.mockReset()
     relaunchAppMock.mockReset()
     relaunchAppMock.mockImplementation(() => appRelaunchMock())
     prepareWindowsAdministratorRestartMock.mockReset()
@@ -186,6 +205,45 @@ describe('registerAppHandlers', () => {
     expect(registerRendererShutdownCheckpointHandlerMock).toHaveBeenCalledWith(store)
     expect(registerMacKeyboardLayoutChangeNotificationsMock).toHaveBeenCalledOnce()
   })
+
+  it('returns current system detection without changing an explicitly selected language', () => {
+    const detection = { detectedTag: 'fr-FR', status: 'supported', locale: 'fr', source: 'browser' }
+    getSystemLanguageDetectionMock.mockReturnValueOnce(null).mockReturnValue(detection)
+    registerAppHandlers({ getSettings: () => ({ uiLanguage: 'en' }) } as never)
+
+    expect(handlers.get('app:getSystemLanguageDetection')?.({}, ['fr-FR'])).toBe(detection)
+    expect(getSystemLanguageDetectionMock).toHaveBeenLastCalledWith(['fr-FR'])
+    expect(setMainUiLanguageMock).not.toHaveBeenCalled()
+  })
+
+  it('refreshes native menus after changed system detection is loaded', async () => {
+    const detection = { detectedTag: 'fr-FR', status: 'supported', locale: 'fr', source: 'browser' }
+    getSystemLanguageDetectionMock.mockReturnValueOnce(null).mockReturnValue(detection)
+    registerAppHandlers({ getSettings: () => ({ uiLanguage: 'system' }) } as never)
+
+    await handlers.get('app:getSystemLanguageDetection')?.({}, ['fr-FR'])
+
+    expect(setMainUiLanguageMock).toHaveBeenCalledExactlyOnceWith('system')
+    expect(rebuildAppMenuMock).toHaveBeenCalledOnce()
+    expect(rebuildSystemTrayMenuMock).toHaveBeenCalledOnce()
+  })
+
+  it.each([
+    { preferences: ['fr', 3] },
+    { preferences: Array(33).fill('fr') },
+    { preferences: ['x'.repeat(129)] }
+  ])(
+    'does not pass malformed or unbounded browser hints to native detection: %j',
+    ({ preferences }) => {
+      getSystemLanguageDetectionMock.mockReturnValue(null)
+      registerAppHandlers({} as never)
+
+      handlers.get('app:getSystemLanguageDetection')?.({}, preferences)
+
+      expect(getSystemLanguageDetectionMock).toHaveBeenLastCalledWith(undefined)
+      expect(setMainUiLanguageMock).not.toHaveBeenCalled()
+    }
+  )
 
   it('checkpoints before scheduling the native administrator restart and quits normally', async () => {
     const plan = { execPath: 'C:\\Orca\\resources\\bin\\orca.exe', args: ['restart'] }

@@ -1,12 +1,11 @@
-import { APP_DISPLAY_NAME } from '../shared/brand'
-import type { JiraConnectionStatus, JiraSite } from '../shared/jira-types'
+import type { JiraConnectionStatus, JiraSite } from '../shared/jira/jira-types'
 import type { RuntimeStatus } from '../shared/runtime-types'
-import { JIRA_AGENT_ACCESS_RUNTIME_CAPABILITY } from '../shared/jira-agent-capability'
+import { JIRA_AGENT_ACCESS_RUNTIME_CAPABILITY } from '../shared/jira/jira-agent-capability'
 import {
   getMatchingJiraSites,
   JIRA_ISSUE_KEY_PATTERN,
   parseJiraIssueUrl
-} from '../shared/jira-issue-url'
+} from '../shared/jira/jira-issue-url'
 import type { HandlerContext } from './dispatch'
 import { getOptionalStringFlag } from './flags'
 import { RuntimeClientError } from './runtime-client'
@@ -40,7 +39,7 @@ export async function resolveJiraTarget(
   if (!runtime.result.capabilities?.includes(JIRA_AGENT_ACCESS_RUNTIME_CAPABILITY)) {
     throw new RuntimeClientError(
       'incompatible_runtime',
-      `Update ${APP_DISPLAY_NAME} on the execution host to use verified Jira commands.`
+      'Update Orca on the execution host to use verified Jira commands.'
     )
   }
   const { result: status } = await context.client.call<JiraConnectionStatus>('jira.status')
@@ -56,7 +55,7 @@ export async function resolveJiraTarget(
     throw new RuntimeClientError(
       'invalid_argument',
       candidates.length === 0
-        ? `No matching connected Jira site. Check orca jira connection and ${APP_DISPLAY_NAME} Jira settings.`
+        ? 'No matching connected Jira site. Check orca jira connection and Orca Jira settings.'
         : `Multiple Jira sites match. Select one with --${siteFlag} using orca jira connection.`
     )
   }

@@ -46,6 +46,7 @@ vi.mock('@/lib/agent-paste-draft', () => ({ pasteDraftWhenAgentReady: vi.fn(asyn
 vi.mock('@/lib/agent-ready-wait', () => ({
   waitForAgentReady: vi.fn(async () => ({ ready: true, reason: 'foreground-match' }))
 }))
+vi.mock('@/runtime/host-structured-agents', () => ({ readHostStructuredAgents: () => [] }))
 vi.mock('@/runtime/local-runtime-capabilities', () => ({
   readLocalRuntimeCapabilitiesOrUnknown: () => []
 }))
@@ -56,6 +57,7 @@ vi.mock('@/runtime/runtime-rpc-result', () => ({ RuntimeRpcCallError: Error }))
 
 function launchesThroughHost(profile: AgentLaunchCallerProfile): boolean {
   return newTabPromptLaunchesThroughHost({
+    agent: profile.args.agent,
     promptDelivery: profile.args.promptDelivery ?? 'auto-submit',
     pastesPrompt: (profile.args.prompt?.trim() ?? '').length > 0,
     isRemote: false
@@ -65,7 +67,7 @@ function launchesThroughHost(profile: AgentLaunchCallerProfile): boolean {
 /**
  * A call site whose prompt the host delivers states its arguments in the request, and the host
  * builds the command from them by the same rule (its startup plan inputs); absent means the
- * setting, shipped bypass default included.
+ * setting, saved argument default included.
  */
 function expectHostRequestArguments(profile: AgentLaunchCallerProfile): void {
   const request = hostLaunchRequest(store)
@@ -79,7 +81,7 @@ function expectHostRequestArguments(profile: AgentLaunchCallerProfile): void {
 
 const CODEX_BYPASS = '--dangerously-bypass-approvals-and-sandbox'
 
-/** One agent per prompt-injection mode, with the bypass flag Orca ships as that agent's default. */
+/** One agent per prompt-injection mode, with the bypass flag Orca stores as literal user arguments. */
 const BYPASS_BY_AGENT: readonly [TuiAgent, string, string][] = [
   ['codex', 'argv', CODEX_BYPASS],
   ['claude', 'argv', '--dangerously-skip-permissions'],
@@ -100,6 +102,8 @@ describe('agent launch caller arguments and permission bypass', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetLaunchFunnelStore(store)
+    store.settings.agentDefaultArgs = Object.fromEntries(BYPASS_BY_AGENT.map(([agent, , flag]) => [agent, flag]))
+    store.settings.agentDefaultEnv = { goose: { GOOSE_MODE: 'auto' } }
   })
 
   it.each(cases)('puts %s on the command line its own arguments describe', async (_id, profile) => {
@@ -111,7 +115,7 @@ describe('agent launch caller arguments and permission bypass', () => {
 
     const command = queuedStartupCommand(store)
     expect(command).toBeDefined()
-    // A call site that names arguments replaces the shipped default outright; one that names none
+    // A call site that names arguments replaces the saved default outright; one that names none
     // inherits it. Both shapes must stay visible on the queued command.
     const args = profile.args.agentArgs === undefined ? `'${CODEX_BYPASS}'` : "'--model' 'gpt-5.5'"
     const argvPrompt =
@@ -156,7 +160,7 @@ describe('agent launch caller arguments and permission bypass', () => {
   )
 
   it.each(BYPASS_BY_AGENT)(
-    'ships %s (%s) with its permission-bypass flag when no call site names arguments',
+    'preserves saved %s (%s) arguments when no call site overrides them',
     async (agent, _mode, bypassFlag) => {
       const { launchAgentInNewTab } = await import('./launch-agent-in-new-tab')
 
@@ -174,7 +178,7 @@ describe('agent launch caller arguments and permission bypass', () => {
 
       launchAgentInNewTab({ requestId: 'request-3', agent, worktreeId: 'wt-1' })
 
-      // A stored empty string owns the key, so it beats the shipped bypass default.
+      // A stored empty string owns the key, so it beats the saved argument default.
       expect(queuedStartupCommand(store)).not.toContain(bypassFlag)
     }
   )
@@ -184,12 +188,12 @@ describe('agent launch caller arguments and permission bypass', () => {
 
     launchAgentInNewTab({ requestId: 'request-4', agent: 'goose', worktreeId: 'wt-1' })
 
-    // Goose has no bypass flag; its default posture is an env var, and a migration that carried
+    // Goose has no bypass flag; its explicitly saved value is an env var, and a migration that carried
     // only argv would silently downgrade it.
     expect(queuedStartupPayload(store)?.env).toEqual({ GOOSE_MODE: 'auto' })
   })
 
-  it('restores the shipped bypass default when a caller passes agentArgs as undefined', async () => {
+  it('restores the saved argument default when a caller passes agentArgs as undefined', async () => {
     const { launchAgentInNewTab } = await import('./launch-agent-in-new-tab')
 
     launchAgentInNewTab({
@@ -201,7 +205,7 @@ describe('agent launch caller arguments and permission bypass', () => {
 
     // Characterized, not endorsed: an explicit `undefined` is indistinguishable from an omitted
     // key here, so a caller that resolved "apply no saved arguments" to `undefined` gets the
-    // shipped bypass default back instead of launching without it.
+    // saved argument default back instead of launching without it.
     expect(queuedStartupCommand(store)).toBe(`codex '${CODEX_BYPASS}'`)
     expect(queuedStartupPayload(store)).not.toHaveProperty('agentArgsOverride')
   })
@@ -260,7 +264,7 @@ describe('agent launch caller arguments and permission bypass', () => {
     async (chatUi, storedArgs, expectedArgs) => {
       store.settings = {
         ...store.settings,
-        experimentalNativeChat: chatUi,
+        nativeChatProviders: { codex: chatUi },
         ...(storedArgs === undefined ? {} : { agentDefaultArgs: { codex: storedArgs } }),
         nativeChatSessionOptions: {
           codex: {

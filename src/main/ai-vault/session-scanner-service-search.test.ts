@@ -16,22 +16,18 @@ import {
   type AiVaultSessionSearchInit
 } from './session-scanner-service-protocol'
 
-/**
- * The child, booted the way a spawn boots it: an init frame and messages, with
- * no renderer, no Electron and no scan request. What this proves is that consent
- * alone constructs the indexer and that every search answer crosses the protocol.
- */
-
 const SESSION_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
 
 let harness: SessionSearchIndexerHarness
 let currentRoots: SessionSearchIndexerHarness['roots']
 let originalSendDescriptor: PropertyDescriptor | undefined
-let entryMessageListener: ReturnType<typeof process.listeners>[number] | undefined
-const originalMessageListeners = new Set<ReturnType<typeof process.listeners>[number]>()
-const originalDisconnectListeners = new Set<ReturnType<typeof process.listeners>[number]>()
-const ownedMessageListeners = new Set<ReturnType<typeof process.listeners>[number]>()
-const ownedDisconnectListeners = new Set<ReturnType<typeof process.listeners>[number]>()
+const messageListeners = () => process.listeners('message')
+const disconnectListeners = () => process.listeners('disconnect')
+let entryMessageListener: ReturnType<typeof messageListeners>[number] | undefined
+const originalMessageListeners = new Set<ReturnType<typeof messageListeners>[number]>()
+const originalDisconnectListeners = new Set<ReturnType<typeof disconnectListeners>[number]>()
+const ownedMessageListeners = new Set<ReturnType<typeof messageListeners>[number]>()
+const ownedDisconnectListeners = new Set<ReturnType<typeof disconnectListeners>[number]>()
 const unrelatedParentFrames = vi.fn()
 const sent: AiVaultServiceChildMessage[] = []
 let nextId = 1
@@ -43,7 +39,6 @@ function emit(message: AiVaultServiceParentMessage): void {
   entryMessageListener.call(process, message, undefined)
 }
 
-/** One request, and the reply the child sent for it, still discriminated by operation. */
 async function call(body: AiVaultServiceRequestBody): Promise<AiVaultServiceResultValue> {
   const id = nextId++
   emit({ ...body, id })
@@ -122,7 +117,11 @@ beforeAll(async () => {
         if (process.listeners('message').includes(replyListener)) {
           replyListener.call(
             process,
-            { type: 'sessionSearchRoots', id: message.id, roots: currentRoots },
+            {
+              type: 'sessionSearchRoots',
+              id: message.id,
+              roots: currentRoots
+            },
             undefined
           )
         }
@@ -253,7 +252,6 @@ it('answers disabled once consent is withdrawn, without a respawn', async () => 
   emit({ type: 'sessionSearch', init: searchInit(false) })
   expect(await searchSessions('distinctive')).toEqual({ kind: 'unavailable', reason: 'disabled' })
   expect(await searchStatus()).toMatchObject({ enabled: false, phase: 'idle' })
-  // Re-consenting reuses the index that was left on disk rather than rebuilding it.
   emit({ type: 'sessionSearch', init: searchInit(true) })
   expect((await searchSessions('distinctive')).kind).toBe('results')
 })

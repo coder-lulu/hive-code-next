@@ -70,6 +70,41 @@ describe("the phone's status stream", () => {
     )
   })
 
+  it('publishes conversation names without inventing live ownership', () => {
+    const feed = mobileStructuredSessionStatusFeed(client)
+    const listener = vi.fn()
+    feed.subscribe(listener)
+    frames[0]?.({
+      type: 'snapshot',
+      sessions: [],
+      conversationNames: [{ sessionId: 'session-1', conversationName: 'Reviewed launch' }],
+      namingActiveSessionIds: []
+    })
+    expect(feed.getNamingSnapshot().get('session-1')?.conversationName).toBe('Reviewed launch')
+    expect(feed.getSnapshot().has('session-1')).toBe(false)
+    expect(feed.getAssociationRevision()).toBe(0)
+    expect(listener).toHaveBeenCalledOnce()
+  })
+
+  it('invalidates history queries when the host changes a provider association', () => {
+    const feed = mobileStructuredSessionStatusFeed(client)
+    feed.subscribe(() => {})
+    const session = { ...summary(false), providerSession: { key: 'codex', id: 'first' } }
+    frames[0]?.({ type: 'snapshot', sessions: [session] })
+    const original = feed.getAssociationRevision()
+    frames[0]?.({ type: 'status', session })
+    expect(feed.getAssociationRevision()).toBe(original)
+    frames[0]?.({
+      type: 'status',
+      session: { ...session, providerSession: { key: 'codex', id: 'second' } }
+    })
+    expect(feed.getAssociationRevision()).toBe(original + 1)
+    connection('reconnecting')
+    connection('connected')
+    frames[0]?.({ type: 'snapshot', sessions: [] })
+    expect(feed.getAssociationRevision()).toBe(original + 2)
+  })
+
   it("follows the host's Stopping from the snapshot through each status frame", () => {
     const listener = vi.fn()
     mobileStructuredSessionStatusFeed(client).subscribe(listener)
@@ -104,6 +139,45 @@ describe("the phone's status stream", () => {
     expect(read()).not.toHaveProperty('stopping')
     expect(read()).not.toHaveProperty('hostExecutionOwned')
   })
+
+  it('requires a fresh runtime permission report after disconnect and reconnect at the same fence', () => {
+    mobileStructuredSessionStatusFeed(client).subscribe(() => {})
+    const current = {
+      ...summary(false),
+      permissionMode: 'own',
+      runtimePermission: { fence: 3, mode: 'full-access' }
+    }
+    frames[0]?.({ type: 'snapshot', sessions: [current] })
+    expect(read()?.runtimePermission).toEqual(current.runtimePermission)
+    connection('reconnecting')
+    expect(read()).not.toHaveProperty('runtimePermission')
+    expect(read()?.permissionMode).toBe('own')
+    connection('connected')
+    frames[0]?.({ type: 'snapshot', sessions: [] })
+    expect(read()).not.toHaveProperty('runtimePermission')
+    frames[0]?.({ type: 'status', session: current })
+    expect(read()?.runtimePermission).toEqual(current.runtimePermission)
+  })
+
+  it.each([{ type: 'end' }, FORBIDDEN])(
+    'revokes runtime permission when the feed closes: %j',
+    (ending) => {
+      mobileStructuredSessionStatusFeed(client).subscribe(() => {})
+      frames[0]?.({
+        type: 'snapshot',
+        sessions: [
+          {
+            ...summary(false),
+            permissionMode: 'own',
+            runtimePermission: { fence: 2, mode: 'full-access' }
+          }
+        ]
+      })
+      frames[0]?.(ending)
+      expect(read()).not.toHaveProperty('runtimePermission')
+      expect(read()?.permissionMode).toBe('own')
+    }
+  )
 
   it('reads a host that refuses the method to phones as one without it, asking once per connection', () => {
     mobileStructuredSessionStatusFeed(client).subscribe(() => {})
@@ -160,6 +234,33 @@ class PhysicalSession implements RpcClient {
 }
 
 describe("the phone's status stream across the logical client's sessions", () => {
+  it('revokes the previous generation before the replacement publishes current authority', async () => {
+    const first = new PhysicalSession()
+    const logical = createStableLogicalRpcClient(first, 'lan')
+    const feed = mobileStructuredSessionStatusFeed(logical)
+    feed.subscribe(() => {})
+    const current = { ...summary(false), runtimePermission: { fence: 1, mode: 'full-access' } }
+    for (const listener of first.streams) {
+      listener({ type: 'snapshot', sessions: [current] })
+    }
+    expect(feed.getSnapshot().get('session-1')?.runtimePermission).toEqual(
+      current.runtimePermission
+    )
+    const next = new PhysicalSession()
+    await logical.migrateTo(next, 'relay')
+    expect(feed.getSnapshot().get('session-1')).not.toHaveProperty('runtimePermission')
+    for (const listener of next.streams) {
+      listener({ type: 'snapshot', sessions: [] })
+    }
+    expect(feed.getSnapshot().get('session-1')).not.toHaveProperty('runtimePermission')
+    for (const listener of next.streams) {
+      listener({ type: 'status', session: current })
+    }
+    expect(feed.getSnapshot().get('session-1')?.runtimePermission).toEqual(
+      current.runtimePermission
+    )
+    logical.close()
+  })
   it('never replays a refused stream when the client moves to another session', async () => {
     const first = new PhysicalSession()
     const logical = createStableLogicalRpcClient(first, 'lan')

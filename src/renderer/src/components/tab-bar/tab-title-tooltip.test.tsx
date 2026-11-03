@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
@@ -9,8 +8,6 @@ import type { TabDragItemData } from '../tab-group/useTabDragSplit'
 import BrowserTab from './BrowserTab'
 import EditorFileTab from './EditorFileTab'
 import SortableTab from './SortableTab'
-
-const tabTokenCss = readFileSync(new URL('../../assets/main.css', import.meta.url), 'utf8')
 
 vi.mock('@dnd-kit/sortable', () => ({
   useSortable: ({ id }: { id: string }) => ({
@@ -98,8 +95,12 @@ vi.mock('../../../../shared/agent-title-decoration', () => ({
 }))
 
 vi.mock('../../store', () => ({
-  useAppStore: (selector: (state: { unreadTerminalTabs: Record<string, boolean> }) => unknown) =>
-    selector({ unreadTerminalTabs: {} })
+  useAppStore: (
+    selector: (state: {
+      unreadTerminalTabs: Record<string, boolean>
+      agentStatusByPaneKey: Record<string, never>
+    }) => unknown
+  ) => selector({ unreadTerminalTabs: {}, agentStatusByPaneKey: {} })
 }))
 
 vi.mock('@/store', () => ({
@@ -108,8 +109,23 @@ vi.mock('@/store', () => ({
       openMarkdownPreview: () => void
       settings: null
       unreadTerminalTabs: Record<string, boolean>
+      agentStatusByPaneKey: Record<string, never>
+      browserPagesByWorkspace: Record<string, never>
+      browserAudiblePageIds: Record<string, never>
+      browserAudioMutedTabIds: Record<string, never>
+      setBrowserTabAudioMuted: () => void
     }) => unknown
-  ) => selector({ openMarkdownPreview: vi.fn(), settings: null, unreadTerminalTabs: {} })
+  ) =>
+    selector({
+      openMarkdownPreview: vi.fn(),
+      settings: null,
+      unreadTerminalTabs: {},
+      agentStatusByPaneKey: {},
+      browserPagesByWorkspace: {},
+      browserAudiblePageIds: {},
+      browserAudioMutedTabIds: {},
+      setBrowserTabAudioMuted: vi.fn()
+    })
 }))
 
 vi.mock('@/store/selectors', () => ({
@@ -183,16 +199,12 @@ function textSpanHtml(markup: string, text: string): string {
 
 function expectTabContainerWidth(markup: string, root: string): void {
   const container = firstOpeningTag(markup)
-  // Why: definite semantic widths keep live title updates from resizing every tab.
-  const widthClasses =
-    'w-[var(--tab-width)] min-w-[var(--tab-min-width)] min-[1280px]:w-[var(--tab-width-wide)]'
-  expect(tabTokenCss).toContain('--tab-width: 180px;')
-  expect(tabTokenCss).toContain('--tab-width-wide: 220px;')
-  expect(tabTokenCss).toContain('--tab-min-width: 128px;')
+  // Assert literal widths so changing the shared constant cannot silently allow live-title tab resizing.
+  const widthClasses = 'w-[180px] min-w-[72px] min-[1280px]:w-[220px]'
   expect(container).toContain(widthClasses)
-  expect(root).not.toContain('w-[var(--tab-width)]')
-  expect(root).not.toContain('min-w-[var(--tab-min-width)]')
-  expect(root).not.toContain('min-[1280px]:w-[var(--tab-width-wide)]')
+  expect(root).not.toContain('w-[180px]')
+  expect(root).not.toContain('min-w-[72px]')
+  expect(root).not.toContain('min-[1280px]:w-[220px]')
 }
 
 function expectTooltipContent(markup: string, text: string): void {
@@ -200,7 +212,7 @@ function expectTooltipContent(markup: string, text: string): void {
   expect(markup).toContain('data-side="bottom"')
   expect(markup).toContain('data-variant="tab-preview" data-side="bottom" data-side-offset="0"')
   expect(markup).toContain('data-variant="tab-preview"')
-  expect(markup).toContain(text)
+  expect(markup).toContain(`data-tab-hover-card-title="true">${text}</div>`)
 }
 
 function makeTerminalTab(overrides: Partial<TerminalTab> = {}): TerminalTab {

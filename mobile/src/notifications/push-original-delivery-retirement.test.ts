@@ -1,40 +1,88 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { z } from 'zod'
 import { expect, it, vi } from 'vitest'
-import {
-  PendingAckStore,
-  type PresentationAckStorage
-} from './hive-mobile-push-presentation-ack-store'
+import { NotificationGetMissedSinceParams } from '../../../src/shared/rpc-contract/notifications-params'
+import { dismissHostPushNotification } from './push-socket-dismissal'
+import { deriveHostFingerprint } from './push-host-fingerprint'
+const native = vi.hoisted(() => ({ catalog: vi.fn(), presented: vi.fn(), dismiss: vi.fn() }))
+vi.mock('../transport/host-store', () => ({ loadHostCatalog: native.catalog }))
+vi.mock('expo-notifications', () => ({
+  getPresentedNotificationsAsync: native.presented,
+  dismissNotificationAsync: native.dismiss
+}))
+vi.mock('@react-native-async-storage/async-storage', () => ({
+  default: { getItem: async () => null, setItem: async () => {} }
+}))
 
-const DEVICE = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
-const OTHER_DEVICE = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
-const ORIGINAL = '11111111-1111-4111-8111-111111111111'
-const NEWER = '22222222-2222-4222-8222-222222222222'
-
-// Hive retires confirmed presentation receipts by account/device/delivery identity.
-it('retires the acknowledged Hive delivery while retaining newer and foreign owner receipts', async () => {
-  const original = {
-    accountId: 'account-a',
-    deviceId: DEVICE,
-    deliveryId: ORIGINAL,
-    presentedAt: 1_000
-  }
-  const newer = { ...original, deliveryId: NEWER, presentedAt: 1_001 }
-  const otherAccount = { ...original, accountId: 'account-b' }
-  const otherDevice = { ...original, deviceId: OTHER_DEVICE }
-  let raw = JSON.stringify({
-    schemaVersion: 2,
-    pending: [original, newer, otherAccount, otherDevice]
+const deliveryIdentity = NotificationGetMissedSinceParams.shape.deliveredPushes.unwrap().element
+const retirementSchema = z.object({
+  originalEpoch: z.string().min(1),
+  restartedEpoch: z.string().min(1),
+  event: deliveryIdentity.extend({
+    type: z.literal('dismiss'),
+    dismissedDelivery: deliveryIdentity
   })
-  const storage: PresentationAckStorage = {
-    getItem: vi.fn(async () => raw),
-    setItem: vi.fn(async (_key: string, value: string) => {
-      raw = value
-    })
+})
+
+async function captureHostRetirement(directory: string) {
+  const modulePath = fileURLToPath(
+    new URL(
+      '../../../src/main/runtime/structured-attention-original-delivery.test-fixture.ts',
+      import.meta.url
+    )
+  ).replaceAll('\\', '/')
+  const fixture: unknown = await import(/* @vite-ignore */ modulePath)
+  if (
+    !fixture ||
+    typeof fixture !== 'object' ||
+    !('captureOriginalDeliveryRetirement' in fixture) ||
+    typeof fixture.captureOriginalDeliveryRetirement !== 'function'
+  ) {
+    throw new Error('host retirement fixture did not load')
   }
-  const store = new PendingAckStore(storage)
+  const captured: unknown = await fixture.captureOriginalDeliveryRetirement(directory)
+  return retirementSchema.parse(captured)
+}
 
-  await store.remove('account-a', DEVICE, new Set([ORIGINAL]), 2_000)
-
-  expect(await store.list('account-a', DEVICE, 2_000)).toEqual([newer])
-  expect(await store.list('account-b', DEVICE, 2_000)).toEqual([otherAccount])
-  expect(await store.list('account-a', OTHER_DEVICE, 2_000)).toEqual([otherDevice])
+it('a restarted host socket withdrawal removes the original native alert and preserves newer identities', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'orca-phone-retirement-'))
+  try {
+    const publicKeyB64 = Buffer.alloc(32, 1).toString('base64')
+    native.catalog.mockResolvedValue([{ id: 'host-a', publicKeyB64 }])
+    const { originalEpoch, restartedEpoch, event } = await captureHostRetirement(directory)
+    const hostFingerprint = deriveHostFingerprint(publicKeyB64)
+    const presented = (
+      identifier: string,
+      notificationEpoch: string,
+      notificationSeq: number,
+      fingerprint = hostFingerprint
+    ) => ({
+      request: {
+        identifier,
+        content: {
+          data: {
+            hostFingerprint: fingerprint,
+            notificationId: 'same',
+            notificationEpoch,
+            notificationSeq
+          }
+        }
+      }
+    })
+    native.presented.mockResolvedValue([
+      presented('original', originalEpoch, 1),
+      presented('newer', originalEpoch, 2),
+      presented('restart', restartedEpoch, 1),
+      presented('other-host', originalEpoch, 1, 'other')
+    ])
+    await dismissHostPushNotification(event, 'host-a')
+    expect(native.dismiss.mock.calls).toEqual([['original']])
+    expect(event.notificationEpoch).toBe(restartedEpoch)
+    expect(event.dismissedDelivery?.notificationEpoch).toBe(originalEpoch)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
 })

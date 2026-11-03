@@ -1,21 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
-import { resolve as resolvePath } from 'node:path'
 import { OsOpenedDocumentState } from './os-opened-documents'
 
-const NOTE_A = resolvePath('/notes/a.md')
-const NOTE_B = resolvePath('/notes/b.md')
-
-/**
- * The two ways a queued "Open With" can be lost between main and the renderer. Both are
- * about ownership: main must not drop paths it has not proven the renderer received.
- */
+/** Keep queued paths until main proves renderer delivery; both consume/resolve failures and pre-mount pushes can lose ownership. */
 describe('os-opened markdown delivery ownership', () => {
   it('keeps the batch when resolution rejects on the pull path', async () => {
     const state = new OsOpenedDocumentState()
-    state.captureFilePaths([NOTE_A])
+    state.captureFilePaths(['/notes/a.md'])
     const resolve = vi.fn().mockRejectedValue(new Error('floating root unavailable'))
 
-    // Mirrors the ipcMain.handle('ui:consumePendingMarkdownFileOpens') body.
+    // Model the IPC pull body.
     const pull = async (): Promise<unknown> => {
       const filePaths = state.consume()
       try {
@@ -27,8 +20,7 @@ describe('os-opened markdown delivery ownership', () => {
     }
 
     await expect(pull()).rejects.toThrow('floating root unavailable')
-    // Without the restore the file would be gone and no later mount could ever open it.
-    expect(state.consume()).toEqual([NOTE_A])
+    expect(state.consume()).toEqual(['/notes/a.md'])
   })
 
   it('holds the batch while the renderer listener is not yet attached', () => {
@@ -36,7 +28,7 @@ describe('os-opened markdown delivery ownership', () => {
     const send = vi.fn()
     let listenerReady = false
 
-    // Mirrors publishOsOpenedDocuments()'s guard.
+    // Model the push readiness guard.
     const publish = (): void => {
       if (!listenerReady) {
         return
@@ -47,26 +39,25 @@ describe('os-opened markdown delivery ownership', () => {
       }
     }
 
-    // A window exists, but the renderer has not mounted its bridge yet: send() here would be
-    // dropped by Electron with no error, and consuming would destroy the queue.
-    state.captureFilePaths([NOTE_A], publish)
+    // An existing window may lack its listener; consuming/pushing now would silently discard paths.
+    state.captureFilePaths(['/notes/a.md'], publish)
     expect(send).not.toHaveBeenCalled()
 
-    // The renderer's pull is what proves the listener is live.
+    // Only the renderer pull proves its listener is ready.
     listenerReady = true
-    state.captureFilePaths([NOTE_B], publish)
-    expect(send).toHaveBeenCalledExactlyOnceWith([NOTE_A, NOTE_B])
+    state.captureFilePaths(['/notes/b.md'], publish)
+    expect(send).toHaveBeenCalledExactlyOnceWith(['/notes/a.md', '/notes/b.md'])
     expect(state.consume()).toEqual([])
   })
 
   it('restores a batch the window could no longer receive', () => {
     const state = new OsOpenedDocumentState()
-    state.captureFilePaths([NOTE_A])
+    state.captureFilePaths(['/notes/a.md'])
     const filePaths = state.consume()
 
     // Window died between consume and send.
     state.restore(filePaths)
 
-    expect(state.consume()).toEqual([NOTE_A])
+    expect(state.consume()).toEqual(['/notes/a.md'])
   })
 })

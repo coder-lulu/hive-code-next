@@ -1,3 +1,4 @@
+import { findAllByHostType, findByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -55,19 +56,19 @@ describe('HostScreenView', () => {
       )
     })
 
-    expect(renderer.root.findAllByType('SafeAreaView')).toHaveLength(1)
-    expect(renderer.root.findAllByType('HostScreenHeader')).toHaveLength(1)
-    expect(renderer.root.findAllByType('HostScreenOverlays')).toHaveLength(1)
-    expect(renderer.root.findAllByType('MobilePrimaryNavigation')).toHaveLength(0)
-    expect(renderer.root.findAllByType('HostWorkspaceList')).toHaveLength(0)
+    expect(findAllByHostType(renderer!.root, 'SafeAreaView')).toHaveLength(1)
+    expect(findAllByHostType(renderer!.root, 'HostScreenHeader')).toHaveLength(1)
+    expect(findAllByHostType(renderer!.root, 'HostScreenOverlays')).toHaveLength(1)
+    expect(findAllByHostType(renderer!.root, 'MobilePrimaryNavigation')).toHaveLength(0)
+    expect(findAllByHostType(renderer!.root, 'HostWorkspaceList')).toHaveLength(0)
 
-    const text = renderer.root
-      .findAllByType('Text')
-      .flatMap((node) => node.children.filter((child) => typeof child === 'string'))
+    const text = findAllByHostType(renderer!.root, 'Text').flatMap((node) =>
+      node.children.filter((child) => typeof child === 'string')
+    )
     expect(text).toContain('Runtime 不可用')
     expect(text).not.toContain('Host not found')
 
-    act(() => renderer.root.findByType('Pressable').props.onPress())
+    act(() => findByHostType(renderer!.root, 'Pressable').props.onPress())
     expect(setShowRuntimeSelector).toHaveBeenCalledWith(true)
   })
 
@@ -76,7 +77,7 @@ describe('HostScreenView', () => {
       renderer = create(createElement(HostScreenView, { controller: controller('') }))
     })
 
-    expect(renderer.root.findAllByType('HostWorkspaceList')).toHaveLength(1)
+    expect(findAllByHostType(renderer!.root, 'HostWorkspaceList')).toHaveLength(1)
   })
 
   it('protects the phone bottom safe area without adding primary tabs', () => {
@@ -85,8 +86,8 @@ describe('HostScreenView', () => {
       renderer = create(createElement(HostScreenView, { controller: currentController }))
     })
 
-    expect(renderer!.root.findByType('SafeAreaView').props.edges).toEqual(['top', 'bottom'])
-    expect(renderer!.root.findAllByType('MobilePrimaryNavigation')).toHaveLength(0)
+    expect(findByHostType(renderer!.root, 'SafeAreaView').props.edges).toEqual(['top', 'bottom'])
+    expect(findAllByHostType(renderer!.root, 'MobilePrimaryNavigation')).toHaveLength(0)
   })
 
   it('leaves the embedded host bottom inset to its parent', () => {
@@ -95,6 +96,6 @@ describe('HostScreenView', () => {
     act(() => {
       renderer = create(createElement(HostScreenView, { controller: currentController }))
     })
-    expect(renderer!.root.findByType('SafeAreaView').props.edges).toEqual(['top'])
+    expect(findByHostType(renderer!.root, 'SafeAreaView').props.edges).toEqual(['top'])
   })
 })

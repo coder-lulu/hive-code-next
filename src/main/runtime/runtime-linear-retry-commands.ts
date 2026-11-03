@@ -1,10 +1,12 @@
 import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '../../shared/brand'
 import {
   type LinearAgentAccessError,
-  type LinearAgentWriteTarget,
-  type LinearCreateFieldIntent,
   linearError,
   sanitizeLinearErrorMessage
+} from '../linear/issue-context/errors'
+import type {
+  LinearAgentWriteTarget,
+  LinearCreateFieldIntent
 } from './runtime-linear-command-dependencies'
 import { RuntimeLinearCommandBase } from './runtime-linear-command-base'
 
@@ -25,7 +27,7 @@ export class RuntimeLinearRetryCommands extends RuntimeLinearCommandBase {
     } = {}
   ): LinearAgentAccessError {
     const workspaceId = target?.workspaceId ?? extra.team?.workspaceId ?? ''
-    // Why: the retry preserves id and target so duplicate recovery can prove intent without matching mutable content.
+    // Preserve id/target for retry proof; mutable content cannot identify the original intent.
     const pinned =
       verb === 'create'
         ? [
@@ -83,18 +85,23 @@ export class RuntimeLinearRetryCommands extends RuntimeLinearCommandBase {
     return /^[A-Za-z0-9._:@%+=,/-]+$/.test(value) ? value : placeholder
   }
 
-  public async notifyLinearLinkedIssueUpdated(
+  public notifyLinearLinkedIssueUpdated(
+    workspaceId: string,
+    identifier: string | readonly string[]
+  ): void {
+    void this.refreshLinearLinkedIssues(workspaceId, identifier).catch((error: unknown) => {
+      console.warn('[linear] Linked issue refresh failed:', error)
+    })
+  }
+
+  private async refreshLinearLinkedIssues(
     workspaceId: string,
     identifier: string | readonly string[]
   ): Promise<void> {
     const identifiers = typeof identifier === 'string' ? [identifier] : identifier
-    const normalized = new Map(
-      identifiers.map((value) => [value.toLocaleUpperCase(), value] as const)
-    )
+    const normalized = new Map(identifiers.map((value) => [value.toUpperCase(), value] as const))
     for (const worktree of await this.listResolvedWorktrees()) {
-      const linkedIdentifier = normalized.get(
-        (worktree.linkedLinearIssue ?? '').toLocaleUpperCase()
-      )
+      const linkedIdentifier = normalized.get((worktree.linkedLinearIssue ?? '').toUpperCase())
       if (!linkedIdentifier) {
         continue
       }

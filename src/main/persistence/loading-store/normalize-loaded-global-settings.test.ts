@@ -6,13 +6,10 @@ import { prepareLoadedTerminalSettings } from './prepare-loaded-terminal-setting
 import { prepareLoadedProfileSettings } from './prepare-loaded-profile-settings'
 import type { GlobalSettings } from '../../../shared/global-settings-types'
 import type { PersistedState } from '../../../shared/persisted-state-types'
-import { applyAgentPermissionMode } from '../../../shared/tui-agent-permissions'
 
-// Simulates a profile created before the dedicated Experimental switch was persisted.
-function normalizeLegacyProfile(overrides: Record<string, unknown>): PersistedState['settings'] {
+function normalizeSettings(overrides: Record<string, unknown>): PersistedState['settings'] {
   const defaults = getDefaultPersistedState(homedir())
   const settings: Partial<GlobalSettings> = { ...defaults.settings }
-  delete settings.experimentalActivity
   Object.assign(settings, overrides)
   const parsed: PersistedState = { ...defaults, settings: settings as GlobalSettings }
   const noop = (): void => {}
@@ -21,70 +18,96 @@ function normalizeLegacyProfile(overrides: Record<string, unknown>): PersistedSt
   return normalizeLoadedGlobalSettings(parsed, terminal, profile)
 }
 
+describe('current feature settings validation', () => {
+  it('bounds untrusted plugin choices, mirror URLs and worker heartbeat intervals on load', () => {
+    const settings = normalizeSettings({
+      pluginAppThemeDark: 'plugin:../../untrusted',
+      pluginIconTheme: 'plugin:publisher.theme/icons',
+      terminalPluginPalettes: [{ id: 'invalid', colors: {} }],
+      pluginUpdatePolicy: 'unbounded',
+      nodeDistMirrorUrl: 'file:///untrusted',
+      orchestrationHeartbeatIntervalMinutes: 0
+    })
+    expect(settings).toMatchObject({
+      pluginAppThemeDark: null,
+      pluginIconTheme: 'plugin:publisher.theme/icons',
+      terminalPluginPalettes: [],
+      pluginUpdatePolicy: 'manual',
+      nodeDistMirrorUrl: '',
+      orchestrationHeartbeatIntervalMinutes: 5
+    })
+  })
+
+  it('defaults completed features on and preserves explicit opt-outs without rollout stamps', () => {
+    expect(
+      normalizeSettings({
+        pluginSystemEnabled: undefined,
+        experimentalBrowserExtensions: undefined,
+        experimentalConnectors: undefined
+      })
+    ).toMatchObject({
+      pluginSystemEnabled: true,
+      experimentalBrowserExtensions: true,
+      experimentalConnectors: true
+    })
+    const settings = normalizeSettings({
+      pluginSystemEnabled: false,
+      pluginSystemDefaultedOn: false,
+      experimentalBrowserExtensions: false,
+      experimentalConnectors: false
+    })
+    expect(settings).toMatchObject({
+      pluginSystemEnabled: false,
+      experimentalBrowserExtensions: false,
+      experimentalConnectors: false
+    })
+    expect(settings).not.toHaveProperty('pluginSystemDefaultedOn')
+  })
+})
+
 describe('persisted default agent', () => {
   it.each(['hivecode', 'managed-pi', 'unknown-agent', 42, undefined])(
     'restores %s as automatic selection',
     (defaultTuiAgent) => {
-      expect(normalizeLegacyProfile({ defaultTuiAgent }).defaultTuiAgent).toBeNull()
+      expect(normalizeSettings({ defaultTuiAgent }).defaultTuiAgent).toBeNull()
     }
   )
 
   it.each(['codex', 'pi', 'blank', null])('preserves %s', (defaultTuiAgent) => {
-    expect(normalizeLegacyProfile({ defaultTuiAgent }).defaultTuiAgent).toBe(defaultTuiAgent)
+    expect(normalizeSettings({ defaultTuiAgent }).defaultTuiAgent).toBe(defaultTuiAgent)
   })
 })
 
-describe('retired Agents sidebar setting', () => {
-  it('does not mark new profiles as migrated', () => {
-    expect(normalizeLegacyProfile({}).agentsSidebarMigratedFromExperimental).toBe(false)
-  })
-
-  it('drops the old visibility setting while preserving migration metadata', () => {
-    const normalized = normalizeLegacyProfile({
+describe('retired settings inputs', () => {
+  it('drops retired sidebar, feature and view selectors without changing current choices', () => {
+    const normalized = normalizeSettings({
       experimentalActivity: true,
-      showAgentsSidebar: false
+      showAgentsSidebar: false,
+      agentsSidebarMigratedFromExperimental: true,
+      experimentalManagedServers: false,
+      experimentalNativeChat: false,
+      experimentalStructuredNativeChat: true,
+      openAgentTabsInChatByDefault: false,
+      nativeChatProviders: { codex: false, claude: true }
     })
-    expect('showAgentsSidebar' in normalized).toBe(false)
-    expect(normalized.agentsSidebarMigratedFromExperimental).toBe(true)
-  })
-})
-
-describe('retired managed servers experiment', () => {
-  it('drops the stored toggle, since managed servers are the default SSH path', () => {
-    expect('experimentalManagedServers' in normalizeLegacyProfile({})).toBe(false)
-    expect(
-      'experimentalManagedServers' in normalizeLegacyProfile({ experimentalManagedServers: true })
-    ).toBe(false)
-  })
-})
-
-describe('retired chat default selectors', () => {
-  it('keeps Chat UI on while dropping both older keys from a saved profile', () => {
-    const normalized = normalizeLegacyProfile({
-      experimentalNativeChat: true,
-      experimentalStructuredNativeChat: false,
-      openAgentTabsInChatByDefault: true
-    })
-    expect(normalized.experimentalNativeChat).toBe(true)
-    expect(normalized).not.toHaveProperty('experimentalStructuredNativeChat')
-    expect(normalized).not.toHaveProperty('openAgentTabsInChatByDefault')
-  })
-
-  it('turns Chat UI off when new tabs opened in the terminal, dropping both older keys', () => {
-    const normalized = normalizeLegacyProfile({
-      experimentalNativeChat: true,
-      experimentalStructuredNativeChat: false,
-      openAgentTabsInChatByDefault: false
-    })
-    expect(normalized.experimentalNativeChat).toBe(false)
-    expect(normalized).not.toHaveProperty('experimentalStructuredNativeChat')
-    expect(normalized).not.toHaveProperty('openAgentTabsInChatByDefault')
+    for (const key of [
+      'experimentalActivity',
+      'showAgentsSidebar',
+      'agentsSidebarMigratedFromExperimental',
+      'experimentalManagedServers',
+      'experimentalNativeChat',
+      'experimentalStructuredNativeChat',
+      'openAgentTabsInChatByDefault'
+    ]) {
+      expect(normalized).not.toHaveProperty(key)
+    }
+    expect(normalized.nativeChatProviders).toEqual({ codex: false, claude: true })
   })
 })
 
 describe('structured chat shell environment settings', () => {
   it('keeps a valid saved list and an explicit opt-out', () => {
-    const normalized = normalizeLegacyProfile({
+    const normalized = normalizeSettings({
       nativeChatInheritShellEnvironment: false,
       nativeChatShellEnvironmentVariables: ['HTTPS_PROXY', 'CODEX_LB_API_KEY']
     })
@@ -96,7 +119,7 @@ describe('structured chat shell environment settings', () => {
   })
 
   it('degrades a malformed hand-edited value to the defaults instead of failing a chat', () => {
-    const normalized = normalizeLegacyProfile({
+    const normalized = normalizeSettings({
       nativeChatInheritShellEnvironment: 'no',
       nativeChatShellEnvironmentVariables: 'HTTPS_PROXY, CODEX_LB_API_KEY'
     })
@@ -106,7 +129,7 @@ describe('structured chat shell environment settings', () => {
 
   it('drops non-string and invalid entries from a saved list', () => {
     expect(
-      normalizeLegacyProfile({
+      normalizeSettings({
         nativeChatShellEnvironmentVariables: ['HTTPS_PROXY', 7, null, 'not valid', 'HTTPS_PROXY']
       }).nativeChatShellEnvironmentVariables
     ).toEqual(['HTTPS_PROXY'])
@@ -114,58 +137,51 @@ describe('structured chat shell environment settings', () => {
 })
 
 describe('machine name setting', () => {
-  it('trims persisted names and defaults missing legacy values to automatic detection', () => {
-    expect(normalizeLegacyProfile({ machineName: '  Build server  ' }).machineName).toBe(
-      'Build server'
-    )
-    expect(normalizeLegacyProfile({ machineName: undefined }).machineName).toBe('')
-    expect(normalizeLegacyProfile({ machineName: 'x'.repeat(300) }).machineName).toHaveLength(255)
+  it('trims persisted names and defaults missing values to automatic detection', () => {
+    expect(normalizeSettings({ machineName: '  Build server  ' }).machineName).toBe('Build server')
+    expect(normalizeSettings({ machineName: undefined }).machineName).toBe('')
+    expect(normalizeSettings({ machineName: 'x'.repeat(300) }).machineName).toHaveLength(255)
   })
 })
 
 describe('chat appearance settings', () => {
-  it('normalizes old and malformed profiles on load', () => {
-    expect(normalizeLegacyProfile({}).nativeChatAppearance).toBeUndefined()
+  it('normalizes missing and malformed appearance preferences on load', () => {
+    expect(normalizeSettings({}).nativeChatAppearance).toBeUndefined()
     expect(
-      normalizeLegacyProfile({
+      normalizeSettings({
         nativeChatAppearance: { fontSize: 40, codeFontSize: 1, width: 'wide' }
       }).nativeChatAppearance
     ).toEqual({ fontSize: 20, codeFontSize: 10, width: 'wide' })
     expect(
-      normalizeLegacyProfile({
+      normalizeSettings({
         nativeChatAppearance: { fontSize: 14, codeFontSize: 12, width: 'comfortable' }
       }).nativeChatAppearance
     ).toBeUndefined()
   })
 })
 
-describe('the new-chat permission setting', () => {
-  it.each([
-    ['manual', 'ask'],
-    ['yolo', 'full-access']
-  ] as const)('seeds a profile without it from %s Agent Permissions', (mode, expected) => {
-    const normalized = normalizeLegacyProfile({
-      nativeChatPermissionMode: undefined,
-      ...applyAgentPermissionMode({ mode })
+describe('current permission preferences', () => {
+  it('keeps explicit typed choices without deriving native grants from retired settings', () => {
+    const normalized = normalizeSettings({
+      agentPermissionDefault: 'ask',
+      agentPermissionOverrides: { codex: 'own' },
+      agentDefaultArgs: { claude: '--custom' },
+      nativeChatPermissionMode: 'full-access',
+      agentPermissionMode: 'yolo'
     })
-    expect(normalized.nativeChatPermissionMode).toBe(expected)
-  })
-
-  // Seeded once: after the next save the setting is the user's, not a mirror of Agent Permissions.
-  it('keeps a saved value when Agent Permissions change afterwards', () => {
-    const normalized = normalizeLegacyProfile({
-      nativeChatPermissionMode: 'ask',
-      ...applyAgentPermissionMode({ mode: 'yolo' })
-    })
-    expect(normalized.nativeChatPermissionMode).toBe('ask')
+    expect(normalized.agentPermissionDefault).toBe('ask')
+    expect(normalized.agentPermissionOverrides).toEqual({ codex: 'own' })
+    expect(normalized.agentDefaultArgs).toEqual({ claude: '--custom' })
+    expect(normalized).not.toHaveProperty('nativeChatPermissionMode')
+    expect(normalized).not.toHaveProperty('agentPermissionMode')
   })
 })
 
 describe('terminal default shell', () => {
   it('trims a hand-edited value and treats whitespace-only as unset', () => {
-    expect(
-      normalizeLegacyProfile({ terminalDefaultShell: '  /bin/zsh  ' }).terminalDefaultShell
-    ).toBe('/bin/zsh')
-    expect(normalizeLegacyProfile({ terminalDefaultShell: '   ' }).terminalDefaultShell).toBe('')
+    expect(normalizeSettings({ terminalDefaultShell: '  /bin/zsh  ' }).terminalDefaultShell).toBe(
+      '/bin/zsh'
+    )
+    expect(normalizeSettings({ terminalDefaultShell: '   ' }).terminalDefaultShell).toBe('')
   })
 })

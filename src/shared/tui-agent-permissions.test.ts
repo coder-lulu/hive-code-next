@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyAgentPermissionMode,
+  AUTO_TUI_AGENT_ARGS,
+  resolveNonAutoAgentPermissionMode,
   resolveAgentPermissionModeSummary,
   resolveTuiAgentLaunchPermission,
   resolveTuiAgentPermissionMode,
@@ -8,6 +10,49 @@ import {
   YOLO_TUI_AGENT_ARGS,
   YOLO_TUI_AGENT_ENV
 } from './tui-agent-permissions'
+
+describe('automatic approval policy', () => {
+  it.each(['yolo', 'manual'] as const)(
+    'preserves the %s policy for agents without automatic approval',
+    (mode) => {
+      const previous = applyAgentPermissionMode({ mode })
+      const automatic = applyAgentPermissionMode({ mode: 'auto', ...previous })
+      expect(automatic.agentDefaultArgs).toMatchObject(AUTO_TUI_AGENT_ARGS)
+      expect(automatic.agentDefaultArgs.gemini).toBe(previous.agentDefaultArgs.gemini)
+      expect(automatic.agentDefaultEnv).toEqual(previous.agentDefaultEnv)
+      expect(resolveAgentPermissionModeSummary(automatic)).toBe('auto')
+      expect(applyAgentPermissionMode({ mode, ...automatic })).toEqual(previous)
+    }
+  )
+
+  it('changes other agents without weakening automatic approval', () => {
+    const automatic = applyAgentPermissionMode({
+      mode: 'auto',
+      ...applyAgentPermissionMode({ mode: 'yolo' })
+    })
+    const result = applyAgentPermissionMode({ mode: 'manual', exceptAuto: true, ...automatic })
+    expect(result.agentDefaultArgs).toMatchObject(AUTO_TUI_AGENT_ARGS)
+    expect(resolveNonAutoAgentPermissionMode(result)).toBe('manual')
+  })
+
+  it('replaces bypass flags when launching with automatic review', () => {
+    const result = resolveTuiAgentLaunchPermission({
+      agent: 'codex',
+      mode: 'auto',
+      agentArgs: '--model gpt-5 --dangerously-bypass-approvals-and-sandbox',
+      shell: 'posix'
+    })
+    expect(result.agentArgs).toContain('--approve-for-me')
+    expect(result.agentArgs).not.toContain('dangerously-bypass')
+    expect(result.agentArgs).toContain('gpt-5')
+  })
+
+  it('rejects automatic review for agents without a verified recipe', () => {
+    expect(() =>
+      resolveTuiAgentLaunchPermission({ agent: 'goose', mode: 'auto', shell: 'posix' })
+    ).toThrow('Automatic approval is unavailable')
+  })
+})
 
 describe('tui agent permissions', () => {
   it('recognizes the current default profile as yolo', () => {

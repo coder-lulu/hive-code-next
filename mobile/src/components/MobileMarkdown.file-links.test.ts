@@ -2,9 +2,8 @@ import { createElement } from 'react'
 import { act, create, type ReactTestRenderer, type ReactTestInstance } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MobileMarkdown } from './MobileMarkdown'
-import { lightTheme, type MobileTheme } from '../theme/mobile-theme'
 
-const openURL = vi.fn(() => Promise.resolve())
+const openURL = vi.fn((_url: string) => Promise.resolve())
 
 vi.mock('react-native', () => ({
   Linking: { openURL: (url: string) => openURL(url) },
@@ -16,9 +15,7 @@ vi.mock('react-native', () => ({
   View: 'View'
 }))
 vi.mock('./pr-sidebar/MermaidDiagram', () => ({ MermaidDiagram: 'MermaidDiagram' }))
-vi.mock('../theme/mobile-theme-provider', () => ({
-  useMobileThemeStyles: (factory: (theme: MobileTheme) => unknown) => factory(lightTheme)
-}))
+vi.mock('./MobileSourceCopyButton', () => ({ MobileSourceCopyButton: 'MobileSourceCopyButton' }))
 
 function flattenText(node: ReactTestInstance): string {
   return node.children
@@ -137,6 +134,29 @@ describe('MobileMarkdown file links', () => {
   it('excludes trailing sentence punctuation from autolinks', () => {
     pressByText(render('see https://example.com/a.'), 'https://example.com/a')
     expect(openURL).toHaveBeenCalledWith('https://example.com/a')
+  })
+
+  it.each([
+    [
+      '投稿（https://github.com/stablyai/orca/pull/1078）。',
+      'https://github.com/stablyai/orca/pull/1078',
+      'https://github.com/stablyai/orca/pull/1078'
+    ],
+    ['詳細は「www.example.com/docs」、次へ', 'www.example.com/docs', 'http://www.example.com/docs'],
+    [
+      'https://ja.wikipedia.org/wiki/ジョン・スミス。',
+      'https://ja.wikipedia.org/wiki/ジョン・スミス',
+      'https://ja.wikipedia.org/wiki/%E3%82%B8%E3%83%A7%E3%83%B3%E3%83%BB%E3%82%B9%E3%83%9F%E3%82%B9'
+    ]
+  ])('ends the autolink in %s at CJK punctuation', (content, linkText, url) => {
+    pressByText(render(content), linkText)
+    expect(openURL).toHaveBeenCalledExactlyOnceWith(url)
+  })
+
+  it('renders text whose url candidate ends before its host', () => {
+    expect(flattenText(render('https://（ユーザー）@example.com').root)).toBe(
+      'https://（ユーザー）@example.com'
+    )
   })
 
   it('opens inline-code path:line citations', () => {

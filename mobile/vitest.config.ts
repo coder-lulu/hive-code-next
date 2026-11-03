@@ -1,29 +1,29 @@
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
-import { resolve } from 'node:path'
 
 const vitestOxcConfig = { tsconfig: false } as never
 const windowsTestWorkerOptions = process.platform === 'win32' ? { maxWorkers: 4 } : {}
 
 export default defineConfig({
   root: import.meta.dirname,
+  // Tests are excluded from the app tsconfig; disable that config for OXC so test modules still transform.
+  oxc: vitestOxcConfig,
   resolve: {
+    // A faithful Node stand-in for the native module, rather than a mock in every test that reaches it.
     alias: {
-      '@': resolve(import.meta.dirname, 'src')
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      'expo-crypto': fileURLToPath(
+        new URL('./src/test-support/expo-crypto-node.ts', import.meta.url)
+      )
     }
   },
-  // Why: the app tsconfig intentionally excludes tests; Vite 8's OXC transform
-  // otherwise fails before Vitest can run the test modules.
-  oxc: vitestOxcConfig,
   test: {
     ...windowsTestWorkerOptions,
     pool: 'threads',
     environment: 'node',
     setupFiles: ['./vitest.setup.ts'],
     onConsoleLog: (log) => !log.includes('react-test-renderer is deprecated'),
-    // .tsx too: component tests exist (react-test-renderer + mocked react-native) and were
-    // silently never collected, so render-level regressions shipped untested.
-    // scripts/ too: the CI guards under it (the RPC recording pin) had no runnable test home,
-    // and a test vitest never collects is not a gate.
+    // Collect component and script tests too so render regressions and CI tooling are covered.
     include: [
       'src/**/*.test.ts',
       'src/**/*.test.tsx',

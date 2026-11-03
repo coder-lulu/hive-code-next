@@ -23,15 +23,12 @@ function isLoopbackHostname(hostname: string): boolean {
   )
 }
 
-/** Sealed auth error for a first pairing from such a page without operator opt-in. */
-export const INSECURE_WEB_ORIGIN_AUTH_CODE = 'insecure_origin' as const
-
-// Operator opt-in, read by the host serving the page (desktop or `orca serve`).
 export const ALLOW_INSECURE_WEB_PAIRING_ENV = 'ORCA_ALLOW_INSECURE_WEB_PAIRING' as const
 
-// Why a marker: React Native phones also send an http Origin on LAN sockets, so the Origin alone
-// cannot say "browser". Only the web bundle adds this query to its upgrade URL; hosts that predate
-// it ignore the query string, so the marked upgrade still connects to them.
+// Retain diagnostics for v1.4.225–v1.4.228 hosts that refuse cross-machine plain-HTTP pairing with this code.
+export const INSECURE_WEB_ORIGIN_AUTH_CODE = 'insecure_origin' as const
+
+// React Native also sends HTTP LAN Origins; only the web upgrade marker distinguishes browsers. Hosts ignore the query, preserving compatibility.
 export const WEB_CLIENT_UPGRADE_PARAM = 'orca-client' as const
 export const WEB_CLIENT_UPGRADE_VALUE = 'web' as const
 

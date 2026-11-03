@@ -5,7 +5,6 @@ import type { ParsedAgentStatusPayload } from '../../../../shared/agent-status-t
 import type { TerminalKittyKeyboardModeTracker } from '../../../../shared/terminal-kitty-keyboard-mode-tracker'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { TerminalLayoutSnapshot } from '../../../../shared/terminal-tab-types'
-import type { SetupSplitDirection } from '../../../../shared/worktree/launch-types'
 import type {
   PaneExternalDropHandler,
   PaneExternalDropResolver,
@@ -19,15 +18,8 @@ import type { ReplayingPanesRef } from './replay-guard'
 import type { TerminalLinkActionRequester } from './terminal-link-action-request'
 import type { TerminalLinkRoutingPreferenceRequester } from './terminal-url-link-hit-testing'
 import type { SessionRestoredBannerReason } from './session-restored-banner-pane-state'
-import type { PaneLayoutEditIntent } from '../../../../shared/rpc-contract/session-tabs-schemas-params'
 
 export type TerminalPaneStartup = Exclude<PtyPaneStartup, null>
-
-export type TerminalPaneSetupSplit = {
-  command: string
-  env?: Record<string, string>
-  direction: SetupSplitDirection
-}
 
 export type TerminalPaneIssueCommandSplit = {
   command: string
@@ -39,8 +31,6 @@ export type UseTerminalPaneLifecycleDeps = {
   worktreeId: string
   cwd?: string
   startup?: TerminalPaneStartup | null
-  /** Split pane runs the setup command so the main terminal stays interactive. */
-  setupSplit?: TerminalPaneSetupSplit | null
   /** Split pane runs the repo's issue-automation command with the issue number interpolated. */
   issueCommandSplit?: TerminalPaneIssueCommandSplit | null
   isActive: boolean
@@ -107,11 +97,14 @@ export type UseTerminalPaneLifecycleDeps = {
   clearExitedPanePtyLayoutBindingForLeaf?: (leafId: string, exitedPtyId: string) => void
   /** Settles the captured one-shot startup only after a pane owns a concrete PTY. */
   onStartupBound?: () => void
+  /** Re-renders mobile lock overlays for fit/driver state that arrived before a pane bound its PTY. */
+  refreshMobileOverlays?: () => void
   setTabPaneExpanded: (tabId: string, expanded: boolean) => void
   setTabCanExpandPane: (tabId: string, canExpand: boolean) => void
   setExpandedPane: (paneId: number | null) => void
   syncExpandedLayout: () => void
-  persistLayoutSnapshot: (intent?: PaneLayoutEditIntent) => void
+  persistLayoutSnapshot: () => void
+  showPaneTitle: (paneId: number, title: string | null) => void
   setPaneTitles: React.Dispatch<React.SetStateAction<Record<number, string>>>
   paneTitlesRef: React.RefObject<Record<number, string>>
   setRenamingPaneId: React.Dispatch<React.SetStateAction<number | null>>

@@ -13,6 +13,10 @@ export type MobileRelayHost = {
   label: string
   health: ExecutionHostHealth
   relay: MobileRelayHostRelay
+  /** This desktop's own WSL host, confirmed stopped: a phone never starts it, only the desktop. */
+  stoppedOnDesktop?: true
+  /** This desktop's own WSL host, not connected there and not known stopped; older phones show "Connecting". */
+  unavailableOnDesktop?: true
 }
 
 export type MobileRelayHostsListResult = { hosts: MobileRelayHost[] }
@@ -24,7 +28,7 @@ export const MobileRelayHostWorktreesParamsSchema = z
 /** One of a server's own `worktree.ps` rows (RuntimeWorktreePsSummary), carrying the server's host id. */
 export type MobileRelayServerWorktreeRow = Record<string, unknown> & {
   hostId: `runtime:${string}`
-  /** The desktop's "Hide other-client workspaces" hides this row; sent only while that is on. */
+  /** The desktop calls this row another client's; the phone applies the shared filter value. */
   desktopOtherClient?: true
 }
 

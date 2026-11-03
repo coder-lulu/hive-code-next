@@ -1,8 +1,5 @@
-import { randomUUID } from 'node:crypto'
 import { reserveNotificationCooldown } from '../../shared/notification-burst-cooldown'
 import type { AgentStatusState } from '../../shared/agent-status-types'
-import { APP_DISPLAY_NAME } from '../../shared/brand'
-import type { HiveMobilePushTestResult } from '../../shared/hive-mobile-push-contract'
 import {
   agentSessionAttentionSubjectPrefix,
   attentionOriginWasRead,
@@ -10,13 +7,17 @@ import {
   type StructuredAttentionRead,
   type StructuredAttentionState
 } from '../../shared/agent-session-attention'
+import type {
+  MobilePushTestResult,
+  MobilePushRegisterInput,
+  MobilePushRegisterResult
+} from '../../shared/mobile-push-contract'
 import { MobileNotificationReplayBuffer } from './mobile-notification-replay'
-import {
-  MobileNotificationDismissalStore,
-  type DeliveredNotificationIdentity
-} from './mobile-notification-dismissal-store'
 import { notifyRuntimeListeners } from './runtime-async-boundaries'
 import { getRuntimeDesktopSurface } from './runtime-desktop-surface'
+import { MobileNotificationDismissalStore } from './mobile-notification-dismissal-store'
+import { DesktopClientPresenceTracker } from './desktop-client-presence-tracker'
+import type { DeliveredNotificationIdentity } from '../../shared/mobile-notification-identity'
 
 export type MobileNotificationDispatchEvent = {
   type: 'notification'
@@ -28,17 +29,17 @@ export type MobileNotificationDispatchEvent = {
   title: string
   body: string
   worktreeId?: string
+  /** The pane the phone opens on tap; old phones ignore it and open the workspace's default tab. */
+  paneKey?: string
   /** See `NotificationDispatchRequest.executionHost`; old phones ignore it and open the desktop's. */
   executionHost?: `runtime:${string}`
   notificationId?: string
-  /** Cross-channel identity shared by the live RPC event and HiveCloud native push. */
+  /** Identity shared by local delivery and the account-authorized cloud push. */
   deliveryId?: string
-  /** HiveCloud account captured with the remote-push authorization before fan-out. */
   accountId?: string
   notificationSeq?: number
   notificationEpoch?: string
-  // Why: background push must tell "needs input" from "finished" without re-deriving
-  // it from the title. Optional and additive — old clients ignore it.
+  // Additive state distinguishes input-needed from finished in push; old clients ignore it.
   agentState?: AgentStatusState
   /** See `NotificationDispatchRequest.attentionKey`: cooldowns key on it instead of the workspace. */
   attentionKey?: string
@@ -58,22 +59,29 @@ export type MobileNotificationEvent =
   | MobileNotificationDismissEvent
 
 export type MobileNotificationRemotePushResult = HiveMobilePushTestResult
-
 export type PreparedMobileNotificationRemotePush = {
   accountId: string
   send(event: MobileNotificationDispatchEvent): Promise<MobileNotificationRemotePushResult>
 }
-
 export type MobileNotificationRemotePushSink = {
   prepare(): PreparedMobileNotificationRemotePush | null
+}
+
+/** The desktop push service, once it exists; absent on hosts that never started one. */
+export type MobilePushRegistrar = {
+  test(deviceId: string): Promise<MobilePushTestResult>
+  register(input: MobilePushRegisterInput): Promise<MobilePushRegisterResult>
+  unregister(deviceId: string): Promise<{ unregistered: boolean }>
 }
 
 export class RuntimeMobileNotificationController {
   private readonly listeners = new Set<(event: MobileNotificationEvent) => void>()
   private readonly legacyCooldown = new Map<string, number>()
   private readonly replay = new MobileNotificationReplayBuffer()
+  private pushRegistrar: MobilePushRegistrar | null = null
   private remotePushSink: MobileNotificationRemotePushSink | null = null
   private dismissalStore: MobileNotificationDismissalStore | null = null
+  private readonly desktopClients = new DesktopClientPresenceTracker()
 
   configureDismissalStore(userDataPath: string): void {
     this.dismissalStore = new MobileNotificationDismissalStore(userDataPath)
@@ -94,15 +102,17 @@ export class RuntimeMobileNotificationController {
     return this.dismissalStore?.reconcile(delivered) ?? []
   }
 
+  setPushRegistrar(registrar: MobilePushRegistrar | null): void {
+    this.pushRegistrar = registrar
+  }
+
   setRemotePushSink(sink: MobileNotificationRemotePushSink | null): void {
     this.remotePushSink = sink
   }
 
   async testRemotePush(): Promise<MobileNotificationRemotePushResult> {
     const prepared = this.prepareRemotePush()
-    if (!prepared) {
-      return { accepted: false, reason: 'unavailable' }
-    }
+    if (!prepared) return { accepted: false, reason: 'unavailable' }
     try {
       return await prepared.send({
         type: 'notification',
@@ -115,6 +125,52 @@ export class RuntimeMobileNotificationController {
     } catch {
       return { accepted: false, reason: 'unavailable' }
     }
+  }
+
+  private prepareRemotePush(): PreparedMobileNotificationRemotePush | null {
+    try {
+      return this.remotePushSink?.prepare() ?? null
+    } catch {
+      return null
+    }
+  }
+
+  async registerPushDevice(input: MobilePushRegisterInput): Promise<MobilePushRegisterResult> {
+    return (
+      (await this.pushRegistrar?.register(input)) ?? {
+        registered: false,
+        reason: 'gateway_unreachable'
+      }
+    )
+  }
+
+  async testPushDevice(deviceId: string): Promise<MobilePushTestResult> {
+    return (await this.pushRegistrar?.test(deviceId)) ?? { accepted: false, reason: 'unavailable' }
+  }
+
+  async unregisterPushDevice(deviceId: string): Promise<{ unregistered: boolean }> {
+    return (await this.pushRegistrar?.unregister(deviceId)) ?? { unregistered: false }
+  }
+
+  /** `bindForget` runs for a connection without a live report, before it is recorded. */
+  reportDesktopClientPresence(
+    connectionId: string,
+    away: boolean,
+    bindForget: (forget: () => void) => void
+  ): void {
+    if (!this.desktopClients.has(connectionId)) {
+      bindForget(() => this.desktopClients.forget(connectionId))
+    }
+    this.desktopClients.report(connectionId, away, Date.now())
+  }
+
+  // Unknown must not silence phones; require fresh desktop/local activity. Headless serves use attached desktops, whose silence means away (#31570).
+  private resolveDesktopAway(): boolean | undefined {
+    if (this.desktopClients.anyPresent(Date.now())) {
+      return false
+    }
+    const surface = getRuntimeDesktopSurface()
+    return surface.isAwayForMobileNotifications ? surface.isAwayForMobileNotifications() : true
   }
 
   onDispatched(listener: (event: MobileNotificationEvent) => void): () => void {
@@ -145,7 +201,7 @@ export class RuntimeMobileNotificationController {
         deliveryId: event.deliveryId ?? randomUUID(),
         ...(preparedPush ? { accountId: preparedPush.accountId } : {}),
         legacySocketAllowed,
-        desktopAway: getRuntimeDesktopSurface().isAwayForMobileNotifications?.()
+        desktopAway: this.resolveDesktopAway()
       }
     }
     const seq = this.replay.record(event)
@@ -168,14 +224,6 @@ export class RuntimeMobileNotificationController {
       void Promise.resolve()
         .then(() => preparedPush.send(dispatchedEvent))
         .catch(() => undefined)
-    }
-  }
-
-  private prepareRemotePush(): PreparedMobileNotificationRemotePush | null {
-    try {
-      return this.remotePushSink?.prepare() ?? null
-    } catch {
-      return null
     }
   }
 
@@ -239,3 +287,6 @@ export class RuntimeMobileNotificationController {
     return { delivered }
   }
 }
+import { randomUUID } from 'node:crypto'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
+import type { HiveMobilePushTestResult } from '../../shared/hive-mobile-push-contract'

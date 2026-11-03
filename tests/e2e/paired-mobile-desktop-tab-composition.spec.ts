@@ -1,18 +1,19 @@
-/** A phone and desktop compose the same owning Runtime's tabs. No desktop-to-host delegation. */
+// Phone relay reads must match desktop host-backed tab moves in server session lists and published groups (P3), including after the macOS desktop window closes.
+import { mkdirSync, writeFileSync } from 'node:fs'
 import type { Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
-import { pairMobileClient, type PairedMobileClient } from './helpers/paired-mobile-client'
-import {
-  createDesktopMobilePairingOffer,
-  createRuntimeDesktopPairingOffer
-} from './helpers/paired-electron-client'
-import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
-import { readPublishedLayout } from './helpers/layout-compat-baseline'
+import { launchPhoneMirrorTopology } from './helpers/phone-mirror-topology'
+import type { PairedMobileSocket } from './helpers/paired-mobile-client'
+import { readPublishedLayout, readSessionTabs } from './helpers/layout-compat-baseline'
+import { toHostSessionTabId, toWebTerminalSurfaceTabId } from '../../src/shared/terminal-surface-id'
 import { z } from 'zod'
-import { decodePairingOffer } from '../../src/shared/pairing'
-import { sendRemoteRuntimeRequest } from '../../src/shared/remote-runtime-client'
+
+type Frame = PairedMobileSocket['frames'][number]
 
 const SORTABLE_TAB = '[data-testid="sortable-tab"]'
+const HostWorktreesSchema = z.looseObject({
+  worktrees: z.array(z.looseObject({ worktreeId: z.string(), path: z.string() })).nullable()
+})
 const CreatedTerminalSchema = z.looseObject({
   tab: z.looseObject({ parentTabId: z.string() })
 })
@@ -24,13 +25,23 @@ const SessionTabsSchema = z.looseObject({
   )
 })
 
+let requestId = 0
 async function call<T>(
-  phone: PairedMobileClient,
+  socket: PairedMobileSocket,
   method: string,
   params: unknown,
-  schema: z.ZodType<T>
+  schema: z.ZodType<T>,
+  executionHost?: string
 ): Promise<T> {
-  return schema.parse(await phone.call(method, params))
+  requestId += 1
+  const id = `${method}-${requestId}`
+  socket.send(id, method, params, executionHost)
+  let found: Frame | undefined
+  await expect
+    .poll(() => (found = socket.frames.find((frame) => frame.id === id)), { timeout: 30_000 })
+    .toBeDefined()
+  expect(found!.ok, `${method}: ${JSON.stringify(found!.error)}`).toBe(true)
+  return schema.parse(found!.result)
 }
 
 /** Each tab group's tab order. Group ids are each host's own, so only order and membership compare. */
@@ -42,7 +53,7 @@ async function desktopStrip(page: Page, worktreeId: string): Promise<Strip> {
     (id) => (window.__store?.getState().groupsByWorktree[id] ?? []).map((group) => group.tabOrder),
     worktreeId
   )
-  return groups
+  return groups.map((tabOrder) => tabOrder.map(toHostSessionTabId))
 }
 
 function desktopActiveTab(page: Page, worktreeId: string): Promise<string | null> {
@@ -56,7 +67,7 @@ function desktopActiveTab(page: Page, worktreeId: string): Promise<string | null
 }
 
 function desktopTab(page: Page, hostTabId: string) {
-  return page.locator(`${SORTABLE_TAB}[data-tab-id="${hostTabId}"]`)
+  return page.locator(`${SORTABLE_TAB}[data-tab-id="${toWebTerminalSurfaceTabId(hostTabId)}"]`)
 }
 
 /** Drops one desktop tab onto the leading edge of another, as a user drags in the tab strip. */
@@ -69,34 +80,62 @@ async function dragTab(page: Page, hostTabId: string, ontoHostTabId: string): Pr
   await page.mouse.up()
 }
 
-test('phone and desktop share one Runtime tab strip with independent selection', async ({
-  orcaPage: page,
-  electronApp
-}) => {
+test('phone shows the desktop tab strip of a server workspace, also with the window closed', async (// oxlint-disable-next-line no-empty-pattern -- this test owns its topology launch.
+{}, testInfo) => {
   test.setTimeout(240_000)
-  await waitForSessionReady(page)
-  const worktreeId = await waitForActiveWorktree(page)
-  const desktop = { page, app: electronApp }
-  const desktopWorktree = { id: worktreeId }
-  const serverWorktreeId = worktreeId
-  const offer = await createRuntimeDesktopPairingOffer(page)
-  const phone = pairMobileClient(await createDesktopMobilePairingOffer(page))
+  const serverFolder = testInfo.outputPath('server-folder')
+  mkdirSync(serverFolder, { recursive: true })
+  writeFileSync(`${serverFolder}/README.md`, 'server workspace\n')
+
+  const { host, desktop, phone, dispose } = await launchPhoneMirrorTopology(
+    { phoneTo: 'desktop' },
+    testInfo
+  )
   try {
-    await page.evaluate((id) => {
-      const state = window.__store!.getState()
-      for (const tab of state.tabsByWorktree[id] ?? []) {
-        state.closeTab(tab.id)
-      }
-    }, worktreeId)
-    const worktree = `id:${worktreeId}`
-    const phoneTabs = () => call(phone, 'session.tabs.list', { worktree }, SessionTabsSchema)
+    await host.client.call('repo.add', { path: serverFolder, kind: 'folder' })
+    let desktopWorktree = { id: '', hostId: '' }
+    await expect
+      .poll(
+        async () =>
+          (desktopWorktree = await desktop.page.evaluate((folder) => {
+            const row = window.__store
+              ?.getState()
+              .allWorktrees()
+              .find((worktree) => worktree.path === folder)
+            return { id: row?.id ?? '', hostId: row?.hostId ?? '' }
+          }, serverFolder)).hostId,
+        { timeout: 30_000 }
+      )
+      .toMatch(/^runtime:/)
+    const serverHostId = desktopWorktree.hostId
+
+    const socket = await phone.openSocket()
+    let serverWorktreeId = ''
+    await expect
+      .poll(async () => {
+        const listed = await call(
+          socket,
+          'mobileRelay.hosts.worktrees',
+          { hostId: serverHostId },
+          HostWorktreesSchema
+        )
+        serverWorktreeId =
+          (listed.worktrees ?? []).find((row) => row.path === serverFolder)?.worktreeId ?? ''
+        return serverWorktreeId
+      })
+      .not.toBe('')
+    const worktree = `id:${serverWorktreeId}`
+    const phoneTabs = () =>
+      call(socket, 'session.tabs.list', { worktree }, SessionTabsSchema, serverHostId)
+
     const created: string[] = []
     for (let i = 0; i < 3; i += 1) {
       const { tab } = await call(
-        phone,
+        socket,
         'session.tabs.createTerminal',
         { worktree, activate: false, select: false, navigation: 'caller' },
-        CreatedTerminalSchema
+        CreatedTerminalSchema,
+        serverHostId
       )
       created.push(tab.parentTabId)
     }
@@ -109,10 +148,11 @@ test('phone and desktop share one Runtime tab strip with independent selection',
 
     // A server-placed browser page sits in the same strip.
     await call(
-      phone,
+      socket,
       'browser.tabCreate',
       { worktree, url: 'about:blank', activate: false },
-      z.looseObject({})
+      z.looseObject({}),
+      serverHostId
     )
     const phoneStrip = async (): Promise<Strip> =>
       ((await phoneTabs()).tabGroups ?? []).map((group) => group.tabOrder)
@@ -123,32 +163,20 @@ test('phone and desktop share one Runtime tab strip with independent selection',
       .toBe(4)
     const [first, second, third] = created
     // The server's own strip, read on the server: its tab list and its published layout.
-    const serverStrip = async (): Promise<Strip> => {
-      const response = await sendRemoteRuntimeRequest(
-        decodePairingOffer(offer.pairingUrl),
-        'session.tabs.list',
-        { worktree },
-        30_000
-      )
-      if (!response.ok) {
-        throw new Error(response.error.message)
-      }
-      return (SessionTabsSchema.parse(response.result).tabGroups ?? []).map(
+    const serverStrip = async (): Promise<Strip> =>
+      ((await readSessionTabs(host.client, worktree)).tabGroups ?? []).map(
         (group) => group.tabOrder
       )
-    }
     const publishedStrip = async (): Promise<Strip> =>
-      (await readPublishedLayout(offer.pairingUrl, serverWorktreeId))?.groups.map(
+      (await readPublishedLayout(host.offer.pairingUrl, serverWorktreeId))?.groups.map(
         (group) => group.tabIds
       ) ?? []
 
-    // Reorder on the desktop by dragging the third terminal onto the first.
     await dragTab(desktop.page, third, first)
     await expect
       .poll(async () => (await desktopStrip(desktop.page, desktopWorktree.id))[0]?.slice(0, 3))
       .toEqual([third, first, second])
 
-    // Group on the desktop: move the second terminal into a split of its own.
     await desktopTab(desktop.page, second).click({ button: 'right' })
     await desktop.page.getByRole('menuitem', { name: 'Move Tab to Split' }).hover()
     await desktop.page.getByRole('menuitem', { name: 'Right', exact: true }).click()
@@ -159,7 +187,6 @@ test('phone and desktop share one Runtime tab strip with independent selection',
     await expect.poll(phoneStrip, { timeout: 30_000 }).toEqual(splitOff)
     expect(await serverStrip()).toEqual(splitOff)
 
-    // Drag the first terminal into the group the desktop just split off.
     await dragTab(desktop.page, first, second)
     await expect
       .poll(async () =>
@@ -171,34 +198,34 @@ test('phone and desktop share one Runtime tab strip with independent selection',
     const arranged = await desktopStrip(desktop.page, desktopWorktree.id)
     await expect.poll(phoneStrip, { timeout: 30_000 }).toEqual(arranged)
     expect(await serverStrip()).toEqual(arranged)
-    const browserTabIds = new Set(
+    // The server saves its own browser page's tab, so its published layout holds the same strip.
+    expect(
       (await phoneTabs()).tabs.filter((tab) => tab.type === 'browser').map((tab) => tab.id)
-    )
-    expect(browserTabIds.size).toBe(1)
+    ).toHaveLength(1)
     expect(await publishedStrip()).toEqual(arranged)
-    // A phone token authorizes this Runtime only; removed desktop delegation is unavailable.
-    const delegated = await phone.request('mobileRelay.hosts.worktrees', {
-      hostId: 'runtime:unrelated-host'
-    })
-    expect(delegated.ok).toBe(false)
+    // Only the server holds this workspace's tabs; the desktop's own answer has none of them.
+    const untargeted = await call(socket, 'session.tabs.list', { worktree }, SessionTabsSchema)
+    expect(untargeted.tabs).toEqual([])
 
     // Selection is each device's own, as for a local workspace.
     await call(
-      phone,
+      socket,
       'session.tabs.activate',
       { worktree, tabId: first, navigation: 'caller' },
-      z.looseObject({})
+      z.looseObject({}),
+      serverHostId
     )
     await desktopTab(desktop.page, third).click()
-    await expect.poll(() => desktopActiveTab(desktop.page, desktopWorktree.id)).toBe(third)
+    await expect
+      .poll(() => desktopActiveTab(desktop.page, desktopWorktree.id))
+      .toBe(toWebTerminalSurfaceTabId(third))
     const phoneActive = async () => {
       const { activeTabId, tabs } = await phoneTabs()
       return tabs.find((candidate) => candidate.id === activeTabId)?.parentTabId
     }
     expect(await phoneActive()).toBe(first)
 
-    // With the desktop window closed, the phone still reads the server's strip. Only macOS keeps
-    // the app running without a window (window-all-closed-quit-policy.ts).
+    // Only macOS keeps the app alive after its window closes (window-all-closed-quit-policy.ts).
     if (process.platform !== 'darwin') {
       return
     }
@@ -214,6 +241,6 @@ test('phone and desktop share one Runtime tab strip with independent selection',
     expect(await serverStrip()).toEqual(arranged)
     expect(await phoneActive()).toBe(first)
   } finally {
-    phone.dispose()
+    await dispose()
   }
 })

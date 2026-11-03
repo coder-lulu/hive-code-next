@@ -1,7 +1,8 @@
 import type { GlobalSettings } from '../../../shared/global-settings-types'
 import type { Tab } from '../../../shared/tab-types'
 import type { TuiAgent } from '../../../shared/tui-agent'
-import type { SetupSplitDirection } from '../../../shared/worktree/launch-types'
+import type { ExecutionHostId } from '../../../shared/execution-host'
+import type { PendingWorktreeCreation } from './pending-worktree-creation'
 import type {
   AgentProviderSessionMetadata,
   SleepingAgentLaunchConfig
@@ -14,6 +15,7 @@ export type WorktreeActivationStore = Partial<WorktreeRuntimeOwnerState> & {
   tabsByWorktree: Record<string, { id: string }[]>
   closedTerminalTabTombstonesByTabId?: ClosedTerminalTabTombstonesByTabId
   defaultTerminalTabsAppliedByWorktreeId: Record<string, true>
+  pendingWorktreeCreations?: Record<string, PendingWorktreeCreation>
   createTab: (
     worktreeId: string,
     targetGroupId?: string,
@@ -47,19 +49,17 @@ export type WorktreeActivationStore = Partial<WorktreeRuntimeOwnerState> & {
   setTabColor: (tabId: string, color: string | null) => void
   markDefaultTerminalTabsApplied: (worktreeId: string) => void
   reconcileWorktreeTabModel: (worktreeId: string) => { renderableTabCount: number }
-  queueTabSetupSplit: (
-    tabId: string,
-    startup: { command: string; env?: Record<string, string>; direction: SetupSplitDirection }
-  ) => void
   queueTabIssueCommandSplit: (
     tabId: string,
     startup: { command: string; env?: Record<string, string> }
   ) => void
   queueTabInitialCwd: (tabId: string, cwd: string) => void
-  settings?: Pick<GlobalSettings, 'experimentalNativeChat'> | null
+  settings?: Pick<GlobalSettings, 'nativeChatProviders'> | null
 }
 
 export type InitialTerminalOptions = {
+  executionHostId?: ExecutionHostId
+  worktreeCreationId?: string
   activateCreatedTabs?: boolean
   backendStartupTerminalSpawned?: boolean
   /** Create a preserved fallback startup beside setup/default terminals. */

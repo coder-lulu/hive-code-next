@@ -1,8 +1,11 @@
-import { View, Text, Pressable, StyleSheet, Platform } from 'react-native'
+import { View, Text, Pressable } from 'react-native'
 import { ChevronDown } from 'lucide-react-native'
-import type { MobileTheme } from '../theme/mobile-theme'
-import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { HostKindIcon } from './HostKindIcon'
+import { colors, spacing, typography } from '../theme/mobile-theme'
+import { themedStyleSheet } from '../theme/themed-styles'
+import { composerInputStyles, COMPOSER_TEXT_SIZE } from './composer-input/composer-input-styles'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 
 type Selection = { label: string; detail?: string }
 
@@ -19,37 +22,43 @@ export function NewWorktreeProjectTargetFields({
   onOpenProject: () => void
   onOpenRunTarget: () => void
 }) {
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createStyles)
+  useMobileColorScheme()
+  const t = useMobileTranslation()
   return (
     <>
       <View style={styles.field}>
-        <Text style={styles.label}>Project</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Select project"
-          style={({ pressed }) => [styles.fieldButton, pressed && styles.fieldButtonPressed]}
-          onPress={onOpenProject}
-        >
+        <Text style={styles.label}>
+          {t('components.newWorktreeProjectTargetFields.project', 'Project')}
+        </Text>
+        <Pressable style={styles.fieldButton} onPress={onOpenProject}>
           {projectBadgeColor ? (
             <View style={[styles.projectDot, { backgroundColor: projectBadgeColor }]} />
           ) : null}
-          <SelectionCopy selection={project} placeholder="Select a project" />
-          <ChevronDown size={16} color={theme.color.text.tertiary} />
+          <SelectionCopy
+            selection={project}
+            placeholder={t(
+              'components.newWorktreeProjectTargetFields.selectProject',
+              'Select a project'
+            )}
+          />
+          <ChevronDown size={14} color={colors.textMuted} />
         </Pressable>
       </View>
 
       <View style={styles.field}>
-        <Text style={styles.label}>Run on</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Select run target"
-          style={({ pressed }) => [styles.fieldButton, pressed && styles.fieldButtonPressed]}
-          onPress={onOpenRunTarget}
-        >
-          <HostKindIcon hostId={runTarget?.hostId} size={16} />
-          <SelectionCopy selection={runTarget} placeholder="Select a run target" />
-          <ChevronDown size={16} color={theme.color.text.tertiary} />
+        <Text style={styles.label}>
+          {t('components.newWorktreeProjectTargetFields.runOn', 'Run on')}
+        </Text>
+        <Pressable style={styles.fieldButton} onPress={onOpenRunTarget}>
+          <HostKindIcon hostId={runTarget?.hostId} size={14} />
+          <SelectionCopy
+            selection={runTarget}
+            placeholder={t(
+              'components.newWorktreeProjectTargetFields.selectRunTarget',
+              'Select a run target'
+            )}
+          />
+          <ChevronDown size={14} color={colors.textMuted} />
         </Pressable>
       </View>
     </>
@@ -63,7 +72,7 @@ function SelectionCopy({
   selection: Selection | null
   placeholder: string
 }) {
-  const styles = useMobileThemeStyles(createStyles)
+  useMobileColorScheme()
   return (
     <View style={styles.fieldButtonCopy}>
       <Text
@@ -81,52 +90,39 @@ function SelectionCopy({
   )
 }
 
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    field: {
-      marginBottom: theme.spacing.space16
-    },
-    label: {
-      ...theme.typography.meta,
-      fontWeight: '500',
-      color: theme.color.text.secondary,
-      marginBottom: theme.spacing.space8
-    },
-    fieldButton: {
-      minHeight: theme.size.minimumTouchTarget,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.space12,
-      backgroundColor: theme.color.bg.surface,
-      borderRadius: theme.radii.control,
-      borderWidth: 1,
-      borderColor: theme.color.border.default,
-      paddingHorizontal: theme.spacing.space12,
-      paddingVertical: Platform.OS === 'ios' ? theme.spacing.space12 : theme.spacing.space8
-    },
-    fieldButtonPressed: {
-      backgroundColor: theme.color.bg.subtle
-    },
-    projectDot: {
-      width: 8,
-      height: 8,
-      borderRadius: theme.radii.circle
-    },
-    fieldButtonCopy: {
-      flex: 1,
-      minWidth: 0
-    },
-    fieldButtonText: {
-      ...theme.typography.body,
-      color: theme.color.text.primary
-    },
-    fieldButtonDetail: {
-      ...theme.typography.caption,
-      color: theme.color.text.tertiary,
-      marginTop: theme.spacing.space4
-    },
-    fieldButtonPlaceholder: {
-      color: theme.color.text.tertiary
-    }
-  })
-}
+const styles = themedStyleSheet(() => ({
+  field: {
+    marginBottom: spacing.md
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.textSecondary,
+    marginBottom: spacing.xs
+  },
+  fieldButton: {
+    ...composerInputStyles.field,
+    paddingVertical: spacing.sm
+  },
+  projectDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999
+  },
+  fieldButtonCopy: {
+    flex: 1,
+    minWidth: 0
+  },
+  fieldButtonText: {
+    fontSize: COMPOSER_TEXT_SIZE,
+    color: colors.textPrimary
+  },
+  fieldButtonDetail: {
+    fontSize: typography.metaSize,
+    color: colors.textMuted,
+    marginTop: 1
+  },
+  fieldButtonPlaceholder: {
+    color: colors.textMuted
+  }
+}))

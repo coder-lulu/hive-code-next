@@ -1,11 +1,10 @@
 import { useAppStore } from '@/store'
-import { returnCreatedWorkspaceToSessions } from '@/lib/workspace-creation-session-return'
-import { needsPostCreateAgentStartup } from '@/lib/worktree-creation-followup-startup'
 import { ensureAgentStartupInTerminal } from '@/lib/new-workspace'
 import { queueWorkspaceActivationTerminalFocus } from '@/lib/workspace-activation-terminal-focus'
 import { seedAgentTabStateAfterWorktreeCreate } from '@/lib/worktree-creation-agent-seeds'
 import type { ActivateAndRevealResult } from '@/lib/worktree-activation'
 import type { WorktreeCreationRequest } from '@/lib/pending-worktree-creation'
+import { returnCreatedWorkspaceToSessions } from '@/lib/workspace-creation-session-return'
 
 export async function completeWorktreeCreation(args: {
   creationId: string
@@ -15,16 +14,22 @@ export async function completeWorktreeCreation(args: {
   activation: ActivateAndRevealResult | false
   primaryTabId: string | null
   startupTerminalTabId?: string
-  startupPaneKey?: string | null
   backendSpawned: boolean
+  /** The host was asked to plan the agent launch, so the desktop's plan never runs. */
+  hostPlannedStartup: boolean
   focusOnCompletion: boolean
 }): Promise<void> {
   const { request } = args
   const returnToSessions =
-    useAppStore.getState().pendingWorktreeCreations[args.creationId]?.returnToSessions === true
+    useAppStore.getState().pendingWorktreeCreations[args.creationId]?.returnToSessions
   // Why: clearing synchronously after activation lets React commit the panel-to-terminal swap in one frame.
   useAppStore.getState().removePendingWorktreeCreation(args.creationId, { cleanupVm: false })
-  if (!args.structuredLaunchAccepted) {
+  if (returnToSessions && args.focusOnCompletion && args.activation !== false) {
+    returnCreatedWorkspaceToSessions(args.worktreeId)
+  }
+  // Why: an agent the host planned but did not start has no tab to seed and is not the window's to start.
+  const hostAgentMissing = args.hostPlannedStartup && !args.backendSpawned
+  if (!args.structuredLaunchAccepted && !hostAgentMissing) {
     seedAgentTabStateAfterWorktreeCreate({
       request,
       worktreeId: args.worktreeId,
@@ -36,17 +41,12 @@ export async function completeWorktreeCreation(args: {
   if (
     !args.structuredLaunchAccepted &&
     request.startupPlan &&
-    needsPostCreateAgentStartup(request, args.backendSpawned)
+    !args.backendSpawned &&
+    !args.hostPlannedStartup
   ) {
     void ensureAgentStartupInTerminal({
       worktreeId: args.worktreeId,
-      primaryTabId:
-        args.backendSpawned && args.startupTerminalTabId
-          ? args.startupTerminalTabId
-          : args.primaryTabId,
-      ...(args.backendSpawned && args.startupPaneKey
-        ? { startupPaneKey: args.startupPaneKey }
-        : {}),
+      primaryTabId: args.primaryTabId,
       startup: request.startupPlan
     })
   }
@@ -56,10 +56,6 @@ export async function completeWorktreeCreation(args: {
     args.focusOnCompletion
   ) {
     queueWorkspaceActivationTerminalFocus(args.worktreeId, args.activation)
-  }
-
-  if (returnToSessions && args.focusOnCompletion) {
-    returnCreatedWorkspaceToSessions(args.worktreeId)
   }
 
   // Why: note persistence is cosmetic and should not delay the visible workspace handoff.

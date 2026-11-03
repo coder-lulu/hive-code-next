@@ -6,10 +6,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '@/store'
 import { readStoreListenerCount } from '@/store/store-listener-census'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
-import type { Worktree } from '../../../../shared/worktree/types'
+import type { Worktree, WorkspaceAttachment } from '../../../../shared/worktree/types'
 import { usePromptCacheCountdownStartedAt } from './CacheTimer'
 import { useWorktreeCardSecondaryDetails } from './use-worktree-card-secondary-details'
 import { useWorktreeAgentRows } from './useWorktreeAgentRows'
+import { buildWorkspaceAttachmentEdits } from './worktree-attachment-editing'
 
 const mocks = vi.hoisted(() => ({ toastError: vi.fn() }))
 vi.mock('sonner', () => ({ toast: { error: mocks.toastError } }))
@@ -93,9 +94,9 @@ function secondaryDetailsArgs(settings: GlobalSettings) {
     linkedBitbucketPR: null,
     linkedAzureDevOpsPR: null,
     linkedGiteaPR: null,
-    cardProps: [] as never,
     newCardStyle: false,
     compactCards: false,
+    cardProps: [],
     agentActivityDisplayMode: 'compact' as const,
     workspacePorts: [],
     openTaskPage: (() => {}) as never,
@@ -131,8 +132,7 @@ describe('useWorktreeCardSecondaryDetails store subscriptions', () => {
     }
     mount(<Probe />)
 
-    // Why: promptCacheTtlMs comes from the settings the card already subscribes to,
-    // so this hook must not open a third subscription for the same field.
+    // Reuse settings passed by the card rather than adding a per-card subscription for the same field.
     expect(listenerCount() - baseline).toBe(composedListeners)
 
     unmount()
@@ -182,7 +182,7 @@ describe('useWorktreeCardSecondaryDetails store subscriptions', () => {
           number: 42,
           title: 'Branch PR'
         },
-        updateWorktreeMeta: updateWorktreeMeta as never
+        updateWorktreeMeta
       })
       unlink = details.handleUnlinkReview
       return null
@@ -194,7 +194,15 @@ describe('useWorktreeCardSecondaryDetails store subscriptions', () => {
     expect(updateWorktreeMeta).toHaveBeenCalledWith(
       WORKTREE_ID,
       { linkedPR: null, suppressedGitHubPR: 42 },
-      { executionHostId: 'ssh:builder' }
+      {
+        executionHostId: 'ssh:builder',
+        githubLinkBase: {
+          hostId: 'ssh:builder',
+          instanceId: null,
+          linkedPR: null,
+          suppressedGitHubPR: null
+        }
+      }
     )
   })
 
@@ -208,7 +216,7 @@ describe('useWorktreeCardSecondaryDetails store subscriptions', () => {
       const details = useWorktreeCardSecondaryDetails({
         ...secondaryDetailsArgs(makeSettings(300_000)),
         prDisplay: { provider: 'github', number: 42, title: 'Branch PR' },
-        updateWorktreeMeta: updateWorktreeMeta as never
+        updateWorktreeMeta
       })
       unlink = details.handleUnlinkReview
       return null
@@ -220,5 +228,23 @@ describe('useWorktreeCardSecondaryDetails store subscriptions', () => {
     expect(mocks.toastError).toHaveBeenCalledWith(
       'Update the remote runtime to unlink GitHub pull requests'
     )
+  })
+  it('edits the chosen sibling through the attachment editor while retaining the selected review', () => {
+    const primary: WorkspaceAttachment = {
+      provider: 'github',
+      type: 'pr',
+      number: 42,
+      url: 'https://github.com/acme/orca/pull/42'
+    }
+    const sibling: WorkspaceAttachment = {
+      provider: 'github',
+      type: 'pr',
+      number: 42,
+      url: 'https://github.com/other/orca/pull/42'
+    }
+    const initial = [primary, sibling]
+    const edits = buildWorkspaceAttachmentEdits({ initial, draft: [primary] })
+    expect(edits).toEqual({ linkedItemsBase: [primary, sibling], linkedItems: [primary] })
+    expect(initial).toEqual([primary, sibling])
   })
 })

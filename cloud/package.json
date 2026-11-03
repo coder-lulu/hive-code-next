@@ -13,7 +13,8 @@
     "infra:init": "node dev/scripts/infra.mjs init",
     "infra:plan": "node dev/scripts/infra.mjs plan",
     "lint": "pnpm -r lint",
-    "test": "pnpm -r test",
+    "test": "pnpm -r test && pnpm test:tooling",
+    "test:tooling": "node --test dev/scripts/*.test.mjs ../.github/actions/cloud-sql-rollout-lease/*.test.mjs",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {

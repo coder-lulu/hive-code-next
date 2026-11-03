@@ -1,16 +1,14 @@
-import { productNameText } from '@/product-brand'
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { AppState, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
-import { useFocusEffect } from 'expo-router'
-import { ChevronLeft, Settings } from 'lucide-react-native'
+import { useState, useCallback, useEffect, useRef, type ReactNode } from 'react'
+import { AppState, View, Text, Pressable, Switch, ScrollView } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { MobileGroupedList, MobileIconButton, MobileScreenHeader } from '../components/ui'
-import type { NotificationPermissionState } from '../notifications/notification-permissions'
-import { useHiveMobilePushAvailability } from '../notifications/hive-mobile-push-availability'
-import { hiveMobilePushAvailabilityCopy } from './hive-mobile-push-availability-copy'
+import { useFocusEffect } from 'expo-router'
 import type { NotificationSettingsOperations } from './notification-settings-operations'
-import type { MobileTheme } from '../theme/mobile-theme'
-import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { ChevronLeft } from 'lucide-react-native'
+import { colors, spacing, typography } from '../theme/mobile-theme'
+import { themedStyleSheet } from '../theme/themed-styles'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
+import type { NotificationPermissionState } from '../notifications/notification-permissions'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 
 const DEFAULT_PERMISSION_STATE: NotificationPermissionState = {
   granted: false,
@@ -30,41 +28,67 @@ export default function NotificationsScreen({
   description?: string
   children?: (enabled: boolean) => ReactNode
 }) {
+  useMobileColorScheme()
+  const t = useMobileTranslation()
   const insets = useSafeAreaInsets()
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createStyles)
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
+  const requestRevision = useRef(0)
   const [error, setError] = useState<string | null>(null)
   const [pushEnabled, setPushEnabled] = useState(false)
   const [permissionState, setPermissionState] = useState(DEFAULT_PERMISSION_STATE)
-  const mobilePushAvailability = useHiveMobilePushAvailability()
 
   const refreshSettings = useCallback(async () => {
-    const [enabled, permission] = await Promise.all([
-      operations.preference(),
-      operations.permission()
-    ])
-    setPushEnabled(enabled.enabled)
-    setPermissionState(permission)
-    setError(null)
-  }, [operations])
+    if (savingRef.current) {
+      return
+    }
+    const revision = ++requestRevision.current
+    try {
+      const [enabled, permission] = await Promise.all([
+        operations.preference(),
+        operations.permission()
+      ])
+      if (revision === requestRevision.current) {
+        setPushEnabled(enabled.enabled)
+        setPermissionState(permission)
+        setError(null)
+      }
+    } catch {
+      if (revision === requestRevision.current) {
+        setError(
+          t(
+            'settings.notificationSettingsScreen.loadFailed',
+            'Could not load notification settings. Try again.'
+          )
+        )
+      }
+    }
+  }, [operations, t])
 
   useFocusEffect(
     useCallback(() => {
-      void refreshSettings().catch(() => setError('无法加载通知设置，请重试。'))
+      void refreshSettings()
+      return () => {
+        requestRevision.current += 1
+      }
     }, [refreshSettings])
   )
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
-        void refreshSettings().catch(() => setError('无法加载通知设置，请重试。'))
+        void refreshSettings()
       }
     })
     return () => subscription.remove()
   }, [refreshSettings])
 
   const togglePush = async (value: boolean) => {
+    if (savingRef.current) {
+      return
+    }
+    savingRef.current = true
+    requestRevision.current += 1
     setError(null)
     setSaving(true)
     try {
@@ -73,8 +97,14 @@ export default function NotificationsScreen({
       const saved = await operations.preference(value && permission.granted)
       setPushEnabled(saved.enabled)
     } catch {
-      setError('无法保存通知设置，请重试。')
+      setError(
+        t(
+          'settings.notificationSettingsScreen.saveFailed',
+          'Could not save notification settings. Try again.'
+        )
+      )
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -82,142 +112,157 @@ export default function NotificationsScreen({
   const switchEnabled = pushEnabled && permissionState.granted
   const notificationsBlocked = permissionState.status === 'denied'
   const hint = notificationsBlocked
-    ? productNameText('系统设置中已关闭通知权限。Orca 不会在无权限时保留开启状态。')
-    : (description ?? '当智能体需要你处理问题或完成任务时，在此设备上接收通知。')
-  const cloudStatus = switchEnabled ? hiveMobilePushAvailabilityCopy(mobilePushAvailability) : null
+    ? t(
+        'settings.notificationSettingsScreen.notificationsBlocked',
+        'Notifications are disabled in system settings.'
+      )
+    : (description ??
+      t(
+        'settings.notificationSettingsScreen.description',
+        'Get notified on this device when an agent needs your input or finishes a task.'
+      ))
 
   return (
-    <View style={styles.screen}>
-      <MobileScreenHeader
-        leading={
-          <MobileIconButton
-            accessibilityLabel="返回"
-            icon={ChevronLeft}
-            iconSize={24}
-            onPress={onBack}
-          />
-        }
-        title="通知"
-      />
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{
+        paddingTop: insets.top + spacing.sm,
+        paddingBottom: insets.bottom + spacing.xl
+      }}
+    >
+      <View style={styles.topRow}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('common.back', 'Back')}
+          style={styles.backButton}
+          onPress={onBack}
+        >
+          <ChevronLeft size={22} color={colors.textSecondary} />
+        </Pressable>
+        <Text style={styles.heading}>
+          {t('settings.notificationSettingsScreen.title', 'Notifications')}
+        </Text>
+      </View>
 
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: insets.bottom + theme.spacing.space32 }
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        {error ? (
-          <Text accessibilityRole="alert" style={styles.hint}>
-            {error}
+      {error && (
+        <Text accessibilityRole="alert" style={styles.hint}>
+          {error}
+        </Text>
+      )}
+      <View style={styles.section}>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>
+            {t('settings.notificationSettingsScreen.enableNotifications', 'Enable notifications')}
           </Text>
-        ) : null}
-        <MobileGroupedList title="推送通知">
-          <View style={styles.row}>
-            <View style={styles.rowCopy}>
-              <Text maxFontSizeMultiplier={1.3} style={styles.rowTitle}>
-                智能体通知
-              </Text>
-              <Text maxFontSizeMultiplier={1.3} style={styles.rowStatus}>
-                {switchEnabled
-                  ? (cloudStatus?.status ?? '已开启')
-                  : notificationsBlocked
-                    ? '权限已关闭'
-                    : '已关闭'}
-              </Text>
-            </View>
-            <Switch
-              accessibilityLabel="智能体通知"
-              accessibilityState={{ disabled: notificationsBlocked || saving, busy: saving }}
-              testID="notification-enabled"
-              value={switchEnabled}
-              disabled={notificationsBlocked || saving}
-              onValueChange={(value) => void togglePush(value)}
-              trackColor={{
-                false: theme.color.bg.subtle,
-                true: theme.color.bg.selected
-              }}
-              thumbColor={switchEnabled ? theme.color.text.inverse : theme.color.text.secondary}
-            />
-          </View>
-          <View style={styles.detailArea}>
-            <Text accessibilityLiveRegion="polite" maxFontSizeMultiplier={1.3} style={styles.hint}>
-              {hint}
+          <Switch
+            value={switchEnabled}
+            testID="notification-enabled"
+            accessibilityLabel={t(
+              'settings.notificationSettingsScreen.enableNotifications',
+              'Enable notifications'
+            )}
+            disabled={notificationsBlocked || saving}
+            onValueChange={(v) => void togglePush(v)}
+            trackColor={{ false: colors.bgRaised, true: colors.textSecondary }}
+            thumbColor={colors.textPrimary}
+          />
+        </View>
+        <Text style={styles.hint}>{hint}</Text>
+        {notificationsBlocked && (
+          <Pressable
+            style={({ pressed }) => [
+              styles.settingsButton,
+              pressed && styles.settingsButtonPressed
+            ]}
+            testID="notification-system-settings"
+            onPress={() =>
+              void operations
+                .openSettings()
+                .catch(() =>
+                  setError(
+                    t(
+                      'settings.notificationSettingsScreen.openSettingsFailed',
+                      'Could not open system settings. Try again.'
+                    )
+                  )
+                )
+            }
+          >
+            <Text style={styles.settingsButtonText}>
+              {t('settings.notificationSettingsScreen.openSettings', 'Open Settings')}
             </Text>
-            {cloudStatus?.detail ? (
-              <Text
-                accessibilityLiveRegion="polite"
-                maxFontSizeMultiplier={1.3}
-                style={cloudStatus.unavailable ? styles.availabilityWarning : styles.hint}
-              >
-                {cloudStatus.detail}
-              </Text>
-            ) : null}
-            {notificationsBlocked ? (
-              <Pressable
-                accessibilityLabel="打开系统通知设置"
-                accessibilityRole="button"
-                style={({ pressed }) => [
-                  styles.settingsButton,
-                  pressed && styles.settingsButtonPressed
-                ]}
-                testID="notification-system-settings"
-                onPress={() =>
-                  void operations.openSettings().catch(() => setError('无法打开系统设置，请重试。'))
-                }
-              >
-                <Settings color={theme.color.text.secondary} size={20} strokeWidth={2} />
-                <Text maxFontSizeMultiplier={1.3} style={styles.settingsButtonText}>
-                  打开系统设置
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
-        </MobileGroupedList>
-        {children?.(switchEnabled && !saving)}
-      </ScrollView>
-    </View>
+          </Pressable>
+        )}
+      </View>
+      {children?.(switchEnabled && !saving)}
+    </ScrollView>
   )
 }
 
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    screen: { flex: 1, backgroundColor: theme.color.bg.canvas },
-    content: {
-      paddingHorizontal: theme.spacing.space20,
-      paddingTop: theme.spacing.space20
-    },
-    row: {
-      minHeight: theme.size.groupedListRowMinHeight,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.space12,
-      paddingHorizontal: theme.spacing.space16,
-      paddingVertical: theme.spacing.space12
-    },
-    rowCopy: { minWidth: 0, flex: 1, gap: theme.spacing.space4 },
-    rowTitle: { ...theme.typography.body, color: theme.color.text.primary },
-    rowStatus: { ...theme.typography.meta, color: theme.color.text.secondary },
-    detailArea: {
-      gap: theme.spacing.space12,
-      paddingHorizontal: theme.spacing.space16,
-      paddingVertical: theme.spacing.space12
-    },
-    hint: { ...theme.typography.meta, color: theme.color.text.secondary },
-    availabilityWarning: { ...theme.typography.meta, color: theme.color.status.warningText },
-    settingsButton: {
-      minHeight: theme.size.minimumTouchTarget,
-      alignSelf: 'flex-start',
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.space8,
-      paddingHorizontal: theme.spacing.space12,
-      borderWidth: 1,
-      borderColor: theme.color.border.default,
-      borderRadius: theme.radii.control,
-      backgroundColor: theme.color.bg.surface
-    },
-    settingsButtonPressed: { backgroundColor: theme.color.bg.subtle },
-    settingsButtonText: { ...theme.typography.label, color: theme.color.text.primary }
-  })
-}
+const styles = themedStyleSheet(() => ({
+  container: {
+    flex: 1,
+    backgroundColor: colors.bgBase,
+    padding: spacing.lg
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.xl
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm
+  },
+  heading: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.textPrimary
+  },
+  section: {
+    backgroundColor: colors.bgPanel,
+    borderRadius: 12,
+    overflow: 'hidden'
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md + 2
+  },
+  rowLabel: {
+    flex: 1,
+    fontSize: typography.bodySize,
+    fontWeight: '500',
+    color: colors.textPrimary
+  },
+  hint: {
+    fontSize: typography.metaSize,
+    color: colors.textMuted,
+    lineHeight: 18,
+    paddingHorizontal: spacing.md + 2,
+    paddingBottom: spacing.md
+  },
+  settingsButton: {
+    alignSelf: 'flex-start',
+    marginHorizontal: spacing.md + 2,
+    marginBottom: spacing.md,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 8,
+    backgroundColor: colors.bgRaised
+  },
+  settingsButtonPressed: {
+    opacity: 0.6
+  },
+  settingsButtonText: {
+    color: colors.textPrimary,
+    fontSize: typography.metaSize,
+    fontWeight: '600'
+  }
+}))

@@ -1,3 +1,4 @@
+import { findAllByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -84,15 +85,13 @@ function mount() {
   })
 }
 function labels() {
-  return renderer!.root
-    .findAllByType('Text')
+  return findAllByHostType(renderer!.root, 'Text')
     .map((node) => node.children.join(''))
     .join('\n')
 }
 async function press(label: string) {
   await act(async () => {
-    renderer!.root
-      .findAllByType('Pressable')
+    findAllByHostType(renderer!.root, 'Pressable')
       .find((node) => node.props.accessibilityLabel === label)!
       .props.onPress()
     await Promise.resolve()
@@ -101,7 +100,7 @@ async function press(label: string) {
 
 it('gates the native claim form behind real authentication and supports cold-route return', async () => {
   mount()
-  expect(renderer!.root.findAllByType('TextInput')).toHaveLength(0)
+  expect(findAllByHostType(renderer!.root, 'TextInput')).toHaveLength(0)
   await press('登录 HiveCloud')
   expect(fixture.push).toHaveBeenCalledWith('/login')
   await press('返回')
@@ -113,8 +112,8 @@ it('does not show login or claim fields until authentication has hydrated', () =
   fixture.hydrated = false
   mount()
   expect(labels()).toContain('正在读取账号')
-  expect(renderer!.root.findAllByType('TextInput')).toHaveLength(0)
-  expect(renderer!.root.findAllByType('Pressable')).toHaveLength(1)
+  expect(findAllByHostType(renderer!.root, 'TextInput')).toHaveLength(0)
+  expect(findAllByHostType(renderer!.root, 'Pressable')).toHaveLength(1)
 })
 
 it('reviews the computer, verifies by SMS, and distinguishes confirmation from desktop binding', async () => {
@@ -155,5 +154,5 @@ it('clears the former account claim when switching accounts or signing out', asy
   expect(labels()).not.toContain('runtime-a')
   fixture.session = null
   act(() => renderer!.update(createElement(MobileRuntimeClaimScreen)))
-  expect(renderer!.root.findAllByType('TextInput')).toHaveLength(0)
+  expect(findAllByHostType(renderer!.root, 'TextInput')).toHaveLength(0)
 })

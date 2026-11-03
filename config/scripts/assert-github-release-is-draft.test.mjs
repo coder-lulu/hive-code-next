@@ -99,8 +99,8 @@ describe('restorePublishedDesktopReleasesToDraft', () => {
   })
 })
 
-describe('release publication boundary', () => {
-  it('keeps Hive artifact publishing explicit and disables implicit GitHub uploads', () => {
+describe('release draft workflow contract', () => {
+  it('keeps GitHub releases draft until publish-release undrafts complete assets', () => {
     const releaseWorkflow = parse(
       readFileSync(join(repoRoot, '.github/workflows/release-cut.yml'), 'utf8')
     )
@@ -109,50 +109,59 @@ describe('release publication boundary', () => {
     )
     const electronBuilderConfig = require('../electron-builder.config.cjs')
     const cutCheckout = releaseWorkflow.jobs.cut.steps.find((step) => step.name === 'Checkout ref')
+    const linuxDraftStep = releaseWorkflow.jobs.build.steps.find(
+      (step) => step.name === 'Verify release remains draft after artifact upload'
+    )
+    const publishRelease = releaseWorkflow.jobs['publish-release'].steps.find(
+      (step) => step.name === 'Publish release'
+    )
     const macSteps = macWorkflow.jobs['build-mac'].steps
-    const macBuildStep = macSteps.find((step) => step.name === 'Build release artifacts (macOS)')
+    const abortParentStep = macSteps.find(
+      (step) => step.name === 'Abort if the parent release-cut run was cancelled'
+    )
     const macPublishStep = macSteps.find(
-      (step) => step.name === 'Publish macOS ZIP artifacts to HiveCloud object storage'
+      (step) => step.name === 'Publish release artifacts (macOS)'
     )
-    const linuxPublishStep = releaseWorkflow.jobs.build.steps.find(
-      (step) => step.name === 'Publish Linux AppImage to HiveCloud object storage'
-    )
-    const windowsPublishStep = releaseWorkflow.jobs.build.steps.find(
-      (step) => step.name === 'Publish signed Windows installer to HiveCloud object storage'
+    const macDraftStep = macSteps.find(
+      (step) => step.name === 'Verify release remains draft after artifact upload'
     )
 
-    expect(electronBuilderConfig.publish).toBeNull()
+    expect(electronBuilderConfig.publish.releaseType).toBe('draft')
+    expect(cutCheckout.with['fetch-depth']).toBe(0)
+    expect(cutCheckout.with.filter).toBe('blob:none')
     expect(cutCheckout.with['fetch-tags']).toBe(true)
-    for (const entry of releaseWorkflow.jobs.build.strategy.matrix.include) {
-      expect(entry.release_command).toContain('--publish never')
+    expect(linuxDraftStep.shell).toBe('bash')
+    expect(linuxDraftStep.run).toContain('assert-github-release-is-draft.mjs')
+    expect(linuxDraftStep.run).toContain('needs.cut.outputs.tag')
+    expect(publishRelease.run).toContain('gh release edit')
+    expect(publishRelease.run).toContain('--draft=false')
+    expect(macSteps.indexOf(abortParentStep)).toBeLessThan(macSteps.indexOf(macPublishStep))
+    expect(abortParentStep.env.PARENT_RUN).toBe('${{ inputs.release_run_id }}')
+    expect(abortParentStep.run).toContain('refusing to publish mac artifacts')
+    expect(macDraftStep.shell).toBe('bash')
+    expect(macDraftStep.run).toContain('assert-github-release-is-draft.mjs')
+    expect(macDraftStep.run).toContain('inputs.tag')
+    expect(macPublishStep.with.command).toContain('-c.publish.releaseType=draft')
+
+    const linuxCommands = releaseWorkflow.jobs.build.strategy.matrix.include
+      .filter((entry) => String(entry.platform).startsWith('linux'))
+      .map((entry) => entry.release_command)
+    expect(linuxCommands.length).toBe(2)
+    for (const command of linuxCommands) {
+      expect(command).toContain('-c.publish.releaseType=draft')
     }
-    expect(macBuildStep.with.command).toContain('--publish never')
-    expect(linuxPublishStep).toBeUndefined()
-    expect(windowsPublishStep).toBeUndefined()
-    for (const file of [
-      'hivecode-linux-release.yml',
-      'hivecode-windows-hardware-sign.yml',
-      'release-mac-build.yml'
-    ]) {
-      const workflow = parse(readFileSync(join(repoRoot, '.github/workflows', file), 'utf8'))
-      const uploads = Object.values(workflow.jobs)
-        .flatMap((job) => job.steps ?? [])
-        .filter((step) => step.run?.includes('publish-hivecloud-desktop-release.mjs'))
-      expect(uploads).toHaveLength(1)
-      if (file === 'hivecode-linux-release.yml') {
-        expect(workflow.jobs.publish.if).toContain("needs.build.result == 'success'")
-        expect(workflow.jobs.publish.if).toContain("inputs.batch_id != ''")
-      } else {
-        expect(uploads[0].if).toBe("inputs.batch_id != ''")
-      }
-      expect(uploads[0].env.HIVECLOUD_RELEASE_BATCH_ID).toBe('${{ inputs.batch_id }}')
-      expect(uploads[0].env.HIVECODE_PUBLISH).toBe(
-        "${{ inputs.batch_id != '' && 'false' || 'true' }}"
-      )
-    }
-    expect(macPublishStep.run).toContain('publish-hivecloud-desktop-release.mjs')
-    expect(releaseWorkflow.jobs['publish-release'].if).toContain(
-      "github.repository == 'stablyai/orca'"
+
+    const createRestore = releaseWorkflow.jobs['create-release'].steps.find(
+      (step) => step.name === 'Restore draft-release scripts from the workflow ref'
     )
+    const buildRestore = releaseWorkflow.jobs.build.steps.find(
+      (step) => step.name === 'Restore draft-publish scripts from the workflow ref'
+    )
+    const macRestore = macSteps.find(
+      (step) => step.name === 'Restore draft-publish scripts from the workflow ref'
+    )
+    expect(createRestore.run).toContain('create-draft-release.mjs')
+    expect(buildRestore.run).toContain('assert-github-release-is-draft.mjs')
+    expect(macRestore.run).toContain('assert-github-release-is-draft.mjs')
   })
 })

@@ -1,10 +1,12 @@
+import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../shared/layout-owner-switch'
+import { placeUnshownLiveTerminalsBestEffort } from '../terminal/adoption/unshown-live-terminal-placement'
 import { ALLOW_INSECURE_WEB_PAIRING_ENV } from '../../../shared/web-origin-security'
 import { AGENT_LAUNCH_RUNTIME_CAPABILITY } from '../../../shared/agent-launch-runtime-capability'
 import type { RuntimeTransportMetadata } from '../../../shared/runtime-bootstrap'
 import { watchRuntimeMetadataOwnership } from '../runtime-metadata-ownership-watch'
 import type { RpcTransport } from '../rpc/transport'
 import { UnixSocketTransport } from '../rpc/unix-socket-transport'
-import { WebSocketTransport } from '../rpc/ws-transport'
+import { PinnedPortUnavailableError, WebSocketTransport } from '../rpc/ws-transport'
 import {
   clearWsFallbackPort,
   readWsFallbackPort,
@@ -112,6 +114,7 @@ export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
             host,
             port: this.wsPort,
             preferPinnedPort: this.preferPinnedWsPort,
+            requirePinnedPort: this.requirePinnedWsPort,
             // Why: stable fallback port across restarts keeps paired devices' endpoints valid (STA-1511); wsPort 0 = random (E2E).
             ...(this.wsPort !== 0 ? { fallbackPort: readWsFallbackPort(this.userDataPath) } : {})
           })
@@ -127,6 +130,10 @@ export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
           console.error('[runtime] Failed to start WebSocket transport:', error)
           this.mobileSocketWiring?.dispose()
           this.mobileSocketWiring = null
+          if (error instanceof PinnedPortUnavailableError) {
+            await socketTransport.stop().catch(() => {})
+            throw error
+          }
         }
       }
     }
@@ -192,6 +199,7 @@ export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
     host: string
     port: number
     preferPinnedPort: boolean
+    requirePinnedPort?: boolean
     fallbackPort?: number
   }): Promise<{ transport: WebSocketTransport; endpoint: string }> {
     const deviceRegistry = this.deviceRegistry
@@ -206,6 +214,7 @@ export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
       httpRouteHandler: (request, response) =>
         this.cloudWebLaunchService?.handleHttpRequest(request, response) ?? false,
       ...(options.fallbackPort !== undefined ? { fallbackPort: options.fallbackPort } : {}),
+      ...(options.requirePinnedPort ? { requirePinnedPort: true } : {}),
       ...(options.preferPinnedPort ? { preferPinnedPort: true } : {}),
       fallbackLadder: wsFallbackPortLadder(this.wsPort)
     })
@@ -284,11 +293,19 @@ export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
       onCloudReady: (socket) => this.handleCloudSocketReady(socket),
       onCloudClose: (socket) => this.handleCloudSocketClose(socket),
       onReady: (socket) => {
+        if (ORCA_LAYOUT_OWNER_IS_MAIN) {
+          void placeUnshownLiveTerminalsBestEffort(this.runtime)
+        }
+        if (socket.device.scope === 'runtime') {
+          this.runtime.sidebarFacts?.noteRuntimeClient(
+            socket.connectionId,
+            socket.clientCapabilities
+          )
+        }
         // The first authenticated client starts path-candidate tracking.
         // Activation is a local-host concern: candidate buffers live on the
         // buffer-owning host's runtime, so a remote runtime proxy may
         // legitimately lack this method (its own server activates it).
-        this.runtime.activateRecentPtyPathCandidateTracking?.()
         if (socket.clientCapabilities.includes(AGENT_LAUNCH_RUNTIME_CAPABILITY)) {
           this.runtime.noteAgentLaunchClientReady?.()
         }
@@ -301,10 +318,13 @@ export class RuntimeRpcLifecycle extends RuntimeRpcWebSocketDispatch {
         this.runtime.releaseUntitledPlaceholdersForClient?.(socket.connectionId)
         // Why: subscriptions and binary streams are socket-scoped, but disconnect state is device-scoped across transports.
         this.runtime.cleanupSubscriptionsForConnection(socket.connectionId)
-        this.runtime.cancelMobileDictationForConnection(socket.connectionId)
+        void this.runtime.stagedFileSaves?.abortConnection(socket.connectionId)
+        this.declaredDesktopClients.forget(socket.connectionId)
         this.binaryMessageRouter.deleteConnection(socket.connectionId)
         if (!hasOtherConnections) {
-          this.runtime.onClientDisconnected(socket.device.clientId ?? socket.device.deviceToken)
+          this.runtime.onClientDisconnected(
+            socket.device.clientId ?? socket.device.deviceToken ?? socket.device.deviceId
+          )
         }
       },
       allowInsecureWebPairing: () => process.env[ALLOW_INSECURE_WEB_PAIRING_ENV] === '1',

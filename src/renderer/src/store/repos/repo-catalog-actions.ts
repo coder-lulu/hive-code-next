@@ -1,3 +1,7 @@
+import {
+  retireRepoCatalogWorktreeMetadata,
+  type RepoCatalogWorktreeRemoval
+} from './repo-catalog-worktree-removal'
 import type { StateCreator } from 'zustand'
 import type { AppState } from '../types'
 import type { Repo } from '../../../../shared/repo-types'
@@ -22,8 +26,10 @@ import {
 } from './repo-catalog-fencing'
 import { claimHostCatalogFence, isHostCatalogFenceCurrent } from '../host-catalog-fencing'
 import {
+  fetchRepoCatalogForTarget,
   filterSetupsForPrunedRepoRows,
   mergeFetchedRepoCatalog,
+  reconcileFetchedCatalogWorktreeState,
   reconcileReadoptedSshWorktreeState,
   reconcileSupersededSshRepos
 } from './repo-catalog-merge'
@@ -34,11 +40,10 @@ import {
 } from '../../../../shared/project-compatibility-merge'
 import { mergeFetchedHostProjectCatalog } from '../../../../shared/project-compatibility-host-merge'
 import { scheduleSafeAutoForkSync } from './safe-auto-fork-sync'
-import { loadRepoCatalog } from './repo-catalog-load'
 import {
-  reconcileRepoCatalogWorktrees,
-  retireRepoCatalogWorktreeMetadata
-} from './repo-catalog-worktree-removal'
+  withWslMovedRepoIds,
+  withWslMovedSetupScriptDismissals
+} from './wsl-moved-repo-ui-retention'
 
 export function createRepoCatalogActions(
   set: Parameters<StateCreator<AppState>>[0],
@@ -66,11 +71,7 @@ export function createRepoCatalogActions(
             setups: remainingSetups
           }
         )
-        // Why: mergeProjectHostSetupCompatibility always allocates; a no-op readoption
-        // must not churn catalog identity. This write is all-repos, not host-scoped,
-        // so it cannot go through mergeFetchedHostProjectCatalog. Reconcile
-        // hands the store arrays straight back when nothing moved, so writing them
-        // unconditionally still leaves identity-keyed selectors untouched.
+        // All-repos readoption cannot use host-scoped merge. Reconcile always-allocating compat results to preserve unchanged catalog arrays and avoid selector churn.
         const projects = reconcileCatalogRows(
           s.projects,
           compatibility.projects,
@@ -99,12 +100,13 @@ export function createRepoCatalogActions(
       set((s) => ({ reposFetchGeneration: s.reposFetchGeneration + 1 }))
       const fence = claimHostCatalogFence(get, 'repos', target)
       try {
-        const catalog = await loadRepoCatalog(target, fence, set, get)
+        const catalog = await fetchRepoCatalogForTarget(target, get().repos)
+        // A newer same-host fetch or a replaced connection superseded us — drop this stale result.
         if (!isHostCatalogFenceCurrent(get, fence)) {
           return
         }
         let finalizedHostRepos: Repo[] = []
-        let removedByRepo = new Map<string, string[]>()
+        let removal: RepoCatalogWorktreeRemoval | undefined
         set((s) => {
           // Why: an in-flight fetch for a just-removed env would re-add purged repos and stick; skip only when the env was tombstoned, not merely unhydrated (#8881).
           if (isRemovedRuntimeHostId(catalog.hostId, s.removedRuntimeEnvironmentIds)) {
@@ -132,33 +134,34 @@ export function createRepoCatalogActions(
           finalizedHostRepos = prunedRepos.filter(
             (repo) => getRepoExecutionHostId(repo) === result.hostId
           )
-          const worktreeState = reconcileReadoptedSshWorktreeState(s, s.pendingSshRepoReadoptions)
-          const removal = reconcileRepoCatalogWorktrees(
-            { ...s, ...worktreeState },
-            prunedRepos,
-            result.hostId
-          )
-          removedByRepo = removal.removedByRepo
           return {
             repos: prunedRepos,
             pendingSshRepoReadoptions: reconciliation.pendingReadoptions,
-            ...worktreeState,
-            ...removal.patch,
+            ...reconcileFetchedCatalogWorktreeState(s, catalog, prunedRepos, (result) => {
+              removal = result
+            }),
             ...mergedProjectCompatibility,
             ...(arrayElementsUnchanged(prunedRepos, s.repos)
               ? {}
               : { folderWorkspacePathStatuses: {} }),
             activeRepoId:
               s.activeRepoId && validRepoIds.has(s.activeRepoId) ? s.activeRepoId : null,
-            filterRepoIds: retainValidFilterRepoIds(s.filterRepoIds, validRepoIds),
-            setupScriptPromptDismissedRepoIds: filterSetupScriptPromptDismissalsToValidRepos(
+            filterRepoIds: retainValidFilterRepoIds(
+              s.filterRepoIds,
+              withWslMovedRepoIds(validRepoIds, s.wslMovedProjects)
+            ),
+            setupScriptPromptDismissedRepoIds: withWslMovedSetupScriptDismissals(
               s.setupScriptPromptDismissedRepoIds,
-              validRepoHostIdentities
+              filterSetupScriptPromptDismissalsToValidRepos(
+                s.setupScriptPromptDismissedRepoIds,
+                validRepoHostIdentities
+              ),
+              s.wslMovedProjects
             )
           }
         })
+        if (removal) retireRepoCatalogWorktreeMetadata(catalog.hostId, removal.removedByRepo)
         scheduleSafeAutoForkSync(finalizedHostRepos)
-        retireRepoCatalogWorktreeMetadata(catalog.hostId, removedByRepo)
       } catch (err) {
         localCatalogOutcome = { status: 'rejected', reason: err }
         console.error('Failed to fetch repos:', err)

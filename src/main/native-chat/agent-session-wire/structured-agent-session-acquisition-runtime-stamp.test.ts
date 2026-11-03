@@ -83,11 +83,13 @@ it('starts a chat whose recorded owner carries the runtime stamp', async () => {
     return published
   })
   const adapter: StructuredAgentSessionAdapter = {
+    open: async () => ({ reportedOptions: {} }),
     acquire: vi.fn<StructuredAgentSessionAdapter['acquire']>(
       async ({ fence, spawnToken, onSpawned }) => {
         const process = { hostId: 'local', pid: 4242, processStartTimeMs: NOW, spawnToken }
         await onSpawned?.(process)
         return {
+          acquisitionGeneration: globalThis.crypto.randomUUID(),
           process,
           link: {
             linkId: 'created-link',
@@ -118,7 +120,6 @@ it('starts a chat whose recorded owner carries the runtime stamp', async () => {
       probe: { outcome: 'reservation-unused' }
     },
     callerKey: 'client-1',
-    optionRevision: () => 0,
     params: attachParams(),
     now: () => NOW,
     onAttached: () => {}

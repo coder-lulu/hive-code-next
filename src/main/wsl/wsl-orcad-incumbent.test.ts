@@ -1,13 +1,19 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import { encodePairingOffer } from '../../shared/pairing'
-import { emptyOrcadActivationRecord } from '../ssh/orcad-activation-record'
-import type { OrcadHostTransport } from '../ssh/orcad-host-transport'
-import type { OrcadRemoteContext } from '../ssh/orcad-remote-context'
+import { encodePairingOffer, parsePairingCode } from '../../shared/pairing'
+import { pairedRuntimeConnectionToken } from '../../shared/paired-runtime-connection'
+import { DeviceRegistry } from '../runtime/device-registry'
+import { ORCAD_UPDATE_ADMISSION_FENCE_MS } from '../../shared/orcad-terminal-census'
+import { emptyOrcadActivationRecord } from '../managed-server/activation/orcad-activation-record'
+import type { OrcadRemoteContext } from '../managed-server/install/orcad-remote-context'
 import type { ServeReadiness } from '../server/serve-readiness'
 import { getRemoteHostPlatform } from '../ssh/ssh-remote-platform'
-import type { StartedPortForward } from '../ssh/ssh-port-forward-provider'
+import type { StartedPortForward } from '../ssh/port-forwarding/ssh-port-forward-provider'
 import { readWslOrcadIncumbent, type WslOrcadIncumbentDependencies } from './wsl-orcad-incumbent'
 import type { WslOrcadHostTarget } from './wsl-orcad-host-target'
+import { unusedOrcadHostTransport } from '../ssh/unused-host-transport.test-fixture'
 
 const host = getRemoteHostPlatform('linux-x64')
 const KEY = Buffer.alloc(32, 7).toString('base64')
@@ -47,8 +53,7 @@ const target: WslOrcadHostTarget = {
   distro: 'Ubuntu',
   label: 'Ubuntu'
 }
-// oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: every host call is a dependency stub.
-const conn = {} as OrcadHostTransport
+const conn = unusedOrcadHostTransport()
 
 function context(active: string | null = '1.4.0+aa'): OrcadRemoteContext<WslOrcadHostTarget> {
   return {
@@ -111,7 +116,7 @@ describe('readWslOrcadIncumbent', () => {
     expect(deps.listen).toHaveBeenCalledWith(conn, 6791, target)
     const [connection, activatedAt, , options] = vi.mocked(deps.census).mock.calls[0]
     expect(connection.endpoint).toMatch(/^ws:\/\/127\.0\.0\.1:51000\/?$/u)
-    expect(connection).toMatchObject({ v: 2, deviceToken: 'device', publicKeyB64: KEY })
+    expect(connection).toMatchObject({ hostPublicKeyB64: KEY, credential: { kind: 'token', deviceToken: 'device' } })
     expect(activatedAt).toBe(Date.parse('2026-10-12T01:00:00.000Z'))
     expect(options).toEqual({ releaseFinishedAutomationTerminals: true })
     expect(close).toHaveBeenCalledTimes(1)
@@ -121,10 +126,17 @@ describe('readWslOrcadIncumbent', () => {
     const { deps, close } = dependencies()
     const incumbent = await readWslOrcadIncumbent({ context: context(), slot }, deps)
     vi.mocked(deps.census).mockResolvedValueOnce({ ...LIVE, liveSessions: 3 })
-    await expect(incumbent.recount?.()).resolves.toMatchObject({ liveSessions: 3 })
+    await expect(incumbent.recount()).resolves.toMatchObject({ liveSessions: 3 })
     expect(deps.wake).toHaveBeenCalledTimes(1)
     expect(deps.listen).toHaveBeenCalledTimes(2)
     expect(close).toHaveBeenCalledTimes(2)
+    // Only final recount closes admission, preventing terminal creation between census and stop.
+    expect(vi.mocked(deps.census).mock.calls[1]?.[3]).toEqual({
+      releaseFinishedAutomationTerminals: true,
+      closeAdmissionForMs: ORCAD_UPDATE_ADMISSION_FENCE_MS
+    })
+    await incumbent.releaseAdmission()
+    expect(vi.mocked(deps.census).mock.calls[2]?.[3]).toEqual({ closeAdmissionForMs: 0 })
   })
 
   // After a reboot the woken incumbent's daemon starts empty, so the census proves zero.
@@ -151,11 +163,10 @@ describe('readWslOrcadIncumbent', () => {
     const { deps } = dependencies({
       wake: vi.fn(async () => ({ outcome: 'unverifiable' as const }))
     })
-    await expect(readWslOrcadIncumbent({ context: context(), slot }, deps)).resolves.toEqual({
-      census: UNVERIFIABLE,
-      readiness: null,
-      recount: null
-    })
+    const incumbent = await readWslOrcadIncumbent({ context: context(), slot }, deps)
+    expect(incumbent).toMatchObject({ census: UNVERIFIABLE, readiness: null })
+    // The recount before the stop must refuse too, never read as zero.
+    await expect(incumbent.recount()).resolves.toEqual(UNVERIFIABLE)
     expect(deps.listen).not.toHaveBeenCalled()
   })
 
@@ -174,11 +185,66 @@ describe('readWslOrcadIncumbent', () => {
 
   it('touches nothing when no version is active', async () => {
     const { deps } = dependencies()
-    await expect(readWslOrcadIncumbent({ context: context(null), slot }, deps)).resolves.toEqual({
-      census: UNVERIFIABLE,
-      readiness: null,
-      recount: null
-    })
+    await expect(
+      readWslOrcadIncumbent({ context: context(null), slot }, deps)
+    ).resolves.toMatchObject({ census: UNVERIFIABLE, readiness: null })
     expect(deps.wake).not.toHaveBeenCalled()
+  })
+})
+
+describe('the incumbent terminal count across restarts', () => {
+  it('authenticates with the enrolled pairing, so restarts do not grow the device registry', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'orca-incumbent-registry-'))
+    try {
+      const registry = new DeviceRegistry(dir)
+      const enrolled = registry.getOrCreatePendingDevice('CLI', 'runtime')
+      registry.updateLastSeen(enrolled.deviceId)
+      const paired = parsePairingCode(
+        encodePairingOffer({
+          v: 2,
+          endpoint: 'ws://127.0.0.1:41000',
+          deviceToken: enrolled.token,
+          publicKeyB64: KEY,
+          pairedDeviceId: enrolled.deviceId
+        })
+      )
+      for (let start = 0; start < 3; start += 1) {
+        // Each orcad start publishes whatever pending device its registry holds.
+        const pending = registry.getOrCreatePendingDevice('CLI', 'runtime')
+        const readiness: ServeReadiness = {
+          ...READINESS,
+          pairing: {
+            available: true,
+            url: encodePairingOffer({
+              v: 2,
+              endpoint: 'ws://127.0.0.1:6791',
+              deviceToken: pending.token,
+              publicKeyB64: KEY
+            }),
+            endpoint: 'ws://127.0.0.1:6791',
+            deviceId: pending.deviceId,
+            webClientUrl: null,
+            scope: 'runtime',
+            qr: null
+          }
+        }
+        const { deps } = dependencies({
+          probe: vi.fn(async () => readiness),
+          // The host marks whichever device authenticated as seen.
+          census: vi.fn(async (connection) => {
+            const token = pairedRuntimeConnectionToken(connection)
+            const device = registry.listDevices().find((entry) => entry.token === token)
+            if (device) {
+              registry.updateLastSeen(device.deviceId)
+            }
+            return LIVE
+          })
+        })
+        await readWslOrcadIncumbent({ context: context(), slot, paired }, deps)
+      }
+      expect(registry.listDevices()).toHaveLength(2)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

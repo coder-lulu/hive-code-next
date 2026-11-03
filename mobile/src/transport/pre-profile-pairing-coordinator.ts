@@ -2,7 +2,10 @@ import { connect, type ConnectOptions, type RpcClient } from './rpc-client'
 import { resolvePairingHostIdentity, savePairedHost } from './host-store'
 import type { HostProfile, PairingOffer } from './types'
 import { offerWithAuthenticatedRuntimeRecordId } from './authenticated-runtime-pairing-offer'
-import { preProfilePairingHostStatusRead } from './host-status-probe-operations'
+import {
+  preProfilePairingHostStatusRead,
+  readPairingCandidateStatus
+} from './host-status-probe-operations'
 import { recordHostDescriptorFromStatus } from './host-descriptor-recorder'
 
 export type PreProfilePairingAttempt = {
@@ -106,7 +109,11 @@ async function runPairing(
   )
   clients.add(client)
   const response = await preProfilePairingHostStatusRead.request(client)
-  const status = preProfilePairingHostStatusRead.interpret(response)
+  // Authenticated success proves the endpoint answered; optional status from older hosts may be unreadable.
+  // Refusals still fail pairing, and offered Runtime metadata is never used without authenticated status.
+  const status = response.ok
+    ? readPairingCandidateStatus(response)
+    : preProfilePairingHostStatusRead.interpret(response)
   const authenticated = offerWithAuthenticatedRuntimeRecordId(offer, status)
   assertActive(isDisposed)
   const host: HostProfile = {

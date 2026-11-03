@@ -20,6 +20,18 @@ import { joinSentences } from '../../../../shared/sentence-joining'
 import { sayAgentSessionFailureTranslated } from './agent-session-failure-words-text'
 
 const SENTENCES: Record<AgentSessionWriteNoticeSentence, () => string> = {
+  pendingWork: () => translate('components.native-chat.writeNotice.pendingWork', COPY.pendingWork),
+  notDoneQueuedEdit: () =>
+    translate('components.native-chat.writeNotice.notDoneQueuedEdit', COPY.notDoneQueuedEdit),
+  continuationSuperseded: () =>
+    translate(
+      'components.native-chat.writeNotice.continuationSuperseded',
+      COPY.continuationSuperseded
+    ),
+  messageTooLarge: () =>
+    translate('components.native-chat.writeNotice.messageTooLarge', COPY.messageTooLarge),
+  shortenMessage: () =>
+    translate('components.native-chat.writeNotice.shortenMessage', COPY.shortenMessage),
   notDoneReadHistory: () =>
     translate('components.native-chat.writeNotice.notDoneReadHistory', COPY.notDoneReadHistory),
   notDoneSend: () => translate('components.native-chat.writeNotice.notDoneSend', COPY.notDoneSend),
@@ -38,7 +50,11 @@ const SENTENCES: Record<AgentSessionWriteNoticeSentence, () => string> = {
     translate('components.native-chat.writeNotice.notDoneOption', COPY.notDoneOption),
   notDoneCommand: () =>
     translate('components.native-chat.writeNotice.notDoneCommand', COPY.notDoneCommand),
-  notDoneGoal: () => translate('components.native-chat.writeNotice.notDoneGoal', COPY.notDoneGoal),
+  notDoneGoalChangeIncomplete: () =>
+    translate(
+      'components.native-chat.writeNotice.notDoneGoalChangeIncomplete',
+      COPY.notDoneGoalChangeIncomplete
+    ),
   restartFailed: () =>
     translate('components.native-chat.writeNotice.restartFailed', COPY.restartFailed),
   capacity: () => translate('components.native-chat.writeNotice.capacity', COPY.capacity),
@@ -57,16 +73,22 @@ const SENTENCES: Record<AgentSessionWriteNoticeSentence, () => string> = {
   historyUnavailable: () =>
     translate('components.native-chat.writeNotice.historyUnavailable', COPY.historyUnavailable),
   savedByNewerOrca: () =>
-    translate('components.native-chat.writeNotice.savedByNewerOrca', COPY.savedByNewerOrca),
+    translate('components.native-chat.writeNotice.savedByNewerHiveCode', COPY.savedByNewerOrca),
   updateOrcaToKeepUsing: () =>
     translate(
-      'components.native-chat.writeNotice.updateOrcaToKeepUsing',
+      'components.native-chat.writeNotice.updateHiveCodeToKeepUsing',
       COPY.updateOrcaToKeepUsing
     ),
   chatSavedByNewerOrca: () =>
-    translate('components.native-chat.writeNotice.chatSavedByNewerOrca', COPY.chatSavedByNewerOrca),
+    translate(
+      'components.native-chat.writeNotice.chatSavedByNewerHiveCode',
+      COPY.chatSavedByNewerOrca
+    ),
   updateOrcaToOpenChat: () =>
-    translate('components.native-chat.writeNotice.updateOrcaToOpenChat', COPY.updateOrcaToOpenChat),
+    translate(
+      'components.native-chat.writeNotice.updateHiveCodeToOpenChat',
+      COPY.updateOrcaToOpenChat
+    ),
   unsupported: () => translate('components.native-chat.writeNotice.unsupported', COPY.unsupported),
   notAvailable: () =>
     translate('components.native-chat.writeNotice.notAvailable', COPY.notAvailable),

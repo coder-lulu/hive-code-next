@@ -50,11 +50,7 @@ export class RuntimeGitGenerationCommands {
     const resolvedSettings = settingsOverride?.sourceControlAiResolvedParams
       ? { ok: true as const, params: settingsOverride.sourceControlAiResolvedParams }
       : resolveCommitMessageSettings(
-          getRuntimeGitGenerationSettings(
-            this.host.getRuntimeSettings(),
-            settingsOverride,
-            'commitMessage'
-          ),
+          getRuntimeGitGenerationSettings(this.host.getRuntimeSettings(), settingsOverride),
           discoveryHostKey,
           'commitMessage',
           target.repo ?? null
@@ -128,11 +124,7 @@ export class RuntimeGitGenerationCommands {
     const resolvedSettings = settingsOverride?.sourceControlAiResolvedParams
       ? { ok: true as const, params: settingsOverride.sourceControlAiResolvedParams }
       : resolveCommitMessageSettings(
-          getRuntimeGitGenerationSettings(
-            this.host.getRuntimeSettings(),
-            settingsOverride,
-            'pullRequest'
-          ),
+          getRuntimeGitGenerationSettings(this.host.getRuntimeSettings(), settingsOverride),
           discoveryHostKey,
           'pullRequest',
           target.repo ?? null

@@ -3,7 +3,7 @@ import {
   createSqliteTestStore,
   readPersistedStateJson,
   writePersistedStateJson
-} from '../../persistence-test-harness'
+} from '../persistence-test-harness'
 /**
  * The write path now hands the file a Buffer it built in one pass instead of a string it rebuilt
  * per secret. Drives the real `Store` end to end — encrypted settings, a local session and a remote
@@ -79,66 +79,29 @@ function session(activeTabId: string): WorkspaceSessionState {
 }
 
 describe('persisted state survives a save/load round trip', () => {
-  it('keeps a #22551 settings-slot OpenCode Go key on disk until its new owner has it', () => {
-    const dataFile = join(
-      realpathSync(mkdtempSync(join(tmpdir(), 'orca-legacy-opencode-go-key-'))),
-      'state.json'
-    )
+  it('drops retired credential settings while current encrypted cookies survive a real reload', () => {
+    const directory = mkdtempSync(join(process.cwd(), 'logs', 'current-secret-roundtrip-'))
+    const dataFile = join(directory, 'state.json')
     const first = openStore(dataFile)
-    first.updateSettings({ opencodeWorkspaceId: 'wrk_test' })
+    const cookie = ['current', 'fixture', 'cookie'].join('-')
+    first.updateSettings({ opencodeSessionCookie: cookie, opencodeWorkspaceId: 'wrk_current' })
     first.flush()
     const persisted = JSON.parse(readPersistedStateJson(dataFile))
-    // Sealed exactly as #22551's protected-secret slot wrote it.
-    const sealed = getSecretStore().encryptString('fake-legacy-key').toString('base64')
-    persisted.settings.opencodeGoApiKey = sealed
+    persisted.settings.opencodeGoApiKey = getSecretStore()
+      .encryptString('retired-fixture')
+      .toString('base64')
     writePersistedStateJson(dataFile, JSON.stringify(persisted))
-    const onDiskKey = (): unknown =>
-      JSON.parse(readPersistedStateJson(dataFile)).settings.opencodeGoApiKey
-
-    // orcad-style consumer: loads and flushes the profile but never runs the migration.
-    const daemon = createSqliteTestStore(Store, { dataFile })
-    stores.push(daemon)
-    expect(daemon.getSettings()).not.toHaveProperty('opencodeGoApiKey')
-    daemon.updateSettings({ opencodeWorkspaceId: 'wrk_daemon' })
-    daemon.flush()
-    expect(onDiskKey()).toBe(sealed)
-    expect(readPersistedStateJson(dataFile)).not.toContain('fake-legacy-key')
 
     const loaded = openStore(dataFile)
-    expect(loaded.getSettings().opencodeWorkspaceId).toBe('wrk_daemon')
     expect(loaded.getSettings()).not.toHaveProperty('opencodeGoApiKey')
-    vi.spyOn(console, 'warn').mockImplementation(() => {})
-    loaded.migrateLegacyOpenCodeGoApiKey({
-      has: () => false,
-      read: () => null,
-      save: () => {
-        throw new Error('disk full')
-      }
-    })
+    expect(loaded.getSettings().opencodeSessionCookie).toBe(cookie)
+    loaded.updateSettings({ theme: 'dark' })
     loaded.flush()
-    expect(onDiskKey()).toBe(sealed)
 
-    // Why: an older paired client can still send the retired field; it must not be stored.
-    const updates = { opencodeGoApiKey: 'fake-remote-key', opencodeWorkspaceId: 'wrk_next' }
-    expect(loaded.updateSettings(updates)).not.toHaveProperty('opencodeGoApiKey')
-    loaded.flush()
-    expect(onDiskKey()).toBe(sealed)
-
-    const saved: string[] = []
-    loaded.migrateLegacyOpenCodeGoApiKey({
-      has: () => saved.length > 0,
-      read: () => saved[0] ?? null,
-      save: (key) => saved.push(key)
-    })
-    loaded.migrateLegacyOpenCodeGoApiKey({
-      has: () => saved.length > 0,
-      read: () => saved[0] ?? null,
-      save: (key) => saved.push(key)
-    })
-    expect(saved).toEqual(['fake-legacy-key'])
-    loaded.flush()
-    expect(readPersistedStateJson(dataFile)).not.toContain('opencodeGoApiKey')
-    expect(openStore(dataFile).getSettings()).not.toHaveProperty('opencodeGoApiKey')
+    const saved = readPersistedStateJson(dataFile)
+    expect(JSON.parse(saved).settings).not.toHaveProperty('opencodeGoApiKey')
+    expect(saved).not.toContain(cookie)
+    expect(openStore(dataFile).getSettings().opencodeSessionCookie).toBe(cookie)
   })
 
   it('reloads settings, secrets and both session partitions unchanged', () => {

@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import nacl from 'tweetnacl'
 import { DesktopMobileE2EEV2Session } from '../../../src/shared/runtime-e2ee-server-session'
 import { authenticateMobileE2EE } from '../../../src/main/runtime/rpc/mobile-e2ee-auth-validation'
+import { AUTHENTICATED_DIRECT_FRAMING_POLICY } from './authenticated-direct-framing-policy'
 import { RpcClientSocketSession } from './rpc-client-socket-session'
 
 vi.mock('expo-crypto', () => ({ getRandomBytes: (n: number) => new Uint8Array(n).fill(7) }))
@@ -42,7 +43,8 @@ function setup() {
   const onForcedClose = vi.fn()
   const onRpcResponse = vi.fn()
   const onBinary = vi.fn()
-  const session = new RpcClientSocketSession({
+  const session: RpcClientSocketSession = new RpcClientSocketSession({
+    framingPolicy: AUTHENTICATED_DIRECT_FRAMING_POLICY,
     endpoint: 'ws://127.0.0.1:6769',
     deviceToken: 'test-token',
     serverPublicKeyB64: Buffer.from(serverKey.publicKey).toString('base64'),
@@ -108,9 +110,12 @@ it('authenticates direct pairing against desktop v2 and exchanges RPC and binary
     )
   })
   await vi.waitFor(() => expect(ctx.onAuthenticated).toHaveBeenCalledOnce())
-  expect(ctx.session.sendEncrypted({ id: '1', method: 'status.get' })).toBe(true)
+  expect(
+    ctx.session.sendEncrypted({ id: '1', deviceToken: 'device-token', method: 'status.get' })
+  ).toBe(true)
   expect(JSON.parse(ctx.server.openText(ctx.socket.sent[2]!)!)).toEqual({
     id: '1',
+    deviceToken: 'device-token',
     method: 'status.get'
   })
   const response = { id: '1', ok: true, result: { ready: true } }
@@ -131,7 +136,9 @@ it('reports an encrypted authentication rejection without marking the socket con
   })
   await vi.waitFor(() => expect(ctx.onAuthRejected).toHaveBeenCalledOnce())
   expect(ctx.onAuthenticated).not.toHaveBeenCalled()
-  expect(ctx.session.sendEncrypted({ id: '1', method: 'status.get' })).toBe(false)
+  expect(
+    ctx.session.sendEncrypted({ id: '1', deviceToken: 'device-token', method: 'status.get' })
+  ).toBe(false)
 })
 
 it('rejects a server ready with a different pinned public key', async () => {
@@ -144,7 +151,9 @@ it('rejects a server ready with a different pinned public key', async () => {
   })
   await vi.waitFor(() => expect(ctx.onAuthRejected).toHaveBeenCalledOnce())
   expect(ctx.onForcedClose).not.toHaveBeenCalled()
-  expect(ctx.session.sendEncrypted({ id: 'blocked', method: 'status.get' })).toBe(false)
+  expect(
+    ctx.session.sendEncrypted({ id: 'blocked', deviceToken: 'device-token', method: 'status.get' })
+  ).toBe(false)
   expect(ctx.onAuthenticated).not.toHaveBeenCalled()
   expect(ctx.socket.sent).toHaveLength(1)
 })
@@ -165,8 +174,21 @@ it('forces reconnect rather than rejecting credentials when an authenticated soc
   vi.spyOn(ctx.socket, 'send').mockImplementationOnce(() => {
     throw new Error('socket write failed')
   })
-  ctx.session.sendEncrypted({ id: 'failed', method: 'status.get' })
+  ctx.session.sendEncrypted({ id: 'failed', deviceToken: 'device-token', method: 'status.get' })
   expect(ctx.onForcedClose).toHaveBeenCalledOnce()
   expect(ctx.onAuthRejected).not.toHaveBeenCalled()
   expect(ctx.socket.sent).toHaveLength(2)
+})
+
+it('never enables legacy framing after a refused v2 hello or an authenticated reconnect', () => {
+  const policy = AUTHENTICATED_DIRECT_FRAMING_POLICY
+  expect(policy.framingForNextDial()).toBe('v2')
+  expect(policy.mayUseLegacy()).toBe(false)
+  expect(policy.helloRefusalIsAuthFailure()).toBe(true)
+  policy.noteV2HelloRefused()
+  expect(policy.framingForNextDial()).toBe('v2')
+  expect(policy.mayUseLegacy()).toBe(false)
+  policy.noteV2Authenticated()
+  expect(policy.framingForNextDial()).toBe('v2')
+  expect(policy.mayUseLegacy()).toBe(false)
 })

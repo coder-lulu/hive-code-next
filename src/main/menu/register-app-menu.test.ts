@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 const {
   buildFromTemplateMock,
@@ -54,6 +53,7 @@ function buildMenuOptions() {
     getAppearanceState: vi.fn(() => ({
       showTasksButton: true,
       showAutomationsButton: true,
+      showMobileButton: true,
       showTitlebarAppName: true,
       statusBarVisible: true
     }))
@@ -128,7 +128,7 @@ describe('registerAppMenu', () => {
 
     expect(buildFromTemplateMock).toHaveBeenCalledTimes(1)
     const viewSubmenu = getSubmenu(getTemplate(), 'View')
-    const expectedForceReloadLabel = `Force Reload\t${isMac ? '⌘⇧R' : 'Ctrl+Shift+R'}`
+    const expectedForceReloadLabel = `Force Reload\t${isMac ? '⌘⇧R' : 'Ctrl+⇧+R'}`
 
     expect(viewSubmenu).toEqual(
       expect.arrayContaining([expect.objectContaining({ label: 'Reload' })])
@@ -193,10 +193,7 @@ describe('registerAppMenu', () => {
     const options = buildMenuOptions()
     registerAppMenu(options)
 
-    // Why: Check for Updates lives under the app-name menu on macOS and
-    // under Help on Windows/Linux. The click behavior must be identical
-    // either way.
-    const parentLabel = isMac ? APP_DISPLAY_NAME : 'Help'
+    const parentLabel = isMac ? 'Orca' : 'Help'
     const item = getSubmenu(getTemplate(), parentLabel).find(
       (entry) => entry.label === 'Check for Updates...'
     )
@@ -257,15 +254,13 @@ describe('registerAppMenu', () => {
     registerAppMenu(buildMenuOptions())
 
     const viewSubmenu = getSubmenu(getTemplate(), 'View')
-    const expectedLabel = `Open Worktree Palette\t${isMac ? '⌘J' : 'Ctrl+Shift+J'}`
+    const expectedLabel = `Open Worktree Palette\t${isMac ? '⌘J' : 'Ctrl+⇧+J'}`
     const paletteItem = viewSubmenu.find((item) => item.label === expectedLabel)
 
     expect(paletteItem).toBeDefined()
     expect(paletteItem?.accelerator).toBeUndefined()
   })
 
-  // Why: pin the platform on every case — CI runs this suite on Linux only, so an
-  // unpinned test leaves the other platforms' branches entirely uncovered.
   it.each(['darwin', 'linux', 'win32'] as const)(
     'routes Edit > Paste through Orca coordinated paste ownership on %s',
     (platform) => {
@@ -328,6 +323,21 @@ describe('registerAppMenu', () => {
 
     expect(guestContents.copy).toHaveBeenCalledOnce()
     expect(guestContents.selectAll).toHaveBeenCalledOnce()
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it('pastes into DevTools instead of the Orca pane when DevTools holds focus (#16285)', () => {
+    const send = vi.fn()
+    const devToolsContents = { paste: vi.fn() }
+    getFocusedWindowMock.mockReturnValue({ webContents: { send } })
+    getFocusedWebContentsMock.mockReturnValue(devToolsContents)
+    registerAppMenu(buildMenuOptions())
+
+    getSubmenu(getTemplate(), 'Edit')
+      .find((item) => item.label === 'Paste')
+      ?.click?.({} as never, {} as never, {} as never)
+
+    expect(devToolsContents.paste).toHaveBeenCalledOnce()
     expect(send).not.toHaveBeenCalled()
   })
 
@@ -436,7 +446,7 @@ describe('registerAppMenu', () => {
       registerAppMenu(buildMenuOptions())
 
       const pasteItem = getSubmenu(getTemplate(), 'Edit').find((item) => item.label === 'Paste')
-      // Why: this case asserts only a negative, so it would pass green if the item vanished.
+      // Negative-only assertions must not pass when the item itself vanished.
       expect(pasteItem).toBeDefined()
       pasteItem?.click?.({} as never, {} as never, {} as never)
 
@@ -448,13 +458,10 @@ describe('registerAppMenu', () => {
     registerAppMenu(buildMenuOptions())
 
     const template = getTemplate()
-    // Why: no redundant app-named "Orca" menu should exist on non-mac — the
-    // app-menu contents (Settings, Exit, Check for Updates, About) have been
-    // redistributed so users see them in File / Help instead.
-    expect(template.find((item) => item.label === APP_DISPLAY_NAME)).toBeUndefined()
+    expect(template.find((item) => item.label === 'Orca')).toBeUndefined()
 
     const fileLabels = getSubmenu(template, 'File').map((item) => item.label)
-    expect(fileLabels).not.toContain(`Export as PDF...\t${isMac ? '⌘⇧E' : 'Ctrl+Shift+E'}`)
+    expect(fileLabels).not.toContain(`Export as PDF...\t${isMac ? '⌘⇧E' : 'Ctrl+⇧+E'}`)
     expect(fileLabels[0]).toBe('Settings')
     expect(fileLabels).toEqual(expect.arrayContaining(['Settings', 'Exit']))
 
@@ -462,8 +469,8 @@ describe('registerAppMenu', () => {
     expect(helpLabels).toEqual(
       expect.arrayContaining([
         'Report Crash...',
-        `Getting Started with ${APP_DISPLAY_NAME}`,
-        `Explore ${APP_DISPLAY_NAME}`,
+        'Getting Started with Orca',
+        'Explore Orca',
         'Check for Updates...'
       ])
     )
@@ -473,18 +480,16 @@ describe('registerAppMenu', () => {
     registerAppMenu(buildMenuOptions())
 
     const template = getTemplate()
-    const appSubmenu = getSubmenu(template, APP_DISPLAY_NAME)
+    const appSubmenu = getSubmenu(template, 'Orca')
     const appLabels = appSubmenu.map((item) => item.label)
     expect(appLabels).toEqual(expect.arrayContaining(['Check for Updates...', 'Settings']))
-    // Why: on macOS File should NOT duplicate Settings/Exit — those live in
-    // the system app menu. Without global Export, there is no File item left.
     expect(template.find((item) => item.label === 'File')).toBeUndefined()
     const helpLabels = getSubmenu(template, 'Help').map((item) => item.label)
     expect(helpLabels).toEqual([
       'Report Crash...',
       undefined,
-      `Explore ${APP_DISPLAY_NAME}`,
-      `Getting Started with ${APP_DISPLAY_NAME}`
+      'Explore Orca',
+      'Getting Started with Orca'
     ])
   })
 
@@ -493,7 +498,7 @@ describe('registerAppMenu', () => {
     registerAppMenu(options)
 
     const setupGuideItem = getSubmenu(getTemplate(), 'Help').find(
-      (entry) => entry.label === `Getting Started with ${APP_DISPLAY_NAME}`
+      (entry) => entry.label === 'Getting Started with Orca'
     )
     expect(setupGuideItem?.accelerator).toBeUndefined()
 
@@ -509,7 +514,7 @@ describe('registerAppMenu', () => {
     registerAppMenu(options)
 
     const featureTourItem = getSubmenu(getTemplate(), 'Help').find(
-      (entry) => entry.label === `Explore ${APP_DISPLAY_NAME}`
+      (entry) => entry.label === 'Explore Orca'
     )
     expect(featureTourItem?.accelerator).toBeUndefined()
 
@@ -540,6 +545,7 @@ describe('registerAppMenu', () => {
     options.getAppearanceState.mockReturnValue({
       showTasksButton: false,
       showAutomationsButton: false,
+      showMobileButton: true,
       showTitlebarAppName: true,
       statusBarVisible: true
     })
@@ -561,10 +567,9 @@ describe('registerAppMenu', () => {
     expect(automationsItem?.type).toBe('checkbox')
     expect(automationsItem?.checked).toBe(false)
 
-    const mobileItem = appearanceSubmenu.find(
-      (item) => item.label === `Show ${APP_DISPLAY_NAME} Mobile Button`
-    )
-    expect(mobileItem).toBeUndefined()
+    const mobileItem = appearanceSubmenu.find((item) => item.label === 'Show Orca Mobile Button')
+    expect(mobileItem?.type).toBe('checkbox')
+    expect(mobileItem?.checked).toBe(true)
 
     const titlebarItem = appearanceSubmenu.find((item) => item.label === 'Show Titlebar App Name')
     expect(titlebarItem?.checked).toBe(true)
@@ -588,11 +593,15 @@ describe('registerAppMenu', () => {
       .find((item) => item.label === 'Show Automations Button')
       ?.click?.({} as never, {} as never, {} as never)
     appearanceSubmenu
+      .find((item) => item.label === 'Show Orca Mobile Button')
+      ?.click?.({} as never, {} as never, {} as never)
+    appearanceSubmenu
       .find((item) => item.label === 'Show Titlebar App Name')
       ?.click?.({} as never, {} as never, {} as never)
 
     expect(options.onToggleAppearance).toHaveBeenCalledWith('showTasksButton')
     expect(options.onToggleAppearance).toHaveBeenCalledWith('showAutomationsButton')
+    expect(options.onToggleAppearance).toHaveBeenCalledWith('showMobileButton')
     expect(options.onToggleAppearance).toHaveBeenCalledWith('showTitlebarAppName')
   })
 
@@ -616,9 +625,7 @@ describe('registerAppMenu', () => {
 
     expect(options.onToggleLeftSidebar).toHaveBeenCalledTimes(1)
     expect(options.onToggleRightSidebar).toHaveBeenCalledTimes(1)
-    // Why: these entries must not bind Cmd/Ctrl+B as real accelerators
-    // because before-input-event carries a TipTap-bold carve-out that the
-    // menu accelerator would bypass.
+    // Native accelerators would bypass the markdown editor's bold shortcut carve-out.
     expect(appearanceSubmenu.find((item) => item.label === leftLabel)?.accelerator).toBeUndefined()
     expect(appearanceSubmenu.find((item) => item.label === rightLabel)?.accelerator).toBeUndefined()
   })
@@ -642,14 +649,42 @@ describe('registerAppMenu', () => {
       registerAppMenu({ ...buildMenuOptions(), onQuit })
       const quit = findQuit()
       expect(quit?.role).toBeUndefined()
-      expect(quit?.label).toBe(platform === 'darwin' ? 'Quit HiveCode' : 'Exit')
+      expect(quit?.label).toBe(platform === 'darwin' ? 'Quit Orca' : 'Exit')
       expect(quit?.accelerator).toBe(platform === 'win32' ? undefined : 'CmdOrCtrl+Q')
-      // Why untyped: the handler ignores its Electron arguments.
       const click: unknown = quit?.click
       if (typeof click === 'function') {
         click()
       }
       expect(onQuit).toHaveBeenCalledOnce()
+    }
+  )
+
+  it.each(['darwin', 'linux', 'win32'] as const)(
+    'offers Quit Completely directly above Quit only when a handler is supplied (%s)',
+    (platform) => {
+      vi.spyOn(process, 'platform', 'get').mockReturnValue(platform)
+      const quitMenu = platform === 'darwin' ? 'Orca' : 'File'
+      const label = 'Quit Completely...'
+
+      registerAppMenu(buildMenuOptions())
+      expect(getSubmenu(getTemplate(), quitMenu).some((item) => item.label === label)).toBe(false)
+
+      buildFromTemplateMock.mockClear()
+      const onQuitAndStopAllSessions = vi.fn()
+      registerAppMenu({ ...buildMenuOptions(), onQuitAndStopAllSessions })
+      const submenu = getSubmenu(getTemplate(), quitMenu)
+      const stopAll = submenu.at(-2)
+      expect(stopAll?.label).toBe(label)
+      expect(stopAll?.id).toBe('quit-and-stop-all-sessions')
+      expect(stopAll?.toolTip).toContain('running agents')
+      expect(stopAll?.accelerator).toBeUndefined()
+      expect(submenu.at(-1)?.role).toBe('quit')
+      // Why untyped: the handler ignores its Electron arguments.
+      const click: unknown = stopAll?.click
+      if (typeof click === 'function') {
+        click()
+      }
+      expect(onQuitAndStopAllSessions).toHaveBeenCalledOnce()
     }
   )
 })

@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getDefaultSettings } from './constants'
 import {
-  mergeLegacyCommitMessageAiIntoSourceControlAi,
-  projectSourceControlAiToLegacyCommitMessageAi,
   resolveSourceControlActionRecipe,
   resolveSourceControlAiForOperation
 } from './source-control-ai'
@@ -142,7 +140,8 @@ describe('source-control AI action recipes', () => {
     ).toEqual({
       agentId: 'codex',
       commandInputTemplate: '{basePrompt}\n\nrepo',
-      agentArgs: '--model gpt-5.5'
+      agentArgs: '--model gpt-5.5',
+      resolvedChoiceSources: expect.any(Object)
     })
   })
 
@@ -177,7 +176,8 @@ describe('source-control AI action recipes', () => {
     ).toEqual({
       agentId: 'claude',
       commandInputTemplate: '{basePrompt}',
-      agentArgs: ''
+      agentArgs: '',
+      resolvedChoiceSources: expect.any(Object)
     })
   })
 
@@ -247,137 +247,8 @@ describe('source-control AI action recipes', () => {
       })
     ).toEqual({
       agentId: 'claude',
-      commandInputTemplate: '{basePrompt}\n\nGlobal checks template.'
-    })
-  })
-
-  it('preserves existing action templates when legacy settings are only the rollback projection', () => {
-    const source = {
-      ...settings().sourceControlAi!,
-      actions: {
-        ...settings().sourceControlAi!.actions,
-        commitMessage: {
-          agentId: 'codex' as const,
-          commandInputTemplate: 'use $best-commit-msg to write a commit'
-        },
-        branchName: {
-          agentId: 'claude' as const,
-          commandInputTemplate: 'name this branch from {firstPrompt}'
-        }
-      }
-    }
-    const legacy = projectSourceControlAiToLegacyCommitMessageAi(source)
-
-    const merged = mergeLegacyCommitMessageAiIntoSourceControlAi(source, legacy)
-
-    expect(merged.actions?.commitMessage).toEqual({
-      agentId: 'codex',
-      commandInputTemplate: 'use $best-commit-msg to write a commit'
-    })
-    expect(merged.actions?.branchName).toEqual({
-      agentId: 'claude',
-      commandInputTemplate: 'name this branch from {firstPrompt}'
-    })
-  })
-
-  it('does not let rollback enabled changes clobber independent branch action templates', () => {
-    const source = {
-      ...settings().sourceControlAi!,
-      enabled: true,
-      actions: {
-        ...settings().sourceControlAi!.actions,
-        commitMessage: {
-          agentId: 'codex' as const,
-          commandInputTemplate: 'use $best-commit-msg to write a commit'
-        },
-        branchName: {
-          agentId: 'claude' as const,
-          commandInputTemplate: 'name this branch from {firstPrompt}'
-        }
-      }
-    }
-    const legacy = {
-      ...projectSourceControlAiToLegacyCommitMessageAi(source),
-      enabled: false
-    }
-
-    const merged = mergeLegacyCommitMessageAiIntoSourceControlAi(source, legacy)
-
-    expect(merged.enabled).toBe(false)
-    expect(merged.actions?.commitMessage).toEqual({
-      agentId: 'codex',
-      commandInputTemplate: 'use $best-commit-msg to write a commit'
-    })
-    expect(merged.actions?.branchName).toEqual({
-      agentId: 'claude',
-      commandInputTemplate: 'name this branch from {firstPrompt}'
-    })
-  })
-
-  it('does not let stale legacy branch instructions clobber independent branch templates', () => {
-    const source = {
-      ...settings().sourceControlAi!,
-      instructionsByOperation: {
-        ...settings().sourceControlAi!.instructionsByOperation,
-        commitMessage: 'old shared prompt',
-        branchName: 'old shared prompt'
-      },
-      actions: {
-        ...settings().sourceControlAi!.actions,
-        commitMessage: {
-          agentId: 'codex' as const,
-          commandInputTemplate: '{basePrompt}\n\nold shared prompt'
-        },
-        branchName: {
-          agentId: 'claude' as const,
-          commandInputTemplate: 'name this branch from {firstPrompt}'
-        }
-      }
-    }
-    const legacy = {
-      ...projectSourceControlAiToLegacyCommitMessageAi(source),
-      customPrompt: 'rollback changed commit prompt'
-    }
-
-    const merged = mergeLegacyCommitMessageAiIntoSourceControlAi(source, legacy)
-
-    expect(merged.actions?.commitMessage).toEqual({
-      agentId: 'codex',
-      commandInputTemplate: '{basePrompt}\n\nrollback changed commit prompt'
-    })
-    expect(merged.instructionsByOperation.branchName).toBe('old shared prompt')
-    expect(merged.actions?.branchName).toEqual({
-      agentId: 'claude',
-      commandInputTemplate: 'name this branch from {firstPrompt}'
-    })
-  })
-
-  it('lets rollback custom-agent changes clear a commit action agent override', () => {
-    const source = {
-      ...settings().sourceControlAi!,
-      agentId: 'codex' as const,
-      customAgentCommand: '',
-      actions: {
-        ...settings().sourceControlAi!.actions,
-        commitMessage: {
-          agentId: 'codex' as const,
-          commandInputTemplate: 'use $best-commit-msg to write a commit'
-        }
-      }
-    }
-    const legacy = {
-      ...projectSourceControlAiToLegacyCommitMessageAi(source),
-      agentId: 'custom' as const,
-      customAgentCommand: 'custom-agent {prompt}'
-    }
-
-    const merged = mergeLegacyCommitMessageAiIntoSourceControlAi(source, legacy)
-
-    expect(merged.agentId).toBe('custom')
-    expect(merged.customAgentCommand).toBe('custom-agent {prompt}')
-    expect(merged.actions?.commitMessage).toEqual({
-      agentId: 'custom',
-      commandInputTemplate: 'use $best-commit-msg to write a commit'
+      commandInputTemplate: '{basePrompt}\n\nGlobal checks template.',
+      resolvedChoiceSources: expect.any(Object)
     })
   })
 

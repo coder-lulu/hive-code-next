@@ -1,4 +1,3 @@
-import { applyProductBranding } from '@/product-brand'
 // @vitest-environment happy-dom
 import { StrictMode } from 'react'
 import userEvent from '@testing-library/user-event'
@@ -18,7 +17,10 @@ import { createGlobalSettingsFixture } from '../../../../shared/global-settings-
 const transport = vi.hoisted(() => ({ read: vi.fn(), mutate: vi.fn(), detection: vi.fn() }))
 vi.mock('./agent-launch-settings-transport', () => ({
   readHostAgentLaunchSettings: transport.read,
-  mutateHostAgentLaunchSettings: transport.mutate
+  mutateHostAgentLaunchSettings: transport.mutate,
+  hostSupportsAutoPermissions: async () => true,
+  hostSupportsNativeChatPermissions: async () => true,
+  hostSupportsOwnChatPermissions: async () => true
 }))
 vi.mock('@/hooks/useDetectedAgents', () => ({
   useDetectedAgents: (target: unknown) => {
@@ -37,7 +39,7 @@ const host = () =>
     agentDefaultEnv: { claude: { API_KEY: 'host-secret' } }
   })
 const renderPermissions: AgentPermissionsRenderer = (_mode, change) => (
-  <button onClick={() => change('manual')}>Manual</button>
+  <button onClick={() => change('ask')}>Ask</button>
 )
 const pane = (revision: number) => (
   <TooltipProvider>
@@ -60,36 +62,27 @@ beforeEach(() => {
 
 describe('host launch settings form', () => {
   it.each(['claude', null] as const)(
-    'selects a blank terminal instead of default %s and restores the selection',
+    'toggles default %s to blank and back',
     async (defaultTuiAgent) => {
       const user = userEvent.setup()
+      const name = defaultTuiAgent === 'claude' ? 'Claude' : 'Auto'
       transport.read.mockResolvedValue({ ...host(), defaultTuiAgent })
       transport.mutate.mockResolvedValue({ ...host(), defaultTuiAgent: 'blank' })
       render(pane(17))
       await screen.findByDisplayValue('--host-marker')
-      await user.click(screen.getByRole('combobox', { name: 'Default Agent' }))
-      await user.click(screen.getByRole('option', { name: 'No agent (blank terminal)' }))
+      await user.click(screen.getByRole('button', { name, pressed: true }))
       await waitFor(() =>
-        expect(transport.mutate).toHaveBeenCalledWith(
-          { environmentId: 'ssh-host', pairingRevision: 17 },
-          { type: 'default', agent: 'blank' },
-          expect.any(AbortSignal)
-        )
+        expect(screen.getByRole('button', { name }).getAttribute('aria-pressed')).toBe('false')
       )
-      await waitFor(() =>
-        expect(screen.getByRole('combobox', { name: 'Default Agent' }).textContent).toContain(
-          'No agent (blank terminal)'
-        )
+      expect(transport.mutate).toHaveBeenCalledWith(
+        { environmentId: 'ssh-host', pairingRevision: 17 },
+        { type: 'default', agent: 'blank' },
+        expect.any(AbortSignal)
       )
       transport.mutate.mockResolvedValue({ ...host(), defaultTuiAgent })
-      await user.click(screen.getByRole('combobox', { name: 'Default Agent' }))
-      await user.click(
-        screen.getByRole('option', { name: defaultTuiAgent === 'claude' ? 'Claude' : 'Auto' })
-      )
+      await user.click(screen.getByRole('button', { name }))
       await waitFor(() =>
-        expect(screen.getByRole('combobox', { name: 'Default Agent' }).textContent).toContain(
-          defaultTuiAgent === 'claude' ? 'Claude' : 'Auto'
-        )
+        expect(screen.getByRole('button', { name }).getAttribute('aria-pressed')).toBe('true')
       )
       expect(transport.mutate).toHaveBeenLastCalledWith(
         { environmentId: 'ssh-host', pairingRevision: 17 },
@@ -105,10 +98,9 @@ describe('host launch settings form', () => {
     transport.mutate.mockResolvedValue(host())
     render(pane(17))
     await screen.findByDisplayValue('--host-marker')
-    await user.click(screen.getByRole('combobox', { name: 'Default Agent' }))
-    await user.click(screen.getByRole('option', { name: 'Auto' }))
+    await user.click(screen.getByRole('button', { name: 'Auto' }))
     await waitFor(() =>
-      expect(screen.getByRole('combobox', { name: 'Default Agent' }).textContent).toContain('Auto')
+      expect(screen.getByRole('button', { name: 'Auto' }).getAttribute('aria-pressed')).toBe('true')
     )
     expect(transport.mutate).toHaveBeenCalledWith(
       { environmentId: 'ssh-host', pairingRevision: 17 },
@@ -153,13 +145,6 @@ describe('host launch settings form', () => {
       </TooltipProvider>
     )
     const args = await screen.findByDisplayValue('--host-marker')
-    expect(
-      screen.getByText(
-        applyProductBranding(
-          'Choose whether Orca launches agents with fewer permission prompts or with manual checks.'
-        )
-      )
-    ).toBeTruthy()
     expect(screen.queryByDisplayValue('--desktop-marker')).toBeNull()
     fireEvent.change(args, { target: { value: '--r10-marker' } })
     fireEvent.blur(args)
@@ -172,15 +157,6 @@ describe('host launch settings form', () => {
     )
     expect(updateDesktop).not.toHaveBeenCalled()
     expect(desktop.agentDefaultEnv?.claude?.DESKTOP_KEY).toBe('desktop-secret')
-    fireEvent.click(screen.getByRole('tab', { name: 'Run preferences' }))
-    fireEvent.click(screen.getByRole('radio', { name: 'Manual', hidden: true }))
-    await waitFor(() =>
-      expect(transport.mutate).toHaveBeenCalledWith(
-        { environmentId: 'ssh-host', pairingRevision: 17 },
-        { type: 'permissions', mode: 'manual' },
-        expect.any(AbortSignal)
-      )
-    )
     expect(updateDesktop).not.toHaveBeenCalled()
   })
 
@@ -193,11 +169,11 @@ describe('host launch settings form', () => {
     expect(secret?.type).toBe('password')
     expect(secret?.value).toBe('')
     expect(container.innerHTML).not.toContain('host-secret')
-    fireEvent.click(screen.getByRole('button', { name: 'Manual' }))
+    fireEvent.click(screen.getByRole('button', { name: /Ask/ }))
     await waitFor(() =>
       expect(transport.mutate).toHaveBeenCalledWith(
         { environmentId: 'ssh-host', pairingRevision: 17 },
-        { type: 'permissions', mode: 'manual' },
+        { type: 'permissions', mode: 'ask' },
         expect.any(AbortSignal)
       )
     )
@@ -237,11 +213,11 @@ describe('host launch settings form', () => {
     fireEvent.blur(args)
     await waitFor(() => expect(transport.mutate).toHaveBeenCalledTimes(1))
     expect(args).toHaveProperty('readOnly', true)
-    fireEvent.click(screen.getByRole('button', { name: 'Manual' }))
+    fireEvent.click(screen.getByRole('button', { name: /Ask/ }))
     expect(transport.mutate).toHaveBeenCalledTimes(1)
     finishArguments(projectAgentLaunchSettings({ agentDefaultArgs: { claude: '--next-marker' } }))
     await waitFor(() => expect(transport.mutate).toHaveBeenCalledTimes(2))
-    expect(transport.mutate.mock.calls[1]?.[1]).toEqual({ type: 'permissions', mode: 'manual' })
+    expect(transport.mutate.mock.calls[1]?.[1]).toEqual({ type: 'permissions', mode: 'ask' })
   })
 
   it('does not display launch controls or local defaults for an old server', async () => {

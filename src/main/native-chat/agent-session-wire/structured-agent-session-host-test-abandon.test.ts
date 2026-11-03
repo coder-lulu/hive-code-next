@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { computeAgentSessionPayloadFingerprint } from '../../../shared/agent-session-mutation-envelope'
 import { openTestAgentSessionRecordStore } from '../../runtime/agent-session-record-store-test-harness'
 import type { StructuredAgentSessionAdapter } from './structured-agent-session-adapter'
@@ -41,12 +41,14 @@ describe('abandoning a structured agent-session host', () => {
       reportEntered = resolve
     })
     const adapter: StructuredAgentSessionAdapter = {
+      open: vi.fn(async () => ({ reportedOptions: {} })),
       acquire: async ({ fence }) => {
         if (gate) {
           reportEntered()
           await gate
         }
         return {
+          acquisitionGeneration: globalThis.crypto.randomUUID(),
           process: {
             hostId: 'local',
             pid: 4242,

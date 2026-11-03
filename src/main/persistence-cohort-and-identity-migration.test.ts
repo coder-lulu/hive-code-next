@@ -2,21 +2,19 @@ import {
   closeTestStores,
   testState,
   createStore,
-  dataFile,
-  writeDataFile,
   makeRepo,
-  makeTerminalTab,
   makeWorktreeLineage,
   makeWorkspaceLineage
-} from './persistence-test-harness'
+} from './persistence/persistence-test-harness'
+import { makeTerminalTab } from './persistence/persistence-session-fixtures'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { writeFileSync, rmSync, mkdtempSync, readFileSync } from 'node:fs'
+import { rmSync, mkdtempSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import type { WorkspaceSessionState } from '../shared/workspace-session-state-types'
 import { getDefaultWorkspaceSession } from '../shared/constants'
 import { folderWorkspaceKey, worktreeWorkspaceKey } from '../shared/workspace-scope'
-import { createProfileStateStore } from './persistence/profile-state/profile-state-store-factory'
+import { hostWorktreeTarget } from '../shared/worktree/host-qualified-identity'
 
 // Stub the ~/.ssh/config parser so the SSH-import test drives the real Store with deterministic hosts, not the operator's actual ~/.ssh/config.
 const { loadUserSshConfigMock, sshConfigHostsToTargetsMock } = vi.hoisted(() => ({
@@ -24,7 +22,7 @@ const { loadUserSshConfigMock, sshConfigHostsToTargetsMock } = vi.hoisted(() => 
   sshConfigHostsToTargetsMock: vi.fn()
 }))
 
-vi.mock('./ssh/ssh-config-parser', () => ({
+vi.mock('./ssh/config/ssh-config-parser', () => ({
   loadUserSshConfig: loadUserSshConfigMock,
   sshConfigHostsToTargets: sshConfigHostsToTargetsMock
 }))
@@ -58,145 +56,27 @@ vi.mock('./telemetry/cohort-classifier', () => ({
   getCohortAtEmit: getCohortAtEmitMock
 }))
 
-describe('Store', () => {
+describe('current Store consent persistence', () => {
   beforeEach(() => {
-    testState.dir = mkdtempSync(join(tmpdir(), 'orca-test-'))
-    trackMock.mockReset()
-    getCohortAtEmitMock.mockReset()
-    getCohortAtEmitMock.mockReturnValue({ nth_repo_added: 2 })
+    testState.dir = mkdtempSync(join(tmpdir(), 'hive-current-consent-'))
   })
-
-  afterEach(async () => {
-    await closeTestStores()
-    rmSync(testState.dir, { recursive: true, force: true })
-  })
-  // ── Telemetry cohort migration ─────────────────────────────────────
-  // Why: keys on `existsSync(dataFile)`, not the new `telemetry` field, so pre-telemetry installs aren't misclassified as fresh and flipped default-on.
-
-  it('classifies a truly fresh install as new-user cohort (file absent → optedIn=true)', async () => {
-    // No data file written — truly fresh install of the telemetry release.
-    const store = await createStore()
-    const t = store.getSettings().telemetry
-    expect(t).toBeDefined()
-    expect(t!.existedBeforeTelemetryRelease).toBe(false)
-    expect(t!.optedIn).toBe(true)
-    expect(t!.installId).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
-    )
-  })
-
-  it('classifies a pre-existing install as existing-user cohort (file present → optedIn=null)', async () => {
-    // A pre-telemetry data file exists on disk with no telemetry block.
-    writeDataFile({
-      schemaVersion: 1,
-      repos: [makeRepo()],
-      worktreeMeta: {},
-      settings: { theme: 'dark' },
-      ui: {},
-      githubCache: { pr: {}, issue: {} },
-      workspaceSession: {}
-    })
-    const store = await createStore()
-    const t = store.getSettings().telemetry
-    expect(t).toBeDefined()
-    expect(t!.existedBeforeTelemetryRelease).toBe(true)
-    expect(t!.optedIn).toBeNull()
-    expect(t!.installId).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
-    )
-    // Sibling migrations still run alongside the telemetry migration.
-    expect(store.getSettings().theme).toBe('dark')
-  })
-
-  it('retains the existing-user cohort when a corrupt legacy primary recovers from backup', async () => {
-    await withRecoveredLegacyProfile((store) => {
-      const telemetry = store.getSettings().telemetry
-      expect(telemetry?.existedBeforeTelemetryRelease).toBe(true)
-      expect(telemetry?.optedIn).toBeNull()
-      expect(telemetry?.installId).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
-      )
-      expect(store.getSettings().experimentalNewWorktreeCardStyle).toBe(false)
-    })
-  })
-
-  it('preserves an already-migrated telemetry block on subsequent launches', async () => {
-    writeDataFile({
-      schemaVersion: 1,
-      repos: [],
-      worktreeMeta: {},
-      settings: {
-        telemetry: {
-          optedIn: true,
-          installId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-          existedBeforeTelemetryRelease: false
-        }
-      },
-      ui: {},
-      githubCache: { pr: {}, issue: {} },
-      workspaceSession: {}
-    })
-    const store = await createStore()
-    expect(store.getSettings().telemetry).toEqual({
-      optedIn: true,
-      installId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-      existedBeforeTelemetryRelease: false
-    })
-  })
-})
-
-describe('Store.migrateTabSwitchKeybindings', () => {
-  // Freezes the tab-switch cohort on first load, keying on `fileExistedOnLoad` (not field presence) so the verdict survives later launches.
-
-  beforeEach(() => {
-    testState.dir = mkdtempSync(join(tmpdir(), 'orca-test-'))
-  })
-
   afterEach(async () => {
     await closeTestStores()
     rmSync(testState.dir, { recursive: true, force: true })
   })
 
-  it('marks a truly fresh install done so it adopts the new defaults', async () => {
-    const store = await createStore()
-    expect(store.getSettings().tabSwitchKeybindingSeed).toBe('done')
-  })
-
-  it('marks a pre-existing install pending so the legacy chords get seeded', async () => {
-    writeDataFile({
-      schemaVersion: 1,
-      repos: [makeRepo()],
-      worktreeMeta: {},
-      settings: { theme: 'dark' },
-      ui: {},
-      githubCache: { pr: {}, issue: {} },
-      workspaceSession: {}
-    })
-    const store = await createStore()
-    expect(store.getSettings().tabSwitchKeybindingSeed).toBe('pending')
-    expect(store.getSettings().theme).toBe('dark')
-  })
-
-  it('retains the existing keybinding cohort when recovering a legacy backup', async () => {
-    await withRecoveredLegacyProfile((store) => {
-      expect(store.getSettings().tabSwitchKeybindingSeed).toBe('pending')
-    })
-  })
-
-  it('preserves an already-frozen cohort on subsequent launches', async () => {
-    writeDataFile({
-      schemaVersion: 1,
-      repos: [],
-      worktreeMeta: {},
-      settings: { tabSwitchKeybindingSeed: 'done' },
-      ui: {},
-      githubCache: { pr: {}, issue: {} },
-      workspaceSession: {}
-    })
-    const store = await createStore()
-    // Existing file, cohort already 'done' — must not flip to 'pending' just because the file exists.
-    expect(store.getSettings().tabSwitchKeybindingSeed).toBe('done')
-  })
+  it.each([true, false, null])(
+    'retains explicit consent %s and identity through SQLite reload',
+    async (optedIn) => {
+      const store = await createStore()
+      store.updateSettings({ theme: 'dark', telemetry: { optedIn, installId: 'recorded-install' } })
+      store.flush()
+      const reloaded = await createStore()
+      expect(reloaded.getSettings().theme).toBe('dark')
+      expect(reloaded.getSettings().telemetry).toEqual({ optedIn, installId: 'recorded-install' })
+      expect(reloaded.getSettings()).not.toHaveProperty('tabSwitchKeybindingSeed')
+    }
+  )
 })
 
 describe('Store.migrateWorktreeIdentity', () => {
@@ -216,8 +96,14 @@ describe('Store.migrateWorktreeIdentity', () => {
 
   it('moves meta, lineage, tabs, active pointers, and records the prior id', async () => {
     const store = await createStore()
-    store.setWorktreeMeta(OLD, { displayName: 'Cunner', linkedIssue: 42 })
-    store.setWorktreeLineage(OLD, makeWorktreeLineage({ worktreeId: OLD }))
+    store.setWorktreeMeta(hostWorktreeTarget({ id: OLD, hostId: 'local' }), {
+      displayName: 'Cunner',
+      linkedIssue: 42
+    })
+    store.setWorktreeLineage(
+      hostWorktreeTarget({ id: OLD, hostId: 'local' }),
+      makeWorktreeLineage({ worktreeId: OLD })
+    )
     store.setWorkspaceLineage(
       makeWorkspaceLineage({
         childWorkspaceKey: OLD_WORKSPACE_KEY,
@@ -322,7 +208,7 @@ describe('Store.migrateWorktreeIdentity', () => {
       'runtime:env-a'
     )
 
-    store.migrateWorktreeIdentity(OLD, NEW)
+    store.migrateWorktreeIdentity(hostWorktreeTarget({ id: OLD, hostId: 'local' }), NEW)
 
     expect(store.getWorktreeMeta(OLD)).toBeUndefined()
     const meta = store.getWorktreeMeta(NEW)
@@ -384,14 +270,16 @@ describe('Store.migrateWorktreeIdentity', () => {
 
   it('rewrites parentWorktreeId back-references in other lineage entries', async () => {
     const store = await createStore()
-    store.setWorktreeMeta(OLD, { displayName: 'Cunner' })
+    store.setWorktreeMeta(hostWorktreeTarget({ id: OLD, hostId: 'local' }), {
+      displayName: 'Cunner'
+    })
     const CHILD = 'repo1::/ws/child'
     store.setWorktreeLineage(
-      CHILD,
+      hostWorktreeTarget({ id: CHILD, hostId: 'local' }),
       makeWorktreeLineage({ worktreeId: CHILD, parentWorktreeId: OLD })
     )
 
-    store.migrateWorktreeIdentity(OLD, NEW)
+    store.migrateWorktreeIdentity(hostWorktreeTarget({ id: OLD, hostId: 'local' }), NEW)
 
     expect(store.getWorktreeLineage(CHILD)?.parentWorktreeId).toBe(NEW)
   })
@@ -406,7 +294,7 @@ describe('Store.migrateWorktreeIdentity', () => {
       }
     })
 
-    store.migrateWorktreeIdentity(OLD, NEW)
+    store.migrateWorktreeIdentity(hostWorktreeTarget({ id: OLD, hostId: 'local' }), NEW)
     store.flush()
 
     expect(store.getMobileClientTabSelections()['device-a']?.[OLD]).toBeUndefined()
@@ -416,10 +304,12 @@ describe('Store.migrateWorktreeIdentity', () => {
 
   it('accumulates prior ids across chained renames', async () => {
     const store = await createStore()
-    store.setWorktreeMeta(OLD, { displayName: 'Cunner' })
-    store.migrateWorktreeIdentity(OLD, NEW)
+    store.setWorktreeMeta(hostWorktreeTarget({ id: OLD, hostId: 'local' }), {
+      displayName: 'Cunner'
+    })
+    store.migrateWorktreeIdentity(hostWorktreeTarget({ id: OLD, hostId: 'local' }), NEW)
     const NEWER = 'repo1::/ws/final-name'
-    store.migrateWorktreeIdentity(NEW, NEWER)
+    store.migrateWorktreeIdentity(hostWorktreeTarget({ id: NEW, hostId: 'local' }), NEWER)
     expect(store.getWorktreeMeta(NEWER)?.priorWorktreeIds).toEqual([OLD, NEW])
   })
 
@@ -430,7 +320,7 @@ describe('Store.migrateWorktreeIdentity', () => {
       lastVisitedAtByWorktreeId: { [OLD]: 100, [NEW]: 900 }
     })
 
-    store.migrateWorktreeIdentity(OLD, NEW)
+    store.migrateWorktreeIdentity(hostWorktreeTarget({ id: OLD, hostId: 'local' }), NEW)
 
     expect(store.getWorkspaceSession().lastVisitedAtByWorktreeId?.[OLD]).toBeUndefined()
     expect(store.getWorkspaceSession().lastVisitedAtByWorktreeId?.[NEW]).toBe(900)
@@ -438,26 +328,10 @@ describe('Store.migrateWorktreeIdentity', () => {
 
   it('is a no-op when the ids match', async () => {
     const store = await createStore()
-    store.setWorktreeMeta(OLD, { displayName: 'Cunner' })
-    store.migrateWorktreeIdentity(OLD, OLD)
+    store.setWorktreeMeta(hostWorktreeTarget({ id: OLD, hostId: 'local' }), {
+      displayName: 'Cunner'
+    })
+    store.migrateWorktreeIdentity(hostWorktreeTarget({ id: OLD, hostId: 'local' }), OLD)
     expect(store.getWorktreeMeta(OLD)?.priorWorktreeIds).toBeUndefined()
   })
 })
-
-async function withRecoveredLegacyProfile(
-  verify: (store: ReturnType<typeof createProfileStateStore>['store']) => void
-): Promise<void> {
-  writeDataFile({ schemaVersion: 1, repos: [], worktreeMeta: {}, settings: {}, ui: {} })
-  writeFileSync(`${dataFile()}.bak.0`, readFileSync(dataFile()))
-  writeFileSync(dataFile(), '{{{corrupt json')
-  const { store } = createProfileStateStore({
-    dataFile: dataFile(),
-    databaseFile: join(testState.dir, 'profile-state.db'),
-    profileId: 'cohort-recovery'
-  })
-  try {
-    verify(store)
-  } finally {
-    await store.freezeWritesAsync()
-  }
-}

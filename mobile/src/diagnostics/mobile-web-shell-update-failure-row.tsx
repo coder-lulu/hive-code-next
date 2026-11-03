@@ -3,14 +3,14 @@ import { Text, View } from 'react-native'
 import type { MobileWebShellUpdateFailure } from '../mobile-web-shell/mobile-web-shell-update-failure'
 import { processGenerationStore } from '../mobile-web-shell/process-generation-store'
 import { loadHosts } from '../transport/host-store'
-import { useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { formatUpdateFailure } from './mobile-web-shell-update-failure-copy'
-import { createTroubleshootScreenStyles } from './troubleshoot-screen-styles'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
+import { troubleshootScreenStyles as styles } from './troubleshoot-screen-styles'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 
 type Line = { readonly hostId: string; readonly text: string }
 
-/** The newest recorded failure of each host still paired, in the host list's order. A host removed
- *  in a build that could not clear its records has no name left to show them under. */
+// Ignore orphaned records from hosts no longer paired; they have no host name to display.
 export function updateFailureLines(
   failures: readonly MobileWebShellUpdateFailure[],
   hosts: readonly { id: string; name: string }[],
@@ -24,15 +24,10 @@ export function updateFailureLines(
   })
 }
 
-/**
- * Why the hybrid shell last failed to update from each host, read off what the shell recorded.
- *
- * The only place a release build shows it: console output never reaches logcat there. Renders
- * nothing until a failure has been recorded, and `app/troubleshoot.tsx` mounts it only in a build
- * that can run the shell.
- */
+// Release console output never reaches logcat; this row is the only update-failure evidence visible there. Mount only in shell-capable builds.
 export function MobileWebShellUpdateFailureRow() {
-  const styles = useMobileThemeStyles(createTroubleshootScreenStyles)
+  useMobileColorScheme()
+  const t = useMobileTranslation()
   const [lines, setLines] = useState<readonly Line[]>([])
 
   useEffect(() => {
@@ -48,14 +43,16 @@ export function MobileWebShellUpdateFailureRow() {
     return () => {
       stale = true
     }
-  }, [])
+  }, [t])
 
   if (lines.length === 0) {
     return null
   }
   return (
     <View testID="mobile-web-shell-update-failures">
-      <Text style={styles.sectionHeading}>Workspace updates</Text>
+      <Text style={styles.sectionHeading}>
+        {t('diagnostics.mobileWebShellUpdateFailureRow.title', 'Workspace updates')}
+      </Text>
       <View style={styles.section}>
         <View style={styles.accordionBody}>
           {lines.map((line) => (

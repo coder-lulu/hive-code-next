@@ -9,6 +9,7 @@ import { PRIVACY_URL, getConsentState, setOptIn as telemetrySetOptIn } from '../
 import { useAppStore } from '../../store'
 import { PrivacyDiagnosticsSection } from './PrivacyDiagnosticsSection'
 import { translate } from '@/i18n/i18n'
+import { openAppHttpLink } from '@/lib/app-http-link-open'
 
 export type EnvBlockedReason = 'do_not_track' | 'orca_disabled' | 'ci'
 export type BlockedReason = { kind: 'env'; reason: EnvBlockedReason }
@@ -53,7 +54,6 @@ export function PrivacyPane({ settings }: PrivacyPaneProps): React.JSX.Element {
   const [inFlight, setInFlight] = useState(false)
   const mountedRef = useMountedRef()
   const fetchSettings = useAppStore((s) => s.fetchSettings)
-  const privacyUrl = PRIVACY_URL
 
   useEffect(() => {
     let stale = false
@@ -102,19 +102,19 @@ export function PrivacyPane({ settings }: PrivacyPaneProps): React.JSX.Element {
             {translate(
               'auto.components.settings.PrivacyPane.8bfdd23a88',
               'Help us figure out what to build next. Orca sends anonymous counts of which features you use and where things break.'
-            )}
-            {privacyUrl ? (
-              <>
-                {' '}
-                <button
-                  type="button"
-                  className="underline underline-offset-2 hover:text-foreground"
-                  onClick={() => void window.api.shell.openUrl(privacyUrl)}
-                >
-                  {translate('auto.components.settings.PrivacyPane.77410e0566', 'Privacy policy')}
-                </button>
-              </>
-            ) : null}
+            )}{' '}
+            <button
+              type="button"
+              className="underline underline-offset-2 hover:text-foreground"
+              disabled={!PRIVACY_URL}
+              onClick={(event) => {
+                if (PRIVACY_URL) {
+                  openAppHttpLink(PRIVACY_URL, { event })
+                }
+              }}
+            >
+              {translate('auto.components.settings.PrivacyPane.77410e0566', 'Privacy policy')}
+            </button>
             .
           </p>
         </div>

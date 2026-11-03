@@ -1,3 +1,4 @@
+import { AGENT_PERMISSION_CHOICES, agentPermissionChoices } from '../tui-agent-permission-choice'
 import { z } from 'zod'
 import { isTuiAgent } from '../tui-agent-config'
 import type { TuiAgent } from '../tui-agent'
@@ -22,7 +23,21 @@ export const AgentLaunchSettingsMutation = z.discriminatedUnion('type', [
     })
     .strict(),
   z.object({ type: z.literal('availability'), agent: Agent, enabled: z.boolean() }).strict(),
-  z.object({ type: z.literal('permissions'), mode: z.enum(['manual', 'yolo']) }).strict(),
+  z
+    .object({
+      type: z.literal('permissions'),
+      agent: Agent.optional(),
+      mode: z.enum([...AGENT_PERMISSION_CHOICES, 'default'])
+    })
+    .strict()
+    .refine(
+      (mutation) =>
+        mutation.agent === undefined
+          ? mutation.mode !== 'default'
+          : mutation.mode === 'default' ||
+            agentPermissionChoices(mutation.agent).includes(mutation.mode),
+      'Unsupported agent permission choice'
+    ),
   z.object({ type: z.literal('command'), agent: Agent, value: Value }).strict(),
   z.object({ type: z.literal('arguments'), agent: Agent, value: Value }).strict(),
   z.object({ type: z.literal('environment-set'), agent: Agent, name: Name, value: Value }).strict(),

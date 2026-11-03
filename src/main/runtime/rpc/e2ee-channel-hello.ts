@@ -1,5 +1,5 @@
 import type { E2EEAccountBinding } from './e2ee-channel-account-authentication'
-import { parseRemoteRuntimeJsonText } from '../../../shared/remote-runtime-request-frames'
+import { parseRemoteRuntimeJsonText } from '../../../shared/remote-runtime/requests/remote-runtime-request-frames'
 import {
   DesktopMobileE2EEV2Session,
   type DesktopMobileE2EEV2Context

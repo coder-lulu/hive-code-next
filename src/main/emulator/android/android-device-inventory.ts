@@ -9,11 +9,6 @@ import {
 } from './android-device-health'
 import type { EmulatorDevice } from '../backends/emulator-backend'
 
-// Android device discovery: turns raw `adb`/`emulator` output into the
-// cross-backend EmulatorDevice list and resolves AVD names to running serials.
-// Kept separate from the backend so the inventory is testable in isolation and
-// the backend file stays focused on lifecycle + input.
-
 export async function listRunningAdbDevices(
   runner: AndroidCommandRunner,
   sdk: AndroidSdkPaths
@@ -22,6 +17,15 @@ export async function listRunningAdbDevices(
   return parseAdbDevices(result.stdout).filter(
     (device) => device.state === 'device' || device.isEmulator
   )
+}
+
+/** Null when adb fails, so a failed census never reads as every device gone. */
+export async function listConfirmedAdbSerials(
+  runner: AndroidCommandRunner,
+  sdk: AndroidSdkPaths
+): Promise<string[] | null> {
+  const result = await runner(sdk.adb, adbDevicesArgs)
+  return result.code === 0 ? parseAdbDevices(result.stdout).map((device) => device.serial) : null
 }
 
 export async function resolveRunningAvdNames(
@@ -98,7 +102,7 @@ export async function listAndroidDevices(
   return mergeAndroidDevices(running, avds, runningAvdBySerial, new Map(healthEntries))
 }
 
-// `adb -s <serial> emu avd name` prints the AVD name then a trailing "OK" line.
+// adb appends an OK status after the AVD name.
 function firstNonStatusLine(stdout: string): string | null {
   for (const raw of stdout.split('\n')) {
     const line = raw.trim()

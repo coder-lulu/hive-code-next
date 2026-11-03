@@ -7,11 +7,11 @@ import {
 } from '../../../shared/untitled-placeholder-retention'
 import { resolveUntitledPlaceholderRetentionRoot } from '../../../shared/untitled-placeholder-recovery-directory'
 import type { SshMutationExpectation } from '../../../shared/ssh-types'
-import { assertSshMutationExpectation } from '../../ssh/ssh-connection-generation'
+import { assertSshMutationExpectation } from '../../ssh/connection/ssh-connection-generation'
 import { SshHostNotServedError } from '../../providers/ssh-host-not-served-error'
 import { resolveDesktopAuthorizedPath } from '../local-file-access-resolution'
 import type { FilesystemHandlerContext } from './filesystem-handler-context'
-import { rethrowWithUserMessage } from '../filesystem-create-path-guards'
+import { rethrowWithUserMessage } from './filesystem-create-path-guards'
 
 type PlaceholderArgs = { filePath: string; connectionId?: string } & SshMutationExpectation
 

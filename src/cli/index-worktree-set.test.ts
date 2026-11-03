@@ -458,4 +458,89 @@ describe('orca cli worktree awareness', () => {
 
     process.exitCode = priorExitCode
   })
+  it('captures the stored PR base before unlinking and pins a path selector to its resolved ID', async () => {
+    const worktree = {
+      ...buildWorktree('/tmp/repo/feature', 'feature/foo'),
+      hostId: 'local',
+      instanceId: 'instance-a',
+      linkedPR: null,
+      suppressedGitHubPR: 41
+    }
+    queueFixtures(callMock, okFixture('req_show', { worktree }), okFixture('req_set', { worktree }))
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+
+    await main(
+      ['worktree', 'set', '--worktree', 'path:/tmp/repo/feature', '--pr', 'null', '--json'],
+      '/tmp/repo'
+    )
+
+    expect(callMock).toHaveBeenNthCalledWith(1, 'worktree.show', {
+      worktree: 'path:/tmp/repo/feature'
+    })
+    expect(callMock).toHaveBeenNthCalledWith(
+      2,
+      'worktree.set',
+      expect.objectContaining({
+        worktree: 'id:repo::/tmp/repo/feature',
+        linkedPR: null,
+        githubLinkBase: {
+          hostId: 'local',
+          instanceId: 'instance-a',
+          linkedPR: null,
+          suppressedGitHubPR: 41
+        }
+      })
+    )
+  })
+
+  it.each([
+    ['missing host', { linkedPR: 41 }],
+    ['missing stored PR', { hostId: 'local' }],
+    [
+      'contradictory owner',
+      { hostId: 'local', identity: { executionHostId: 'ssh:other' }, linkedPR: 41 }
+    ],
+    ['malformed instance', { hostId: 'local', instanceId: '', linkedPR: 41 }],
+    ['malformed suppression', { hostId: 'local', linkedPR: 41, suppressedGitHubPR: -1 }],
+    ['different target', { hostId: 'local', linkedPR: 41, id: 'repo::/tmp/repo/other' }]
+  ])('refuses unlink when the snapshot has %s', async (_label, fields) => {
+    queueFixtures(
+      callMock,
+      okFixture('req_show', {
+        worktree: { ...buildWorktree('/tmp/repo/feature', 'feature/foo'), ...fields }
+      })
+    )
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const priorExitCode = process.exitCode
+    try {
+      await main(
+        ['worktree', 'set', '--worktree', 'id:repo::/tmp/repo/feature', '--pr', 'null', '--json'],
+        '/tmp/repo'
+      )
+      expect(callMock).toHaveBeenCalledTimes(1)
+      expect([...logSpy.mock.calls, ...errSpy.mock.calls].flat().join('\n')).toContain(
+        'github_link_unavailable'
+      )
+      expect(process.exitCode).toBe(1)
+    } finally {
+      process.exitCode = priorExitCode
+    }
+  })
+
+  it('does not add a snapshot lookup for a positive PR link', async () => {
+    queueFixtures(
+      callMock,
+      okFixture('req_set', {
+        worktree: { ...buildWorktree('/tmp/repo/feature', 'feature/foo'), linkedPR: 41 }
+      })
+    )
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    await main(
+      ['worktree', 'set', '--worktree', 'id:repo::/tmp/repo/feature', '--pr', '41', '--json'],
+      '/tmp/repo'
+    )
+    expect(callMock).toHaveBeenCalledTimes(1)
+    expect(callMock).toHaveBeenCalledWith('worktree.set', expect.objectContaining({ linkedPR: 41 }))
+  })
 })

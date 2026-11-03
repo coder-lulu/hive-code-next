@@ -42,6 +42,7 @@ export type RpcClient = UnvalidatedRpcRequestPort & {
   carriesRpcEnvelope?: () => boolean
   onStateChange: (listener: (state: ConnectionState) => void) => () => void
   notifyForeground: (reason?: ForegroundNudgeReason) => void
+  probeLivenessNow?: () => void
   /**
    * Must settle every pending `sendRequest` promise before returning.
    *

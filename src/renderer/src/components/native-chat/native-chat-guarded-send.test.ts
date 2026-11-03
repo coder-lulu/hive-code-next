@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 const write = vi.hoisted(() => vi.fn())
-vi.mock('@/runtime/runtime-terminal-inspection', () => ({ sendRuntimePtyInputVerified: write }))
+const rawWrite = vi.hoisted(() => vi.fn())
+vi.mock('@/runtime/runtime-terminal-inspection', () => ({ sendRuntimePtyInput: rawWrite }))
+import { sendNativeChatMessage } from './native-chat-runtime-send'
+vi.mock('@/runtime/runtime-terminal-verified-input', () => ({ sendRuntimePtyInputVerified: write }))
 import { sendGuardedNativeChatMessage } from './native-chat-guarded-send'
 import {
   cancelNativeChatPtySends,
@@ -73,4 +76,18 @@ it('model-command cancellation also settles queued guarded messages', async () =
   await expect(first.accepted).resolves.toBe(false)
   await expect(queued.accepted).resolves.toBe(false)
   expect(write.mock.calls.map((call) => call[1])).toEqual(['\x15', '\x1b[200~first\x1b[201~'])
+})
+
+it('routes sendable product messages through the guarded active entry', async () => {
+  write.mockResolvedValue(false)
+  const onRejected = vi.fn()
+  const handle = sendNativeChatMessage('pty', 'protected', {
+    requireAgentStatus: 'sendable',
+    onRejected
+  })
+  await vi.advanceTimersByTimeAsync(1000)
+  await expect(handle.accepted).resolves.toBe(false)
+  expect(write).toHaveBeenCalledTimes(1)
+  expect(onRejected).toHaveBeenCalledTimes(1)
+  expect(rawWrite).not.toHaveBeenCalled()
 })

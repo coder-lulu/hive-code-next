@@ -6,9 +6,6 @@ import type * as ProfileCloudClient from './profile-cloud-client'
 import type * as SecureFile from '../../shared/secure-file'
 import type { OrcaCloudSession } from './profile-cloud-session-store'
 
-// Pins the auth behaviour that must not change, through public entry points only, so the
-// same file runs unchanged before and after a refactor of session storage.
-
 const net = vi.hoisted(() => ({
   exchange: vi.fn(),
   refresh: vi.fn(),
@@ -17,7 +14,6 @@ const net = vi.hoisted(() => ({
   revoke: vi.fn()
 }))
 
-// Fails the next N writes of a session file, as a disk-full or locked-file moment would.
 const disk = vi.hoisted(() => ({ failSessionWrites: 0 }))
 
 vi.mock('../../shared/secure-file', async (importOriginal) => {
@@ -39,8 +35,7 @@ vi.mock('electron', () => ({
   safeStorage: {
     isEncryptionAvailable: () => true,
     encryptString: (value: string) => Buffer.from(value, 'utf-8'),
-    decryptString: (value: Buffer) => value.toString('utf-8'),
-    getSelectedStorageBackend: () => 'gnome_libsecret'
+    decryptString: (value: Buffer) => value.toString('utf-8')
   }
 }))
 
@@ -75,18 +70,25 @@ import {
   signOutCurrentOrcaProfile
 } from './profile-cloud-service'
 import { readOrcaCloudSession } from './profile-cloud-session-store'
-import { getProductCloudAuthConfig } from '../product/product-cloud-config'
-import {
-  readFreshOrcaCloudSession,
-  runWithFreshOrcaCloudSession
-} from './profile-cloud-session-refresh'
+import { getProductCloudAuthConfig as getOrcaCloudAuthConfig } from '../product/product-cloud-config'
+import { runWithFreshOrcaCloudSession } from './profile-cloud-session-refresh'
 import { onOrcaCloudSessionInvalidated } from './profile-cloud-session-invalidation'
 import {
   createLocalOrcaProfile,
   ensureActiveOrcaProfile,
   setActiveOrcaProfile
 } from './profile-index-store'
-import { runSkillCloudOperation } from '../skills/skill-cloud-auth'
+import { readFreshOrcaCloudSession } from './profile-cloud-session-refresh'
+import type { OrcaCloudAuthConfig } from './profile-cloud-auth-config'
+
+async function readAuthSession(config: OrcaCloudAuthConfig, path: string) {
+  const active = ensureActiveOrcaProfile(path)
+  if (!active.profile.cloud) {
+    return null
+  }
+  const result = await readFreshOrcaCloudSession(config, active, path)
+  return result.status === 'found' ? result.session : null
+}
 
 const cloud = (orgId = 'org-1') => ({
   userId: 'user-1',
@@ -112,18 +114,9 @@ const issue = (options: { expiresIn?: number; orgId?: string; relay?: boolean } 
   }
 }
 
-async function readFreshSession(): Promise<OrcaCloudSession | null> {
-  const result = await readFreshOrcaCloudSession(
-    authConfig(),
-    ensureActiveOrcaProfile(userDataPath),
-    userDataPath
-  )
-  return result.status === 'found' ? result.session : null
-}
-
 let userDataPath = ''
 const authConfig = () => {
-  const state = getProductCloudAuthConfig()
+  const state = getOrcaCloudAuthConfig()
   if (!state.configured) {
     throw new Error('auth config not configured')
   }
@@ -136,7 +129,6 @@ const storedRefreshToken = (profileId?: string) => {
   return session.status === 'found' ? session.session.refreshToken : session.status
 }
 
-// Signs in with an access token that is already inside the refresh skew when `expiresIn` is small.
 async function signIn(expiresIn = 600_000): Promise<void> {
   net.exchange.mockResolvedValueOnce(issue({ expiresIn }))
   await expect(connectCurrentOrcaProfile(userDataPath)).resolves.toMatchObject({
@@ -148,7 +140,6 @@ describe('cloud auth characterization', () => {
   beforeEach(() => {
     vi.stubEnv('ORCA_CLOUD_API_URL', 'http://localhost:4100')
     vi.stubEnv('ORCA_CLOUD_CLIENT_ID', 'desktop-client')
-    vi.stubEnv('ORCA_ARTIFACTS_API_URL', 'http://localhost:4100')
     vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     userDataPath = mkdtempSync(join(tmpdir(), 'orca-auth-characterization-'))
     for (const mock of Object.values(net)) {
@@ -214,7 +205,7 @@ describe('cloud auth characterization', () => {
       )
       expect(storedRefreshToken()).toBe('missing')
       expect(getCurrentOrcaProfileAuthStatus(userDataPath)).toMatchObject({ state: 'local' })
-      await expect(readFreshSession()).resolves.toBeNull()
+      await expect(readAuthSession(authConfig(), userDataPath)).resolves.toBeNull()
     })
 
     it('a server-revoked refresh signs out, notifies, and stops refreshing', async () => {
@@ -223,8 +214,8 @@ describe('cloud auth characterization', () => {
       const unsubscribe = onOrcaCloudSessionInvalidated(invalidated)
       net.refresh.mockRejectedValue(new OrcaCloudRequestError(401))
 
-      await expect(readFreshSession()).resolves.toBeNull()
-      await expect(readFreshSession()).resolves.toBeNull()
+      await expect(readAuthSession(authConfig(), userDataPath)).resolves.toBeNull()
+      await expect(readAuthSession(authConfig(), userDataPath)).resolves.toBeNull()
 
       expect(net.refresh).toHaveBeenCalledTimes(1)
       expect(invalidated).toHaveBeenCalledTimes(1)
@@ -238,7 +229,7 @@ describe('cloud auth characterization', () => {
     it('a 403 from refresh also signs out', async () => {
       await signIn(1_000)
       net.refresh.mockRejectedValue(new OrcaCloudRequestError(403))
-      await expect(readFreshSession()).resolves.toBeNull()
+      await expect(readAuthSession(authConfig(), userDataPath)).resolves.toBeNull()
       expect(storedRefreshToken()).toBe('missing')
     })
   })
@@ -359,12 +350,11 @@ describe('cloud auth characterization', () => {
     })
   })
 
-  describe('HiveCloud session auth and renewal', () => {
+  describe('cloud session renewal', () => {
     it('returns the stored identity and token without a refresh while fresh', async () => {
       await signIn()
-      await expect(readFreshSession()).resolves.toMatchObject({
-        accessToken: `access-${issued}`,
-        capabilities: { flags: { 'relay.use': true } }
+      await expect(readAuthSession(authConfig(), userDataPath)).resolves.toMatchObject({
+        accessToken: `access-${issued}`
       })
       expect(net.refresh).not.toHaveBeenCalled()
     })
@@ -373,7 +363,10 @@ describe('cloud auth characterization', () => {
       await signIn(1_000)
       const rotated = issue()
       net.refresh.mockResolvedValue(rotated)
-      const [first, second] = await Promise.all([readFreshSession(), readFreshSession()])
+      const [first, second] = await Promise.all([
+        readAuthSession(authConfig(), userDataPath),
+        readAuthSession(authConfig(), userDataPath)
+      ])
       expect(net.refresh).toHaveBeenCalledTimes(1)
       expect(first?.accessToken).toBe(rotated.accessToken)
       expect(second?.accessToken).toBe(rotated.accessToken)
@@ -387,7 +380,7 @@ describe('cloud auth characterization', () => {
         capabilities: { flags: { 'relay.use': true, renewed: true }, refreshedAt: Date.now() }
       }
       net.refresh.mockResolvedValue(rotated)
-      await readFreshSession()
+      await readAuthSession(authConfig(), userDataPath)
       expect(getCurrentOrcaProfileAuthStatus(userDataPath)).toMatchObject({
         capabilities: { flags: { renewed: true } }
       })
@@ -397,7 +390,7 @@ describe('cloud auth characterization', () => {
       await signIn(1_000)
       let finish!: (value: unknown) => void
       net.refresh.mockReturnValue(new Promise((resolve) => (finish = resolve)))
-      const renewing = readFreshSession().catch(() => null)
+      const renewing = readAuthSession(authConfig(), userDataPath).catch(() => null)
       await signOutCurrentOrcaProfile(userDataPath)
       finish(issue())
       await renewing
@@ -406,19 +399,19 @@ describe('cloud auth characterization', () => {
     })
 
     it('reports a profile that is not linked as no context', async () => {
-      await expect(readFreshSession()).resolves.toBeNull()
+      await expect(readAuthSession(authConfig(), userDataPath)).resolves.toBeNull()
     })
 
-    it('returns the server capability flags without adding relay authorization', async () => {
+    it('reports a session without the relay entitlement', async () => {
       net.exchange.mockResolvedValueOnce(issue({ relay: false }))
       await connectCurrentOrcaProfile(userDataPath)
-      await expect(readFreshSession()).resolves.toMatchObject({
+      expect(getCurrentOrcaProfileAuthStatus(userDataPath)).toMatchObject({
         capabilities: { flags: { 'relay.use': false } }
       })
     })
   })
 
-  describe('artifact and skill cloud auth', () => {
+  describe('authenticated cloud operations', () => {
     it('retries an operation once with a refreshed token after a 401', async () => {
       await signIn()
       const rotated = issue()
@@ -428,7 +421,12 @@ describe('cloud auth characterization', () => {
         .mockRejectedValueOnce(new OrcaCloudRequestError(401))
         .mockResolvedValueOnce('done')
       await expect(
-        runSkillCloudOperation({ userDataPath, options: {}, operation })
+        runWithFreshOrcaCloudSession(
+          authConfig(),
+          ensureActiveOrcaProfile(userDataPath),
+          userDataPath,
+          (session) => operation(session.accessToken)
+        )
       ).resolves.toEqual({ status: 'ok', value: 'done' })
       expect(operation.mock.calls.map(([token]) => token)).toEqual([
         `access-${issued - 1}`,
@@ -476,7 +474,12 @@ describe('cloud auth characterization', () => {
       const token = storedRefreshToken()
       const operation = vi.fn().mockRejectedValue(new OrcaCloudRequestError(500))
       await expect(
-        runSkillCloudOperation({ userDataPath, options: {}, operation })
+        runWithFreshOrcaCloudSession(
+          authConfig(),
+          ensureActiveOrcaProfile(userDataPath),
+          userDataPath,
+          (session) => operation(session.accessToken)
+        )
       ).rejects.toThrow('orca_cloud_request_failed_500')
       expect(net.refresh).not.toHaveBeenCalled()
       expect(storedRefreshToken()).toBe(token)
@@ -509,7 +512,7 @@ describe('cloud auth characterization', () => {
       await signIn(1_000)
       const token = storedRefreshToken()
       net.refresh.mockRejectedValue(failure())
-      await expect(readFreshSession()).rejects.toBeTruthy()
+      await expect(readAuthSession(authConfig(), userDataPath)).rejects.toBeTruthy()
       expect(storedRefreshToken()).toBe(token)
       expect(getCurrentOrcaProfileAuthStatus(userDataPath)).toMatchObject({ state: 'connected' })
     })
@@ -517,8 +520,10 @@ describe('cloud auth characterization', () => {
     it('does not resend a token whose refresh timed out, inside the replay window', async () => {
       await signIn(1_000)
       net.refresh.mockRejectedValue(Object.assign(new Error('timed out'), { name: 'TimeoutError' }))
-      await expect(readFreshSession()).rejects.toBeTruthy()
-      await expect(readFreshSession()).rejects.toThrow('orca_cloud_refresh_replay_blocked')
+      await expect(readAuthSession(authConfig(), userDataPath)).rejects.toBeTruthy()
+      await expect(readAuthSession(authConfig(), userDataPath)).rejects.toThrow(
+        'orca_cloud_refresh_replay_blocked'
+      )
       expect(net.refresh).toHaveBeenCalledTimes(1)
     })
 
@@ -528,7 +533,7 @@ describe('cloud auth characterization', () => {
       net.refresh
         .mockRejectedValueOnce(new OrcaCloudRequestError(502))
         .mockResolvedValueOnce(rotated)
-      await expect(readFreshSession()).resolves.toMatchObject({
+      await expect(readAuthSession(authConfig(), userDataPath)).resolves.toMatchObject({
         accessToken: rotated.accessToken
       })
       expect(net.refresh).toHaveBeenCalledTimes(2)
@@ -543,7 +548,7 @@ describe('cloud auth characterization', () => {
       await signIn(1_000)
       const signedIn = storedRefreshToken()
       const rotated = issue()
-      // The server's grace window: the parent token keeps answering with the same child.
+      // Grace-window replays return the same rotated child token.
       net.refresh.mockImplementation(async (_config: unknown, session: OrcaCloudSession) => {
         if (session.refreshToken === signedIn) {
           return rotated
@@ -552,7 +557,7 @@ describe('cloud auth characterization', () => {
       })
       disk.failSessionWrites = 1
       for (let renewal = 0; renewal < 13; renewal++) {
-        await readFreshSession().catch(() => null)
+        await readAuthSession(authConfig(), userDataPath).catch(() => null)
       }
       vi.resetModules()
       const store = await import('./profile-cloud-session-store')
@@ -567,7 +572,9 @@ describe('cloud auth characterization', () => {
       await signIn(1_000)
       const token = storedRefreshToken()
       net.refresh.mockRejectedValue(new OrcaCloudRequestError(502))
-      await expect(readFreshSession()).rejects.toThrow('orca_cloud_request_failed_502')
+      await expect(readAuthSession(authConfig(), userDataPath)).rejects.toThrow(
+        'orca_cloud_request_failed_502'
+      )
       expect(net.refresh).toHaveBeenCalledTimes(2)
       expect(storedRefreshToken()).toBe(token)
     })

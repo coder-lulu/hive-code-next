@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, expect, it, vi } from 'vitest'
 
 import { i18n, setRendererPluginLanguagePacks } from '../i18n/i18n'
-import { pluginLanguageResourceId } from '../../../shared/plugins/plugin-language-pack-artifact'
+import { pluginLanguageResourceId } from '../../../shared/plugins/artifacts/plugin-language-pack-artifact'
 import { useSettingsNavigationMetadata } from './useSettingsNavigationMetadata'
 import type { SettingsNavSection } from '@/lib/settings-navigation-types'
 
@@ -80,6 +80,7 @@ it('refreshes navigation after replacing a catalog without changing its language
     resourceLanguage: pluginLanguageResourceId(id),
     pluginKey: 'review.navigation',
     locale: 'fr',
+    coverage: 100,
     catalog: {
       auto: { hooks: { useSettingsNavigationMetadata: { b49abbd2f7: 'Anciens agents' } } },
       agentsSettings: { packageSource: 'Ancienne source' }

@@ -1,35 +1,13 @@
-# HiveCode Mobile
+# Orca Mobile
 
-React Native companion app for HiveCode. Monitor worktrees, view terminal output, and send commands from your phone.
+React Native companion app for Orca. Monitor worktrees, view terminal output, and send commands from your phone.
 
 Local development uses two processes:
 
-- HiveCode desktop/Electron from the repo root. This hosts the mobile WebSocket RPC server on port `6768`.
+- Orca desktop/Electron from the repo root. This hosts the mobile WebSocket RPC server on port `6768`.
 - Expo Metro from `mobile/`. This serves the React Native app on port `8081`.
 
 Unless a command says otherwise, run mobile app commands from the `mobile/` directory.
-
-## Android emulator iteration
-
-With a development client installed and the emulator running, use:
-
-```bash
-pnpm dev:android
-```
-
-Keep Metro running. TypeScript and UI edits use Fast Refresh without rebuilding
-an APK. Android Studio can open `mobile/android` for Logcat and native debugging;
-it does not need to rebuild the application for every JavaScript change.
-Native dependency/configuration changes require another native build. Verify a
-release APK before distribution because debug timing and performance differ.
-
-Use the same product code, application ID and public account/Relay services.
-Account Runtime testing uses normal login and device claiming; local QR pairing
-below is a separate connection path, not a prerequisite for account connections.
-The shared test AVD is `hivecode-crash-check`. Preserve its login with an in-place
-update signed by the existing key; do not uninstall or clear data to resolve a
-debug/release signing mismatch. The initial signed development client was built
-locally using the existing protected signing configuration.
 
 The Node commands `pnpm rpc:diff` and `pnpm rpc:record` use a development dependency linked to `../src/packages/process-host`. Mobile's install supplies the link, and `tsx` runs its source with the `orca-source` condition, so these command wrappers do not require a desktop install or package build. Keep that source directory in sparse checkouts. The recording suites still need root dependencies when they exercise desktop modules. The React Native app does not import this host package.
 
@@ -41,7 +19,7 @@ The Node commands `pnpm rpc:diff` and `pnpm rpc:record` use a development depend
 - Expo Go on your phone, or a development client build when native modules are needed
 - Phone and desktop on the same LAN when testing a physical phone
 
-## Start HiveCode Desktop
+## Start Desktop Orca
 
 From the repository root:
 
@@ -71,14 +49,29 @@ Scan the Expo QR code with your phone's camera on iOS, or Expo Go on Android.
 For a native dev-client build:
 
 ```bash
-pnpm exec expo run:android
-pnpm exec expo run:ios
+pnpm native ensure ios       # or: pnpm native ensure android [--device <name|udid|serial>]
 pnpm start --dev-client
 ```
 
-## Pair With HiveCode Desktop
+`ensure` computes the Expo fingerprint of the native inputs (native dependencies, config plugins,
+`modules/`, `patches/`, and the Expo config). On a **HIT** it installs the cached build on the booted
+simulator or the running emulator in a few seconds. On a **MISS** it regenerates `ios/` or `android/`,
+runs `expo run:<platform>`, and caches the result. `--rebuild` forces a fresh build.
 
-1. Open HiveCode desktop.
+Builds are cached per fingerprint in the user cache directory (`~/Library/Caches/orca-mobile/native-builds`
+on macOS, `$XDG_CACHE_HOME/orca-mobile/native-builds` on Linux, `%LOCALAPPDATA%\orca-mobile\native-builds`
+on Windows, or `ORCA_MOBILE_NATIVE_BUILD_CACHE_DIR`), so every worktree reuses them. The newest three
+per platform are kept. `app.config.js` also registers the cache as Expo's `buildCacheProvider`, so a
+plain `pnpm ios` / `pnpm android` installs a cached build instead of compiling. Only `ensure` writes to
+the cache, because `expo run` reuses an existing `ios/` or `android/` directory even when it was
+generated from older inputs. Expo caches iOS Simulator builds only, not physical devices.
+
+`pnpm native fingerprint` prints the current hashes. On pull requests, the `Mobile native fingerprint`
+job reports in its summary whether the PR changes them, which means dev clients need a native rebuild.
+
+## Pair With Desktop Orca
+
+1. Open Orca desktop.
 2. Go to Settings > Mobile.
 3. Scan the pairing QR code from the mobile app.
 4. Confirm the mobile host endpoint is `ws://<desktop-ip>:6768`.
@@ -106,10 +99,10 @@ If the phone has a stale host entry, remove it from the app and pair again.
 The phone can be inspected through the connected device tooling:
 
 ```bash
-hive snapshot --json
-hive click --element @e3 --json
-hive fill --element @e1 --value "ls" --json
-hive screenshot --json
+orca snapshot --json
+orca click --element @e3 --json
+orca fill --element @e1 --value "ls" --json
+orca screenshot --json
 ```
 
 Use `snapshot` first to find the current element refs, then click/fill those refs. After mobile file edits, Metro usually hot reloads automatically, but navigating out of and back into the session screen can be useful because it re-runs `terminal.subscribe`.
@@ -139,15 +132,6 @@ readSawMarker: true
 ```
 
 If this repro fails, debug the desktop runtime/PTY path before the mobile WebView. If it passes but the phone is blank, debug the session screen or `TerminalWebView` readiness/queueing path.
-
-### Stable Terminal And Recovery Behavior
-
-The authoritative cross-product behavior lives in [`docs/engineering/product-design.md`](../docs/engineering/product-design.md). Mobile changes must preserve these local contracts:
-
-- The first focus for a terminal handle uses direct input. Users can opt into buffered input, and switching sessions does not open the keyboard automatically.
-- Output received before the terminal WebView is ready is queued with a bound and replayed in order. Reconnect establishes a fresh PTY subscription.
-- Foreground and network handoffs probe liveness and replace a dead physical client. A disconnected socket is not proof that the remote session exited.
-- Expected relay migration keeps loaded content visible and presents a connecting/reconnecting state instead of an empty grey surface.
 
 ## Terminal Color Repro Without A Phone
 
@@ -186,6 +170,22 @@ the script's `TESTS_OUTSIDE_PROGRAM` with a reason. Without that, a test exclude
 `tsconfig.test.json` — or a `Foo.test.tsx` shadowed by a `Foo.test.ts` beside it, which a wildcard
 `include` drops for the higher-priority extension — would leave the ratchet silently.
 
+## Localization
+
+UI copy goes through `src/i18n`, with the same call shape and languages as desktop:
+
+- In components and hooks: `const t = useMobileTranslation()`, then `t('area.thing.label', 'English text')`.
+  The function changes with the language, so list it in memo and callback dependencies.
+- In helpers and imperative code (alerts, notifications): `translate(key, fallback, options)` from
+  `src/i18n/mobile-i18n`, called when the text is shown, never at module scope.
+- Counts: `count === 1 ? t('x.files_one', '{{count}} file', { count }) : t('x.files_other', '{{count}} files', { count })`.
+- Dates and numbers: pass `getUiIntlLocale()` to `Intl` formatters instead of `undefined`.
+- Keep identity separate from display text: never compare or key on a translated string.
+
+Run `pnpm sync:mobile-localization` from the repo root to add new keys to `src/i18n/locales/en.json`;
+other catalogs may lag and fall back to English. `pnpm verify:mobile-localization` and
+`pnpm verify:mobile-localization-coverage` run in CI. iOS permission prompts live in `locales/<lang>.json`.
+
 ## Protocol Version Compatibility
 
 Mobile and desktop talk over a versioned protocol. Because mobile updates lag desktop by 24-48h via the App Store, both sides exchange version numbers on `status.get` so a genuinely incompatible combo can hard-block instead of silently misbehaving.
@@ -213,13 +213,13 @@ Do **not** bump for additive changes:
 
 Set `MIN_COMPATIBLE_MOBILE_VERSION` (kill-switch) when desktop ships a change that requires a minimum mobile version to function safely. Same for `MIN_COMPATIBLE_DESKTOP_VERSION` from the mobile side.
 
-When a verdict is `blocked`, `mobile/src/components/ProtocolBlockScreen.tsx` renders a screen pointing the user at either the App Store (mobile too old) or the configured HiveCloud update/store link (desktop too old).
+When a verdict is `blocked`, `mobile/src/components/ProtocolBlockScreen.tsx` renders a screen pointing the user at the update that clears it. When mobile is too old it opens the newest release if the installed app's update check knows one, otherwise the App Store (iOS) or GitHub Releases (Android). When desktop is too old it opens GitHub Releases.
 
 To exercise the block screen locally: set `MIN_COMPATIBLE_DESKTOP_VERSION = 999` in `mobile/src/transport/protocol-version.ts`, rebuild, pair to any desktop. Revert before merging.
 
 ## Mock Server
 
-Develop the mobile app without a running HiveCode desktop instance:
+Develop the mobile app without a running Orca desktop instance:
 
 ```bash
 pnpm mock-server           # starts mock WebSocket server on port 6768
@@ -241,10 +241,10 @@ Read on every request, so behaviour can be flipped mid-session without a restart
 - `MOCK_TERMINAL_LIST_MODE_FILE` (default `orca-mock-terminal-list-mode` in the system temporary directory) — `omit` returns an empty terminal list, `other` returns a list that omits the chat handle, anything else lists it.
 - `MOCK_TERMINAL_STREAM_MODE_FILE` (default `orca-mock-terminal-stream-mode` in the system temporary directory) — `dead` answers a subscribe with `subscribed` then `end` (a gone PTY), which is what exercises the rearm bound and terminal prune; anything else streams normally.
 
-## Connect to HiveCode Desktop
+## Connecting to Real Orca
 
-1. Start HiveCode desktop with WebSocket transport enabled
-2. In HiveCode, go to Settings > Mobile and scan the QR code with this app
+1. Start Orca desktop with WebSocket transport enabled
+2. In Orca, go to Settings > Mobile and scan the QR code with this app
 3. The QR encodes the connection endpoint, device token, and TLS fingerprint
 
 ## Project Structure
@@ -263,22 +263,3 @@ mobile/
 │   └── mock-server.ts     # Standalone mock WebSocket server
 └── assets/                # App icons and splash screen
 ```
-
-## RPC recording provenance
-
-RPC recordings use format v6. Hive differences are reviewed sparse overlays over the upstream
-corpus. New provenance manifests use v3 and bind a canonical raw Git source projection to
-published maintenance controls; historical v2 manifests are read-only.
-
-Record from an isolated raw source fixture under `logs/`, with independent dependencies and
-an explicit source input JSON. The recorder checks source bytes and modes before and after
-execution. Review trace differences before generating the manifest and overlays:
-
-```text
-RPC_FOUNDATION_RECORD=1 pnpm --dir mobile rpc:record --record-hive <source-input.json> <logs-output-directory> --evidence-only
-RPC_FOUNDATION_RECORD=1 pnpm --dir mobile rpc:record --publish-hive <source-input.json> <logs-output-directory>
-```
-
-See [Hive RPC recording overlay](rpc-foundation/hive/README.md) for the source input contract,
-review requirements and frozen tree verification. Generated evidence stays under `logs/`
-until reviewed result blobs are frozen for synchronization.

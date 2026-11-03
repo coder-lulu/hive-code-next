@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { StyleSheet, Text, View } from 'react-native'
 import type { HomeStatsSummary } from '../stats/home-stats-total'
 import { useMobileTheme } from '../theme/mobile-theme-provider'
@@ -15,6 +16,8 @@ function formatDuration(ms: number): string {
 }
 
 export function MobileHomeListHeader({ stats }: { stats: HomeStatsSummary | null }) {
+  const t = useMobileTranslation()
+
   const theme = useMobileTheme()
   const styles = createStyles(theme)
   return (
@@ -26,7 +29,7 @@ export function MobileHomeListHeader({ stats }: { stats: HomeStatsSummary | null
               {stats.totalAgentsSpawned.toLocaleString()}
             </Text>
             <Text maxFontSizeMultiplier={1.3} style={styles.statLabel}>
-              已启动 Agent
+              {t('auto.mobile.src.home.MobileHomeListHeader.83d3c8e05a', 'Agents started')}
             </Text>
           </View>
           <View style={styles.statCard}>
@@ -34,7 +37,7 @@ export function MobileHomeListHeader({ stats }: { stats: HomeStatsSummary | null
               {formatDuration(stats.totalAgentTimeMs)}
             </Text>
             <Text maxFontSizeMultiplier={1.3} style={styles.statLabel}>
-              Agent 用时
+              {t('auto.mobile.src.home.MobileHomeListHeader.9d7871f9b9', 'Agent time')}
             </Text>
           </View>
           <View style={styles.statCard}>
@@ -42,13 +45,13 @@ export function MobileHomeListHeader({ stats }: { stats: HomeStatsSummary | null
               {stats.totalPRsCreated.toLocaleString()}
             </Text>
             <Text maxFontSizeMultiplier={1.3} style={styles.statLabel}>
-              已创建 PR
+              {t('home.listHeader.prsCreated', 'PRs created')}
             </Text>
           </View>
         </View>
       ) : null}
       <Text accessibilityRole="header" maxFontSizeMultiplier={1.3} style={styles.sectionHeading}>
-        电脑
+        {t('auto.mobile.src.home.MobileHomeListHeader.4b68984038', 'Computer')}
       </Text>
     </View>
   )

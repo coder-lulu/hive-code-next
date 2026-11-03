@@ -1,9 +1,12 @@
+import { abandonStructuredAgentSessionHost } from './structured-agent-session-host-test-abandon'
+import { StructuredAgentSessionHost } from './structured-agent-session-host'
+import type { AttachFlowInput } from './structured-agent-session-attach-flow'
 import {
   closeTestJournalHostDatabases,
   createTrackedJournalOpener,
   openTestJournalHostDatabase
 } from '../agent-session-journal/journal-host-database-test-support'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -16,7 +19,6 @@ import type { AgentSessionRecord } from '../../../shared/agent-session-record'
 import type { StructuredAgentSessionAdapter } from './structured-agent-session-adapter'
 import { digestPayload } from '../agent-session-journal/journal-payload-bounds'
 import type { AgentSessionJournal } from '../agent-session-journal/journal-store'
-import type { ProviderHistoryWindow } from '../agent-session-journal/journal-submission-reconciler'
 import {
   attachFingerprintFields,
   type AgentSessionAttachParams
@@ -34,8 +36,12 @@ const CREATE_OPERATION = `${NOW}-${'1'.padStart(32, '0')}`
 const RESUME_OPERATION = `${NOW}-${'2'.padStart(32, '0')}`
 let root: string | null = null
 const journals = createTrackedJournalOpener()
+const openedHosts: StructuredAgentSessionHost[] = []
 
 afterEach(async () => {
+  for (const host of openedHosts.splice(0)) {
+    await abandonStructuredAgentSessionHost(host)
+  }
   await journals.closeAll()
   if (root) {
     closeTestJournalHostDatabases()
@@ -67,7 +73,7 @@ function attachParams(
     accountHome: { variable: 'CODEX_HOME', path: '/home/dev/.codex' },
     runtimeKind: 'native',
     ...(options ? { options } : {}),
-    providerHandle: { kind: 'codex', threadId: 'legacy-thread' }
+    providerHandle: { kind: 'codex', threadId: '019fd532-7c11-7a90-b6de-4e1a2c3d5f60' }
   }
   return {
     ...params,
@@ -85,12 +91,17 @@ function attachParams(
 function adapter(input: {
   origin: 'created' | 'resumed'
   options?: AgentSessionOptionsResult
-  restoreFailures?: readonly string[]
 }): StructuredAgentSessionAdapter {
   return {
+    open: vi.fn(async () => ({
+      reportedOptions: Object.fromEntries(
+        Object.entries(input.options?.current ?? {}).map(([key, value]) => [key, String(value)])
+      )
+    })),
     acquire: vi
       .fn<StructuredAgentSessionAdapter['acquire']>()
       .mockImplementation(async ({ fence, spawnToken }) => ({
+        acquisitionGeneration: globalThis.crypto.randomUUID(),
         process: {
           hostId: 'local',
           pid: 4242,
@@ -98,22 +109,42 @@ function adapter(input: {
           spawnToken
         },
         link: {
-          linkId: `${input.origin}-link`,
-          handle: codexProviderHandle('legacy-thread'),
+          linkId: `${input.origin}-link-${fence}`,
+          handle: codexProviderHandle('019fd532-7c11-7a90-b6de-4e1a2c3d5f60'),
           origin: input.origin,
           mintedAtFence: fence,
           observedAt: NOW
         }
       })),
     ...(input.options ? { readOptions: vi.fn(async () => input.options!) } : {}),
-    ...(input.restoreFailures
-      ? { readOptionRestoreFailures: vi.fn(() => input.restoreFailures!) }
-      : {}),
     dispatch: vi.fn(),
     cancelTurn: vi.fn(),
     answerPrompt: vi.fn(),
     setOption: vi.fn()
   }
+}
+
+async function performOpenedAttach(input: AttachFlowInput) {
+  const host = new StructuredAgentSessionHost({
+    agents: NO_STRUCTURED_AGENTS,
+    logger: input.logger,
+    store: input.store,
+    adapter: input.adapter,
+    journalDatabase: openTestJournalHostDatabase(root!),
+    claimKeyId: input.authority.claimKeyId,
+    mintSpawnToken: () => {
+      const token = input.authority.spawnToken
+      return typeof token === 'function' ? token() : token
+    },
+    now: input.now
+  })
+  openedHosts.push(host)
+  const result = await host.attach({ callerKey: input.callerKey }, input.params)
+  if (result.ok) {
+    await vi.waitFor(() => expect(input.adapter.open).toHaveBeenCalled())
+    await vi.waitFor(() => expect(host['sessions'].get(SESSION)?.child?.phase).toBe('ready'))
+  }
+  return result
 }
 
 function expectSettledAttachLease(record: AgentSessionRecord | null): void {
@@ -125,46 +156,56 @@ function expectSettledAttachLease(record: AgentSessionRecord | null): void {
 }
 
 describe('structured session acquisition options', () => {
-  it('samples provider history before acquiring a replacement child', async () => {
+  it('imports adopted history before acquisition and preserves uncertain sends on replacement', async () => {
     root = await mkdtemp(join(tmpdir(), 'orca-history-before-acquire-'))
     const initialStore = await openTestAgentSessionRecordStore(root)
-    let childAcquired = false
-    const historyWindow = (): ProviderHistoryWindow => ({
-      items: [],
-      boundaryConsistent: true,
-      turnInFlight: childAcquired
-    })
-    const withHistory = (origin: 'created' | 'resumed'): StructuredAgentSessionAdapter => {
+    const transcriptPath = join(root, 'rollout.jsonl')
+    const writeTranscript = (text: string) =>
+      writeFile(
+        transcriptPath,
+        `${[
+          JSON.stringify({
+            type: 'session_meta',
+            payload: {
+              id: '019fd532-7c11-7a90-b6de-4e1a2c3d5f60',
+              timestamp: new Date(NOW).toISOString(),
+              cwd: '/workspace'
+            }
+          }),
+          JSON.stringify({
+            type: 'response_item',
+            timestamp: new Date(NOW).toISOString(),
+            payload: { type: 'message', role: 'user', content: text }
+          })
+        ].join('\n')}\n`
+      )
+    await writeTranscript('history before acquiring')
+    const withHistory = (origin: 'created' | 'resumed') => {
       const sessionAdapter = adapter({ origin })
-      const acquire = vi.mocked(sessionAdapter.acquire)
-      acquire.mockImplementation(async (input) => {
-        childAcquired = true
-        return {
-          process: {
-            hostId: 'local',
-            pid: 4242,
-            processStartTimeMs: NOW,
-            spawnToken: input.spawnToken
-          },
-          link: {
-            linkId: `${origin}-link`,
-            handle: codexProviderHandle('legacy-thread'),
-            origin,
-            mintedAtFence: input.fence,
-            observedAt: NOW
-          }
-        }
+      const acquire = sessionAdapter.acquire
+      sessionAdapter.acquire = vi.fn(async (input) => {
+        await writeTranscript('provider changed history after acquiring')
+        return acquire(input)
       })
-      sessionAdapter.providerHistoryWindow = vi.fn(async () => historyWindow())
       return sessionAdapter
     }
 
+    const adoptedParams = attachParams(CREATE_OPERATION, null)
+    adoptedParams.adopt = {
+      providerHandle: codexProviderHandle('019fd532-7c11-7a90-b6de-4e1a2c3d5f60'),
+      transcriptPath
+    }
+    adoptedParams.envelope.payloadFingerprint = computeAgentSessionPayloadFingerprint({
+      method: 'agentSession.attach',
+      sessionId: SESSION,
+      fields: attachFingerprintFields(adoptedParams)
+    })
     let firstJournal: AgentSessionJournal | undefined
     const first = await performAttach({
       agents: NO_STRUCTURED_AGENTS,
       logger: createStructuredAgentSessionLogger(),
       store: initialStore,
-      adapter: withHistory('created'),
+      adapter: withHistory('resumed'),
       openConversation: openTestAttachConversation(openTestJournalHostDatabase(root!)),
       authority: {
         spawnToken: 'spawn-a',
@@ -173,14 +214,17 @@ describe('structured session acquisition options', () => {
         probe: { outcome: 'reservation-unused' }
       },
       callerKey: 'client-1',
-      optionRevision: () => 0,
-      params: attachParams(CREATE_OPERATION, null),
+      params: adoptedParams,
       now: () => NOW,
       onAttached: (attached) => {
         firstJournal = journals.track(attached.journal)
       }
     })
-    expect(first).toMatchObject({ ok: true })
+    expect(first, JSON.stringify(first)).toMatchObject({ ok: true })
+    expect(JSON.stringify(firstJournal!.snapshot().items)).toContain('history before acquiring')
+    expect(JSON.stringify(firstJournal!.snapshot().items)).not.toContain(
+      'provider changed history after acquiring'
+    )
     await firstJournal!.appendSubmission({
       clientMessageId: 'crashed-send',
       payloadFingerprint: digestPayload('deploy the thing'),
@@ -198,7 +242,6 @@ describe('structured session acquisition options', () => {
       probe: async () => ({ outcome: 'pid-absent' }),
       now: NOW + 1
     })
-    childAcquired = false
     const releasedFence = store.getRecord(SESSION)?.lease.runtimeFence ?? 0
 
     const resumedAdapter = withHistory('resumed')
@@ -215,7 +258,6 @@ describe('structured session acquisition options', () => {
         probe: { outcome: 'reservation-unused' }
       },
       callerKey: 'client-1',
-      optionRevision: () => 0,
       params: attachParams(RESUME_OPERATION, releasedFence),
       now: () => NOW + 1,
       onAttached: (attached) => {
@@ -223,10 +265,6 @@ describe('structured session acquisition options', () => {
       }
     })
 
-    expect(resumedAdapter.providerHistoryWindow).toHaveBeenCalledOnce()
-    expect(
-      vi.mocked(resumedAdapter.providerHistoryWindow!).mock.invocationCallOrder[0]
-    ).toBeLessThan(vi.mocked(resumedAdapter.acquire).mock.invocationCallOrder[0])
     expect(resumedAdapter.dispatch).not.toHaveBeenCalled()
     expect(second).toMatchObject({
       ok: true,
@@ -263,7 +301,6 @@ describe('structured session acquisition options', () => {
         probe: { outcome: 'reservation-unused' }
       },
       callerKey: 'client-1',
-      optionRevision: () => 0,
       params: attachParams(CREATE_OPERATION, null, options),
       now: () => NOW,
       recordPhase,
@@ -297,7 +334,6 @@ describe('structured session acquisition options', () => {
           probe: { outcome: 'reservation-unused' }
         },
         callerKey: 'client-1',
-        optionRevision: () => 0,
         params: attachParams(CREATE_OPERATION, null, options),
         now: () => NOW,
         onAttached: (attached) => {
@@ -315,11 +351,11 @@ describe('structured session acquisition options', () => {
     expect(store.getRecord(SESSION)?.options).toEqual({ model: 'gpt-5.6-sol', effort: 'medium' })
   })
 
-  it('persists provider options before proving a resumed legacy record', async () => {
+  it('preserves saved choices separately from reported options when reopening a legacy record', async () => {
     root = await mkdtemp(join(tmpdir(), 'orca-acquisition-options-'))
     const store = await openTestAgentSessionRecordStore(root)
 
-    const created = await performAttach({
+    const created = await performOpenedAttach({
       agents: NO_STRUCTURED_AGENTS,
       logger: createStructuredAgentSessionLogger(),
       store,
@@ -332,7 +368,6 @@ describe('structured session acquisition options', () => {
         probe: { outcome: 'reservation-unused' }
       },
       callerKey: 'client-1',
-      optionRevision: () => 0,
       params: attachParams(CREATE_OPERATION, null),
       now: () => NOW,
       onAttached: (attached) => {
@@ -355,7 +390,7 @@ describe('structured session acquisition options', () => {
       now: NOW + 1
     })
     const releasedFence = resumedStore.getRecord(SESSION)?.lease.runtimeFence ?? 0
-    const resumed = await performAttach({
+    const resumed = await performOpenedAttach({
       agents: NO_STRUCTURED_AGENTS,
       logger: createStructuredAgentSessionLogger(),
       store: resumedStore,
@@ -374,7 +409,6 @@ describe('structured session acquisition options', () => {
         probe: { outcome: 'reservation-unused' }
       },
       callerKey: 'client-1',
-      optionRevision: () => 0,
       params: attachParams(RESUME_OPERATION, releasedFence),
       now: () => NOW + 1,
       onAttached: (attached) => {
@@ -387,22 +421,19 @@ describe('structured session acquisition options', () => {
     expect(reopened.getRecord(SESSION)?.options).toEqual({
       approvalPolicy: 'on-request',
       personality: 'concise',
-      model: 'gpt-5.6-terra',
-      effort: 'medium',
-      fastMode: 'false'
+      fastMode: 'true'
     })
   })
 
-  it('clears a rejected Fast restore instead of retaining the prior encoded value', async () => {
+  it('keeps a saved Fast choice separate from the effective provider options', async () => {
     root = await mkdtemp(join(tmpdir(), 'orca-acquisition-fast-restore-'))
     const store = await openTestAgentSessionRecordStore(root)
     const sessionAdapter = adapter({
       origin: 'created',
-      options: { current: { model: 'gpt-standard' }, models: [] },
-      restoreFailures: ['fastMode']
+      options: { current: { model: 'gpt-standard' }, models: [] }
     })
 
-    const created = await performAttach({
+    const created = await performOpenedAttach({
       agents: NO_STRUCTURED_AGENTS,
       logger: createStructuredAgentSessionLogger(),
       store,
@@ -415,7 +446,6 @@ describe('structured session acquisition options', () => {
         probe: { outcome: 'reservation-unused' }
       },
       callerKey: 'client-1',
-      optionRevision: () => 0,
       params: attachParams(CREATE_OPERATION, null, {
         model: 'gpt-standard',
         fastMode: 'true'
@@ -427,7 +457,11 @@ describe('structured session acquisition options', () => {
     })
 
     expect(created).toMatchObject({ ok: true })
-    expect(store.getRecord(SESSION)?.options).toEqual({ model: 'gpt-standard' })
+    expect(store.getRecord(SESSION)?.options).toEqual({ model: 'gpt-standard', fastMode: 'true' })
+    expect(await sessionAdapter.readOptions!({ sessionId: SESSION, fence: 1 })).toEqual({
+      current: { model: 'gpt-standard' },
+      models: []
+    })
   })
 
   it('proves an opened Codex owner from effective options without reading its catalog', async () => {
@@ -438,10 +472,10 @@ describe('structured session acquisition options', () => {
       readOptions: vi.fn(async () => {
         throw new Error('model list unavailable')
       }),
-      readAcquisitionOptions: vi.fn(() => ({ model: 'gpt-reported', effort: 'high' }))
+      open: vi.fn(async () => ({ reportedOptions: { model: 'gpt-reported', effort: 'high' } }))
     }
 
-    const created = await performAttach({
+    const created = await performOpenedAttach({
       agents: NO_STRUCTURED_AGENTS,
       logger: createStructuredAgentSessionLogger(),
       store,
@@ -454,7 +488,6 @@ describe('structured session acquisition options', () => {
         probe: { outcome: 'reservation-unused' }
       },
       callerKey: 'client-1',
-      optionRevision: () => 0,
       params: attachParams(CREATE_OPERATION, null, { model: 'gpt-saved', effort: 'medium' }),
       now: () => NOW,
       onAttached: () => {}
@@ -462,7 +495,7 @@ describe('structured session acquisition options', () => {
 
     expect(created).toMatchObject({ ok: true })
     expect(sessionAdapter.readOptions).not.toHaveBeenCalled()
-    expect(store.getRecord(SESSION)?.options).toEqual({ model: 'gpt-reported', effort: 'high' })
+    expect(store.getRecord(SESSION)?.options).toEqual({ model: 'gpt-saved', effort: 'medium' })
     expect(store.getRecord(SESSION)?.lease.claimStatus).toBe('live')
   })
 
@@ -474,11 +507,11 @@ describe('structured session acquisition options', () => {
       readOptions: vi.fn(async () => {
         throw new Error('model list unavailable')
       }),
-      readAcquisitionOptions: vi.fn(() => undefined)
+      open: vi.fn(async () => ({ reportedOptions: {} }))
     }
     const options = { model: 'gpt-saved', effort: 'medium' }
 
-    const created = await performAttach({
+    const created = await performOpenedAttach({
       agents: NO_STRUCTURED_AGENTS,
       logger: createStructuredAgentSessionLogger(),
       store,
@@ -491,7 +524,6 @@ describe('structured session acquisition options', () => {
         probe: { outcome: 'reservation-unused' }
       },
       callerKey: 'client-1',
-      optionRevision: () => 0,
       params: attachParams(CREATE_OPERATION, null, options),
       now: () => NOW,
       onAttached: () => {}
@@ -502,53 +534,8 @@ describe('structured session acquisition options', () => {
     expect(sessionAdapter.readOptions).not.toHaveBeenCalled()
   })
 
-  it('releases an acquisition when provider options cannot be read', async () => {
-    root = await mkdtemp(join(tmpdir(), 'orca-acquisition-options-failure-'))
-    const store = await openTestAgentSessionRecordStore(root)
-    const releaseAcquisition = vi.fn(async () => true)
-    const failingAdapter: StructuredAgentSessionAdapter = {
-      ...adapter({ origin: 'created' }),
-      readOptions: vi.fn(async () => {
-        throw new Error('model list unavailable')
-      }),
-      releaseAcquisition
-    }
-
-    await expect(
-      performAttach({
-        agents: NO_STRUCTURED_AGENTS,
-        logger: createStructuredAgentSessionLogger(),
-        store,
-        adapter: failingAdapter,
-        openConversation: openTestAttachConversation(openTestJournalHostDatabase(root!)),
-        authority: {
-          spawnToken: 'spawn-a',
-          claimKeyId: 'key-1',
-          handoffOperationId: CREATE_OPERATION,
-          probe: { outcome: 'reservation-unused' }
-        },
-        callerKey: 'client-1',
-        optionRevision: () => 0,
-        params: attachParams(CREATE_OPERATION, null),
-        now: () => NOW,
-        onAttached: (attached) => {
-          journals.track(attached.journal)
-        }
-      })
-    ).resolves.toEqual({
-      ok: false,
-      refusal: {
-        code: 'agent_session_operation_invalid',
-        message: "Codex couldn't restart. Send your message to try again."
-      }
-    })
-    expect(releaseAcquisition).toHaveBeenCalledOnce()
-    expect(store.getRecord(SESSION)?.lease.ownerProcess).toBeNull()
-  })
-
   describe.each([
     ['adapter acquire', 'acquire'],
-    ['options read', 'options'],
     ['identity commit', 'identity'],
     ['owner proof', 'proof'],
     ['journal attach', 'journal']
@@ -570,14 +557,13 @@ describe('structured session acquisition options', () => {
       const readOptions = vi.mocked(base.readOptions!)
       if (failurePoint === 'acquire') {
         acquire.mockRejectedValueOnce(injected)
-      } else if (failurePoint === 'options') {
-        readOptions.mockRejectedValueOnce(injected)
       } else if (failurePoint === 'identity') {
         vi.spyOn(store, 'commitProcessIdentity').mockRejectedValueOnce(injected)
       } else if (failurePoint === 'proof') {
         vi.spyOn(store, 'proveOwner').mockRejectedValueOnce(injected)
       } else if (failurePoint === 'journal') {
         acquire.mockImplementation(async ({ fence, spawnToken }) => ({
+          acquisitionGeneration: globalThis.crypto.randomUUID(),
           process: {
             hostId: 'local',
             pid: 4242,
@@ -586,7 +572,7 @@ describe('structured session acquisition options', () => {
           },
           link: {
             linkId: `link-${fence}`,
-            handle: codexProviderHandle('legacy-thread'),
+            handle: codexProviderHandle('019fd532-7c11-7a90-b6de-4e1a2c3d5f60'),
             origin: store.getRecord(SESSION)?.providerHandleChain.length ? 'resumed' : 'created',
             mintedAtFence: fence,
             observedAt: NOW
@@ -626,7 +612,6 @@ describe('structured session acquisition options', () => {
             probe: { outcome: 'reservation-unused' }
           },
           callerKey: 'client-1',
-          optionRevision: () => 0,
           params: attachParams(operationId, fence),
           now: () => NOW,
           onAttached: (attached) => {
@@ -729,7 +714,6 @@ describe('the tab a create reserves', () => {
         probe: { outcome: 'reservation-unused' }
       },
       callerKey: 'client-1',
-      optionRevision: () => 0,
       // Beside the fingerprinted fields, like `options`: which tab shows the chat is not which
       // conversation this attaches to.
       params: {
@@ -757,4 +741,45 @@ describe('the tab a create reserves', () => {
     })
     expect(store.getSessionTabId(SESSION)).toBe('chat-tab-1')
   })
+})
+
+describe('provider open failure after ownership publication', () => {
+  it.each([true, false, 'throws'] as const)(
+    'keeps exit proof authoritative when cleanup returns %s',
+    async (cleanup) => {
+      root = await mkdtemp(join(tmpdir(), 'hive-open-failure-'))
+      const store = await openTestAgentSessionRecordStore(root)
+      const sessionAdapter = adapter({ origin: 'created' })
+      vi.mocked(sessionAdapter.open).mockRejectedValue(new Error('provider options unavailable'))
+      const closeSession = vi.fn(async () => {
+        if (cleanup === 'throws') {
+          throw new Error('cleanup unavailable')
+        }
+        return cleanup
+      })
+      const host = new StructuredAgentSessionHost({
+        agents: NO_STRUCTURED_AGENTS,
+        logger: createStructuredAgentSessionLogger(),
+        store,
+        adapter: { ...sessionAdapter, closeSession },
+        journalDatabase: openTestJournalHostDatabase(root),
+        claimKeyId: 'key-1',
+        mintSpawnToken: () => 'open-failure',
+        now: () => NOW
+      })
+      openedHosts.push(host)
+      expect(
+        await host.attach({ callerKey: 'client-1' }, attachParams(CREATE_OPERATION, null))
+      ).toMatchObject({ ok: true })
+      await vi.waitFor(() => expect(closeSession).toHaveBeenCalled())
+      if (cleanup === true) {
+        await vi.waitFor(() => expect(store.getRecord(SESSION)?.lease.ownerProcess).toBeNull())
+        expect(store.getRecord(SESSION)?.lease.claimStatus).toBe('released')
+      } else {
+        expect(store.getRecord(SESSION)?.lease.ownerProcess).not.toBeNull()
+        expect(sessionAdapter.acquire).toHaveBeenCalledOnce()
+      }
+      expect(sessionAdapter.dispatch).not.toHaveBeenCalled()
+    }
+  )
 })

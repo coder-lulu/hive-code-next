@@ -1,10 +1,4 @@
-import { APP_DISPLAY_NAME } from '../../shared/brand'
-/**
- * What `orca terminal-daemon status` reports about the daemon this server uses. The daemon is
- * respawned lazily, so between a crash and the next terminal there is none; that window must read
- * as `exited`, not as healthy. Vocabulary per the SSH execution boundary: live / unverifiable /
- * exited, and only positive proof earns `exited`.
- */
+/** Only positive death proof earns exited; lazy respawn leaves a gap until the next terminal. */
 import { parseLinuxStartTicks } from '../agent-hooks/managed-hook-owner-identity'
 import { checkDaemonHealthWithCoverage, type DaemonHealthCheck } from './daemon-health'
 import { inspectProcessLiveness, readLinuxStat } from './daemon-process-inspection'
@@ -74,7 +68,7 @@ export async function readTerminalDaemonLiveness(
     ? {
         verdict: 'exited',
         pid,
-        detail: `pid ${record.pid} is gone; ${APP_DISPLAY_NAME} starts a new daemon with the next terminal`,
+        detail: `pid ${record.pid} is gone; Orca starts a new daemon with the next terminal`,
         processCeiling: null
       }
     : {
@@ -96,7 +90,7 @@ export async function inspectDaemonRecordProcess(
     return signal
   }
   const stat = await readStat(record.pid)
-  // Why not exited on a missing stat: the signal just proved the pid live; procfs may hide it.
+  // A signal-live PID may have hidden procfs data; missing stat alone cannot prove death.
   if (stat.status !== 'present') {
     return stat.status === 'missing' ? 'unverifiable' : 'live'
   }

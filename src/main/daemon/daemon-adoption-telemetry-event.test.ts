@@ -28,7 +28,7 @@ vi.mock('node:fs', async (importOriginal) => ({
   existsSync: existsSyncMock,
   readFileSync: readFileSyncMock
 }))
-// The app-side read is async on purpose: it can sit on an unanswered macOS folder prompt.
+// Async directory reads can remain pending on an unanswered macOS folder prompt.
 vi.mock('node:fs/promises', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   opendir: opendirMock
@@ -169,8 +169,6 @@ describe('hasDaemonPtyCwdDenialDiverged', () => {
     expect(opendirMock).toHaveBeenCalledWith(DENIED_CWD)
   })
 
-  // False positives would drown the signal this event exists to measure, so every
-  // non-divergent shape must stay silent — including daemons too old to report.
   it('is false when the daemon could read the cwd or did not report one', async () => {
     expect(await hasDaemonPtyCwdDenialDiverged(DENIED_CWD, true)).toBe(false)
     expect(await hasDaemonPtyCwdDenialDiverged(DENIED_CWD, undefined)).toBe(false)
@@ -335,8 +333,6 @@ describe('reportDaemonPtyCwdVerdict', () => {
     ).resolves.toBeUndefined()
   })
 
-  // The read behind this can sit on an unanswered macOS folder prompt, and a spawn that waited
-  // for it would hold main's event loop for as long as the user leaves the sheet up.
   it('records nothing until the app-side read resolves, and the spawn need not wait', async () => {
     let release: (dir: ReturnType<typeof readableDir>) => void = () => {}
     opendirMock.mockReturnValue(

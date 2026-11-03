@@ -1,42 +1,46 @@
 import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import type { StructuredAgentSessionReadOwner } from './structured-agent-session-read-owner'
 
-const owners = new Map<string, StructuredAgentSessionReadOwner>()
 const snapshotListeners = new Set<() => void>()
-export function notifyStructuredReadSnapshotListeners(): void {
-  for (const listener of snapshotListeners) {
-    listener()
-  }
-}
 export function subscribeStructuredAgentSessionReadSnapshots(listener: () => void): () => void {
   snapshotListeners.add(listener)
   return () => {
     snapshotListeners.delete(listener)
   }
 }
-export function getExistingStructuredAgentSessionReadOwner(
-  sessionId: string,
-  target: RuntimeClientTarget
-): StructuredAgentSessionReadOwner | null {
-  return findStructuredAgentSessionReadOwner(sessionId, target) ?? null
+export function notifyStructuredReadSnapshots(): void {
+  for (const listener of snapshotListeners) {
+    listener()
+  }
 }
-export function structuredReadOwnerKey(sessionId: string, target: RuntimeClientTarget): string {
+const owners = new Map<string, StructuredAgentSessionReadOwner>()
+export function structuredReadOwnerKey(
+  sessionId: string,
+  target: RuntimeClientTarget | null,
+  unroutableHost = ''
+): string {
+  if (!target) {
+    return `unroutable:${unroutableHost}:${sessionId}`
+  }
   return `${target.kind === 'local' ? 'local' : `environment:${target.environmentId}`}:${sessionId}`
 }
 export function findStructuredAgentSessionReadOwner(
   sessionId: string,
-  target: RuntimeClientTarget
+  target: RuntimeClientTarget | null,
+  unroutableHost = ''
 ): StructuredAgentSessionReadOwner | undefined {
-  return owners.get(structuredReadOwnerKey(sessionId, target))
+  return owners.get(structuredReadOwnerKey(sessionId, target, unroutableHost))
 }
 /** A closed chat no longer needs an unmounted create page or an active reader. */
 export function retireStructuredAgentSessionReadOwner(
   sessionId: string,
-  target: RuntimeClientTarget
+  target: RuntimeClientTarget | null,
+  unroutableHost = ''
 ): void {
-  const key = structuredReadOwnerKey(sessionId, target)
+  const key = structuredReadOwnerKey(sessionId, target, unroutableHost)
   const owner = owners.get(key)
   owners.delete(key)
+  notifyStructuredReadSnapshots()
   try {
     owner?.dispose()
   } catch (error) {
@@ -53,6 +57,7 @@ export function getOrCreateStructuredReadOwner(
   }
   const owner = create()
   owners.set(key, owner)
+  notifyStructuredReadSnapshots()
   return owner
 }
 /** A held owner names its key again once its last holders released it, never over a live one. */
@@ -62,6 +67,7 @@ export function adoptStructuredReadOwner(
 ): void {
   if (!owners.has(key)) {
     owners.set(key, owner)
+    notifyStructuredReadSnapshots()
   }
 }
 export function forgetStructuredReadOwner(
@@ -70,7 +76,7 @@ export function forgetStructuredReadOwner(
 ): void {
   if (owners.get(key) === owner) {
     owners.delete(key)
-    notifyStructuredReadSnapshotListeners()
+    notifyStructuredReadSnapshots()
   }
 }
 export function resetStructuredAgentSessionReadOwnersForTests(): void {
@@ -78,5 +84,4 @@ export function resetStructuredAgentSessionReadOwnersForTests(): void {
     owner.dispose()
   }
   owners.clear()
-  notifyStructuredReadSnapshotListeners()
 }

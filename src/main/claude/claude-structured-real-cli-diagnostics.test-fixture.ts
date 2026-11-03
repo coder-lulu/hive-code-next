@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto'
 import * as claudeConnection from './claude-stream-json-connection'
 import { readWindowsProcessCreationTime } from '../windows/windows-process-table'
-import type { ClaudeStructuredSessionAdapterDeps } from './claude-structured-session-state'
-import type { ClaudeStructuredSessionEvent } from './claude-structured-session-adapter'
+import type { ClaudeStructuredSessionAdapterDeps } from './structured/claude-structured-session-state'
+import type { ClaudeStructuredSessionEvent } from './structured/claude-structured-session-state'
 
 export function commandLifecycleIndex(
   events: ClaudeStructuredSessionEvent[],

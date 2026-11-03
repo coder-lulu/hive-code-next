@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../src/i18n/use-mobile-translation'
 import { productNameText } from '@/product-brand'
 import { useState } from 'react'
 import { Linking } from 'react-native'
@@ -19,6 +20,8 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 }
 
 export default function LegalScreen() {
+  const t = useMobileTranslation()
+
   const router = useRouter()
   const params = useLocalSearchParams<{ document?: string | string[] }>()
   const isPrivacy = firstParam(params.document) === 'privacy'
@@ -41,17 +44,20 @@ export default function LegalScreen() {
     <FutureFeatureScreen
       capabilityId={capabilityId}
       title={title}
-      description="法律文档只展示产品配置中的权威来源，不使用示例文字代替正式条款。"
+      description={t(
+        'auto.mobile.app.legal.eea4cde650',
+        'Legal documents use only authoritative sources configured for this product. Sample text does not replace formal terms.'
+      )}
     >
-      <FutureFeatureSection title="文档类型">
+      <FutureFeatureSection title={t('auto.mobile.app.legal.10179e7e21', 'Document type')}>
         <FutureFeatureRow
-          label="服务协议"
+          label={t('auto.mobile.app.legal.8a806d6ade', 'Terms of service')}
           selected={!isPrivacy}
           value={!isPrivacy ? '当前' : undefined}
           onPress={() => router.replace({ pathname: '/legal', params: { document: 'terms' } })}
         />
         <FutureFeatureRow
-          label="隐私政策"
+          label={t('auto.mobile.app.legal.98ca2cece5', 'Privacy policy')}
           selected={isPrivacy}
           value={isPrivacy ? '当前' : undefined}
           onPress={() => router.replace({ pathname: '/legal', params: { document: 'privacy' } })}
@@ -61,19 +67,33 @@ export default function LegalScreen() {
       {documentUrl ? (
         <FutureFeatureAction
           disabled={documentAction.disabled}
-          label={`打开正式${title}`}
+          label={t('auto.mobile.app.legal.a0899e6bd5', 'Open official {{value0}}', {
+            value0: title
+          })}
           loading={opening}
           reason={documentAction.reason}
           onPress={openDocument}
         />
       ) : (
-        <FutureFeatureNotice title={`${title}尚未配置`}>
-          当前没有可验证的正式文档地址。为避免错误或误导，此处不生成正文，也不会跳转到其他页面。
+        <FutureFeatureNotice
+          title={t('auto.mobile.app.legal.4df65a3cea', '{{value0}} is not configured', {
+            value0: title
+          })}
+        >
+          {t(
+            'auto.mobile.app.legal.2730ca6999',
+            'No official document address can be verified. To avoid misleading information, no document text is generated and no other page is opened.'
+          )}
         </FutureFeatureNotice>
       )}
 
       {openFailed ? (
-        <FutureFeatureNotice danger title={`未能打开${title}`}>
+        <FutureFeatureNotice
+          danger
+          title={t('auto.mobile.app.legal.6f98f546bd', 'Could not open {{value0}}', {
+            value0: title
+          })}
+        >
           {productNameText(
             '系统未能验证或打开已配置的正式链接。为确保来源可信，Orca 未跳转到其他地址。'
           )}

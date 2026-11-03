@@ -4,7 +4,6 @@ import type { PreloadApi } from '../api-types'
 export const settingsApi: PreloadApi['settings'] = {
   get: () => ipcRenderer.invoke('settings:get'),
 
-  // Why: blocking read for the few startup decisions (terminal side-effect authority) that can't wait for async hydration. Call sparingly.
   getSync: () => ipcRenderer.sendSync('settings:get-sync'),
 
   set: (args) => ipcRenderer.invoke('settings:set', args),

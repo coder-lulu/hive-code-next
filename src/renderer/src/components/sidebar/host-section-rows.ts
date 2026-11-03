@@ -13,8 +13,8 @@ import type { ExecutionHostHealth } from '../../../../shared/execution-host-regi
 import type { RuntimeCompatVerdict } from '../../../../shared/protocol-compat'
 import type { SshConnectionStatus } from '../../../../shared/ssh-types'
 import type { Repo } from '../../../../shared/repo-types'
-import type { Row } from './worktree-list/grouping/row-types'
-import { getFolderWorkspaceHostId } from './folder-workspace-host-id'
+import type { Row } from '../../../../shared/sidebar-list/row-types'
+import { getFolderWorkspaceHostId } from '../../../../shared/sidebar-list/folder-workspace-host-id'
 
 export type HostHeaderRow = {
   type: 'host-header'

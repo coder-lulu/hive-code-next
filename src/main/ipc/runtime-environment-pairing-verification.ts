@@ -7,11 +7,12 @@ import {
   verifyRemotePairingRuntimeStatus,
   type VerifyAndAddRuntimeEnvironmentResult
 } from '../../shared/remote-pairing-verification'
-import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
-import { sendRemoteRuntimeRequest } from '../../shared/remote-runtime-client'
+import { RemoteRuntimeClientError } from '../../shared/remote-runtime/remote-runtime-client-error'
+import { sendRemoteRuntimeRequest } from '../../shared/remote-runtime/remote-runtime-client'
 import { APP_DISPLAY_NAME, applyProductBranding } from '../../shared/brand'
 import { redactRuntimeEnvironment } from '../../shared/runtime-environments'
 import type { RuntimeStatus } from '../../shared/runtime-types'
+import { pairedRuntimeConnectionFromOffer } from '../../shared/paired-runtime-connection'
 import { ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES } from '../../shared/electron-remote-runtime-client-capabilities'
 
 type VerifyAndAddRuntimeEnvironmentArgs = {
@@ -39,7 +40,7 @@ export async function verifyAndAddRuntimeEnvironmentFromPairingCode(
   let runtimeStatus: RuntimeStatus
   try {
     const response = await sendRemoteRuntimeRequest<RuntimeStatus>(
-      (parsed.value.pairing),
+      pairedRuntimeConnectionFromOffer(parsed.value.pairing),
       'status.get',
       undefined,
       15_000,

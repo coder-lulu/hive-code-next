@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import type { HostedReviewInfo } from '../../../../../shared/hosted-review'
 import type { Worktree } from '../../../../../shared/worktree/types'
 import type { WorktreeSlice } from '@/store/slices/worktree-helpers'
+import { captureWorktreeGitHubLinkBase } from '../../../../../shared/worktree/github-link-base'
 
 type UseUnlinkGitHubPullRequestArgs = {
   activeReview: HostedReviewInfo | null
@@ -27,7 +28,10 @@ export function useUnlinkGitHubPullRequest({
     const result = await updateWorktreeMeta(
       activeWorktreeId,
       { linkedPR: null, suppressedGitHubPR: linkedPR ?? activeReview.number },
-      { executionHostId: activeWorktree.hostId }
+      {
+        executionHostId: activeWorktree.hostId,
+        githubLinkBase: captureWorktreeGitHubLinkBase(activeWorktree)
+      }
     )
     if (!result.ok) {
       toast.error(result.error)

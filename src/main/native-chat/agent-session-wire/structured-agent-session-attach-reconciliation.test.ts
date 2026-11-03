@@ -60,10 +60,19 @@ function adapterWith(providerHistoryWindow?: () => Promise<ProviderHistoryWindow
   dispatch: ReturnType<typeof vi.fn>
 } {
   const dispatch = vi.fn()
-  const adapter = {
+  const adapter: StructuredAgentSessionAdapter = {
+    open: vi.fn(async () => {
+      await providerHistoryWindow?.()
+      return { reportedOptions: {} }
+    }),
+    acquire: vi.fn(async () => {
+      throw new Error('journal adoption must not acquire a provider')
+    }),
     dispatch,
-    ...(providerHistoryWindow ? { providerHistoryWindow } : {})
-  } as unknown as StructuredAgentSessionAdapter
+    cancelTurn: vi.fn(),
+    answerPrompt: vi.fn(),
+    setOption: vi.fn()
+  }
   return { adapter, dispatch }
 }
 
@@ -85,10 +94,10 @@ async function crashedJournal(clientMessageId = 'cm_1', text = 'deploy the thing
 async function attach(adapter: StructuredAgentSessionAdapter) {
   const attached = await attachJournal({
     record: RECORD,
-    params: PARAMS,
-    openConversation: openTestAttachConversation(openTestJournalHostDatabase(root)),
-    adapter
+    openConversation: openTestAttachConversation(openTestJournalHostDatabase(root))
   })
+  expect(adapter.open).not.toHaveBeenCalled()
+  expect(adapter.acquire).not.toHaveBeenCalled()
   journals.track(attached.journal)
   return attached
 }
@@ -177,13 +186,10 @@ describe('attachJournal restart reconciliation', () => {
       fence: RECORD.lease.runtimeFence,
       handoverRecorded: true
     })
-    // History that holds nothing: absence would prove a handed-over message undelivered.
-    const { adapter, dispatch } = adapterWith(async () => window())
+    const { dispatch } = adapterWith()
 
     const attached = await attachJournal({
       record: RECORD,
-      params: PARAMS,
-      adapter,
       openConversation: async () => journal
     })
 

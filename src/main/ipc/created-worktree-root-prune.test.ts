@@ -57,10 +57,8 @@ describe('recovered worktree root pruning', () => {
     invalidateAuthorizedRootsCache()
     __resetCreatedWorktreeRootsForTests()
     vi.mocked(listRepoWorktreeGraph).mockReset()
-    // A valid repository graph omits the recovered row, so the disk probe decides whether it is gone.
-    vi.mocked(listRepoWorktreeGraph).mockResolvedValue([
-      { path: repo.path, head: 'abc', branch: 'main', isBare: false, isMainWorktree: true }
-    ])
+    // Git failures soften to empty listings; the probe must preserve independently recovered roots (#16520).
+    vi.mocked(listRepoWorktreeGraph).mockResolvedValue([])
     statMock.mockReset()
     statMock.mockResolvedValue({})
   })
@@ -79,21 +77,8 @@ describe('recovered worktree root pruning', () => {
     await expect(resolveRegisteredWorktreePath(RECOVERED, store)).rejects.toThrow('Access denied')
   })
 
-  it('keeps a recovered root without probing when the repository graph is unavailable', async () => {
-    const store = makeStore()
-    registerCreatedWorktreeRoot(store, repo.id, RECOVERED)
-    vi.mocked(listRepoWorktreeGraph).mockResolvedValue([])
-    statMock.mockRejectedValue(statError('ENOENT'))
-
-    await rebuildAuthorizedRootsCache(store)
-
-    await expect(resolveRegisteredWorktreePath(RECOVERED, store)).resolves.toBe(RECOVERED)
-    expect(statMock).not.toHaveBeenCalled()
-  })
-
   it('keeps a recovered root when the probe fails for any reason but ENOENT', async () => {
-    // A transient EACCES/EIO is not evidence of removal, and revoking on it would deny a worktree
-    // the user is working in.
+    // Transient permission/I/O errors do not prove removal.
     for (const code of ['EACCES', 'EIO', 'EPERM']) {
       __resetCreatedWorktreeRootsForTests()
       const store = makeStore()
@@ -107,7 +92,7 @@ describe('recovered worktree root pruning', () => {
   })
 
   it('finishes the rebuild and keeps the root when the probe never settles', async () => {
-    // A dead mount pins the syscall; the rebuild gates filesystem auth, so it must not wait on it.
+    // Authorization rebuilds must not wait on a dead mount's stat.
     vi.useFakeTimers()
     const store = makeStore()
     registerCreatedWorktreeRoot(store, repo.id, RECOVERED)

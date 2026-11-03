@@ -156,7 +156,7 @@ export function scrollSubsectionIntoView(targetId: string, container?: HTMLEleme
 }
 
 export function readSourceControlAiSettings(settings: GlobalSettings): SourceControlAiSettings {
-  return normalizeSourceControlAiSettings(settings.sourceControlAi, settings.commitMessageAi)
+  return normalizeSourceControlAiSettings(settings.sourceControlAi)
 }
 
 export function cancelPendingSettingsSubsectionScrollFrame(

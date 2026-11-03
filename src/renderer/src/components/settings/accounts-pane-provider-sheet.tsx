@@ -1,3 +1,10 @@
+import { CodexLoginLinkNotice } from './CodexLoginLinkNotice'
+import {
+  addClaudeAccountOnHost,
+  addCodexAccountOnHost
+} from '@/runtime/runtime-host-account-sign-in-client'
+import { HostAccountSignInPrompt } from './HostAccountSignInPrompt'
+import { trackAccountAddition, cancelAccountAddition } from './account-add-cancel-target'
 import { AlertTriangle, Loader2, Plus, Terminal, X } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import {
@@ -15,7 +22,7 @@ import {
 } from './claude-sign-in-link-menu'
 import { getCodexSystemDefaultSubtitle } from './accounts-pane-runtime'
 import type { AccountsPaneSectionModel } from './accounts-pane-types'
-import { ClaudeAccountsSheetList } from './accounts-pane-claude-section'
+import { ClaudeAccountsSheetList } from './accounts-pane-claude-sheet-list'
 import { CodexAccountsSheetList } from './accounts-pane-codex-account-row'
 
 export type ProviderAccountSheetKind = 'claude' | 'codex'
@@ -102,7 +109,6 @@ export function AccountsProviderSheet({
   const action = isCodex ? model.codexAction : model.claudeAction
   const adding = action === 'adding'
   const addDisabled =
-    model.isRemoteAccountScope ||
     (isCodex ? model.codexAccountsLoadState : model.claudeAccountsLoadState) !== 'loaded' ||
     action !== 'idle' ||
     model.wslCapabilitiesLoading ||
@@ -117,10 +123,20 @@ export function AccountsProviderSheet({
       wslDistro: model.accountRuntime.wslDistro
     }
     if (isCodex) {
-      void model.runCodexAccountAction('adding', () => window.api.codexAccounts.add(input))
+      void model.runCodexAccountAction('adding', () =>
+        trackAccountAddition('codex', model.accountOwner, () =>
+          model.accountOwner.kind === 'environment'
+            ? addCodexAccountOnHost(model.accountOwner)
+            : window.api.codexAccounts.add(input)
+        )
+      )
     } else {
       void model.runClaudeAccountAction('adding', () =>
-        withCopiedClaudeLink(copyLink, window.api.claudeAccounts.add({ ...input, copyLink }))
+        trackAccountAddition('claude', model.accountOwner, () =>
+          model.accountOwner.kind === 'environment'
+            ? addClaudeAccountOnHost(model.accountOwner)
+            : withCopiedClaudeLink(copyLink, window.api.claudeAccounts.add({ ...input, copyLink }))
+        )
       )
     }
   }
@@ -175,7 +191,11 @@ export function AccountsProviderSheet({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => void window.api.claudeAccounts.cancelPendingLogin()}
+                onClick={() =>
+                  void cancelAccountAddition('claude', () =>
+                    window.api.claudeAccounts.cancelPendingLogin()
+                  )
+                }
               >
                 <X className="size-4" />
                 {translate('auto.components.settings.AccountsPane.dbb9626ed1', 'Cancel')}
@@ -190,7 +210,9 @@ export function AccountsProviderSheet({
                   )}
                   {translate('auto.components.settings.AccountsPane.b0e948a4f9', 'Add Account')}
                 </Button>
-                {!isCodex && canOfferClaudeSignInLink(model.accountRuntime.runtime) ? (
+                {!isCodex &&
+                !model.isRemoteAccountScope &&
+                canOfferClaudeSignInLink(model.accountRuntime.runtime) ? (
                   <ClaudeSignInLinkMenu
                     variant="outline"
                     disabled={addDisabled}
@@ -200,6 +222,13 @@ export function AccountsProviderSheet({
               </div>
             )}
           </div>
+          {model.isRemoteAccountScope ? (
+            <HostAccountSignInPrompt
+              owner={model.accountOwner}
+              provider={kind}
+              hostLabel={model.accountRuntimeSentenceLabel}
+            />
+          ) : null}
           {model.isRemoteAccountScope ? (
             <div className="mt-4">{model.remoteAccountScopeNotice}</div>
           ) : null}
@@ -213,6 +242,7 @@ export function AccountsProviderSheet({
             </div>
           ) : null}
           <div className="mt-4">
+            {isCodex && open && !model.isRemoteAccountScope ? <CodexLoginLinkNotice /> : null}
             <SystemAccountRow kind={kind} model={model} />
           </div>
           <div className="mt-8 flex items-center gap-2">

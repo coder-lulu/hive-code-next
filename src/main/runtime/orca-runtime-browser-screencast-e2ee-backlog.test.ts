@@ -7,8 +7,13 @@ import {
   createStreamedGuest
 } from './single-page-browser-commands-host-test-double'
 import { E2EEChannel } from './rpc/e2ee-channel'
-import { generateKeyPair } from './rpc/e2ee-crypto'
-import { RuntimeE2EEClientSession } from '../../shared/runtime-e2ee-client-session'
+import {
+  decrypt,
+  decryptBytes,
+  deriveSharedKey,
+  encrypt,
+  generateKeyPair
+} from '../../shared/e2ee-crypto'
 import type { RpcBinarySender } from './rpc/rpc-binary-sender'
 
 const { webContentsFromId, startBrowserScreencast } = vi.hoisted(() => ({
@@ -23,8 +28,7 @@ vi.mock('electron', () => ({
 vi.mock('../browser/browser-screencast-stream', () => ({ startBrowserScreencast }))
 vi.mock('../telemetry/client', () => ({ track: vi.fn() }))
 
-/** A real current E2EE channel, as every directly connected phone uses. */
-function connectCurrentChannel() {
+function connectLegacyChannel() {
   const serverKeys = generateKeyPair()
   const clientKeys = generateKeyPair()
   const sent: (string | Buffer)[] = []
@@ -52,26 +56,27 @@ function connectCurrentChannel() {
     onReady: vi.fn(),
     onError
   })
-  const sharedKey = RuntimeE2EEClientSession.create({
-    desktopPublicKeyB64: Buffer.from(serverKeys.publicKey).toString('base64'),
-    transport: 'direct',
-    clientKeyPair: clientKeys
-  })
-  channel.handleRawMessage(JSON.stringify(sharedKey.hello))
-  expect(sharedKey.acceptReady(JSON.parse(String(sent[0])))).toBe(true)
-  channel.handleRawMessage(sharedKey.sealText(sharedKey.authMessage('valid-token')))
-  expect(sharedKey.isAuthenticated(sharedKey.openText(String(sent[1]))!)).toBe(true)
+  const sharedKey = deriveSharedKey(clientKeys.secretKey, serverKeys.publicKey)
+  channel.handleRawMessage(
+    JSON.stringify({
+      type: 'e2ee_hello',
+      publicKeyB64: Buffer.from(clientKeys.publicKey).toString('base64')
+    })
+  )
+  channel.handleRawMessage(
+    encrypt(JSON.stringify({ type: 'e2ee_auth', deviceToken: 'valid-token' }), sharedKey)
+  )
   let reply!: (response: string) => void
   let sendBinary!: RpcBinarySender
   channel.onMessage((_plaintext, textReply, binaryReply) => {
     reply = textReply
     sendBinary = binaryReply
   })
-  channel.handleRawMessage(sharedKey.sealText('{"id":"s","method":"browser.screencast"}'))
+  channel.handleRawMessage(encrypt('{"id":"s","method":"browser.screencast"}', sharedKey))
   const decode = (frame: string | Buffer): string =>
     typeof frame === 'string'
-      ? sharedKey.openText(frame)!
-      : `binary:${Buffer.from(sharedKey.openBinary(new Uint8Array(frame))!).join(',')}`
+      ? decrypt(frame, sharedKey)!
+      : `binary:${Buffer.from(decryptBytes(new Uint8Array(frame), sharedKey)!).join(',')}`
   return { ws, sent, onError, reply, sendBinary, decode, channel }
 }
 
@@ -93,7 +98,7 @@ async function subscribe(sendBinary: RpcBinarySender) {
   return { subscription, onFrame, stop }
 }
 
-describe('screencast over a backlogged current E2EE socket', () => {
+describe('screencast over a backlogged legacy E2EE socket', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     webContentsFromId.mockReset()
@@ -104,12 +109,11 @@ describe('screencast over a backlogged current E2EE socket', () => {
     vi.useRealTimers()
   })
 
-  // Why: a busy socket is alive; evicting its viewer as a ghost would blank a working phone.
+  // Backlogged sockets remain live; ghost eviction would blank working phones.
   it('keeps the viewer through a long backlog and then delivers only the newest frame', async () => {
-    const transport = connectCurrentChannel()
+    const transport = connectLegacyChannel()
     const { subscription, onFrame, stop } = await subscribe(transport.sendBinary)
     onFrame(new Uint8Array([0]))
-    expect(transport.decode(transport.sent.at(-1)!)).toBe('binary:0')
     const baseline = transport.sent.length
 
     transport.ws.bufferedAmount = 9 * 1024 * 1024

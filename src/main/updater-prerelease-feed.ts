@@ -4,6 +4,7 @@ import { cancelUnreadResponseBody } from './lib/unread-response-body'
 import { fetchWithProductUpdaterSession } from './product/product-updater-session'
 import { fetchReleaseResourceWithApprovedRedirects } from './updater-approved-redirects'
 import { compareVersions, isValidVersion } from './updater-fallback'
+import { probeLatestStableReleaseTag } from './updater-latest-stable-feed'
 import { readResponseTextWithLimit } from './updater-response-body'
 
 const FETCH_TIMEOUT_MS = 5000
@@ -28,7 +29,7 @@ function getPlatformManifestName(): string {
     return 'latest-mac.yml'
   }
   if (process.platform === 'linux') {
-    return 'latest-linux.yml'
+    return process.arch === 'x64' ? 'latest-linux.yml' : `latest-linux-${process.arch}.yml`
   }
   return 'latest.yml'
 }
@@ -53,7 +54,13 @@ type ReleaseFeedTag = {
 }
 
 export function isPerfPrereleaseTag(tag: string): boolean {
-  return /^v\d+\.\d+\.\d+-rc\.\d+\.perf$/.test(tag)
+  return /^\d+\.\d+\.\d+-rc\.\d+\.perf(?:\+[0-9A-Za-z-.]+)?$/.test(normalizeTagToVersion(tag))
+}
+
+export function fetchLatestStableReleaseTag(): Promise<string | null> {
+  return probeLatestStableReleaseTag(
+    async (tag) => (await getPlatformManifestReadiness(tag)) === 'ready'
+  )
 }
 
 function isCanonicalStableTag(tag: string): boolean {

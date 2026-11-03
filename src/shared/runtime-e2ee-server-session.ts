@@ -9,7 +9,7 @@ import {
 import { openMobileE2EEV2Frame, sealMobileE2EEV2Frame } from './mobile-e2ee-v2-framing'
 import { deriveSharedKey } from './e2ee-crypto'
 import { deriveMobileE2EEV2KeySchedule } from './runtime-e2ee-key-schedule'
-import { REMOTE_RUNTIME_MAX_OUTBOUND_JSON_BYTES } from './remote-runtime-memory-limits'
+import { REMOTE_RUNTIME_MAX_OUTBOUND_JSON_BYTES } from './remote-runtime/remote-runtime-memory-limits'
 
 const MOBILE_E2EE_V2_FRAME_OVERHEAD_BYTES = 82
 export const MAX_MOBILE_E2EE_V2_TEXT_FRAME_BASE64_CHARACTERS =

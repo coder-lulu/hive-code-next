@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   canClickBlockedCreateReviewReason,
-  resolveBlockedCreateReviewNoticeMessage,
-  resolveUnavailableCreateReviewLookupNoticeMessage
+  resolveBlockedCreateReviewNoticeMessage
 } from './source-control-create-review-blocked-action'
 import type { HostedReviewCreationEligibility } from '../../../../shared/hosted-review'
-import { APP_DISPLAY_NAME } from '@/product-brand'
 
 function eligibility(
   overrides: Partial<HostedReviewCreationEligibility> = {}
@@ -54,7 +52,7 @@ describe('source-control-create-review-blocked-action', () => {
         })
       )
     ).toBe(
-      'Create MR failed: GitLab is not authenticated. Next step: Run glab auth login in this environment.'
+      'Create MR failed: GitLab is not authenticated. Next step: run glab auth login in this environment.'
     )
   })
 
@@ -87,14 +85,11 @@ describe('source-control-create-review-blocked-action', () => {
         })
       )
     ).toBe(
-      'Create MR failed: GitLab is not authenticated. Next step: Run glab auth login in this environment.'
+      'Create MR failed: GitLab is not authenticated. Next step: run glab auth login in this environment.'
     )
   })
 
   it('reports unavailable review lookup authority when no local blocker is known', () => {
-    expect(resolveUnavailableCreateReviewLookupNoticeMessage('gitlab')).toBe(
-      `Create MR failed: ${APP_DISPLAY_NAME} could not confirm whether this branch already has a merge request. Retry once the GitLab lookup succeeds.`
-    )
     expect(
       resolveBlockedCreateReviewNoticeMessage(
         eligibility({
@@ -105,7 +100,7 @@ describe('source-control-create-review-blocked-action', () => {
         })
       )
     ).toBe(
-      `Create MR failed: ${APP_DISPLAY_NAME} could not confirm whether this branch already has a merge request. Retry once the GitLab lookup succeeds.`
+      'Create MR failed: Orca could not confirm whether this branch already has a merge request. Retry once the GitLab lookup succeeds.'
     )
   })
 

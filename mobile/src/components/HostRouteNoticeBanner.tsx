@@ -1,21 +1,12 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { Info, X } from 'lucide-react-native'
-import type { MobileTheme } from '../theme/mobile-theme'
-import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { Pressable, Text, View } from 'react-native'
+import { X } from 'lucide-react-native'
+import { colors, spacing } from '../theme/mobile-theme'
+import { themedStyleSheet } from '../theme/themed-styles'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 
-/**
- * One dismissible line above the list, in two tones.
- *
- * `notice` is the default and stays monochrome: the host is healthy and the user's target simply
- * went away. `failure` is for an action that did not happen, which the list has to say without
- * taking the screen: color is for state, so it is one red rule and nothing else.
- *
- * Both are inserted into a screen that is already on screen, so a reader who has moved past the top
- * of the list never arrives at one. The tone decides how loudly it is carried to them: a refusal
- * interrupts, and a bounced route waits its turn, because interrupting for the second would train
- * people to ignore the first. `alert` only for the refusal, and no role for the other — React
- * Native has no `status` role, so the polite region is the whole of that answer.
- */
+// Monochrome notice reports vanished target; failure uses one red rule for action refusal without taking screen.
+// Announce inserted banners: failure uses alert/assertive, notice uses polite live region (RN has no status role).
 export function HostRouteNoticeBanner({
   message,
   tone = 'notice',
@@ -25,67 +16,40 @@ export function HostRouteNoticeBanner({
   tone?: 'notice' | 'failure'
   onDismiss: () => void
 }) {
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createStyles)
-
+  useMobileColorScheme()
+  const t = useMobileTranslation()
   return (
     <View
       style={[styles.banner, tone === 'failure' && styles.failure]}
       accessibilityRole={tone === 'failure' ? 'alert' : undefined}
       accessibilityLiveRegion={tone === 'failure' ? 'assertive' : 'polite'}
     >
-      <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        <Info
-          color={tone === 'failure' ? theme.color.status.dangerText : theme.color.text.secondary}
-          size={20}
-          strokeWidth={2}
-        />
-      </View>
-      <Text maxFontSizeMultiplier={1.3} style={styles.text}>
-        {message}
-      </Text>
+      <Text style={styles.text}>{message}</Text>
       <Pressable
         onPress={onDismiss}
         accessibilityRole="button"
-        accessibilityLabel="Dismiss notice"
-        hitSlop={theme.spacing.space8}
-        style={({ pressed }) => [styles.dismiss, pressed && styles.pressed]}
+        accessibilityLabel={t('components.hostRouteNoticeBanner.dismissNotice', 'Dismiss notice')}
+        hitSlop={spacing.sm}
+        style={styles.dismiss}
       >
-        <X size={20} color={theme.color.text.secondary} strokeWidth={2} />
+        <X size={16} color={colors.textMuted} />
       </Pressable>
     </View>
   )
 }
 
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    banner: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.space12,
-      minHeight: theme.size.groupedListRowMinHeight,
-      paddingLeft: theme.spacing.space20,
-      paddingRight: theme.spacing.space8,
-      paddingVertical: theme.spacing.space8,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.color.border.subtle,
-      backgroundColor: theme.color.bg.surface
-    },
-    failure: {
-      borderBottomColor: theme.color.status.danger
-    },
-    text: {
-      ...theme.typography.meta,
-      flex: 1,
-      color: theme.color.text.secondary
-    },
-    dismiss: {
-      width: theme.size.minimumTouchTarget,
-      height: theme.size.minimumTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: theme.radii.control
-    },
-    pressed: { backgroundColor: theme.color.bg.subtle }
-  })
-}
+const styles = themedStyleSheet(() => ({
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.bgPanel,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSubtle
+  },
+  failure: { borderBottomColor: colors.statusRed },
+  text: { flex: 1, color: colors.textSecondary, fontSize: 13 },
+  dismiss: { padding: spacing.xs }
+}))

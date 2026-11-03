@@ -83,6 +83,7 @@ async function firstAnswerAndReplay(thrown: AgentSessionPreSpawnError) {
     throw new Error('not reached before a spawn')
   }
   const adapter: StructuredAgentSessionAdapter = {
+    open: unused,
     acquire: async () => {
       throw thrown
     },

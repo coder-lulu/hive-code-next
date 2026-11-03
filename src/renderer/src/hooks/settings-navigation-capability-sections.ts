@@ -73,7 +73,7 @@ export function buildCapabilitySettingsSections({
       ),
       icon: Network,
       searchEntries: [
-        ...getOrchestrationPaneSearchEntries({ includeNestedWorkerDepth: !isWebClient }),
+        ...getOrchestrationPaneSearchEntries({ includeLocalRuntimeSettings: !isWebClient }),
         ...(showDesktopOnlySettings ? getComputerUsePaneSearchEntries() : [])
       ],
       group: 'capabilities'

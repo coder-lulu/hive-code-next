@@ -8,8 +8,7 @@ export type PreflightIssue = {
   description: string
   fixLabel: string
   fixUrl: string
-  /** Git is a hard global dependency and stays pinned; provider-specific CLI
-   *  setup is a soft nudge the user can dismiss. */
+  /** Git is required globally; provider CLI setup nudges remain dismissible. */
   dismissible?: boolean
 }
 
@@ -41,13 +40,12 @@ export function getLandingPreflightIssues(
         'auto.components.Landing.b673e7cf1b',
         'Git is required for Git projects, source control, and workspace management.'
       ),
-      fixLabel: translate('components.desktopHome.preflight.installGit', 'Install Git'),
+      fixLabel: translate('auto.components.Landing.installGit', 'Install Git'),
       fixUrl: 'https://git-scm.com/downloads'
     })
   }
 
-  // Why: gh only powers GitHub PRs/issues/checks; GitLab-only projects should
-  // not see GitHub setup pressure on the landing screen.
+  // Only nudge GitHub CLI setup when a GitHub-backed project can use it.
   if (!options.hasGitHubBackedProject) {
     return issues
   }
@@ -60,10 +58,7 @@ export function getLandingPreflightIssues(
         'auto.components.Landing.73e1ad4282',
         'Orca uses the GitHub CLI (gh) to show pull requests, issues, and checks.'
       ),
-      fixLabel: translate(
-        'components.desktopHome.preflight.installGitHubCli',
-        'Install GitHub CLI'
-      ),
+      fixLabel: translate('auto.components.Landing.installGitHubCli', 'Install GitHub CLI'),
       fixUrl: 'https://cli.github.com',
       dismissible: true
     })
@@ -75,7 +70,7 @@ export function getLandingPreflightIssues(
         'auto.components.Landing.00cee697c1',
         'Run "gh auth login" in a terminal to connect your GitHub account.'
       ),
-      fixLabel: translate('components.desktopHome.preflight.learnMore', 'Learn more'),
+      fixLabel: translate('auto.components.Landing.learnMore', 'Learn more'),
       fixUrl: 'https://cli.github.com/manual/gh_auth_login',
       dismissible: true
     })

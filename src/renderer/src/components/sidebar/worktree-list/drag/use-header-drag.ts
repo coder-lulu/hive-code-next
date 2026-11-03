@@ -6,8 +6,11 @@ import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import type { ProjectOrderBy } from '../../../../../../shared/ui-chrome-types'
 import type { Repo } from '../../../../../../shared/repo-types'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
-import type { HostHeaderRow, HostSectionRow } from '../../host-section-rows'
-import type { Row, WorktreeGroupBy } from '../grouping/row-types'
+import type {
+  HostHeaderRow,
+  HostSectionRow
+} from '../../../../../../shared/sidebar-list/host-section-rows'
+import type { Row, WorktreeGroupBy } from '../../../../../../shared/sidebar-list/row-types'
 import type { RenderRow } from '../listing/render-row'
 import {
   getProjectGroupHeaderSectionEndByGroupId,
@@ -19,7 +22,8 @@ import { getSidebarOrderedRepoHeaderIdsByBucket } from '../../project-header-dro
 import { useProjectGroupHeaderDrag } from '../../project-group-header-drag'
 import { getSidebarOrderedProjectGroupHeaderIdsByBucket } from '../../project-group-header-drop'
 import { USER_SCROLL_MEASUREMENT_ADJUSTMENT_SUPPRESS_MS } from '../viewport/use-scroll-suppression'
-import { useProjectTree } from '../../project-tree-context'
+
+const readLiveRepos = (): readonly Repo[] => useAppStore.getState().repos
 
 export type WorktreeSidebarHeaderDrag = ReturnType<typeof useWorktreeSidebarHeaderDrag>
 
@@ -43,8 +47,6 @@ function bucketById(byBucket: ReadonlyMap<string, readonly string[]>): Map<strin
   return map
 }
 
-// Reordering the three header tiers (host card, project group, project) plus the bucket
-// bookkeeping their drag controllers and DOM attributes need.
 export function useWorktreeSidebarHeaderDrag(args: {
   rows: HostSectionRow[]
   renderRows: readonly RenderRow[]
@@ -60,7 +62,6 @@ export function useWorktreeSidebarHeaderDrag(args: {
   suppressMeasurementAdjustmentUntilRef: React.MutableRefObject<number>
   directScrollInputUntilRef: React.MutableRefObject<number>
 }) {
-  const projectTree = useProjectTree()
   const {
     rows,
     renderRows,
@@ -97,7 +98,7 @@ export function useWorktreeSidebarHeaderDrag(args: {
     return byGroupId
   }, [projectGroups])
 
-  // Why: reorder keeps scrollTop stable; flag direct scroll input so anchor-restore won't chase the moved row (jumpy drop).
+  // Suppress anchor correction after manual header moves so it cannot chase the reordered row.
   const suppressScrollCorrectionForHeaderCommit = useCallback(() => {
     const suppressUntil = window.performance.now() + USER_SCROLL_MEASUREMENT_ADJUSTMENT_SUPPRESS_MS
     suppressMeasurementAdjustmentUntilRef.current = suppressUntil
@@ -159,13 +160,8 @@ export function useWorktreeSidebarHeaderDrag(args: {
     [sidebarProjectGroupHeaderIdsByBucket]
   )
   const commitProjectGroupOrder = useCallback(
-    (
-      repoId: string,
-      projectGroupId: string | null,
-      order: number,
-      sourceExecutionHostId: ExecutionHostId
-    ) => {
-      void moveProjectToGroup(repoId, projectGroupId, order, sourceExecutionHostId)
+    (project: Repo, projectGroupId: string | null, order: number) => {
+      void moveProjectToGroup(project, projectGroupId, order)
     },
     [moveProjectToGroup]
   )
@@ -186,9 +182,8 @@ export function useWorktreeSidebarHeaderDrag(args: {
     orderedRepoIds: allRepoIds,
     sidebarRepoHeaderIdsByBucket,
     repoById: repoMap,
+    getLiveRepos: readLiveRepos,
     usesProjectGroupOrdering: hasProjectGroups,
-    canMoveAcrossProjectGroups: hasProjectGroups,
-    projectGroupHostIdByGroupId: projectGroupOwnerHostIdByGroupId,
     onCommitRepoOrder: commitRepoReorder,
     onCommitProjectGroupOrder: commitProjectGroupOrder,
     getScrollContainer: () => scrollRef.current
@@ -204,30 +199,21 @@ export function useWorktreeSidebarHeaderDrag(args: {
       getRepoHeaderSectionEndByRepoId({
         rows: renderRows,
         firstHeaderIndex,
-        projectTree,
         sidebarRepoHeaderIdsByBucket,
         repoHeaderBucketByRepoId
       }),
-    [
-      firstHeaderIndex,
-      projectTree,
-      renderRows,
-      repoHeaderBucketByRepoId,
-      sidebarRepoHeaderIdsByBucket
-    ]
+    [firstHeaderIndex, renderRows, repoHeaderBucketByRepoId, sidebarRepoHeaderIdsByBucket]
   )
   const projectGroupHeaderSectionEndByGroupId = useMemo(
     () =>
       getProjectGroupHeaderSectionEndByGroupId({
         rows: renderRows,
         firstHeaderIndex,
-        projectTree,
         sidebarProjectGroupHeaderIdsByBucket,
         projectGroupHeaderBucketByGroupId
       }),
     [
       firstHeaderIndex,
-      projectTree,
       projectGroupHeaderBucketByGroupId,
       renderRows,
       sidebarProjectGroupHeaderIdsByBucket
@@ -236,7 +222,6 @@ export function useWorktreeSidebarHeaderDrag(args: {
 
   return {
     canReorderRepoHeaders,
-    canMoveRepoHeadersAcrossGroups: canReorderRepoHeaders && hasProjectGroups,
     canReorderProjectGroupHeaders,
     orderedHostIds,
     hostDrag,

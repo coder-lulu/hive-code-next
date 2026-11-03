@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as SystemTrayModule from './system-tray'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 const {
   attentionImage,
@@ -90,11 +91,11 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('../../../resources/tray/hivecode-menu-barTemplate.png?asset&asarUnpack', () => ({
-  default: '/assets/hivecode-menu-barTemplate.png'
+  default: '/assets/orca-menu-barTemplate.png'
 }))
 
 vi.mock('../../../resources/tray/hivecode-menu-barTemplate@2x.png?asset&asarUnpack', () => ({
-  default: '/assets/hivecode-menu-barTemplate@2x.png'
+  default: '/assets/orca-menu-barTemplate@2x.png'
 }))
 
 vi.mock('../app-icon', () => ({
@@ -142,8 +143,7 @@ function builtMenuItems(): MenuItem[] {
   return menuFromTemplateMock.mock.calls.at(-1)?.[0] as MenuItem[]
 }
 
-// Why: tray image/tooltip writes are deferred off the caller's stack to keep the
-// NSStatusItem scene update out of AppKit's dispatch; run the pending turn.
+// Flush the deferred native scene mutation after the AppKit caller stack returns.
 function flushTraySceneMutation(): void {
   vi.advanceTimersByTime(0)
 }
@@ -201,8 +201,12 @@ describe('createSystemTray', () => {
 
     expect(trayInstances).toHaveLength(1)
     expect(trayInstances[0].image).toBe(resizedImage)
-    expect(trayInstances[0].setToolTip).toHaveBeenCalledWith('HiveCode')
-    expect(builtMenuItems().map((item) => item.label)).toEqual(['Open HiveCode', undefined, 'Quit'])
+    expect(trayInstances[0].setToolTip).toHaveBeenCalledWith(APP_DISPLAY_NAME)
+    expect(builtMenuItems().map((item) => item.label)).toEqual([
+      `Open ${APP_DISPLAY_NAME}`,
+      undefined,
+      'Quit'
+    ])
     const clickHandler = trayInstances[0].on.mock.calls.find((call) => call[0] === 'click')?.[1]
     expect(clickHandler).toBeTypeOf('function')
 
@@ -228,7 +232,7 @@ describe('createSystemTray', () => {
       dataURL: 'data:image/png;base64,mac-retina'
     })
     expect(builtMenuItems().map((item) => item.label)).toEqual([
-      'Open HiveCode',
+      `Open ${APP_DISPLAY_NAME}`,
       undefined,
       'Settings',
       'Check for Updates...',
@@ -239,7 +243,7 @@ describe('createSystemTray', () => {
     expect(nativeThemeMock.on).toHaveBeenCalledWith('updated', expect.any(Function))
 
     for (const [label, callback] of [
-      ['Open HiveCode', options.onOpen],
+      [`Open ${APP_DISPLAY_NAME}`, options.onOpen],
       ['Settings', options.onOpenSettings],
       ['Check for Updates...', options.onCheckForUpdates],
       ['Quit', options.onQuit]
@@ -250,6 +254,34 @@ describe('createSystemTray', () => {
       expect(callback).toHaveBeenCalledOnce()
     }
   })
+
+  it.each(['win32', 'darwin'] as const)(
+    'offers Quit Completely directly above Quit on %s when a handler is supplied',
+    async (platform) => {
+      setPlatform(platform)
+      const { createSystemTray } = await loadModule()
+      const options = { ...createOptions(), onQuitAndStopAllSessions: vi.fn() }
+
+      createSystemTray(options)
+
+      expect(builtMenuItems().map((item) => item.label)).toEqual(
+        platform === 'darwin'
+          ? [
+              `Open ${APP_DISPLAY_NAME}`,
+              undefined,
+              'Settings',
+              'Check for Updates...',
+              undefined,
+              'Quit Completely...',
+              'Quit'
+            ]
+          : [`Open ${APP_DISPLAY_NAME}`, undefined, 'Quit Completely...', 'Quit']
+      )
+      builtMenuItems().at(-2)?.click?.()
+      expect(options.onQuitAndStopAllSessions).toHaveBeenCalledOnce()
+      expect(options.onQuit).not.toHaveBeenCalled()
+    }
+  )
 
   it('does not create a blank macOS item when the template asset fails to load', async () => {
     setPlatform('darwin')
@@ -291,9 +323,9 @@ describe('dev instance indicator', () => {
     expect(devBadgeImage.setTemplateImage).toHaveBeenCalledWith(true)
     expect(trayInstances[0].image).toBe(devBadgeImage)
     expect(trayInstances[0].setTitle).not.toHaveBeenCalled()
-    expect(trayInstances[0].setToolTip).toHaveBeenCalledWith('HiveCode DEV (my-branch)')
+    expect(trayInstances[0].setToolTip).toHaveBeenCalledWith(`${APP_DISPLAY_NAME} DEV (my-branch)`)
     expect(builtMenuItems()[0]).toMatchObject({
-      label: 'HiveCode DEV (my-branch)',
+      label: `${APP_DISPLAY_NAME} DEV (my-branch)`,
       enabled: false
     })
   })
@@ -331,8 +363,8 @@ describe('dev instance indicator', () => {
 
     createSystemTray(createOptions({ isDevInstance: true }))
 
-    expect(trayInstances[0].setToolTip).toHaveBeenCalledWith('HiveCode DEV')
-    expect(builtMenuItems()[0]).toMatchObject({ label: 'HiveCode DEV', enabled: false })
+    expect(trayInstances[0].setToolTip).toHaveBeenCalledWith(`${APP_DISPLAY_NAME} DEV`)
+    expect(builtMenuItems()[0]).toMatchObject({ label: `${APP_DISPLAY_NAME} DEV`, enabled: false })
   })
 
   it('keeps the DEV marker in the tooltip across the attention toggle', async () => {
@@ -344,10 +376,12 @@ describe('dev instance indicator', () => {
 
     setTrayAttention(true)
     flushTraySceneMutation()
-    expect(created.setToolTip).toHaveBeenCalledWith('HiveCode DEV (my-branch) - activity waiting')
+    expect(created.setToolTip).toHaveBeenCalledWith(
+      `${APP_DISPLAY_NAME} DEV (my-branch) - activity waiting`
+    )
     setTrayAttention(false)
     flushTraySceneMutation()
-    expect(created.setToolTip).toHaveBeenLastCalledWith('HiveCode DEV (my-branch)')
+    expect(created.setToolTip).toHaveBeenLastCalledWith(`${APP_DISPLAY_NAME} DEV (my-branch)`)
   })
 
   it('marks the Windows tooltip without badging the icon', async () => {
@@ -356,9 +390,12 @@ describe('dev instance indicator', () => {
 
     createSystemTray(createOptions({ isDevInstance: true, devInstanceLabel: 'my-branch' }))
 
-    expect(trayInstances[0].setToolTip).toHaveBeenCalledWith('HiveCode DEV (my-branch)')
+    expect(trayInstances[0].setToolTip).toHaveBeenCalledWith(`${APP_DISPLAY_NAME} DEV (my-branch)`)
     expect(stampDevBadgeMock).not.toHaveBeenCalled()
-    expect(builtMenuItems()[0]).toMatchObject({ label: 'HiveCode DEV (my-branch)', enabled: false })
+    expect(builtMenuItems()[0]).toMatchObject({
+      label: `${APP_DISPLAY_NAME} DEV (my-branch)`,
+      enabled: false
+    })
   })
 
   it('adds no DEV marker for production instances', async () => {
@@ -369,7 +406,7 @@ describe('dev instance indicator', () => {
 
     expect(stampDevBadgeMock).not.toHaveBeenCalled()
     expect(trayInstances[0].image).toBe(baseMacImage)
-    expect(builtMenuItems()[0].label).toBe('Open HiveCode')
+    expect(builtMenuItems()[0].label).toBe(`Open ${APP_DISPLAY_NAME}`)
   })
 })
 
@@ -419,8 +456,7 @@ describe('setTrayAttention', () => {
     flushTraySceneMutation()
     expect(tintTemplateMock).toHaveBeenCalledWith(baseMacImage, false)
     expect(composeAttentionMock).toHaveBeenCalledWith(tintedMacImage)
-    // Why: the attention image is rebuilt from 1x pixels, so the @2x
-    // representation must be re-added or the glyph blurs on Retina.
+    // Bitmap rebuild starts at 1x; re-add 2x or attention glyphs blur on Retina.
     expect(tintTemplateMock).toHaveBeenCalledWith(baseMacImage, false, 2)
     expect(attentionImage.addRepresentation).toHaveBeenCalledWith({
       scaleFactor: 2,
@@ -428,13 +464,13 @@ describe('setTrayAttention', () => {
     })
     expect(attentionImage.setTemplateImage).toHaveBeenCalledWith(false)
     expect(created.setImage).toHaveBeenCalledWith(attentionImage)
-    expect(created.setToolTip).toHaveBeenCalledWith('HiveCode - activity waiting')
+    expect(created.setToolTip).toHaveBeenCalledWith(`${APP_DISPLAY_NAME} - activity waiting`)
 
     setTrayAttention(false)
     flushTraySceneMutation()
     expect(baseMacImage.setTemplateImage).toHaveBeenLastCalledWith(true)
     expect(created.setImage).toHaveBeenLastCalledWith(baseMacImage)
-    expect(created.setToolTip).toHaveBeenLastCalledWith('HiveCode')
+    expect(created.setToolTip).toHaveBeenLastCalledWith(APP_DISPLAY_NAME)
   })
 
   it('recomposes active macOS attention when the system appearance changes', async () => {
@@ -447,7 +483,7 @@ describe('setTrayAttention', () => {
     nativeThemeMock.shouldUseDarkColors = true
 
     themeState.updatedListener?.()
-    // Why: appearance changes arrive on an AppKit dispatch too, so the recompose defers.
+    // Appearance events also arrive from AppKit; defer their native writes.
     expect(tintTemplateMock).not.toHaveBeenCalled()
 
     flushTraySceneMutation()
@@ -485,8 +521,7 @@ describe('setTrayAttention', () => {
     created.setImage.mockClear()
     created.setToolTip.mockClear()
 
-    // Why: show/restore call this from AppKit's window-state dispatch; a scene
-    // update sent there self-deadlocks the main thread on macOS 26.
+    // Native scene writes inside AppKit window-state dispatch can deadlock main on macOS 26.
     setTrayAttention(true)
     expect(created.setImage).not.toHaveBeenCalled()
     expect(created.setToolTip).not.toHaveBeenCalled()
@@ -600,7 +635,7 @@ describe('macOS hardening', () => {
     setTrayAttention(true)
     expect(() => flushTraySceneMutation()).not.toThrow()
     expect(created.setImage).toHaveBeenLastCalledWith(baseMacImage)
-    expect(created.setToolTip).toHaveBeenLastCalledWith('HiveCode')
+    expect(created.setToolTip).toHaveBeenLastCalledWith(APP_DISPLAY_NAME)
     expect(warn).toHaveBeenCalledWith(
       '[system-tray] macOS attention icon failed; showing plain icon',
       expect.any(Error)
@@ -631,22 +666,25 @@ describe('language changes', () => {
       const { createSystemTray, rebuildSystemTrayMenu } = await loadModule()
       const { setMainUiLanguage } = await import('../i18n/main-i18n')
       await setMainUiLanguage('en')
-      const options = createOptions()
+      const options = { ...createOptions(), onQuitAndStopAllSessions: vi.fn() }
       createSystemTray(options)
-      expect(builtMenuItems()[0].label).toBe('Open HiveCode')
+      expect(builtMenuItems()[0].label).toBe(`Open ${APP_DISPLAY_NAME}`)
 
       await setMainUiLanguage('ja')
       rebuildSystemTrayMenu()
-      expect(builtMenuItems()[0].label).toBe('Open HiveCode')
+      expect(builtMenuItems()[0].label).toBe(`Open ${APP_DISPLAY_NAME}`)
       flushTraySceneMutation()
 
       expect(trayInstances).toHaveLength(1)
       expect(trayInstances[0].setContextMenu).toHaveBeenCalledTimes(2)
-      expect(builtMenuItems()[0].label).toBe('HiveCode を開く')
+      expect(builtMenuItems()[0].label).toBe(`Open ${APP_DISPLAY_NAME}`)
+      expect(builtMenuItems().at(-2)?.label).toBe('完全に終了…')
       expect(builtMenuItems().at(-1)?.label).toBe('終了')
       builtMenuItems()[0].click?.()
+      builtMenuItems().at(-2)?.click?.()
       builtMenuItems().at(-1)?.click?.()
       expect(options.onOpen).toHaveBeenCalledOnce()
+      expect(options.onQuitAndStopAllSessions).toHaveBeenCalledOnce()
       expect(options.onQuit).toHaveBeenCalledOnce()
       if (platform === 'darwin') {
         expect(builtMenuItems()[2].label).toBe('設定')
@@ -674,15 +712,15 @@ describe('language changes', () => {
     rebuildSystemTrayMenu()
     flushTraySceneMutation()
     expect(trayInstances[0].setToolTip).toHaveBeenLastCalledWith(
-      'HiveCode DEV (language-test) - 件のアクティビティが待機中'
+      `${APP_DISPLAY_NAME} DEV (language-test) - 件のアクティビティが待機中`
     )
-    expect(builtMenuItems()[0].label).toBe('HiveCode DEV (language-test)')
+    expect(builtMenuItems()[0].label).toBe(`${APP_DISPLAY_NAME} DEV (language-test)`)
     expect(composeAttentionMock).toHaveBeenCalled()
 
-    mainI18n.addResource('ja', 'translation', 'tray.openOrca', 'HiveCode を表示')
+    mainI18n.addResource('ja', 'translation', 'tray.openOrca', 'Orca を表示')
     rebuildSystemTrayMenu()
     flushTraySceneMutation()
-    expect(builtMenuItems()[2].label).toBe('HiveCode を表示')
+    expect(builtMenuItems()[2].label).toBe('Orca を表示')
   })
 
   it('does nothing without a tray or when destroyed before the deferred refresh', async () => {

@@ -47,7 +47,7 @@ export function shouldOpenAutoRenameBranchAdvanced(searchQuery: string): boolean
 }
 
 function readSourceControlSettings(settings: GlobalSettings): SourceControlAiSettings {
-  return normalizeSourceControlAiSettings(settings.sourceControlAi, settings.commitMessageAi)
+  return normalizeSourceControlAiSettings(settings.sourceControlAi)
 }
 
 export function AutoRenameBranchFromWorkSetting({

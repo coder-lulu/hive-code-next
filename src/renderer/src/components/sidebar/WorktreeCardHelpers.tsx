@@ -1,10 +1,8 @@
 import React from 'react'
-import { translate } from '@/i18n/i18n'
 import type { GitConflictOperation } from '../../../../shared/git-status-types'
 import type { CheckStatus } from '../../../../shared/github/pull-request-types'
 import type { TerminalTab } from '../../../../shared/terminal-tab-types'
-
-// ── Display helper functions ─────────────────────────────────────────
+import { translate } from '@/i18n/i18n'
 
 export function branchDisplayName(branch: string): string {
   return branch.replace(/^refs\/heads\//, '')
@@ -13,35 +11,34 @@ export function branchDisplayName(branch: string): string {
 export function checksLabel(status: CheckStatus): string {
   switch (status) {
     case 'success':
-      return translate('auto.components.rightSidebar.parentPrChecks.groups.passing', 'Passing')
+      return translate('auto.components.sidebar.WorktreeCardHelpers.checksPassing', 'Passing')
     case 'failure':
-      return translate('components.worktreeCard.checks.failing', 'Failing')
+      return translate('auto.components.sidebar.WorktreeCardHelpers.checksFailing', 'Failing')
     case 'pending':
-      return translate('auto.components.rightSidebar.parentPrChecks.groups.pending', 'Pending')
+      return translate('auto.components.sidebar.WorktreeCardHelpers.checksPending', 'Pending')
     case 'neutral':
       return ''
   }
 }
 
-export function getConflictOperationLabel(operation: GitConflictOperation): string {
+export function conflictOperationLabel(operation: GitConflictOperation): string {
   switch (operation) {
     case 'merge':
-      return translate('components.worktreeCard.conflictOperation.merge', 'Merging')
+      return translate('auto.components.sidebar.WorktreeCardHelpers.conflictMerging', 'Merging')
     case 'rebase':
-      return translate('components.worktreeCard.conflictOperation.rebase', 'Rebasing')
+      return translate('auto.components.sidebar.WorktreeCardHelpers.conflictRebasing', 'Rebasing')
     case 'cherry-pick':
-      return translate('components.worktreeCard.conflictOperation.cherryPick', 'Cherry-picking')
+      return translate(
+        'auto.components.sidebar.WorktreeCardHelpers.conflictCherryPicking',
+        'Cherry-picking'
+      )
     case 'unknown':
       return ''
   }
 }
 
-// ── Stable empty arrays for tabs fallback ────────────────────────────
-
 export const EMPTY_TABS: TerminalTab[] = []
 export const EMPTY_BROWSER_TABS: { id: string }[] = []
-
-// ── SVG icon components ──────────────────────────────────────────────
 
 export function FilledBellIcon({ className }: { className?: string }): React.JSX.Element {
   return (

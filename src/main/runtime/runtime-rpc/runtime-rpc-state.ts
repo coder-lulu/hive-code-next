@@ -1,3 +1,5 @@
+import type { MobileRelayHostCatalog } from '../mobile-desktop-relay/mobile-relay-host-catalog'
+import { DeclaredDesktopClients } from '../declared-desktop-clients'
 import type { HiveRuntimeCloudWebLaunchService } from '../../hive-runtime-cloud/hive-runtime-cloud-web-launch-service'
 import { randomBytes } from 'node:crypto'
 import type { RuntimeTransportMetadata } from '../../../shared/runtime-bootstrap'
@@ -28,6 +30,9 @@ import type {
 import { DEFAULT_WS_PORT } from './runtime-rpc-pairing-types'
 
 export class RuntimeRpcState {
+  protected mobileRelayHostCatalog: MobileRelayHostCatalog | null = null
+  protected readonly declaredDesktopClients = new DeclaredDesktopClients()
+  protected readonly requirePinnedWsPort: boolean
   protected cloudWebLaunchService: HiveRuntimeCloudWebLaunchService | null = null
   protected readonly runtime: OrcaRuntimeService
   protected readonly dispatcher: RpcDispatcher
@@ -91,6 +96,7 @@ export class RuntimeRpcState {
     enableWebSocket = false,
     wsPort = DEFAULT_WS_PORT,
     preferPinnedWsPort = false,
+    requirePinnedWsPort = false,
     exposeNetworkByDefault = false,
     pinnedBindHost,
     webClientRoot,
@@ -111,6 +117,7 @@ export class RuntimeRpcState {
     this.enableWebSocket = enableWebSocket
     this.wsPort = wsPort
     this.preferPinnedWsPort = preferPinnedWsPort
+    this.requirePinnedWsPort = requirePinnedWsPort
     this.exposeNetworkByDefault = exposeNetworkByDefault
     this.pinnedBindHost = pinnedBindHost ?? null
     this.webClientRoot = webClientRoot

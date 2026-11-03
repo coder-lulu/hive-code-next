@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react'
-import type { MobileNativeChatLaunchDraftSeed } from './use-mobile-native-chat-launch-draft-seed'
+import type { MobileNativeChatLaunchDraftSeed } from './native-chat/composer/use-mobile-native-chat-launch-draft-seed'
 import type {
   MobileNativeChatPendingMessage,
   MobileNativeChatSendOrigin

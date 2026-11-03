@@ -1,24 +1,19 @@
-import { closeTestStores, createSqliteTestStore } from '../persistence-test-harness'
-/**
- * A definition change must name the host it affected, and a change that moves a
- * record between hosts must name both — a subscriber that never hears about the
- * source keeps rendering a row that has left it.
- *
- * Runs against the real Store so the published selectors are the ones the
- * persistence layer actually derives, not fixture stand-ins. The runtime methods
- * are the single publication site for every transport (local IPC and remote RPC).
- */
+import { closeTestStores, createSqliteTestStore } from '../persistence/persistence-test-harness'
+// Moving a definition must publish both hosts or source subscribers retain a stale row.
 
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { installFakeAppEnvironment } from '../../../config/scripts/vitest-host-ports-setup'
-import type { Automation } from '../../shared/automations-types'
+import type { Automation, AutomationRun } from '../../shared/automations-types'
 import type { Repo } from '../../shared/repo-types'
 import type { SshTarget } from '../../shared/ssh-types'
 import { getDefaultPersistedState } from '../../shared/constants'
 import type { AutomationsChangedPayload } from '../../shared/runtime-client-events'
+import { AUTOMATION_OWNER_CONFLICT_CODES } from '../../shared/automation-owner-conflict'
+import type { AutomationOwnerPrecondition } from '../../shared/automation-owner-precondition'
+import { AutomationService } from '../automations/service'
 import { Store, initDataPath } from '../persistence'
 import { OrcaRuntimeService } from './orca-runtime'
 import * as worktreeChangeInvalidators from '../ipc/worktree-change-invalidators'
@@ -124,27 +119,36 @@ async function makeRuntime() {
   return { store, runtime, published }
 }
 
-let runtimeFixture: Awaited<ReturnType<typeof makeRuntime>>
-let runtimeSetup: Promise<Awaited<ReturnType<typeof makeRuntime>>> | undefined
+async function makeManualRunRuntime() {
+  const { store, runtime } = await makeRuntime()
+  runtime.setAutomationService(new AutomationService(store, { tickMs: 60_000 }))
+  return { store, runtime }
+}
 
-beforeEach(async () => {
-  runtimeSetup = undefined
+type RuntimeWithRunNow = {
+  runAutomationNow: (
+    id: string,
+    expectedOwner?: AutomationOwnerPrecondition
+  ) => Promise<AutomationRun>
+}
+
+const runNow = async (
+  runtime: RuntimeWithRunNow,
+  id: string,
+  expectedOwner?: AutomationOwnerPrecondition
+): Promise<AutomationRun> => await runtime.runAutomationNow(id, expectedOwner)
+
+beforeEach(() => {
   testState.dir = mkdtempSync(join(tmpdir(), 'automation-publish-'))
-  // Why: the store resolves orca-data.json through the app environment, so the
-  // suite's fixture directory must be what `userData` answers with.
+  // Store resolves its data path through the app environment; point it at the fixture.
   installFakeAppEnvironment({
     getPath: (name) => (name === 'userData' ? testState.dir : tmpdir())
   })
   registrationSpy = vi.spyOn(worktreeChangeInvalidators, 'registerWorktreeChangeInvalidator')
-  runtimeSetup = makeRuntime()
-  runtimeFixture = await runtimeSetup
 })
 
 afterEach(async () => {
   try {
-    if (runtimeSetup) {
-      await Promise.allSettled([runtimeSetup])
-    }
     await closeTestStores()
   } finally {
     try {
@@ -168,7 +172,7 @@ describe('scoped automationsChanged publication', () => {
   it.each(['update', 'delete'] as const)(
     'waits for durable %s before publishing success',
     async (operation) => {
-      const { store, runtime, published } = runtimeFixture
+      const { store, runtime, published } = await makeRuntime()
       const gate = Promise.withResolvers<void>()
       vi.spyOn(store, 'flushPendingOrThrowAsync').mockReturnValue(gate.promise)
       const pending =
@@ -184,7 +188,7 @@ describe('scoped automationsChanged publication', () => {
   )
 
   it('rejects a failed durable definition write without publishing success', async () => {
-    const { store, runtime, published } = runtimeFixture
+    const { store, runtime, published } = await makeRuntime()
     vi.spyOn(store, 'flushPendingOrThrowAsync').mockRejectedValue(new Error('disk full'))
     await expect(runtime.updateAutomation('local-1', { name: 'Changed' })).rejects.toThrow(
       'disk full'
@@ -193,7 +197,7 @@ describe('scoped automationsChanged publication', () => {
   })
 
   it('names the host a delete removed a row from', async () => {
-    const { runtime, published } = runtimeFixture
+    const { runtime, published } = await makeRuntime()
     await runtime.deleteAutomation('ssh-1-a', {
       selector: { kind: 'ssh', targetId: 'ssh-1', targetGeneration: 7 }
     })
@@ -203,13 +207,13 @@ describe('scoped automationsChanged publication', () => {
   })
 
   it('names the orphan bucket when an unowned row is deleted', async () => {
-    const { runtime, published } = runtimeFixture
+    const { runtime, published } = await makeRuntime()
     await runtime.deleteAutomation('orphan-1', { selector: { kind: 'orphan' } })
     expect(published).toEqual([{ reason: 'definition', selector: { kind: 'orphan' } }])
   })
 
   it('publishes source and destination when an update moves a record between hosts', async () => {
-    const { runtime, published, store } = runtimeFixture
+    const { runtime, published, store } = await makeRuntime()
     await runtime.updateAutomation(
       'local-1',
       { repo: 'repo-ssh' },
@@ -229,7 +233,7 @@ describe('scoped automationsChanged publication', () => {
   })
 
   it('publishes one event when an update leaves the record on the same host', async () => {
-    const { runtime, published } = runtimeFixture
+    const { runtime, published } = await makeRuntime()
     await runtime.updateAutomation(
       'local-1',
       { enabled: false },
@@ -238,11 +242,9 @@ describe('scoped automationsChanged publication', () => {
     expect(published).toEqual([{ reason: 'definition', selector: { kind: 'self' } }])
   })
 
-  // Why: an unnameable destination is exactly when scoping is unsafe — a subscriber scoped
-  // elsewhere would never hear about the row it is still rendering. The publication has to
-  // degrade to one unscoped authority event rather than name only the stale source.
+  // Unknown destinations require an unscoped event so every affected subscriber hears the change.
   it('degrades to an unscoped event when the store cannot name the destination', async () => {
-    const { store, runtime, published } = runtimeFixture
+    const { store, runtime, published } = await makeRuntime()
     const selector = store.automationChangeSelector.bind(store)
     let updated = false
     vi.spyOn(store, 'automationChangeSelector').mockImplementation((id: string) =>
@@ -257,5 +259,37 @@ describe('scoped automationsChanged publication', () => {
     await update
 
     expect(published).toEqual([{ reason: 'definition' }])
+  })
+})
+
+describe('manual run refused before dispatch', () => {
+  it('answers the caller with the conflict and still leaves the user a run record', async () => {
+    const { store, runtime } = await makeManualRunRuntime()
+
+    await expect(runNow(runtime, 'orphan-1')).rejects.toMatchObject({
+      code: AUTOMATION_OWNER_CONFLICT_CODES.targetRemoved
+    })
+
+    expect(store.listAutomationRuns('orphan-1')).toMatchObject([
+      {
+        status: 'skipped_unavailable',
+        trigger: 'manual',
+        error: 'The automation host is no longer registered, so this automation has nowhere to run.'
+      }
+    ])
+  })
+
+  // A stale caller must not fill run history with refusals the owner can still run.
+  it('writes nothing when the refusal is about a stale caller, not a lost host', async () => {
+    const { store, runtime } = await makeManualRunRuntime()
+    const stale = {
+      selector: { kind: 'ssh', targetId: 'ssh-1', targetGeneration: 6 }
+    } as const satisfies AutomationOwnerPrecondition
+
+    await expect(runNow(runtime, 'ssh-1-a', stale)).rejects.toMatchObject({
+      code: AUTOMATION_OWNER_CONFLICT_CODES.ownerChanged
+    })
+
+    expect(store.listAutomationRuns('ssh-1-a')).toEqual([])
   })
 })

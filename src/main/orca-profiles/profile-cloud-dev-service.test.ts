@@ -1,5 +1,3 @@
-import { ensureActiveOrcaProfile } from './profile-index-store'
-import { readOrcaCloudSession } from './profile-cloud-session-store'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -17,8 +15,7 @@ const {
   safeStorageMock: {
     decryptString: vi.fn((value: Buffer) => value.toString('utf-8')),
     encryptString: vi.fn((value: string) => Buffer.from(value, 'utf-8')),
-    isEncryptionAvailable: vi.fn(() => true),
-    getSelectedStorageBackend: vi.fn(() => 'gnome_libsecret')
+    isEncryptionAvailable: vi.fn(() => true)
   }
 }))
 
@@ -93,7 +90,7 @@ describe('Orca cloud dev auth service', () => {
       persistence: 'encrypted',
       cloud: {
         cloudProfileId: 'dev-cloud-local-default',
-        email: 'dev@hivecode.local'
+        email: 'dev@orca.local'
       },
       capabilities: {
         flags: expect.objectContaining({ 'share.create': true })
@@ -131,20 +128,13 @@ describe('Orca cloud dev auth service', () => {
 
   it('signs out locally without calling the cloud logout endpoint', async () => {
     await connectCurrentOrcaProfile(userDataPath)
-    const { profile } = ensureActiveOrcaProfile(userDataPath)
-    expect(readOrcaCloudSession(profile.id, userDataPath).status).toBe('found')
     const regionCache = join(userDataPath, 'orca-relay-region-preference.json')
     writeFileSync(regionCache, '{}')
 
     const result = await signOutCurrentOrcaProfile(userDataPath)
 
     expect(result.status).toBe('signed-out')
-    // The current profile owns its session, not retired Relay cache files.
-    expect(readOrcaCloudSession(profile.id, userDataPath)).toEqual({
-      status: 'missing',
-      persistence: 'none'
-    })
-    expect(existsSync(regionCache)).toBe(true)
+    expect(existsSync(regionCache)).toBe(false)
     expect(revokeOrcaCloudSessionMock).not.toHaveBeenCalled()
     expect(getCurrentOrcaProfileAuthStatus(userDataPath)).toMatchObject({
       configured: true,

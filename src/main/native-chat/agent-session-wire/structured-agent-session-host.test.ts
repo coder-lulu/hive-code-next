@@ -1,3 +1,4 @@
+import { abandonStructuredAgentSessionHost } from './structured-agent-session-host-test-abandon'
 import { AGENT_JOURNAL_THREAD_SCOPE } from '../../../shared/agent-session-journal-types'
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { agentJournalItemKey } from '../../../shared/agent-session-journal-item-key'
@@ -130,6 +131,7 @@ describe('attach', () => {
     const acquire = vi
       .fn<StructuredAgentSessionAdapter['acquire']>()
       .mockImplementationOnce(async ({ fence, spawnToken }) => ({
+        acquisitionGeneration: globalThis.crypto.randomUUID(),
         process: {
           hostId: 'local',
           pid: 4242,
@@ -145,6 +147,7 @@ describe('attach', () => {
         }
       }))
       .mockImplementation(async ({ fence, spawnToken }) => ({
+        acquisitionGeneration: globalThis.crypto.randomUUID(),
         process: {
           hostId: 'local',
           pid: 4242,
@@ -531,7 +534,7 @@ describe('respondToPrompt', () => {
 })
 
 describe('setOption', () => {
-  it('goes to the provider and writes nothing to the journal', async () => {
+  it('persists a choice without requiring an idle provider write or a journal row', async () => {
     await attach()
     setOption.mockResolvedValueOnce({ model: 'gpt-5', effort: 'high' })
     const fields = { key: 'model', value: 'gpt-5' }
@@ -542,20 +545,20 @@ describe('setOption', () => {
     const result = await host.setOption(CALLER, params)
     expect(result).toMatchObject({
       ok: true,
-      value: { ...fields, options: { model: 'gpt-5', effort: 'high' } }
+      value: { ...fields, options: { model: 'gpt-5' } }
     })
     expect(await host.setOption(CALLER, params)).toMatchObject({
       ok: true,
       replayed: true,
-      value: { ...fields, options: { model: 'gpt-5', effort: 'high' } }
+      value: { ...fields, options: { model: 'gpt-5' } }
     })
-    expect(setOption).toHaveBeenCalledTimes(1)
-    expect(store.getRecord(SESSION)?.options).toEqual({ model: 'gpt-5', effort: 'high' })
+    expect(setOption).not.toHaveBeenCalled()
+    expect(store.getRecord(SESSION)?.options).toEqual({ model: 'gpt-5' })
     const page = await host.history({ sessionId: SESSION, direction: 'tail' })
     expect(page.ok && page.page.items).toHaveLength(0)
   })
 
-  it('does not turn an unknown provider outcome into a successful replay', async () => {
+  it('replays the durable choice without invoking an unsupported idle provider write', async () => {
     await attach()
     setOption.mockRejectedValueOnce(new Error('reply lost'))
     const fields = { key: 'model', value: 'gpt-5' }
@@ -564,12 +567,13 @@ describe('setOption', () => {
       ...fields
     }
 
-    await expect(host.setOption(CALLER, params)).rejects.toThrow('reply lost')
+    await expect(host.setOption(CALLER, params)).resolves.toMatchObject({ ok: true })
     expect(await host.setOption(CALLER, params)).toMatchObject({
-      ok: false,
-      refusal: { code: 'agent_session_operation_unknown' }
+      ok: true,
+      replayed: true,
+      value: { ...fields, options: { model: 'gpt-5' } }
     })
-    expect(setOption).toHaveBeenCalledTimes(1)
+    expect(setOption).not.toHaveBeenCalled()
   })
 })
 
@@ -583,12 +587,7 @@ describe('restart', () => {
     adapterOverrides: Partial<StructuredAgentSessionAdapter> = {},
     stopOwnerProcess?: StructuredAgentSessionHostDeps['stopOwnerProcess']
   ) {
-    // Teardown now releases proved owners. Restore the pre-crash record when a test needs
-    // an interrupted runtime whose child survived, after closing all test-owned handles.
-    await host.flushAllStreamedEvents()
-    if (crashRecord) {
-      await store.transitionHandoff(SESSION, () => crashRecord)
-    }
+    await (crashRecord ? abandonStructuredAgentSessionHost(host) : host.flushAllStreamedEvents())
     closeTestJournalHostDatabase(root)
     store = await openTestAgentSessionRecordStore(root)
     host = new StructuredAgentSessionHost({
@@ -632,15 +631,16 @@ describe('restart', () => {
 
   it('restores durable journals for read-only history without acquiring a provider', async () => {
     await attach()
+    await host.setSessionTabVisibility(SESSION, true)
     const body = hostTestMessage('persisted conversation')
     await host.send(CALLER, { envelope: envelope('agentSession.send', { body }), body })
     await reboot(async () => ({ outcome: 'indeterminate', reason: 'read does not need ownership' }))
     acquire.mockClear()
-    const listRecords = vi.spyOn(store, 'listRecords')
 
-    await host.restoreReadableSessions()
-    const restoreReads = listRecords.mock.calls.length
-    await host.restoreReadableSessions()
+    await host.reconcileRestartLeases()
+    await host.seedSessionTabs([SESSION])
+    await host.reconcileRestartLeases()
+    await host.seedSessionTabs([SESSION])
 
     expect(host.listSessionTabs()).toEqual([
       { sessionId: SESSION, workspaceId: 'workspace-1', agent: 'codex' }
@@ -648,7 +648,6 @@ describe('restart', () => {
     const history = await host.history({ sessionId: SESSION, direction: 'tail' })
     expect(history.ok && history.page.items).not.toHaveLength(0)
     expect(acquire).not.toHaveBeenCalled()
-    expect(listRecords).toHaveBeenCalledTimes(restoreReads)
   })
 
   it('clears a stale conflicted recovery at restart, and reacquires the native owner on the next start', async () => {
@@ -665,7 +664,8 @@ describe('restart', () => {
     await reboot(async () => ({ outcome: 'pid-absent' }))
     acquire.mockClear()
 
-    await host.restoreReadableSessions()
+    await host.reconcileRestartLeases()
+    await host.seedSessionTabs([SESSION])
     // The recovery stage clears on evidence at startup; the child comes back only once work
     // starts it — here the explicit attach a send's delivery would make.
     const fence = store.getRecord(SESSION)?.lease.runtimeFence ?? 0
@@ -705,7 +705,8 @@ describe('restart', () => {
   it('answers native for a chat whose start is still in flight', async () => {
     await attach()
     await reboot(async () => ({ outcome: 'pid-absent' }))
-    await host.restoreReadableSessions()
+    await host.reconcileRestartLeases()
+    await host.seedSessionTabs([SESSION])
     const started = Promise.withResolvers<void>()
     const release = Promise.withResolvers<void>()
     const settled = acquire.getMockImplementation()
@@ -878,6 +879,8 @@ describe('subscribe', () => {
     if (!replacement.ok) {
       throw new Error(`expected replacement owner, got ${replacement.refusal.code}`)
     }
-    expect(events.at(-1)).toMatchObject({ type: 'snapshot', fence: replacement.fence })
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: 'snapshot', fence: replacement.fence })
+    )
   })
 })

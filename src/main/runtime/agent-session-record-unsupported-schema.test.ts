@@ -10,7 +10,7 @@ import {
 } from './agent-session-record-store-test-harness'
 import { closeTestJournalHostDatabases } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import { agentSessionStorePath, loadAgentSessionStore } from './agent-session-record-store-file'
-import type { AgentSessionReserveRequest } from './agent-session-reservation-admission'
+import type { AgentSessionReserveRequest } from './agent-session/ownership/agent-session-reservation-admission'
 
 const NOW = 1_800_000_000_000
 const SESSION_ID = 'session-alpha-1'

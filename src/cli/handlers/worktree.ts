@@ -23,7 +23,8 @@ import {
 import {
   getOptionalWorktreeSelector,
   getRequiredWorktreeSelector,
-  resolveCurrentWorktreeSelector
+  resolveCurrentWorktreeSelector,
+  resolveCurrentWorktreeSelection
 } from '../selectors'
 import type { TuiAgent } from '../../shared/tui-agent'
 import { parseCliAgent, readCliAgentLaunch } from '../agent-launch-request'
@@ -33,7 +34,7 @@ import { projectWorktreePsTerminalVerdict } from '../worktree-ps-terminal-verdic
 import {
   assertWorkspaceTargetFlagsCompatible,
   hasWorkspaceProjectTarget,
-  getCreateRepoSelector
+  getCreateRepoTarget
 } from '../worktree-project-target'
 import {
   assertWorktreeParentFlagsCompatible,
@@ -43,6 +44,7 @@ import {
 import { getOptionalLinearIssueLinkFlag } from './worktree-linear-issue-link'
 import { getOptionalWorktreeUnreadFlag } from './worktree-unread-flag'
 import { getReviewTargetLinkFlags } from './worktree-review-link-flags'
+import { captureCliWorktreeGitHubLinkBase } from './worktree-github-link-base'
 import { withSetupDecisionRecovery } from './worktree-setup-decision-recovery'
 import { assertGitLabLinkFlagProjectsMatch } from './worktree-gitlab-link-context'
 import {
@@ -103,7 +105,7 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
       'worktree.ps',
       { limit: getOptionalPositiveIntegerFlag(flags, 'limit') }
     )
-    await annotateOmittedHostScope(client, result.result)
+    await annotateOmittedHostScope(result.result)
     const worktrees = result.result.worktrees.map(projectWorktreePsTerminalVerdict)
     printResult({ ...result, result: { ...result.result, worktrees } }, json, () =>
       formatWorktreePs(result.result)
@@ -117,7 +119,7 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
         limit: getOptionalPositiveIntegerFlag(flags, 'limit')
       }
     )
-    await annotateOmittedHostScope(client, result.result)
+    await annotateOmittedHostScope(result.result)
     printResult(result, json, formatWorktreeList)
   },
   'worktree show': async ({ flags, client, cwd, json }) => {
@@ -157,7 +159,7 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
       !noParent && !explicitParentWorkspace && !explicitParentWorktree
         ? getEnvParentWorkspace()
         : undefined
-    let cwdParentWorktree: string | undefined
+    let cwdSelection: Awaited<ReturnType<typeof resolveCurrentWorktreeSelection>> | undefined
     const needsCwdRepoInference = !flags.has('repo') && !hasWorkspaceProjectTarget(flags)
     if (
       (!explicitParentWorktree && !explicitParentWorkspace && !noParent) ||
@@ -167,16 +169,23 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
         // Why: agent shells can lose ORCA_TERMINAL_HANDLE while still running
         // inside an Orca worktree. Cwd keeps CLI-created children nestable and
         // lets create infer the repo for the common current-workspace case.
-        cwdParentWorktree = await resolveCurrentWorktreeSelector(cwd, client)
-      } catch {
-        cwdParentWorktree = undefined
+        cwdSelection = await resolveCurrentWorktreeSelection(cwd, client)
+      } catch (error) {
+        if (
+          needsCwdRepoInference &&
+          error instanceof RuntimeClientError &&
+          error.code === 'selector_ambiguous'
+        ) {
+          throw error
+        }
+        cwdSelection = undefined
       }
     }
     const linearIssueLink = getOptionalLinearIssueLinkFlag(flags, 'linear-issue')
     const activate = flags.get('activate') === true || flags.get('run-hooks') === true
     const name = getRequiredStringFlag(flags, 'name')
-    const repo = await getCreateRepoSelector(flags, cwdParentWorktree, client)
-    await assertGitLabLinkFlagProjectsMatch(flags, client, { repo })
+    const repoTarget = await getCreateRepoTarget(flags, cwdSelection, client)
+    await assertGitLabLinkFlagProjectsMatch(flags, client, repoTarget)
     const linkedItems = referenceInputs
       ? await resolveReferenceInputs(context, referenceInputs)
       : undefined
@@ -184,11 +193,12 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
       await assertReferenceWritesSupported(client)
     }
     const create = {
-      repo,
+      ...repoTarget,
       name,
       displayName: name,
       displayNameKind: 'user',
       baseBranch: getOptionalStringFlag(flags, 'base-branch'),
+      branchNameOverride: getPresentStringFlag(flags, 'branch'),
       ...reviewLinks,
       ...linearIssueLink,
       ...(linkedItems ? { linkedItems } : {}),
@@ -201,7 +211,7 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
       parentWorktree: explicitParentWorktree,
       ...(explicitParentWorkspace ? { parentWorkspace: explicitParentWorkspace } : {}),
       ...(envParentWorkspace ? { envParentWorkspace } : {}),
-      ...(cwdParentWorktree ? { cwdParentWorktree } : {}),
+      ...(cwdSelection ? { cwdParentWorktree: cwdSelection.selector } : {}),
       noParent,
       callerTerminalHandle,
       // Why: marks the workspace as CLI-created so the sidebar can badge and
@@ -231,8 +241,12 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
     })
     const worktree = await getRequiredWorktreeSelector(flags, 'worktree', cwd, client)
     await assertGitLabLinkFlagProjectsMatch(flags, client, { worktree })
+    const target =
+      reviewLinks.linkedPR === null
+        ? await captureCliWorktreeGitHubLinkBase(client, worktree)
+        : { worktree }
     const result = await client.call<RuntimeWorktreeSetResult>('worktree.set', {
-      worktree,
+      ...target,
       displayName: getOptionalStringFlag(flags, 'display-name'),
       ...reviewLinks,
       ...linearIssueLink,

@@ -1,4 +1,6 @@
+import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import { EmulatorError } from '../emulator-errors'
+import { emulatorFailureText } from '../../../shared/emulator-failure-copy'
 import type { AndroidAdbDevice, AndroidAdbDeviceState } from './adb-devices'
 import type { AndroidCommandRunner } from './android-command-runner'
 import type { AndroidSdkPaths } from './android-sdk-discovery'
@@ -32,7 +34,7 @@ export type AndroidBootOptions = {
   managedAvds: AndroidManagedAvdProcesses
 }
 
-// Returns a healthy adb serial. AVDs launched by HiveCode get one automatic
+// Returns a healthy adb serial. AVDs launched by the app get one automatic
 // cold restart when their adb transport stops responding; external processes
 // are never killed.
 export async function bootAndroidDevice(
@@ -90,12 +92,12 @@ export async function bootAndroidDevice(
   if (!avds.includes(deviceOrName)) {
     throw new EmulatorError(
       'emulator_device_not_found',
-      `"${deviceOrName}" is not a running device or a known AVD.`
+      emulatorFailureText('unknownDeviceOrAvd', { device: deviceOrName })
     )
   }
 
   // Do not risk starting a second copy when adb can see an emulator but cannot
-  // identify it. HiveCode has no ownership proof for such a process.
+  // identify it. The app has no ownership proof for such a process.
   for (const device of running.filter(
     (candidate) => candidate.isEmulator && !namesBySerial.has(candidate.serial)
   )) {
@@ -243,7 +245,16 @@ async function waitForManagedBoot(
     if (candidates.length === 0) {
       lastObservedState = null
     }
+    const candidateNames = await resolveRunningAvdNames(
+      runner,
+      sdk,
+      candidates,
+      options.managedAvds.namesBySerial()
+    )
     for (const device of candidates) {
+      if (candidateNames.get(device.serial) !== process.avdName) {
+        continue
+      }
       if (!process.serial) {
         options.managedAvds.bindSerial(process, device.serial)
       }
@@ -277,7 +288,7 @@ async function restartManagedAvd(
     await options.managedAvds.terminate(process)
     throw new EmulatorError(
       'emulator_device_unresponsive',
-      `AVD "${process.avdName}" stayed unresponsive after HiveCode restarted it once. Open Android Studio Device Manager, cold boot or wipe the AVD, then try again.`
+      `AVD "${process.avdName}" stayed unresponsive after ${APP_DISPLAY_NAME} restarted it once. Open Android Studio Device Manager, cold boot or wipe the AVD, then try again.`
     )
   }
   budget.usedColdRestart = true
@@ -286,7 +297,7 @@ async function restartManagedAvd(
   if (!(await options.managedAvds.terminate(process))) {
     throw new EmulatorError(
       'emulator_helper_failed',
-      `HiveCode could not stop its unresponsive AVD "${process.avdName}" safely.`
+      `${APP_DISPLAY_NAME} could not stop its unresponsive AVD "${process.avdName}" safely.`
     )
   }
 

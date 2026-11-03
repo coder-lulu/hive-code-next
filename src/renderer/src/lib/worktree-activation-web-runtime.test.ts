@@ -1,17 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { SETUP_AGENT_SEQUENCE_SETUP_SCRIPT_ENV } from '../../../shared/setup-agent-sequencing'
 import { activateAndRevealFolderWorkspace, activateAndRevealWorktree } from './worktree-activation'
 import { ensureWorktreeHasInitialTerminal } from './worktree-initial-terminal-seeding'
-import type { AppStoreState } from './worktree-activation-test-harness'
+import type { AppStoreState } from './worktree-activation.test-fixture'
 import {
   createMockStore,
   registerWorktreeActivationReset,
   createdTabStartups
-} from './worktree-activation-test-harness'
+} from './worktree-activation.test-fixture'
 import { useAppStore } from '@/store'
 import {
   makeCreatedAgentWorktree,
   seedEmptyActivatableWorktree
-} from './worktree-activation-created-agent-test-state'
+} from './worktree-activation-created-agent.test-fixture'
 import {
   resetWebRuntimeWakeTerminalRespawnForTests,
   shouldSkipWebRuntimeWakeTerminalRespawn
@@ -300,16 +301,15 @@ describe('ensureWorktreeHasInitialTerminal', () => {
     expect(store.setTabCustomTitle).toHaveBeenCalledWith('tab-2', 'Setup', {
       recordInteraction: false
     })
-    expect(createdTabStartups(store)['tab-2']).toEqual(
-      expect.objectContaining({
-        command: expect.stringContaining('bash /tmp/repo/.git/orca/setup-runner.sh')
-      })
-    )
-    expect(createdTabStartups(store)['tab-2']).toEqual(
-      expect.objectContaining({
-        command: expect.stringContaining('printf')
-      })
-    )
+    expect(createdTabStartups(store)['tab-2']).toEqual({
+      command: `bash -lc 'eval "\${${SETUP_AGENT_SEQUENCE_SETUP_SCRIPT_ENV}:?missing}"'`,
+      env: {
+        ORCA_ROOT_PATH: '/tmp/repo',
+        [SETUP_AGENT_SEQUENCE_SETUP_SCRIPT_ENV]: expect.stringContaining(
+          'bash /tmp/repo/.git/orca/setup-runner.sh'
+        )
+      }
+    })
   })
 
   it('holds the issue command for the first mirrored web runtime tab when none exists yet', () => {

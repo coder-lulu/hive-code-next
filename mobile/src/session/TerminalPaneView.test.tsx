@@ -1,3 +1,4 @@
+import { findByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement, useEffect, type ComponentProps } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { expect, it, vi } from 'vitest'
@@ -50,18 +51,18 @@ it('allocates a terminal only on first activation and preserves it across tab sw
   act(() => {
     renderer.update(createElement(TerminalPaneView, { ...props, active: true }))
   })
-  const terminal = renderer!.root.findByType('TerminalWebView')
+  const terminal = findByHostType(renderer!.root, 'TerminalWebView')
   expect(lifecycle.mount).toHaveBeenCalledOnce()
 
   act(() => {
     renderer.update(createElement(TerminalPaneView, props))
   })
-  expect(renderer!.root.findByType('TerminalWebView')).toBe(terminal)
-  expect(renderer!.root.findByType('View').props.pointerEvents).toBe('none')
+  expect(findByHostType(renderer!.root, 'TerminalWebView')).toBe(terminal)
+  expect(findByHostType(renderer!.root, 'View').props.pointerEvents).toBe('none')
   act(() => {
     renderer.update(createElement(TerminalPaneView, { ...props, active: true }))
   })
-  expect(renderer!.root.findByType('TerminalWebView')).toBe(terminal)
+  expect(findByHostType(renderer!.root, 'TerminalWebView')).toBe(terminal)
   expect(lifecycle.mount).toHaveBeenCalledOnce()
   expect(lifecycle.unmount).not.toHaveBeenCalled()
   act(() => renderer.unmount())

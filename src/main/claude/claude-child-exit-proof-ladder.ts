@@ -13,20 +13,19 @@ const FORCED_EXIT_MS = 1_000
 
 export function claudeChildClosePolicy(
   supervised: boolean,
-  _platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = process.platform
 ): ProviderProcessClosePolicy {
   return {
     gracefulExitMs: supervised ? SUPERVISED_GRACEFUL_EXIT_MS : GRACEFUL_EXIT_MS,
     forcedExitMs: FORCED_EXIT_MS,
     signalSupervisorOnClose: true,
-    // Root exit never substitutes for descendant exit evidence.
-    selfExitIsClose: false
+    // Windows accepts voluntary exit after stdin ends; any forced reap retains taskkill's verdict.
+    selfExitIsClose: platform === 'win32'
   }
 }
 
-/** The root exited and its captured tree was observed gone. */
 export function claudeChildCloseProven(result: ProviderProcessCloseResult): boolean {
-  return result.root === 'exited' && result.tree === 'exited'
+  return result.root === 'exited' && (result.tree === 'exited' || result.selfExit === true)
 }
 
 export type ClaudeChildExitProofInput = {

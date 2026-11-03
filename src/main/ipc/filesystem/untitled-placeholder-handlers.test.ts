@@ -1,4 +1,4 @@
-import { getSshConnectionGeneration } from '../../ssh/ssh-connection-generation'
+import { getSshConnectionGeneration } from '../../ssh/connection/ssh-connection-generation'
 import { EventEmitter } from 'node:events'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'

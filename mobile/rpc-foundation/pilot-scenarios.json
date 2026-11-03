@@ -5,7 +5,7 @@
       "id": "b1",
       "operation": "workspace.file-inventory",
       "family": "legacy-inventory",
-      "sites": ["mobile/src/session/use-mobile-native-chat-file-search.ts"],
+      "sites": ["mobile/src/session/native-chat/composer/use-mobile-native-chat-file-search.ts"],
       "schedules": ["a-b-a", "stale-inflight-cleanup"],
       "steps": [
         {
@@ -2508,7 +2508,7 @@
       "id": "inventory-lifecycle",
       "operation": "workspace.file-inventory",
       "family": "legacy-inventory",
-      "sites": ["mobile/src/session/use-mobile-native-chat-file-search.ts"],
+      "sites": ["mobile/src/session/native-chat/composer/use-mobile-native-chat-file-search.ts"],
       "schedules": ["reset", "unmount-remount", "blur-retained-route"],
       "steps": [
         {
@@ -2572,7 +2572,7 @@
       "id": "inventory-repeat-query",
       "operation": "workspace.file-inventory",
       "family": "legacy-inventory",
-      "sites": ["mobile/src/session/use-mobile-native-chat-file-search.ts"],
+      "sites": ["mobile/src/session/native-chat/composer/use-mobile-native-chat-file-search.ts"],
       "schedules": ["normalized-repeat", "cache-cancels-debounce", "cache-stales-inflight"],
       "steps": [
         {
@@ -4281,7 +4281,8 @@
           "complete": "worktree.set#2",
           "params": {
             "worktree": "id:repo42::/p",
-            "linkedPR": null
+            "linkedPR": null,
+            "suppressedGitHubPR": 12
           },
           "reply": {
             "ok": true,
@@ -4695,7 +4696,12 @@
           "action": "apply",
           "id": "apply",
           "args": {
-            "blockedReason": "needs_push"
+            "blockedReason": "needs_push",
+            "upstreamStatus": {
+              "hasUpstream": true,
+              "ahead": 1,
+              "behind": 0
+            }
           }
         },
         {
@@ -4729,7 +4735,57 @@
           "action": "apply",
           "id": "apply",
           "args": {
-            "blockedReason": "no_upstream"
+            "blockedReason": "no_upstream",
+            "upstreamStatus": {
+              "hasUpstream": false,
+              "ahead": 0,
+              "behind": 0
+            }
+          }
+        },
+        {
+          "complete": "worktree.show#1",
+          "params": {
+            "worktree": "id:repo42::/p"
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "worktree": {
+                "baseRef": "origin/main"
+              }
+            }
+          }
+        },
+        {
+          "complete": "repo.list#1",
+          "params": {
+            "$undefined": true
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "repos": []
+            }
+          }
+        },
+        {
+          "complete": "git.branchCompare#1",
+          "params": {
+            "worktree": "id:repo42::/p",
+            "baseRef": "origin/main"
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "summary": {
+                "baseRef": "origin/main",
+                "changedFiles": 1,
+                "status": "ready",
+                "commitsAhead": 2
+              },
+              "entries": []
+            }
           }
         },
         {
@@ -4762,7 +4818,12 @@
           "id": "apply",
           "args": {
             "blockedReason": "needs_sync",
-            "patchEquivalent": true
+            "upstreamStatus": {
+              "hasUpstream": true,
+              "ahead": 1,
+              "behind": 1,
+              "behindCommitsArePatchEquivalent": true
+            }
           }
         },
         {
@@ -5343,7 +5404,7 @@
               "defaultBaseRef": "main",
               "title": "Host title",
               "body": "Host body",
-              "canCreate": true,
+              "canCreate": false,
               "blockedReason": "needs_push",
               "nextAction": null,
               "reviewLookupOutcome": "not_found"
@@ -5619,7 +5680,7 @@
               "defaultBaseRef": "main",
               "title": "Host title",
               "body": "Host body",
-              "canCreate": true,
+              "canCreate": false,
               "blockedReason": "needs_push",
               "nextAction": null,
               "reviewLookupOutcome": "not_found"
@@ -7219,7 +7280,7 @@
         {
           "complete": "preflight.detectAgents#1",
           "params": {
-            "$undefined": true
+            "repoId": "repo-1"
           },
           "reply": {
             "ok": true,
@@ -7963,6 +8024,20 @@
           }
         },
         {
+          "complete": "settings.get#1",
+          "params": {
+            "$undefined": true
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "settings": {
+                "compactWorktreeCards": true
+              }
+            }
+          }
+        },
+        {
           "action": "sort",
           "id": "sort"
         },
@@ -8345,7 +8420,9 @@
           "params": {
             "repo": "id:repo-9",
             "branch": "feature",
-            "linkedPRNumber": null
+            "linkedPRNumber": null,
+            "fallbackPRNumber": null,
+            "currentHeadOid": null
           },
           "reply": {
             "ok": true,
@@ -8594,7 +8671,9 @@
           "params": {
             "repo": "id:repo-9",
             "branch": "feature",
-            "linkedPRNumber": null
+            "linkedPRNumber": null,
+            "fallbackPRNumber": null,
+            "currentHeadOid": null
           },
           "reply": {
             "ok": true,
@@ -8617,7 +8696,9 @@
           "params": {
             "repo": "id:repo-9",
             "branch": "feature",
-            "linkedPRNumber": null
+            "linkedPRNumber": null,
+            "fallbackPRNumber": null,
+            "currentHeadOid": null
           },
           "reply": {
             "ok": true,
@@ -8642,7 +8723,9 @@
           "params": {
             "repo": "id:repo-9",
             "branch": "feature",
-            "linkedPRNumber": null
+            "linkedPRNumber": null,
+            "fallbackPRNumber": null,
+            "currentHeadOid": null
           },
           "reply": {
             "ok": true,
@@ -8695,7 +8778,7 @@
             "ok": true,
             "result": {
               "worktree": {
-                "linkedPR": 12
+                "linkedPR": null
               }
             }
           }
@@ -8708,8 +8791,11 @@
           "params": {
             "repo": "id:repo-9",
             "branch": "feature",
-            "linkedPRNumber": 12
+            "linkedPRNumber": null,
+            "fallbackPRNumber": 12,
+            "currentHeadOid": null
           },
+          "paramsFollowDivergence": true,
           "reply": {
             "ok": true,
             "result": {
@@ -8794,7 +8880,7 @@
             "ok": true,
             "result": {
               "worktree": {
-                "linkedPR": 12
+                "linkedPR": null
               }
             }
           }
@@ -8807,8 +8893,11 @@
           "params": {
             "repo": "id:repo-9",
             "branch": "feature",
-            "linkedPRNumber": 12
+            "linkedPRNumber": null,
+            "fallbackPRNumber": 12,
+            "currentHeadOid": null
           },
+          "paramsFollowDivergence": true,
           "reply": {
             "ok": true,
             "result": {
@@ -10611,6 +10700,863 @@
       ]
     },
     {
+      "id": "transport-pairing-race-relay-completes-first",
+      "operation": "transport.pairing-race",
+      "family": "transport.pairing-race",
+      "sites": ["mobile/src/transport/pairing-candidate-race.ts"],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "race",
+          "id": "race"
+        },
+        {
+          "bind": "direct-status",
+          "request": "status.get#1",
+          "params": {
+            "$undefined": true
+          }
+        },
+        {
+          "bind": "relay-status",
+          "request": "status.get#2",
+          "params": {
+            "$undefined": true
+          }
+        },
+        {
+          "complete": "relay-status",
+          "params": {
+            "$undefined": true
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "capabilities": []
+            }
+          }
+        },
+        {
+          "complete": "direct-status",
+          "params": {
+            "$undefined": true
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "capabilities": []
+            }
+          }
+        },
+        {
+          "checkpoint": "relay-wins-when-it-completes-first"
+        }
+      ]
+    },
+    {
+      "id": "transport-pairing-race-direct-completes-first",
+      "operation": "transport.pairing-race",
+      "family": "transport.pairing-race",
+      "sites": ["mobile/src/transport/pairing-candidate-race.ts"],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "race",
+          "id": "race"
+        },
+        {
+          "bind": "direct-status",
+          "request": "status.get#1",
+          "params": {
+            "$undefined": true
+          }
+        },
+        {
+          "bind": "relay-status",
+          "request": "status.get#2",
+          "params": {
+            "$undefined": true
+          }
+        },
+        {
+          "complete": "direct-status",
+          "params": {
+            "$undefined": true
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "capabilities": []
+            }
+          }
+        },
+        {
+          "complete": "relay-status",
+          "params": {
+            "$undefined": true
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "capabilities": []
+            }
+          }
+        },
+        {
+          "checkpoint": "direct-wins-when-it-completes-first"
+        }
+      ]
+    },
+    {
+      "id": "transport-pairing-race-relay-wins-when-direct-refused",
+      "operation": "transport.pairing-race",
+      "family": "transport.pairing-race",
+      "sites": ["mobile/src/transport/pairing-candidate-race.ts"],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "race",
+          "id": "race"
+        },
+        {
+          "bind": "direct-status",
+          "request": "status.get#1",
+          "params": {
+            "$undefined": true
+          }
+        },
+        {
+          "bind": "relay-status",
+          "request": "status.get#2",
+          "params": {
+            "$undefined": true
+          }
+        },
+        {
+          "complete": "direct-status",
+          "params": {
+            "$undefined": true
+          },
+          "reply": {
+            "ok": false,
+            "error": {
+              "code": "unauthorized",
+              "message": "direct refused"
+            }
+          }
+        },
+        {
+          "complete": "relay-status",
+          "params": {
+            "$undefined": true
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "capabilities": []
+            }
+          }
+        },
+        {
+          "checkpoint": "relay-wins"
+        }
+      ]
+    },
+    {
+      "id": "transport-pairing-race-both-refused",
+      "operation": "transport.pairing-race",
+      "family": "transport.pairing-race",
+      "sites": ["mobile/src/transport/pairing-candidate-race.ts"],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "race",
+          "id": "race"
+        },
+        {
+          "bind": "direct-status",
+          "request": "status.get#1",
+          "params": {
+            "$undefined": true
+          }
+        },
+        {
+          "bind": "relay-status",
+          "request": "status.get#2",
+          "params": {
+            "$undefined": true
+          }
+        },
+        {
+          "complete": "direct-status",
+          "params": {
+            "$undefined": true
+          },
+          "reply": {
+            "ok": false,
+            "error": {
+              "code": "unauthorized",
+              "message": "direct refused"
+            }
+          }
+        },
+        {
+          "complete": "relay-status",
+          "params": {
+            "$undefined": true
+          },
+          "reply": {
+            "ok": false,
+            "error": {
+              "code": "unauthorized",
+              "message": "relay refused"
+            }
+          }
+        },
+        {
+          "checkpoint": "both-paths-failed"
+        }
+      ]
+    },
+    {
+      "id": "relay-rotation-installs-and-commits",
+      "operation": "relay.credential-rotation",
+      "family": "relay.credential-rotation",
+      "sites": ["mobile/src/transport/mobile-relay-credential-rotation.ts"],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "rotate",
+          "id": "rotate"
+        },
+        {
+          "complete": "pairing.getEndpoints#1",
+          "params": {
+            "installReqId": "rotate-VftjjHf-4Lb1-Sdfryl-LA"
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "v": 1,
+              "relay": {
+                "v": 1,
+                "directorUrl": "https://director.example",
+                "cellUrl": "https://cell.example",
+                "assignmentEpoch": 1,
+                "relayHostId": "relay-host-0001x",
+                "e2eeFraming": 2
+              },
+              "installStatus": {
+                "v": 1,
+                "reqId": "rotate-VftjjHf-4Lb1-Sdfryl-LA",
+                "state": "not-found"
+              }
+            }
+          }
+        },
+        {
+          "complete": "pairing.provisionRelay#1",
+          "params": {
+            "reqId": "rotate-VftjjHf-4Lb1-Sdfryl-LA",
+            "newResumeTokenHash": "yrnYzw4B0YZ_R6Tcm4arO3oysaG7lsPjvyp4uWmdBtU",
+            "expectedCurrentHash": "r_9byaBlTZTXS3aLLlWTKwss-nmx4vGRrjKskxWyP30"
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "v": 1,
+              "reqId": "rotate-VftjjHf-4Lb1-Sdfryl-LA",
+              "authorizationMode": "authenticated-direct",
+              "currentVersion": 4,
+              "resumeExpiresAt": 1767830400000
+            }
+          }
+        },
+        {
+          "complete": "pairing.getEndpoints#2",
+          "params": {
+            "installReqId": "rotate-VftjjHf-4Lb1-Sdfryl-LA"
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "v": 1,
+              "relay": {
+                "v": 1,
+                "directorUrl": "https://director.example",
+                "cellUrl": "https://cell.example",
+                "assignmentEpoch": 1,
+                "relayHostId": "relay-host-0001x",
+                "e2eeFraming": 2
+              },
+              "installStatus": {
+                "v": 1,
+                "reqId": "rotate-VftjjHf-4Lb1-Sdfryl-LA",
+                "state": "committed",
+                "result": {
+                  "v": 1,
+                  "reqId": "rotate-VftjjHf-4Lb1-Sdfryl-LA",
+                  "authorizationMode": "authenticated-direct",
+                  "currentVersion": 4,
+                  "resumeExpiresAt": 1767830400000
+                }
+              }
+            }
+          }
+        },
+        {
+          "checkpoint": "credential-rotated"
+        }
+      ]
+    },
+    {
+      "id": "relay-rotation-resumes-committed-pending",
+      "operation": "relay.credential-rotation",
+      "family": "relay.credential-rotation",
+      "sites": ["mobile/src/transport/mobile-relay-credential-rotation.ts"],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "rotate",
+          "id": "rotate",
+          "args": {
+            "pending": true
+          }
+        },
+        {
+          "complete": "pairing.getEndpoints#1",
+          "params": {
+            "installReqId": "install-fixture-1"
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "v": 1,
+              "relay": {
+                "v": 1,
+                "directorUrl": "https://director.example",
+                "cellUrl": "https://cell.example",
+                "assignmentEpoch": 1,
+                "relayHostId": "relay-host-0001x",
+                "e2eeFraming": 2
+              },
+              "installStatus": {
+                "v": 1,
+                "reqId": "install-fixture-1",
+                "state": "committed",
+                "result": {
+                  "v": 1,
+                  "reqId": "install-fixture-1",
+                  "authorizationMode": "authenticated-direct",
+                  "currentVersion": 5,
+                  "resumeExpiresAt": 1767830400000,
+                  "graceExpiresAt": 1767398400000
+                }
+              }
+            }
+          }
+        },
+        {
+          "checkpoint": "pending-install-adopted"
+        }
+      ]
+    },
+    {
+      "id": "relay-direct-upgrade-commits",
+      "operation": "relay.direct-upgrade",
+      "family": "relay.direct-upgrade",
+      "sites": ["mobile/src/transport/mobile-relay-direct-upgrade.ts"],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "upgrade",
+          "id": "upgrade",
+          "args": {
+            "journal": true
+          }
+        },
+        {
+          "complete": "pairing.getEndpoints#1",
+          "params": {
+            "installReqId": "install-fixture-1"
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "v": 1,
+              "relay": {
+                "v": 1,
+                "directorUrl": "https://director.example",
+                "cellUrl": "https://cell.example",
+                "assignmentEpoch": 1,
+                "relayHostId": "relay-host-0001x",
+                "e2eeFraming": 2
+              },
+              "installStatus": {
+                "v": 1,
+                "reqId": "install-fixture-1",
+                "state": "not-found"
+              }
+            }
+          }
+        },
+        {
+          "complete": "pairing.provisionRelay#1",
+          "params": {
+            "reqId": "install-fixture-1",
+            "newResumeTokenHash": "7ehR_WuQWkxwOFJdkHfI5jEg4DeVYWImtDuip60LHK4"
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "v": 1,
+              "reqId": "install-fixture-1",
+              "authorizationMode": "authenticated-direct",
+              "currentVersion": 4,
+              "resumeExpiresAt": 1767830400000
+            }
+          }
+        },
+        {
+          "complete": "pairing.getEndpoints#2",
+          "params": {
+            "installReqId": "install-fixture-1"
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "v": 1,
+              "relay": {
+                "v": 1,
+                "directorUrl": "https://director.example",
+                "cellUrl": "https://cell.example",
+                "assignmentEpoch": 1,
+                "relayHostId": "relay-host-0001x",
+                "e2eeFraming": 2
+              },
+              "installStatus": {
+                "v": 1,
+                "reqId": "install-fixture-1",
+                "state": "committed",
+                "result": {
+                  "v": 1,
+                  "reqId": "install-fixture-1",
+                  "authorizationMode": "authenticated-direct",
+                  "currentVersion": 4,
+                  "resumeExpiresAt": 1767830400000
+                }
+              }
+            }
+          }
+        },
+        {
+          "checkpoint": "direct-upgrade-committed"
+        }
+      ]
+    },
+    {
+      "id": "relay-direct-upgrade-unsupported-host-declines",
+      "operation": "relay.direct-upgrade",
+      "family": "relay.direct-upgrade",
+      "sites": ["mobile/src/transport/mobile-relay-direct-upgrade.ts"],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "upgrade",
+          "id": "upgrade",
+          "args": {
+            "journal": true
+          }
+        },
+        {
+          "complete": "pairing.getEndpoints#1",
+          "params": {
+            "installReqId": "install-fixture-1"
+          },
+          "reply": {
+            "ok": false,
+            "error": {
+              "code": "method_not_found",
+              "message": "Unknown method"
+            }
+          }
+        },
+        {
+          "checkpoint": "upgrade-declined"
+        }
+      ]
+    },
+    {
+      "id": "relay-pairing-recovery-resume-committed",
+      "operation": "relay.pairing-recovery",
+      "family": "relay.pairing-recovery",
+      "sites": ["mobile/src/transport/mobile-relay-pairing-recovery.ts"],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "recover",
+          "id": "recover"
+        },
+        {
+          "complete": "pairing.getEndpoints#1",
+          "params": {
+            "installReqId": "install-fixture-1",
+            "resumeConfirmReqId": "confirm-fixture-1"
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "v": 1,
+              "relay": {
+                "v": 1,
+                "directorUrl": "https://director.example",
+                "cellUrl": "https://cell.example",
+                "assignmentEpoch": 1,
+                "relayHostId": "relay-host-0001x",
+                "e2eeFraming": 2
+              },
+              "installStatus": {
+                "v": 1,
+                "reqId": "install-fixture-1",
+                "state": "committed",
+                "result": {
+                  "v": 1,
+                  "reqId": "install-fixture-1",
+                  "authorizationMode": "relay-basis",
+                  "currentVersion": 4,
+                  "resumeExpiresAt": 1767830400000
+                }
+              }
+            }
+          }
+        },
+        {
+          "checkpoint": "recovered-on-resume"
+        }
+      ]
+    },
+    {
+      "id": "relay-pairing-recovery-invite-authorizes",
+      "operation": "relay.pairing-recovery",
+      "family": "relay.pairing-recovery",
+      "sites": ["mobile/src/transport/mobile-relay-pairing-recovery.ts"],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "recover",
+          "id": "recover"
+        },
+        {
+          "complete": "pairing.getEndpoints#1",
+          "params": {
+            "installReqId": "install-fixture-1",
+            "resumeConfirmReqId": "confirm-fixture-1"
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "v": 1,
+              "relay": {
+                "v": 1,
+                "directorUrl": "https://director.example",
+                "cellUrl": "https://cell.example",
+                "assignmentEpoch": 1,
+                "relayHostId": "relay-host-0001x",
+                "e2eeFraming": 2
+              },
+              "installStatus": {
+                "v": 1,
+                "reqId": "install-fixture-1",
+                "state": "not-found"
+              }
+            }
+          }
+        },
+        {
+          "complete": "pairing.getEndpoints#2",
+          "params": {
+            "installReqId": "install-fixture-1"
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "v": 1,
+              "relay": {
+                "v": 1,
+                "directorUrl": "https://director.example",
+                "cellUrl": "https://cell.example",
+                "assignmentEpoch": 1,
+                "relayHostId": "relay-host-0001x",
+                "e2eeFraming": 2
+              },
+              "installStatus": {
+                "v": 1,
+                "reqId": "install-fixture-1",
+                "state": "not-found"
+              }
+            }
+          }
+        },
+        {
+          "complete": "pairing.provisionRelay#1",
+          "params": {
+            "reqId": "install-fixture-1",
+            "newResumeTokenHash": "7ehR_WuQWkxwOFJdkHfI5jEg4DeVYWImtDuip60LHK4"
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "v": 1,
+              "reqId": "install-fixture-1",
+              "authorizationMode": "relay-basis",
+              "currentVersion": 4,
+              "resumeExpiresAt": 1767830400000
+            }
+          }
+        },
+        {
+          "complete": "pairing.getEndpoints#3",
+          "params": {
+            "installReqId": "install-fixture-1"
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "v": 1,
+              "relay": {
+                "v": 1,
+                "directorUrl": "https://director.example",
+                "cellUrl": "https://cell.example",
+                "assignmentEpoch": 1,
+                "relayHostId": "relay-host-0001x",
+                "e2eeFraming": 2
+              },
+              "installStatus": {
+                "v": 1,
+                "reqId": "install-fixture-1",
+                "state": "committed",
+                "result": {
+                  "v": 1,
+                  "reqId": "install-fixture-1",
+                  "authorizationMode": "relay-basis",
+                  "currentVersion": 4,
+                  "resumeExpiresAt": 1767830400000
+                }
+              }
+            }
+          }
+        },
+        {
+          "checkpoint": "recovered-through-invite"
+        }
+      ]
+    },
+    {
+      "id": "pairing-pre-profile-direct-wins-and-provisions",
+      "operation": "pairing.pre-profile",
+      "family": "pairing.pre-profile",
+      "sites": [
+        "mobile/src/transport/pre-profile-pairing-coordinator.ts",
+        "mobile/src/transport/pairing-candidate-race.ts"
+      ],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "pair",
+          "id": "pair"
+        },
+        {
+          "bind": "direct-status",
+          "request": "status.get#1",
+          "params": {
+            "$undefined": true
+          }
+        },
+        {
+          "bind": "relay-status",
+          "request": "status.get#2",
+          "params": {
+            "$undefined": true
+          }
+        },
+        {
+          "complete": "direct-status",
+          "params": {
+            "$undefined": true
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "capabilities": []
+            }
+          }
+        },
+        {
+          "complete": "relay-status",
+          "params": {
+            "$undefined": true
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "capabilities": []
+            }
+          }
+        },
+        {
+          "complete": "pairing.provisionRelay#1",
+          "params": {
+            "reqId": "install-l99UBPM71AZiC1ghz2glnA",
+            "newResumeTokenHash": "yrnYzw4B0YZ_R6Tcm4arO3oysaG7lsPjvyp4uWmdBtU"
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "v": 1,
+              "reqId": "install-l99UBPM71AZiC1ghz2glnA",
+              "authorizationMode": "authenticated-direct",
+              "currentVersion": 4,
+              "resumeExpiresAt": 1767830400000
+            }
+          }
+        },
+        {
+          "complete": "pairing.getEndpoints#1",
+          "params": {
+            "installReqId": "install-l99UBPM71AZiC1ghz2glnA"
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "v": 1,
+              "relay": {
+                "v": 1,
+                "directorUrl": "https://director.example",
+                "cellUrl": "https://cell.example",
+                "assignmentEpoch": 1,
+                "relayHostId": "relay-host-0001x",
+                "e2eeFraming": 2
+              },
+              "installStatus": {
+                "v": 1,
+                "reqId": "install-l99UBPM71AZiC1ghz2glnA",
+                "state": "committed",
+                "result": {
+                  "v": 1,
+                  "reqId": "install-l99UBPM71AZiC1ghz2glnA",
+                  "authorizationMode": "authenticated-direct",
+                  "currentVersion": 4,
+                  "resumeExpiresAt": 1767830400000
+                }
+              }
+            }
+          }
+        },
+        {
+          "checkpoint": "paired-over-direct"
+        }
+      ]
+    },
+    {
+      "id": "pairing-pre-profile-provision-unsupported-saves-direct-host",
+      "operation": "pairing.pre-profile",
+      "family": "pairing.pre-profile",
+      "sites": [
+        "mobile/src/transport/pre-profile-pairing-coordinator.ts",
+        "mobile/src/transport/pairing-candidate-race.ts"
+      ],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "pair",
+          "id": "pair"
+        },
+        {
+          "bind": "direct-status",
+          "request": "status.get#1",
+          "params": {
+            "$undefined": true
+          }
+        },
+        {
+          "bind": "relay-status",
+          "request": "status.get#2",
+          "params": {
+            "$undefined": true
+          }
+        },
+        {
+          "complete": "direct-status",
+          "params": {
+            "$undefined": true
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "capabilities": []
+            }
+          }
+        },
+        {
+          "complete": "relay-status",
+          "params": {
+            "$undefined": true
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "capabilities": []
+            }
+          }
+        },
+        {
+          "complete": "pairing.provisionRelay#1",
+          "params": {
+            "reqId": "install-l99UBPM71AZiC1ghz2glnA",
+            "newResumeTokenHash": "yrnYzw4B0YZ_R6Tcm4arO3oysaG7lsPjvyp4uWmdBtU"
+          },
+          "reply": {
+            "ok": false,
+            "error": {
+              "code": "method_not_found",
+              "message": "Unknown method"
+            }
+          }
+        },
+        {
+          "checkpoint": "direct-host-saved"
+        }
+      ]
+    },
+    {
+      "id": "pairing-pre-profile-times-out",
+      "operation": "pairing.pre-profile",
+      "family": "pairing.pre-profile",
+      "sites": [
+        "mobile/src/transport/pre-profile-pairing-coordinator.ts",
+        "mobile/src/transport/pairing-candidate-race.ts"
+      ],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "pair",
+          "id": "pair",
+          "args": {
+            "timeoutMs": 5000
+          }
+        },
+        {
+          "checkpoint": "racing"
+        },
+        {
+          "advance": 5000
+        },
+        {
+          "checkpoint": "timed-out"
+        }
+      ]
+    },
+    {
       "id": "transport-capability-probe-cutover-reasks-fast",
       "operation": "transport.capability-probe",
       "family": "transport.capability-probe",
@@ -10775,7 +11721,10 @@
           "complete": "gitlab.workItemDetails#1",
           "params": {
             "iid": 4,
-            "projectRef": { "host": "gitlab.com", "path": "group/project" },
+            "projectRef": {
+              "host": "gitlab.com",
+              "path": "group/project"
+            },
             "repo": "id:repo-1",
             "type": "issue"
           },
@@ -10818,7 +11767,10 @@
           "complete": "gitlab.workItemDetails#1",
           "params": {
             "iid": 4,
-            "projectRef": { "host": "gitlab.com", "path": "group/project" },
+            "projectRef": {
+              "host": "gitlab.com",
+              "path": "group/project"
+            },
             "repo": "id:repo-1",
             "type": "issue"
           },
@@ -11113,10 +12065,8 @@
         {
           "complete": "github.listWorkItems#1",
           "params": {
-            "before": {
-              "$undefined": true
-            },
             "limit": 36,
+            "page": 1,
             "query": "is:issue bug",
             "repo": "id:repo-1"
           },
@@ -11653,7 +12603,10 @@
           "params": {
             "body": "a comment",
             "number": 4,
-            "projectRef": { "host": "gitlab.com", "path": "group/project" },
+            "projectRef": {
+              "host": "gitlab.com",
+              "path": "group/project"
+            },
             "repo": "id:repo-1"
           },
           "reply": {
@@ -11694,7 +12647,10 @@
           "params": {
             "body": "a comment",
             "iid": 7,
-            "projectRef": { "host": "gitlab.com", "path": "group/project" },
+            "projectRef": {
+              "host": "gitlab.com",
+              "path": "group/project"
+            },
             "repo": "id:repo-1"
           },
           "reply": {
@@ -11990,7 +12946,10 @@
           "params": {
             "iid": 7,
             "method": "squash",
-            "projectRef": { "host": "gitlab.com", "path": "group/project" },
+            "projectRef": {
+              "host": "gitlab.com",
+              "path": "group/project"
+            },
             "repo": "id:repo-1"
           },
           "reply": {
@@ -12024,7 +12983,10 @@
           "complete": "gitlab.updateIssue#1",
           "params": {
             "number": 4,
-            "projectRef": { "host": "gitlab.com", "path": "group/project" },
+            "projectRef": {
+              "host": "gitlab.com",
+              "path": "group/project"
+            },
             "repo": "id:repo-1",
             "updates": {
               "state": "closed"
@@ -12086,7 +13048,10 @@
           "complete": "gitlab.updateMRState#1",
           "params": {
             "iid": 7,
-            "projectRef": { "host": "gitlab.com", "path": "group/project" },
+            "projectRef": {
+              "host": "gitlab.com",
+              "path": "group/project"
+            },
             "repo": "id:repo-1",
             "state": "closed"
           },
@@ -12158,7 +13123,10 @@
           "complete": "gitlab.updateIssue#1",
           "params": {
             "number": 4,
-            "projectRef": { "host": "gitlab.com", "path": "group/project" },
+            "projectRef": {
+              "host": "gitlab.com",
+              "path": "group/project"
+            },
             "repo": "id:repo-1",
             "updates": {
               "addLabels": ["triage"],
@@ -12196,7 +13164,10 @@
           "complete": "gitlab.updateMR#1",
           "params": {
             "iid": 7,
-            "projectRef": { "host": "gitlab.com", "path": "group/project" },
+            "projectRef": {
+              "host": "gitlab.com",
+              "path": "group/project"
+            },
             "repo": "id:repo-1",
             "updates": {
               "addLabels": ["triage"],
@@ -13578,7 +14549,8 @@
           "params": {
             "audioBase64": "ACVKb5S53gM=",
             "dictationId": "dictation-1",
-            "sampleRate": 16000
+            "sampleRate": 16000,
+            "seq": 0
           },
           "reply": {
             "ok": true,
@@ -14139,6 +15111,90 @@
         },
         {
           "checkpoint": "resubscribed"
+        }
+      ]
+    },
+    {
+      "id": "notifications-push-registered",
+      "operation": "notifications.push-registration",
+      "family": "notifications.push-registration",
+      "sites": ["mobile/src/notifications/push-registration.ts"],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "register",
+          "id": "register"
+        },
+        {
+          "complete": "notifications.registerPush#1",
+          "params": {
+            "filter": {
+              "onlyWhenDesktopAway": true,
+              "sound": true
+            },
+            "apnsEnvironment": "production",
+            "platform": "ios",
+            "token": "apns-token-1"
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "registered": true,
+              "registrationId": "registration-1"
+            }
+          }
+        },
+        {
+          "action": "unregister",
+          "id": "unregister"
+        },
+        {
+          "complete": "notifications.unregisterPush#1",
+          "params": null,
+          "reply": {
+            "ok": true,
+            "result": {
+              "unregistered": true
+            }
+          }
+        },
+        {
+          "checkpoint": "settled"
+        }
+      ]
+    },
+    {
+      "id": "notifications-push-gateway-rejected",
+      "operation": "notifications.push-registration",
+      "family": "notifications.push-registration",
+      "sites": ["mobile/src/notifications/push-registration.ts"],
+      "schedules": [],
+      "steps": [
+        {
+          "action": "register",
+          "id": "register"
+        },
+        {
+          "complete": "notifications.registerPush#1",
+          "params": {
+            "filter": {
+              "onlyWhenDesktopAway": true,
+              "sound": true
+            },
+            "apnsEnvironment": "production",
+            "platform": "ios",
+            "token": "apns-token-1"
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "registered": false,
+              "reason": "gateway_rejected"
+            }
+          }
+        },
+        {
+          "checkpoint": "not-registered"
         }
       ]
     },
@@ -15018,7 +16074,7 @@
           "complete": "terminal.send#1",
           "params": {
             "terminal": "terminal-1",
-            "text": "\u001b[200~@/tmp/img.png\u001b[201~ ",
+            "text": "\u001b[200~/tmp/img.png\u001b[201~ ",
             "enter": false,
             "client": {
               "id": "device-token-1",
@@ -15169,7 +16225,7 @@
           "complete": "terminal.send#1",
           "params": {
             "terminal": "terminal-1",
-            "text": "\u001b[200~@/tmp/img.png\u001b[201~ ",
+            "text": "\u001b[200~/tmp/img.png\u001b[201~ ",
             "enter": false
           },
           "reply": {
@@ -15190,7 +16246,7 @@
       "id": "native-chat-image-paste-single",
       "operation": "nativeChat.image-paste",
       "family": "nativeChat.image-paste",
-      "sites": ["mobile/src/session/mobile-native-chat-image-send.ts"],
+      "sites": ["mobile/src/session/native-chat/composer/mobile-native-chat-image-send.ts"],
       "schedules": [],
       "steps": [
         {
@@ -15246,7 +16302,7 @@
       "id": "native-chat-image-paste-two-images",
       "operation": "nativeChat.image-paste",
       "family": "nativeChat.image-paste",
-      "sites": ["mobile/src/session/mobile-native-chat-image-send.ts"],
+      "sites": ["mobile/src/session/native-chat/composer/mobile-native-chat-image-send.ts"],
       "schedules": [],
       "steps": [
         {
@@ -15322,7 +16378,7 @@
       "id": "native-chat-image-paste-stops-on-rejection",
       "operation": "nativeChat.image-paste",
       "family": "nativeChat.image-paste",
-      "sites": ["mobile/src/session/mobile-native-chat-image-send.ts"],
+      "sites": ["mobile/src/session/native-chat/composer/mobile-native-chat-image-send.ts"],
       "schedules": [],
       "steps": [
         {
@@ -15378,7 +16434,7 @@
       "id": "native-chat-image-paste-trailing-image",
       "operation": "nativeChat.image-paste",
       "family": "nativeChat.image-paste",
-      "sites": ["mobile/src/session/mobile-native-chat-image-send.ts"],
+      "sites": ["mobile/src/session/native-chat/composer/mobile-native-chat-image-send.ts"],
       "schedules": [],
       "steps": [
         {
@@ -15434,7 +16490,7 @@
       "id": "native-chat-write-accepted",
       "operation": "nativeChat.terminal-write",
       "family": "nativeChat.terminal-write",
-      "sites": ["mobile/src/session/mobile-native-chat-send.ts"],
+      "sites": ["mobile/src/session/native-chat/mobile-native-chat-send.ts"],
       "schedules": [],
       "steps": [
         {
@@ -15482,7 +16538,7 @@
       "id": "native-chat-write-rejected",
       "operation": "nativeChat.terminal-write",
       "family": "nativeChat.terminal-write",
-      "sites": ["mobile/src/session/mobile-native-chat-send.ts"],
+      "sites": ["mobile/src/session/native-chat/mobile-native-chat-send.ts"],
       "schedules": [],
       "steps": [
         {
@@ -15518,7 +16574,7 @@
       "id": "native-chat-write-delivery-unknown",
       "operation": "nativeChat.terminal-write",
       "family": "nativeChat.terminal-write",
-      "sites": ["mobile/src/session/mobile-native-chat-send.ts"],
+      "sites": ["mobile/src/session/native-chat/mobile-native-chat-send.ts"],
       "schedules": [],
       "steps": [
         {
@@ -15550,7 +16606,7 @@
       "id": "native-chat-write-clear-line",
       "operation": "nativeChat.terminal-write",
       "family": "nativeChat.terminal-write",
-      "sites": ["mobile/src/session/mobile-native-chat-send.ts"],
+      "sites": ["mobile/src/session/native-chat/mobile-native-chat-send.ts"],
       "schedules": [],
       "steps": [
         {
@@ -15586,7 +16642,7 @@
       "id": "native-chat-write-typed-command",
       "operation": "nativeChat.terminal-write",
       "family": "nativeChat.terminal-write",
-      "sites": ["mobile/src/session/mobile-native-chat-send.ts"],
+      "sites": ["mobile/src/session/native-chat/mobile-native-chat-send.ts"],
       "schedules": [],
       "steps": [
         {
@@ -15703,7 +16759,9 @@
       "id": "native-chat-session-option-pick-written",
       "operation": "nativeChat.session-option-pick",
       "family": "nativeChat.session-option-pick",
-      "sites": ["mobile/src/session/mobile-native-chat-session-option-persistence.ts"],
+      "sites": [
+        "mobile/src/session/native-chat/input/mobile-native-chat-session-option-persistence.ts"
+      ],
       "schedules": [],
       "steps": [
         {
@@ -15739,7 +16797,9 @@
       "id": "native-chat-session-option-pick-refused",
       "operation": "nativeChat.session-option-pick",
       "family": "nativeChat.session-option-pick",
-      "sites": ["mobile/src/session/mobile-native-chat-session-option-persistence.ts"],
+      "sites": [
+        "mobile/src/session/native-chat/input/mobile-native-chat-session-option-persistence.ts"
+      ],
       "schedules": [],
       "steps": [
         {
@@ -15776,7 +16836,9 @@
       "id": "native-chat-session-option-pick-empty",
       "operation": "nativeChat.session-option-pick",
       "family": "nativeChat.session-option-pick",
-      "sites": ["mobile/src/session/mobile-native-chat-session-option-persistence.ts"],
+      "sites": [
+        "mobile/src/session/native-chat/input/mobile-native-chat-session-option-persistence.ts"
+      ],
       "schedules": [],
       "steps": [
         {
@@ -16904,7 +17966,7 @@
           "checkpoint": "first-accepted"
         },
         {
-          "advance": 120
+          "advance": 1000
         },
         {
           "complete": "terminal.send#2",
@@ -16962,7 +18024,7 @@
           }
         },
         {
-          "advance": 120
+          "advance": 1000
         },
         {
           "complete": "terminal.send#2",
@@ -17016,7 +18078,7 @@
           }
         },
         {
-          "advance": 120
+          "advance": 1000
         },
         {
           "complete": "terminal.send#2",
@@ -17393,7 +18455,7 @@
         "mobile/src/session/use-mobile-diff-review-comment-actions.ts",
         "mobile/src/session/use-mobile-diff-review-git-actions.ts",
         "mobile/src/session/use-mobile-diff-review-send-actions.ts",
-        "mobile/src/session/mobile-native-chat-stale-input.ts"
+        "mobile/src/session/native-chat/mobile-native-chat-stale-input.ts"
       ],
       "schedules": [],
       "steps": [
@@ -17405,6 +18467,17 @@
           "complete": "worktree.set#1",
           "params": {
             "diffComments": [
+              {
+                "body": "needs a test",
+                "createdAt": 0,
+                "filePath": "src/app.ts",
+                "id": "note-1",
+                "lineNumber": 4,
+                "worktreeId": "workspace-1",
+                "side": "modified"
+              }
+            ],
+            "diffCommentsBase": [
               {
                 "body": "needs a test",
                 "createdAt": 0,
@@ -17459,7 +18532,7 @@
         "mobile/src/session/use-mobile-diff-review-comment-actions.ts",
         "mobile/src/session/use-mobile-diff-review-git-actions.ts",
         "mobile/src/session/use-mobile-diff-review-send-actions.ts",
-        "mobile/src/session/mobile-native-chat-stale-input.ts"
+        "mobile/src/session/native-chat/mobile-native-chat-stale-input.ts"
       ],
       "schedules": [],
       "steps": [
@@ -17471,6 +18544,17 @@
           "complete": "worktree.set#1",
           "params": {
             "diffComments": [
+              {
+                "body": "needs a test",
+                "createdAt": 0,
+                "filePath": "src/app.ts",
+                "id": "note-1",
+                "lineNumber": 4,
+                "worktreeId": "workspace-1",
+                "side": "modified"
+              }
+            ],
+            "diffCommentsBase": [
               {
                 "body": "needs a test",
                 "createdAt": 0,
@@ -17526,7 +18610,7 @@
         "mobile/src/session/use-mobile-diff-review-comment-actions.ts",
         "mobile/src/session/use-mobile-diff-review-git-actions.ts",
         "mobile/src/session/use-mobile-diff-review-send-actions.ts",
-        "mobile/src/session/mobile-native-chat-stale-input.ts"
+        "mobile/src/session/native-chat/mobile-native-chat-stale-input.ts"
       ],
       "schedules": [],
       "steps": [
@@ -17561,7 +18645,7 @@
         "mobile/src/session/use-mobile-diff-review-comment-actions.ts",
         "mobile/src/session/use-mobile-diff-review-git-actions.ts",
         "mobile/src/session/use-mobile-diff-review-send-actions.ts",
-        "mobile/src/session/mobile-native-chat-stale-input.ts"
+        "mobile/src/session/native-chat/mobile-native-chat-stale-input.ts"
       ],
       "schedules": [],
       "steps": [
@@ -17597,7 +18681,7 @@
         "mobile/src/session/use-mobile-diff-review-comment-actions.ts",
         "mobile/src/session/use-mobile-diff-review-git-actions.ts",
         "mobile/src/session/use-mobile-diff-review-send-actions.ts",
-        "mobile/src/session/mobile-native-chat-stale-input.ts"
+        "mobile/src/session/native-chat/mobile-native-chat-stale-input.ts"
       ],
       "schedules": [],
       "steps": [
@@ -17633,7 +18717,7 @@
         "mobile/src/session/use-mobile-diff-review-comment-actions.ts",
         "mobile/src/session/use-mobile-diff-review-git-actions.ts",
         "mobile/src/session/use-mobile-diff-review-send-actions.ts",
-        "mobile/src/session/mobile-native-chat-stale-input.ts"
+        "mobile/src/session/native-chat/mobile-native-chat-stale-input.ts"
       ],
       "schedules": [],
       "steps": [
@@ -17675,7 +18759,7 @@
         "mobile/src/session/use-mobile-diff-review-comment-actions.ts",
         "mobile/src/session/use-mobile-diff-review-git-actions.ts",
         "mobile/src/session/use-mobile-diff-review-send-actions.ts",
-        "mobile/src/session/mobile-native-chat-stale-input.ts"
+        "mobile/src/session/native-chat/mobile-native-chat-stale-input.ts"
       ],
       "schedules": [],
       "steps": [
@@ -17735,7 +18819,7 @@
             },
             "prompt": {
               "delivery": "submit",
-              "text": "You are reviewing the current worktree. Address the following mobile review notes.\n\nFile: src/app.ts\nLine: 4\nUser comment: \"needs a test\"\n\nAfter applying fixes:\n1. Summarize changed files.\n2. Run relevant tests.\n3. Tell me if anything remains risky."
+              "text": "File: src/app.ts\nLine: 4\nUser comment: \"needs a test\""
             },
             "launchSource": "notes_send"
           },
@@ -18030,7 +19114,7 @@
       "id": "native-chat-image-upload-start-refused",
       "operation": "nativeChat.image-upload",
       "family": "nativeChat.image-upload",
-      "sites": ["mobile/src/session/mobile-native-chat-image-attachment.ts"],
+      "sites": ["mobile/src/session/native-chat/composer/mobile-native-chat-image-attachment.ts"],
       "schedules": [],
       "steps": [
         {
@@ -18060,7 +19144,7 @@
       "id": "native-chat-image-upload-single",
       "operation": "nativeChat.image-upload",
       "family": "nativeChat.image-upload",
-      "sites": ["mobile/src/session/mobile-native-chat-image-attachment.ts"],
+      "sites": ["mobile/src/session/native-chat/composer/mobile-native-chat-image-attachment.ts"],
       "schedules": [],
       "steps": [
         {
@@ -18113,7 +19197,7 @@
       "id": "native-chat-image-upload-two",
       "operation": "nativeChat.image-upload",
       "family": "nativeChat.image-upload",
-      "sites": ["mobile/src/session/mobile-native-chat-image-attachment.ts"],
+      "sites": ["mobile/src/session/native-chat/composer/mobile-native-chat-image-attachment.ts"],
       "schedules": [],
       "steps": [
         {
@@ -18203,7 +19287,7 @@
       "id": "native-chat-image-upload-second-fails",
       "operation": "nativeChat.image-upload",
       "family": "nativeChat.image-upload",
-      "sites": ["mobile/src/session/mobile-native-chat-image-attachment.ts"],
+      "sites": ["mobile/src/session/native-chat/composer/mobile-native-chat-image-attachment.ts"],
       "schedules": [],
       "steps": [
         {
@@ -18270,7 +19354,7 @@
       "id": "native-chat-image-upload-cancelled",
       "operation": "nativeChat.image-upload",
       "family": "nativeChat.image-upload",
-      "sites": ["mobile/src/session/mobile-native-chat-image-attachment.ts"],
+      "sites": ["mobile/src/session/native-chat/composer/mobile-native-chat-image-attachment.ts"],
       "schedules": [],
       "steps": [
         {
@@ -18428,10 +19512,7 @@
       "id": "codex-reset-credit-consumed",
       "operation": "accounts.codex-reset-credit",
       "family": "components.codex-reset-credit",
-      "sites": [
-        "mobile/src/components/codex-reset-credit.ts",
-        "mobile/src/storage/codex-reset-attempt-journal.ts"
-      ],
+      "sites": ["mobile/src/components/codex-reset-credit.ts"],
       "schedules": [],
       "deviceStore": {},
       "steps": [
@@ -18514,90 +19595,67 @@
       ]
     },
     {
-      "id": "codex-reset-credit-resumed",
-      "operation": "accounts.codex-reset-credit",
-      "family": "components.codex-reset-credit",
-      "sites": ["mobile/src/storage/codex-reset-attempt-journal.ts"],
+      "id": "push-dismissal-tray-reconciled",
+      "operation": "notifications.push-dismissal",
+      "family": "notifications.push-dismissal",
+      "sites": ["mobile/src/notifications/push-dismissal-reconciliation.ts"],
       "schedules": [],
       "deviceStore": {
-        "orca:codex-reset-credit-attempt:v1:0832055c2fa90e8e145c588ad4db656a2fc2840ed2e851a28494eae769db9b3e": "{\"v\":1,\"hostId\":\"host-1\",\"expectedScope\":{\"target\":{\"runtime\":\"host\",\"wslDistro\":null},\"accountId\":\"codex-1\",\"accountRevision\":1700000000000,\"offerRevision\":\"v1:[1,null,null,[],null,null,1700000000000]\"},\"idempotencyKey\":\"11111111-1111-4111-8111-111111111111\"}"
+        "orca:hosts": "[{\"id\":\"host-1\",\"name\":\"Desk\",\"endpoint\":\"wss://desk.test\",\"publicKeyB64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"lastConnected\":1700000000000}]"
+      },
+      "deviceState": {
+        "notificationTray": [
+          {
+            "request": {
+              "identifier": "tray-1",
+              "content": {
+                "data": {
+                  "hostFingerprint": "Yw3NKWbEM2aRElRI",
+                  "kind": "alert",
+                  "notificationId": "note-1",
+                  "notificationEpoch": "epoch-1",
+                  "notificationSeq": 7
+                }
+              }
+            }
+          }
+        ]
       },
       "steps": [
         {
-          "action": "confirm",
-          "id": "confirm"
+          "action": "catchup",
+          "id": "catchup"
         },
         {
           "checkpoint": "requested"
         },
         {
-          "complete": "accounts.consumeCodexResetCredit#1",
+          "complete": "notifications.getMissedSince#1",
           "params": {
-            "idempotencyKey": "11111111-1111-4111-8111-111111111111",
-            "expectedScope": {
-              "target": {
-                "runtime": "host",
-                "wslDistro": null
-              },
-              "accountId": "codex-1",
-              "accountRevision": 1700000000000,
-              "offerRevision": "v1:[1,null,null,[],null,null,1700000000000]"
-            }
+            "lastSeenSeq": 9007199254740991,
+            "deliveredPushes": [
+              {
+                "notificationId": "note-1",
+                "notificationEpoch": "epoch-1",
+                "notificationSeq": 7
+              }
+            ]
           },
           "reply": {
             "ok": true,
             "result": {
-              "outcome": "alreadyRedeemed",
-              "scope": {
-                "target": {
-                  "runtime": "host",
-                  "wslDistro": null
-                },
-                "accountId": "codex-1",
-                "accountRevision": 1700000000000,
-                "offerRevision": "v1:[1,null,null,[],null,null,1700000000000]"
-              },
-              "snapshot": {
-                "claude": {
-                  "accounts": [],
-                  "activeAccountId": null
-                },
-                "codex": {
-                  "accounts": [
-                    {
-                      "id": "codex-1",
-                      "email": "codex@example.test",
-                      "updatedAt": 1700000000000
-                    }
-                  ],
-                  "activeAccountId": "codex-1",
-                  "activeAccountIdsByRuntime": {
-                    "host": "codex-1",
-                    "wsl": {}
-                  }
-                },
-                "rateLimits": {
-                  "claude": null,
-                  "codex": {
-                    "provider": "codex",
-                    "session": null,
-                    "weekly": null,
-                    "rateLimitResetCredits": {
-                      "availableCount": 1
-                    },
-                    "updatedAt": 1700000000000,
-                    "error": null,
-                    "status": "ok"
-                  },
-                  "inactiveClaudeAccounts": [],
-                  "inactiveCodexAccounts": []
+              "dismissedPushes": [
+                {
+                  "notificationId": "note-1",
+                  "notificationEpoch": "epoch-1",
+                  "notificationSeq": 7
                 }
-              }
+              ]
             }
           }
         },
         {
-          "checkpoint": "consumed"
+          "checkpoint": "reconciled"
         }
       ]
     },
@@ -19023,7 +20081,12 @@
       "sites": ["mobile/src/settings/notification-display-test.tsx"],
       "schedules": [],
       "deviceStore": {
+        "orca:pushServiceNotificationsEnabled": "true",
         "orca:hosts": "[{\"id\":\"host-1\",\"name\":\"Desk\",\"endpoint\":\"ws://desk.local:7777\",\"publicKeyB64\":\"AAAA\",\"lastConnected\":1700000000000}]"
+      },
+      "deviceState": {
+        "notificationPermissions": { "status": "granted", "canAskAgain": true },
+        "pushToken": { "type": "ios", "data": "fixture-apns-token" }
       },
       "steps": [
         {
@@ -19062,7 +20125,12 @@
       "sites": ["mobile/src/settings/notification-display-test.tsx"],
       "schedules": [],
       "deviceStore": {
+        "orca:pushServiceNotificationsEnabled": "true",
         "orca:hosts": "[{\"id\":\"host-1\",\"name\":\"Desk\",\"endpoint\":\"ws://desk.local:7777\",\"publicKeyB64\":\"AAAA\",\"lastConnected\":1700000000000}]"
+      },
+      "deviceState": {
+        "notificationPermissions": { "status": "granted", "canAskAgain": true },
+        "pushToken": { "type": "ios", "data": "fixture-apns-token" }
       },
       "steps": [
         {
@@ -19102,7 +20170,12 @@
       "sites": ["mobile/src/settings/notification-display-test.tsx"],
       "schedules": [],
       "deviceStore": {
+        "orca:pushServiceNotificationsEnabled": "true",
         "orca:hosts": "[{\"id\":\"host-1\",\"name\":\"Desk\",\"endpoint\":\"ws://desk.local:7777\",\"publicKeyB64\":\"AAAA\",\"lastConnected\":1700000000000}]"
+      },
+      "deviceState": {
+        "notificationPermissions": { "status": "granted", "canAskAgain": true },
+        "pushToken": { "type": "ios", "data": "fixture-apns-token" }
       },
       "steps": [
         {
@@ -19142,7 +20215,12 @@
       "sites": ["mobile/src/settings/notification-display-test.tsx"],
       "schedules": [],
       "deviceStore": {
+        "orca:pushServiceNotificationsEnabled": "true",
         "orca:hosts": "[{\"id\":\"host-1\",\"name\":\"Desk\",\"endpoint\":\"ws://desk.local:7777\",\"publicKeyB64\":\"AAAA\",\"lastConnected\":1700000000000}]"
+      },
+      "deviceState": {
+        "notificationPermissions": { "status": "granted", "canAskAgain": true },
+        "pushToken": { "type": "ios", "data": "fixture-apns-token" }
       },
       "steps": [
         {
@@ -19682,7 +20760,8 @@
         {
           "complete": "git.status#1",
           "params": {
-            "worktree": "id:repo42::/p"
+            "worktree": "id:repo42::/p",
+            "includeLineStats": false
           },
           "reply": {
             "ok": true,
@@ -19894,6 +20973,286 @@
       ]
     },
     {
+      "id": "notifications-desktop-stream",
+      "operation": "notifications.desktop-stream",
+      "family": "notifications.desktop-stream",
+      "sites": ["mobile/src/notifications/mobile-notifications.ts"],
+      "schedules": [],
+      "deviceStore": {
+        "orca:hosts": "[{\"id\":\"host-1\",\"name\":\"Desk\",\"endpoint\":\"wss://desk.test\",\"publicKeyB64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"lastConnected\":1700000000000}]"
+      },
+      "deviceState": {
+        "notificationTray": [
+          {
+            "request": {
+              "identifier": "tray-1",
+              "content": {
+                "data": {
+                  "hostFingerprint": "Yw3NKWbEM2aRElRI",
+                  "kind": "alert",
+                  "notificationId": "note-1",
+                  "notificationEpoch": "epoch-1",
+                  "notificationSeq": 7
+                }
+              }
+            }
+          },
+          {
+            "request": {
+              "identifier": "tray-2",
+              "content": {
+                "data": {
+                  "hostFingerprint": "Yw3NKWbEM2aRElRI",
+                  "kind": "alert",
+                  "notificationId": "note-2",
+                  "notificationEpoch": "epoch-1",
+                  "notificationSeq": 8
+                }
+              }
+            }
+          }
+        ]
+      },
+      "steps": [
+        {
+          "action": "start",
+          "id": "start"
+        },
+        {
+          "checkpoint": "subscribed"
+        },
+        {
+          "frame": "notifications.subscribe#1",
+          "params": {
+            "includeDesktopSuppressed": true
+          },
+          "reply": {
+            "ok": true,
+            "streaming": true,
+            "result": {
+              "type": "ready",
+              "subscriptionId": "sub-1"
+            }
+          }
+        },
+        {
+          "checkpoint": "ready"
+        },
+        {
+          "complete": "notifications.getMissedSince#1",
+          "params": {
+            "lastSeenSeq": 9007199254740991,
+            "deliveredPushes": [
+              {
+                "notificationId": "note-1",
+                "notificationEpoch": "epoch-1",
+                "notificationSeq": 7
+              },
+              {
+                "notificationId": "note-2",
+                "notificationEpoch": "epoch-1",
+                "notificationSeq": 8
+              }
+            ]
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "dismissedPushes": [
+                {
+                  "notificationId": "note-1",
+                  "notificationEpoch": "epoch-1",
+                  "notificationSeq": 7
+                }
+              ]
+            }
+          }
+        },
+        {
+          "checkpoint": "caught-up"
+        },
+        {
+          "frame": "notifications.subscribe#1",
+          "params": {
+            "includeDesktopSuppressed": true
+          },
+          "reply": {
+            "ok": true,
+            "streaming": true,
+            "result": {
+              "type": "dismiss",
+              "notificationId": "note-2",
+              "notificationEpoch": "epoch-1",
+              "notificationSeq": 8
+            }
+          }
+        },
+        {
+          "checkpoint": "dismissed"
+        },
+        {
+          "action": "stop",
+          "id": "stop"
+        },
+        {
+          "checkpoint": "unsubscribing"
+        },
+        {
+          "checkpoint": "stopped"
+        }
+      ]
+    },
+    {
+      "id": "notifications-desktop-stream-replayed",
+      "operation": "notifications.desktop-stream",
+      "family": "notifications.desktop-stream",
+      "sites": ["mobile/src/notifications/mobile-notifications.ts"],
+      "schedules": [],
+      "deviceStore": {
+        "orca:hosts": "[{\"id\":\"host-1\",\"name\":\"Desk\",\"endpoint\":\"wss://desk.test\",\"publicKeyB64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"lastConnected\":1700000000000}]"
+      },
+      "deviceState": {
+        "notificationTray": [
+          {
+            "request": {
+              "identifier": "tray-1",
+              "content": {
+                "data": {
+                  "hostFingerprint": "Yw3NKWbEM2aRElRI",
+                  "kind": "alert",
+                  "notificationId": "note-1",
+                  "notificationEpoch": "epoch-1",
+                  "notificationSeq": 7
+                }
+              }
+            }
+          },
+          {
+            "request": {
+              "identifier": "tray-2",
+              "content": {
+                "data": {
+                  "hostFingerprint": "Yw3NKWbEM2aRElRI",
+                  "kind": "alert",
+                  "notificationId": "note-2",
+                  "notificationEpoch": "epoch-1",
+                  "notificationSeq": 8
+                }
+              }
+            }
+          }
+        ]
+      },
+      "steps": [
+        {
+          "action": "start",
+          "id": "start"
+        },
+        {
+          "frame": "notifications.subscribe#1",
+          "params": {
+            "includeDesktopSuppressed": true
+          },
+          "reply": {
+            "ok": true,
+            "streaming": true,
+            "result": {
+              "type": "ready",
+              "subscriptionId": "sub-1"
+            }
+          }
+        },
+        {
+          "complete": "notifications.getMissedSince#1",
+          "params": {
+            "lastSeenSeq": 9007199254740991,
+            "deliveredPushes": [
+              {
+                "notificationId": "note-1",
+                "notificationEpoch": "epoch-1",
+                "notificationSeq": 7
+              },
+              {
+                "notificationId": "note-2",
+                "notificationEpoch": "epoch-1",
+                "notificationSeq": 8
+              }
+            ]
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "dismissedPushes": []
+            }
+          }
+        },
+        {
+          "checkpoint": "ready"
+        },
+        {
+          "action": "cutover",
+          "id": "cutover"
+        },
+        {
+          "checkpoint": "re-subscribed"
+        },
+        {
+          "frame": "notifications.subscribe#2",
+          "params": {
+            "includeDesktopSuppressed": true
+          },
+          "reply": {
+            "ok": true,
+            "streaming": true,
+            "result": {
+              "type": "ready",
+              "subscriptionId": "sub-2"
+            }
+          }
+        },
+        {
+          "complete": "notifications.getMissedSince#2",
+          "params": {
+            "lastSeenSeq": 9007199254740991,
+            "deliveredPushes": [
+              {
+                "notificationId": "note-1",
+                "notificationEpoch": "epoch-1",
+                "notificationSeq": 7
+              },
+              {
+                "notificationId": "note-2",
+                "notificationEpoch": "epoch-1",
+                "notificationSeq": 8
+              }
+            ]
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "dismissedPushes": [
+                {
+                  "notificationId": "note-2",
+                  "notificationEpoch": "epoch-1",
+                  "notificationSeq": 8
+                }
+              ]
+            }
+          }
+        },
+        {
+          "checkpoint": "replayed"
+        },
+        {
+          "action": "stop",
+          "id": "stop"
+        },
+        {
+          "checkpoint": "stopped"
+        }
+      ]
+    },
+    {
       "id": "native-chat-page-earlier",
       "operation": "session.native-chat-page",
       "family": "session.native-chat-page",
@@ -19915,7 +21274,8 @@
             "limit": 40,
             "subscriptionId": "claude:session-1:00000000-0000-4000-8000-000000000001",
             "capabilities": {
-              "transcriptPending": 1
+              "transcriptPending": 1,
+              "transcriptSourceOrder": 1
             },
             "transcriptPath": "/work/feature/.claude/session-1.jsonl"
           },
@@ -19971,6 +21331,9 @@
             "agent": "claude",
             "sessionId": "session-1",
             "limit": 60,
+            "capabilities": {
+              "transcriptSourceOrder": 1
+            },
             "beforeOffset": 1200,
             "transcriptPath": "/work/feature/.claude/session-1.jsonl"
           },
@@ -20026,7 +21389,8 @@
             "limit": 40,
             "subscriptionId": "claude:session-1:00000000-0000-4000-8000-000000000001",
             "capabilities": {
-              "transcriptPending": 1
+              "transcriptPending": 1,
+              "transcriptSourceOrder": 1
             },
             "transcriptPath": "/work/feature/.claude/session-1.jsonl"
           },
@@ -20167,7 +21531,7 @@
           "reply": {
             "ok": true,
             "result": {
-              "cleared": true
+              "clear": { "handle": "terminal-1", "cleared": true }
             }
           }
         },
@@ -21431,6 +22795,109 @@
       ]
     },
     {
+      "id": "notifications-desktop-stream-closed",
+      "operation": "notifications.desktop-stream",
+      "family": "notifications.desktop-stream",
+      "sites": ["mobile/src/notifications/mobile-notifications.ts"],
+      "schedules": [],
+      "deviceStore": {
+        "orca:hosts": "[{\"id\":\"host-1\",\"name\":\"Desk\",\"endpoint\":\"wss://desk.test\",\"publicKeyB64\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\",\"lastConnected\":1700000000000}]"
+      },
+      "deviceState": {
+        "notificationTray": [
+          {
+            "request": {
+              "identifier": "tray-1",
+              "content": {
+                "data": {
+                  "hostFingerprint": "Yw3NKWbEM2aRElRI",
+                  "kind": "alert",
+                  "notificationId": "note-1",
+                  "notificationEpoch": "epoch-1",
+                  "notificationSeq": 7
+                }
+              }
+            }
+          },
+          {
+            "request": {
+              "identifier": "tray-2",
+              "content": {
+                "data": {
+                  "hostFingerprint": "Yw3NKWbEM2aRElRI",
+                  "kind": "alert",
+                  "notificationId": "note-2",
+                  "notificationEpoch": "epoch-1",
+                  "notificationSeq": 8
+                }
+              }
+            }
+          }
+        ]
+      },
+      "steps": [
+        {
+          "action": "start",
+          "id": "start"
+        },
+        {
+          "frame": "notifications.subscribe#1",
+          "params": {
+            "includeDesktopSuppressed": true
+          },
+          "reply": {
+            "ok": true,
+            "streaming": true,
+            "result": {
+              "type": "ready",
+              "subscriptionId": "sub-1"
+            }
+          }
+        },
+        {
+          "complete": "notifications.getMissedSince#1",
+          "params": {
+            "lastSeenSeq": 9007199254740991,
+            "deliveredPushes": [
+              {
+                "notificationId": "note-1",
+                "notificationEpoch": "epoch-1",
+                "notificationSeq": 7
+              },
+              {
+                "notificationId": "note-2",
+                "notificationEpoch": "epoch-1",
+                "notificationSeq": 8
+              }
+            ]
+          },
+          "reply": {
+            "ok": true,
+            "result": {
+              "dismissedPushes": []
+            }
+          }
+        },
+        {
+          "checkpoint": "ready"
+        },
+        {
+          "action": "stop",
+          "id": "stop"
+        },
+        {
+          "checkpoint": "stopped"
+        },
+        {
+          "action": "cutover",
+          "id": "cutover"
+        },
+        {
+          "checkpoint": "not-replayed"
+        }
+      ]
+    },
+    {
       "id": "review-file-diff-shapes",
       "operation": "session.diff-review-load",
       "family": "session.review-file-diff",
@@ -21570,7 +23037,7 @@
         "mobile/src/session/use-mobile-diff-review-comment-actions.ts",
         "mobile/src/session/use-mobile-diff-review-git-actions.ts",
         "mobile/src/session/use-mobile-diff-review-send-actions.ts",
-        "mobile/src/session/mobile-native-chat-stale-input.ts"
+        "mobile/src/session/native-chat/mobile-native-chat-stale-input.ts"
       ],
       "schedules": [],
       "steps": [
@@ -21645,7 +23112,7 @@
         "mobile/src/session/use-mobile-diff-review-comment-actions.ts",
         "mobile/src/session/use-mobile-diff-review-git-actions.ts",
         "mobile/src/session/use-mobile-diff-review-send-actions.ts",
-        "mobile/src/session/mobile-native-chat-stale-input.ts"
+        "mobile/src/session/native-chat/mobile-native-chat-stale-input.ts"
       ],
       "schedules": [],
       "steps": [

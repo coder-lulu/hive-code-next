@@ -1,53 +1,64 @@
-import { Pressable, StyleSheet } from 'react-native'
+import { Pressable } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Plus } from 'lucide-react-native'
-import type { MobileTheme } from '../theme/mobile-theme'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
+import { colors, spacing } from '../theme/mobile-theme'
+import { themedStyleSheet } from '../theme/themed-styles'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
+
+// Export diameter so worktree list reserves matching padding and last row stays tappable.
+export const FAB_SIZE = 48
 
 type NewWorkspaceFabProps = {
-  theme: MobileTheme
   onPress: () => void
   disabled?: boolean
 }
 
-// Phone-only floating "+" for creating a workspace. The parent list ends above
-// primary navigation, so this offset only needs to clear workspace rows.
-export function NewWorkspaceFab({
-  theme,
-  onPress,
-  disabled
-}: NewWorkspaceFabProps): React.JSX.Element {
-  const styles = createStyles(theme)
+// Phone-only FAB sits above home indicator and outside list-row hit area.
+export function NewWorkspaceFab({ onPress, disabled }: NewWorkspaceFabProps): React.JSX.Element {
+  useMobileColorScheme()
+  const t = useMobileTranslation()
+  const insets = useSafeAreaInsets()
   return (
     <Pressable
       style={({ pressed }) => [
         styles.fab,
+        { bottom: spacing.xl + insets.bottom },
         pressed && styles.fabPressed,
         disabled && styles.fabDisabled
       ]}
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
-      accessibilityLabel="新建工作区"
+      accessibilityLabel={t('components.newWorkspaceFab.newWorkspace', 'New workspace')}
       hitSlop={8}
     >
-      <Plus size={24} color={theme.color.text.inverse} strokeWidth={2.75} />
+      <Plus size={24} color={colors.bgBase} strokeWidth={2.75} />
     </Pressable>
   )
 }
 
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    fab: {
-      position: 'absolute',
-      right: theme.spacing.space20,
-      bottom: theme.spacing.space24,
-      width: theme.size.floatingActionButtonSize,
-      height: theme.size.floatingActionButtonSize,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: theme.radii.circle,
-      backgroundColor: theme.color.bg.selected
-    },
-    fabPressed: { opacity: 0.74 },
-    fabDisabled: { opacity: 0.4 }
-  })
-}
+const styles = themedStyleSheet(() => ({
+  fab: {
+    position: 'absolute',
+    right: spacing.lg,
+    width: FAB_SIZE,
+    height: FAB_SIZE,
+    borderRadius: FAB_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // High-contrast monochrome primary action; tight shadow avoids disabled-looking halo (STYLEGUIDE reserves color for state).
+    backgroundColor: colors.surfaceBright,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4
+  },
+  fabPressed: {
+    backgroundColor: colors.textPrimary
+  },
+  fabDisabled: {
+    opacity: 0.5
+  }
+}))

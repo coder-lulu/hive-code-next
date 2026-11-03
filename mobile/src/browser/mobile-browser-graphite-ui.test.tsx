@@ -1,3 +1,4 @@
+import { findAllByHostType, findByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -44,15 +45,12 @@ function renderControls(preference: 'light' | 'dark'): ReactTestRenderer {
         createElement(
           'View',
           null,
-          createElement(
-            MobileBrowserToolbarIconButton,
-            {
-              label: 'Back',
-              onPress: () => {}
-            },
-            createElement('Icon')
-          ),
+          <MobileBrowserToolbarIconButton label="Back" onPress={() => {}}>
+            {createElement('Icon')}
+          </MobileBrowserToolbarIconButton>,
           createElement(MobileBrowserAddressField, {
+            loading: false,
+            loadFailed: false,
             disabled: false,
             focused: false,
             onBlur: () => {},
@@ -93,16 +91,16 @@ describe('mobile browser Graphite controls', () => {
   it('uses the light semantic surface with accessible 44dp controls', () => {
     renderer = renderControls('light')
 
-    const back = renderer.root
-      .findAllByType('Pressable')
-      .find((node) => node.props.accessibilityLabel === 'Back')
-    const address = renderer.root.findByType('TextInput')
-    const enter = renderer.root
-      .findAllByType('Pressable')
-      .find((node) => node.props.accessibilityLabel === 'Send Enter key to browser')
-    const webMode = renderer.root
-      .findAllByType('Pressable')
-      .find((node) => node.props.accessibilityLabel === 'Show web website view')
+    const back = findAllByHostType(renderer.root, 'Pressable').find(
+      (node) => node.props.accessibilityLabel === 'Back'
+    )
+    const address = findByHostType(renderer.root, 'TextInput')
+    const enter = findAllByHostType(renderer.root, 'Pressable').find(
+      (node) => node.props.accessibilityLabel === 'Send Enter key to browser'
+    )
+    const webMode = findAllByHostType(renderer.root, 'Pressable').find(
+      (node) => node.props.accessibilityLabel === 'Show web website view'
+    )
 
     expect(resolvedStyle(back!)).toMatchObject({ height: 44, width: 44 })
     expect(resolvedStyle(address)).toMatchObject({
@@ -119,10 +117,10 @@ describe('mobile browser Graphite controls', () => {
   it('uses the dark semantic palette and non-color selection semantics', () => {
     renderer = renderControls('dark')
 
-    const address = renderer.root.findByType('TextInput')
-    const ctrl = renderer.root
-      .findAllByType('Pressable')
-      .find((node) => node.props.accessibilityLabel === 'Ctrl click modifier')
+    const address = findByHostType(renderer.root, 'TextInput')
+    const ctrl = findAllByHostType(renderer.root, 'Pressable').find(
+      (node) => node.props.accessibilityLabel === 'Ctrl click modifier'
+    )
 
     expect(resolvedStyle(address)).toMatchObject({
       backgroundColor: '#171A1F',

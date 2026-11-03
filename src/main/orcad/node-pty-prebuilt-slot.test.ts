@@ -58,7 +58,6 @@ afterEach(() => {
 
 const sha256 = (text: string): string => createHash('sha256').update(text).digest('hex')
 
-/** Stage `files` under `<prebuilds>/<slot>` and record them in a schema 2 manifest. */
 const stageSlot = (
   prebuilds: string,
   slot: string,
@@ -109,7 +108,7 @@ describe('resolveOrcadPrebuildsDir', () => {
 })
 
 describe('installPrebuiltSlot', () => {
-  it('installs the macOS slot binary and spawn-helper into build/Release', () => {
+  it('installs the slot binary and spawn-helper into build/Release on macOS', () => {
     const prebuilds = temp()
     const nodePtyDir = temp()
     stageSlot(
@@ -128,26 +127,11 @@ describe('installPrebuiltSlot', () => {
 
     expect(outcome).toEqual({ installed: true, slot: 'darwin-arm64', spawnHelper: true })
     expect(existsSync(join(nodePtyDir, 'build', 'Release', 'pty.node'))).toBe(true)
-    expect(existsSync(join(nodePtyDir, 'build', 'Release', 'spawn-helper'))).toBe(true)
-  })
-
-  // POSIX mode bits are an actual filesystem contract, independent of the selected ABI.
-  it.runIf(process.platform !== 'win32')('makes the installed macOS helper executable', () => {
-    const prebuilds = temp()
-    const nodePtyDir = temp()
-    stageSlot(
-      prebuilds,
-      'darwin-arm64',
-      { platform: 'darwin', arch: 'arm64', libc: 'none', glibc: null, napi: 8 },
-      { 'pty.node': 'binary', 'spawn-helper': 'helper' }
-    )
-    installPrebuiltSlot({ abi: DARWIN_ARM64, nodePtyDir, prebuildsDir: prebuilds })
-    expect(statSync(join(nodePtyDir, 'build', 'Release', 'spawn-helper')).mode & 0o111).not.toBe(0)
+    const helper = statSync(join(nodePtyDir, 'build', 'Release', 'spawn-helper'))
+    expect(helper.mode & 0o111).not.toBe(0)
   })
 
   it('installs a Linux slot without claiming a spawn-helper it never execs', () => {
-    // node-pty builds spawn-helper only under binding.gyp's OS=="mac"; reporting one off
-    // macOS is what made every Linux orcad boot degraded on spawn_helper_missing (#17844).
     const prebuilds = temp()
     const nodePtyDir = temp()
     stageSlot(prebuilds, 'linux-x64-glibc', LINUX_GLIBC_ENTRY, { 'pty.node': 'binary' })
@@ -165,8 +149,7 @@ describe('installPrebuiltSlot', () => {
   })
 
   it('installs the Windows ConPTY runtime beside conpty.node', () => {
-    // conpty.node resolves conpty\\conpty.dll relative to its own path; flattening the
-    // directory would fail every useConptyDll spawn.
+    // conpty.node resolves its DLL relative to conpty/; flattening breaks useConptyDll.
     const prebuilds = temp()
     const nodePtyDir = temp()
     stageSlot(
@@ -195,7 +178,6 @@ describe('installPrebuiltSlot', () => {
   })
 
   it('will not load a glibc slot on a musl host', () => {
-    // node-pty's own loader cannot tell these apart; the slot name is the only thing that can.
     const prebuilds = temp()
     const nodePtyDir = temp()
     stageSlot(prebuilds, 'linux-x64-glibc', LINUX_GLIBC_ENTRY, { 'pty.node': 'binary' })
@@ -212,8 +194,6 @@ describe('installPrebuiltSlot', () => {
   })
 
   it('refuses a glibc build filed under the musl slot name', () => {
-    // A mislabelled CI run (`--slot=linux-x64-musl` in a glibc container) must not reach
-    // Alpine's loader: the recorded libc, not the directory name, decides.
     const prebuilds = temp()
     const nodePtyDir = temp()
     stageSlot(prebuilds, 'linux-x64-musl', LINUX_GLIBC_ENTRY, { 'pty.node': 'binary' })
@@ -249,8 +229,7 @@ describe('installPrebuiltSlot', () => {
   })
 
   it('gates on N-API, so a newer Node ABI still installs and an older N-API does not', () => {
-    // NODE_MODULE_VERSION differs between the pinned Node and a host Node 18; N-API is the
-    // contract that lets one build serve both.
+    // N-API compatibility lets one slot serve runtimes with different NODE_MODULE_VERSION values.
     const prebuilds = temp()
     stageSlot(prebuilds, 'linux-x64-glibc', LINUX_GLIBC_ENTRY, { 'pty.node': 'binary' })
 
@@ -287,7 +266,6 @@ describe('installPrebuiltSlot', () => {
         hostNapi: 10
       })
     ).toMatchObject({ installed: false, why: 'glibc-too-old' })
-    // An unread version is not evidence of an old glibc.
     expect(
       installPrebuiltSlot({
         abi: { ...LINUX_GLIBC, glibcVersion: null },
@@ -330,7 +308,6 @@ describe('installPrebuiltSlot', () => {
   })
 
   it('reports a missing prebuilds directory distinctly from a missing slot', () => {
-    // They mean different things: no matrix shipped at all, versus a matrix with a hole.
     expect(
       installPrebuiltSlot({
         abi: LINUX_GLIBC,

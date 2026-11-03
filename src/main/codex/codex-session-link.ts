@@ -26,13 +26,9 @@ function existingAncestorDevice(filePath: string): number | null {
   }
 }
 
-/**
- * Attempts a hardlink so resume sees one physical JSONL session log.
- */
 export function tryHardlinkCodexSessionFile(sourcePath: string, targetPath: string): boolean {
   try {
-    // Why: Codex resume ignores symlinked JSONL sessions, while a hardlink
-    // preserves one physical log without copy divergence.
+    // Codex resume ignores symlinked JSONL sessions; hardlinks keep one resumable log.
     linkSync(sourcePath, targetPath)
     return true
   } catch {
@@ -40,9 +36,6 @@ export function tryHardlinkCodexSessionFile(sourcePath: string, targetPath: stri
   }
 }
 
-/**
- * Links a session without introducing an independent writable transcript.
- */
 export function linkCodexSessionFile(sourcePath: string, targetPath: string): boolean {
   try {
     // Codex ignores symlinked rollouts, even on hosts that permit creating them.

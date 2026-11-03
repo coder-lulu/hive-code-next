@@ -1,3 +1,4 @@
+import { translate } from '../i18n/mobile-i18n'
 import type { PickerOption } from '../components/PickerModal'
 import type { MobileGroupMode, MobileSortMode } from './workspace-view-settings'
 
@@ -8,18 +9,107 @@ export const WORKSPACE_SORT_OPTIONS: PickerOption<MobileSortMode>[] = [
   // Why: desktop and persisted state keep the `smart` key, while mobile shows the product label.
   {
     value: 'smart',
-    label: 'Agent 活动',
-    subtitle: '优先显示需要关注的 Agent，再按最近活动排序'
+    get label() {
+      return translate(
+        'auto.mobile.src.worktree.workspace.list.picker.options.0220c03c22',
+        'Agent activity'
+      )
+    },
+    get subtitle() {
+      return translate(
+        'auto.mobile.src.worktree.workspace.list.picker.options.99a8d6128a',
+        'Show agents needing attention first, then sort by recent activity'
+      )
+    }
   },
-  { value: 'name', label: '名称', subtitle: '按名称排序' },
-  { value: 'recent', label: '最近活动', subtitle: '最新输出优先' },
-  { value: 'repo', label: '代码仓库', subtitle: '先按仓库，再按工作区名称' },
-  { value: 'manual', label: '手动', subtitle: '保持电脑端拖动顺序' }
+  {
+    value: 'name',
+    get label() {
+      return translate('host.edit.name', 'Name')
+    },
+    get subtitle() {
+      return translate(
+        'auto.mobile.src.worktree.workspace.list.picker.options.2ab9069aac',
+        'Sort by name'
+      )
+    }
+  },
+  {
+    value: 'recent',
+    get label() {
+      return translate(
+        'auto.mobile.src.worktree.workspace.list.picker.options.cc1c1d4509',
+        'Recent activity'
+      )
+    },
+    get subtitle() {
+      return translate(
+        'auto.mobile.src.worktree.workspace.list.picker.options.f33c2220ef',
+        'Latest output first'
+      )
+    }
+  },
+  {
+    value: 'repo',
+    get label() {
+      return translate(
+        'auto.mobile.src.worktree.workspace.list.picker.options.3b36f18ae0',
+        'Repository'
+      )
+    },
+    get subtitle() {
+      return translate(
+        'auto.mobile.src.worktree.workspace.list.picker.options.40be689c1d',
+        'Sort by repository, then workspace name'
+      )
+    }
+  },
+  {
+    value: 'manual',
+    get label() {
+      return translate(
+        'auto.mobile.src.worktree.workspace.list.picker.options.a3c88fc206',
+        'Manual'
+      )
+    },
+    get subtitle() {
+      return translate(
+        'auto.mobile.src.worktree.workspace.list.picker.options.6d9db46eb7',
+        'Keep the order arranged on the computer'
+      )
+    }
+  }
 ]
 
 export const WORKSPACE_GROUP_OPTIONS: PickerOption<MobileGroupMode>[] = [
-  { value: 'none', label: '不分组' },
-  { value: 'workspaceStatus', label: '状态' },
-  { value: 'repo', label: '项目' },
-  { value: 'prStatus', label: 'PR 状态' }
+  {
+    value: 'none',
+    get label() {
+      return translate(
+        'auto.mobile.src.worktree.workspace.list.picker.options.ce87911514',
+        'No grouping'
+      )
+    }
+  },
+  {
+    value: 'workspace-status',
+    get label() {
+      return translate('hostScreen.workspaceOptionControls.status', 'Status')
+    }
+  },
+  {
+    value: 'repo',
+    get label() {
+      return translate('agentHistory.panel.project', 'Project')
+    }
+  },
+  {
+    value: 'pr-status',
+    get label() {
+      return translate(
+        'auto.mobile.src.worktree.workspace.list.picker.options.874551dd85',
+        'PR status'
+      )
+    }
+  }
 ]

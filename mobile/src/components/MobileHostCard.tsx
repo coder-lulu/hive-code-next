@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { productNameText } from '@/product-brand'
 import { Monitor, MoreVertical } from 'lucide-react-native'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
@@ -25,6 +26,8 @@ export function MobileHostCard(props: {
   onLongPress: () => void
   onOpenActions: () => void
 }) {
+  const t = useMobileTranslation()
+
   const styles = createStyles(props.theme)
   const credentialUnavailable = props.credentialStatus === 'temporarily-unavailable'
   const credentialMissing = props.credentialStatus === 'missing'
@@ -177,7 +180,11 @@ export function MobileHostCard(props: {
       </Pressable>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${display.title} 的更多操作`}
+        accessibilityLabel={t(
+          'auto.mobile.src.components.MobileHostCard.3158ecda90',
+          'More actions for {{value0}}',
+          { value0: display.title }
+        )}
         hitSlop={8}
         style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
         onPress={props.onOpenActions}

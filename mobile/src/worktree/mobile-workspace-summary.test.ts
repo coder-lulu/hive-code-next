@@ -11,7 +11,6 @@ function worktree(overrides: Partial<Worktree> = {}): Worktree {
     linkedPR: null,
     liveTerminalCount: 0,
     path: '/workspace',
-    preview: '',
     repo: 'repo',
     repoId: 'repo',
     unread: false,
@@ -28,20 +27,38 @@ describe('mobile workspace summary', () => {
         worktree({
           agents: [
             {
+              paneKey: 'working',
+              parentPaneKey: null,
+              agentType: 'claude',
+              taskTitle: null,
+              displayName: null,
+              lastAssistantMessage: null,
+              toolName: null,
+              toolInput: null,
+              stateStartedAt: now,
               state: 'working',
-              workingMode: 'working',
+              workingMode: 'monitoring',
               interrupted: false,
               updatedAt: now,
               prompt: ''
             },
             {
+              paneKey: 'waiting',
+              parentPaneKey: null,
+              agentType: 'claude',
+              taskTitle: null,
+              displayName: null,
+              lastAssistantMessage: null,
+              toolName: null,
+              toolInput: null,
+              stateStartedAt: now,
               state: 'waiting',
-              workingMode: 'working',
+              workingMode: 'monitoring',
               interrupted: false,
               updatedAt: now,
               prompt: ''
             }
-          ] as Worktree['agents']
+          ]
         }),
         worktree({ worktreeId: 'permission', status: 'permission' })
       ],

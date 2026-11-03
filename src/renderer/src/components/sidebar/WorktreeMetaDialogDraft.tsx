@@ -1,4 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react'
+import { captureWorktreeGitHubLinkBase } from '../../../../shared/worktree/github-link-base'
 import { getWorktreeMetaDialogOwner } from './worktree-meta-dialog-owner'
 import { Plus } from 'lucide-react'
 import { useAppStore } from '@/store'
@@ -81,7 +82,8 @@ const WorktreeMetaDialogDraft = React.memo(function WorktreeMetaDialogDraft() {
       typeof modalData.currentComment === 'string'
         ? modalData.currentComment
         : (worktree?.comment ?? ''),
-    items: getWorkspaceAttachments(worktree ?? {})
+    items: getWorkspaceAttachments(worktree ?? {}),
+    githubLinkBase: captureWorktreeGitHubLinkBase(worktree)
   }))
   const [displayNameInput, setDisplayNameInput] = useState(initial.displayName)
   const [commentInput, setCommentInput] = useState(initial.comment)
@@ -116,13 +118,11 @@ const WorktreeMetaDialogDraft = React.memo(function WorktreeMetaDialogDraft() {
           draft: items
         })
       }
-      const result =
-        executionHostId || suppressHostedReviewRefresh
-          ? await updateWorktreeMeta(worktreeId, updates, {
-              ...(executionHostId ? { executionHostId } : {}),
-              ...(suppressHostedReviewRefresh ? { suppressHostedReviewRefresh: true } : {})
-            })
-          : await updateWorktreeMeta(worktreeId, updates)
+      const result = await updateWorktreeMeta(worktreeId, updates, {
+        githubLinkBase: initial.githubLinkBase,
+        ...(executionHostId ? { executionHostId } : {}),
+        ...(suppressHostedReviewRefresh ? { suppressHostedReviewRefresh: true } : {})
+      })
       if (
         !mountedRef.current ||
         getWorktreeMetaDialogOwner(useAppStore.getState()) !== dialogOwner

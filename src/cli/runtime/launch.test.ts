@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promise
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { applyProductBranding } from '../../shared/brand'
+import { headlessServeOzonePlatformSwitches } from '../../shared/headless-serve-ozone-platform'
 import { encodePairingOffer, PAIRING_OFFER_VERSION } from '../../shared/pairing'
 import {
   getServeUpdateHandoffPath,
@@ -19,15 +19,13 @@ const { spawnMock, spawnSyncMock } = vi.hoisted(() => ({
   spawnSyncMock: vi.fn()
 }))
 
-vi.mock('@orca/process-host', () => ({
-  spawnProcess: spawnMock,
-  runProcessSync: spawnSyncMock,
-  runProcess: vi.fn(() => {
-    throw new Error('Unexpected process execution in launch unit test')
-  })
+vi.mock('child_process', () => ({
+  spawn: spawnMock,
+  spawnSync: spawnSyncMock
 }))
 
-import { getExecutableAppArgs, launchOrcaApp, serveOrcaApp, stripElectronRunAsNode } from './launch'
+import { launchOrcaApp, serveOrcaApp } from './launch'
+import { getExecutableAppArgs, stripElectronRunAsNode } from './orca-app-executable'
 
 class FakeChildProcess extends EventEmitter {
   stdout = new EventEmitter()
@@ -76,6 +74,7 @@ const INVALID_SSH_RECIPE_JSON = SSH_RECIPE_JSON.replace('/workspace/repo', 'rela
 const IGNORED_NON_RECIPE_STDOUT = '[serve] ignored non-recipe stdout'
 const PROFILE = resolve('/profiles/serve')
 const PIN_PROFILE = `--user-data-dir=${PROFILE}`
+const HOST_SERVE_OZONE_SWITCHES = headlessServeOzonePlatformSwitches(process.platform)
 
 function restoreEnv(key: string, value: string | undefined): void {
   if (value === undefined) {
@@ -86,7 +85,7 @@ function restoreEnv(key: string, value: string | undefined): void {
 }
 
 function firstServeSpawnArgs(): string[] {
-  const args: unknown = spawnMock.mock.calls[0]?.[0]?.args
+  const args: unknown = spawnMock.mock.calls[0]?.[1]
   if (!Array.isArray(args)) {
     throw new Error('orca serve did not spawn its server')
   }
@@ -112,7 +111,7 @@ describe('serveOrcaApp', () => {
     spawnMock.mockReset()
     spawnSyncMock.mockReset()
     process.env.ORCA_APP_EXECUTABLE = '/Applications/Orca.app/Contents/MacOS/Orca'
-    // These cover Electron serve itself; the orcad default is in launch-serve-runtime.test.ts.
+    // Test Electron here; launch-serve-runtime.test.ts covers orcad selection.
     process.env.ORCA_SERVE_RUNTIME = 'electron'
     process.env.ORCA_USER_DATA_PATH = PROFILE
   })
@@ -134,7 +133,7 @@ describe('serveOrcaApp', () => {
     delete process.env.ELECTRON_RUN_AS_NODE
     try {
       expect(() => serveOrcaApp({ supervise: true })).toThrow(
-        applyProductBranding('Install the Orca app on this machine')
+        /Install the Orca app on this machine/
       )
       expect(spawnMock).not.toHaveBeenCalled()
     } finally {
@@ -226,7 +225,7 @@ describe('serveOrcaApp', () => {
         supervisorExited = true
         return code
       })
-      const childEnv = spawnMock.mock.calls[0]?.[0]?.env as NodeJS.ProcessEnv | undefined
+      const childEnv = spawnMock.mock.calls[0]?.[2]?.env as NodeJS.ProcessEnv | undefined
       const handoffPath = childEnv?.ORCA_SERVE_UPDATE_HANDOFF_PATH
       expect(handoffPath).toBeTruthy()
       await writeFile(
@@ -442,9 +441,9 @@ describe('serveOrcaApp', () => {
     await expect(serveOrcaApp({ json: true })).resolves.toBe(0)
 
     expect(spawnMock).toHaveBeenCalledWith(
+      '/Applications/Orca.app/Contents/MacOS/Orca',
+      [PIN_PROFILE, '--serve', '--serve-json', ...HOST_SERVE_OZONE_SWITCHES],
       expect.objectContaining({
-        program: '/Applications/Orca.app/Contents/MacOS/Orca',
-        args: [PIN_PROFILE, '--serve', '--serve-json'],
         cwd: resolve(__dirname, '../../..')
       })
     )
@@ -474,18 +473,19 @@ describe('serveOrcaApp', () => {
     ).resolves.toBe(0)
 
     expect(spawnMock).toHaveBeenCalledWith(
+      '/Applications/Orca.app/Contents/MacOS/Orca',
+      [
+        PIN_PROFILE,
+        '--serve',
+        '--serve-json',
+        '--serve-port',
+        '6768',
+        '--serve-pairing-address',
+        '100.64.1.20',
+        '--serve-mobile-pairing',
+        ...HOST_SERVE_OZONE_SWITCHES
+      ],
       expect.objectContaining({
-        program: '/Applications/Orca.app/Contents/MacOS/Orca',
-        args: [
-          PIN_PROFILE,
-          '--serve',
-          '--serve-json',
-          '--serve-port',
-          '6768',
-          '--serve-pairing-address',
-          '100.64.1.20',
-          '--serve-mobile-pairing'
-        ],
         cwd: resolve(__dirname, '../../..')
       })
     )
@@ -510,16 +510,17 @@ describe('serveOrcaApp', () => {
     await expect(serveOrcaApp({ json: true, port: '6768' })).resolves.toBe(0)
 
     expect(spawnMock).toHaveBeenCalledWith(
+      '/repo/node_modules/.bin/electron',
+      [
+        resolve(__dirname, '../../..'),
+        PIN_PROFILE,
+        '--serve',
+        '--serve-json',
+        '--serve-port',
+        '6768',
+        ...HOST_SERVE_OZONE_SWITCHES
+      ],
       expect.objectContaining({
-        program: '/repo/node_modules/.bin/electron',
-        args: [
-          resolve(__dirname, '../../..'),
-          PIN_PROFILE,
-          '--serve',
-          '--serve-json',
-          '--serve-port',
-          '6768'
-        ],
         cwd: resolve(__dirname, '../../..')
       })
     )
@@ -536,19 +537,19 @@ describe('serveOrcaApp', () => {
   })
 
   it.each([
-    { probe: 'exits nonzero', result: { code: 1 }, expectedPrefix: ['--no-sandbox'] },
-    { probe: 'succeeds', result: { code: 0 }, expectedPrefix: [] },
+    { probe: 'exits nonzero', result: { status: 1 }, expectedPrefix: ['--no-sandbox'] },
+    { probe: 'succeeds', result: { status: 0 }, expectedPrefix: [] },
     {
       probe: 'times out',
       result: {
-        code: null,
+        status: null,
         error: Object.assign(new Error('timed out'), { code: 'ETIMEDOUT' })
       },
       expectedPrefix: ['--no-sandbox']
     },
     {
       probe: 'cannot start',
-      result: { code: null, error: Object.assign(new Error('missing'), { code: 'ENOENT' }) },
+      result: { status: null, error: Object.assign(new Error('missing'), { code: 'ENOENT' }) },
       expectedPrefix: ['--no-sandbox']
     }
   ])(
@@ -572,19 +573,15 @@ describe('serveOrcaApp', () => {
         queueMicrotask(() => child.emit('exit', 0, null))
         await expect(result).resolves.toBe(0)
         expect(spawnSyncMock).toHaveBeenCalledWith(
-          expect.objectContaining({
-            program: 'unshare',
-            args: ['-Ur', 'true'],
-            stdio: 'ignore',
-            timeoutMs: 2e3
-          })
+          'unshare',
+          ['-Ur', 'true'],
+          expect.objectContaining({ stdio: 'ignore', timeout: 2_000 })
         )
         expect(spawnMock).toHaveBeenCalledWith(
-          expect.objectContaining({
-            program: executable,
-            args: [...expectedPrefix, PIN_PROFILE, '--serve', '--serve-json'],
-            detached: false
-          })
+          executable,
+          [...expectedPrefix, PIN_PROFILE, '--serve', '--serve-json', '--ozone-platform=x11'],
+          // Foreground serve must share POSIX job-control signals with its CLI supervisor.
+          expect.objectContaining({ detached: false })
         )
       } finally {
         if (platformDescriptor) {
@@ -616,17 +613,18 @@ describe('serveOrcaApp', () => {
     await expect(result).resolves.toBe(0)
 
     expect(spawnMock).toHaveBeenCalledWith(
+      '/Applications/Orca.app/Contents/MacOS/Orca',
+      [
+        PIN_PROFILE,
+        '--serve',
+        '--serve-pairing-address',
+        'wss://sandbox.example.com',
+        '--serve-recipe-json',
+        '--serve-project-root',
+        '/workspace/repo',
+        ...HOST_SERVE_OZONE_SWITCHES
+      ],
       expect.objectContaining({
-        program: '/Applications/Orca.app/Contents/MacOS/Orca',
-        args: [
-          PIN_PROFILE,
-          '--serve',
-          '--serve-pairing-address',
-          'wss://sandbox.example.com',
-          '--serve-recipe-json',
-          '--serve-project-root',
-          '/workspace/repo'
-        ],
         cwd: resolve(__dirname, '../../..'),
         detached: true,
         stdio: ['ignore', 'pipe', 'inherit']
@@ -693,9 +691,7 @@ describe('serveOrcaApp', () => {
 
     await expect(result).rejects.toMatchObject({
       code: 'runtime_serve_failed',
-      message: applyProductBranding(
-        'Orca serve exited before printing valid recipe JSON with code 0.'
-      )
+      message: 'Orca serve exited before printing valid recipe JSON with code 0.'
     })
     expect(stdoutSpy).not.toHaveBeenCalled()
     expect(stderrSpy).toHaveBeenCalledTimes(5)
@@ -720,7 +716,7 @@ describe('serveOrcaApp', () => {
     expect(child.unref).toHaveBeenCalledOnce()
   })
 
-  it('delegates a Windows Electron shim to process-host without a raw shell', async () => {
+  it('runs a Windows command-shim Electron executable through cmd.exe without a raw shell', async () => {
     const platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform')
     Object.defineProperty(process, 'platform', { value: 'win32' })
     process.env.ORCA_APP_EXECUTABLE = 'C:\\repo\\node_modules\\.bin\\electron.cmd'
@@ -739,17 +735,13 @@ describe('serveOrcaApp', () => {
 
     try {
       await expect(serveOrcaApp({ json: true })).resolves.toBe(0)
-      const spec = spawnMock.mock.calls[0]?.[0]
-      expect(spec).toEqual(
-        expect.objectContaining({
-          program: 'C:\\repo\\node_modules\\.bin\\electron.cmd',
-          args: expect.arrayContaining(['--serve', '--serve-json']),
-          detached: false,
-          stdio: 'inherit'
-        })
+      const [program, [commandLine], options] = spawnMock.mock.calls[0]
+      expect(program).toMatch(/cmd\.exe$/i)
+      expect(commandLine).toContain('C:\\repo\\node_modules\\.bin\\electron.cmd')
+      expect(commandLine).toContain('--serve-json')
+      expect(options).toEqual(
+        expect.objectContaining({ shell: false, windowsHide: true, windowsVerbatimArguments: true })
       )
-      // process-host owns cmd shim encoding and hidden-window defaults.
-      expect(spec.shell).toBeUndefined()
     } finally {
       if (platformDescriptor) {
         Object.defineProperty(process, 'platform', platformDescriptor)
@@ -796,24 +788,21 @@ describe('launchOrcaApp', () => {
       process.env.ELECTRON_RUN_AS_NODE = '1'
       Object.defineProperty(process, 'platform', { configurable: true, value: 'linux' })
       Object.defineProperty(process, 'getuid', { configurable: true, value: () => 1000 })
-      spawnSyncMock.mockReturnValue({ code: 1 })
+      spawnSyncMock.mockReturnValue({ status: 1 })
       const child = new FakeChildProcess()
       spawnMock.mockReturnValue(child)
 
       launchOrcaApp()
 
       expect(spawnSyncMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          program: 'unshare',
-          args: ['-Ur', 'true'],
-          stdio: 'ignore',
-          timeoutMs: 2e3
-        })
+        'unshare',
+        ['-Ur', 'true'],
+        expect.objectContaining({ stdio: 'ignore', timeout: 2_000 })
       )
       expect(spawnMock).toHaveBeenCalledWith(
+        executable,
+        ['--no-sandbox', PIN_PROFILE],
         expect.objectContaining({
-          program: executable,
-          args: ['--no-sandbox', PIN_PROFILE],
           detached: true,
           stdio: 'ignore',
           env: expect.not.objectContaining({ ELECTRON_RUN_AS_NODE: '1' })

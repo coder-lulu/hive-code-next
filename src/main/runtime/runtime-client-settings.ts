@@ -1,3 +1,8 @@
+import {
+  isAgentPermissionChoice,
+  normalizeAgentPermissionOverrides
+} from '../../shared/tui-agent-permission-choice'
+import { normalizeNativeChatProviders } from '../../shared/structured-native-chat-launch-route'
 import { getAppEnvironment } from '../../shared/app-environment'
 import { isArtifactSharingEnabled } from '../../shared/artifact-sharing-gate'
 import { isAgentSkillSharingEnabled } from '../../shared/agent-skill-sharing-gate'
@@ -5,7 +10,6 @@ import { applyPRBotAuthorOverride } from '../../shared/pr-bot-author-overrides'
 import { TASK_PROVIDERS } from '../../shared/task-providers'
 import {
   applyTerminalQuickCommandMutation,
-  MAX_QUICK_COMMANDS,
   type TerminalQuickCommandMutation
 } from '../../shared/terminal-quick-commands'
 import { haveSameDisabledTuiAgents } from '../../shared/tui-agent-selection'
@@ -13,7 +17,7 @@ import { normalizeSourceControlAiSettings } from '../../shared/source-control-ai
 import { SOURCE_CONTROL_LAUNCH_ACTION_IDS } from '../../shared/source-control-ai-actions'
 import type { GlobalSettings } from '../../shared/global-settings-types'
 import { applyNativeChatSessionOptionSettingsMutation } from '../../shared/native-chat-session-option-defaults'
-import type { NativeChatSessionOptionSettingsMutation } from '../../shared/native-chat-session-options'
+import type { NativeChatSessionOptionSettingsMutation } from '../../shared/native-chat/input/native-chat-session-options'
 import { getHostDisplayLabelOverrides } from '../../shared/host-setting-overrides'
 import type { TerminalQuickCommand } from '../../shared/terminal-quick-command-types'
 import { recordManagedHookInstallFailure } from '../agent-hooks/install-telemetry'
@@ -34,6 +38,11 @@ import type {
   RuntimeHostDisplayLabelOverrides
 } from './runtime-client-settings-shape'
 
+export type RuntimeSharingServicePresence = {
+  artifacts(): boolean
+  skills(): boolean
+}
+
 export class RuntimeClientSettingsController {
   private reconciliationGeneration = 0
   private reconciliationTail: Promise<void> = Promise.resolve()
@@ -43,7 +52,8 @@ export class RuntimeClientSettingsController {
       RuntimeStore,
       'getSettings' | 'updateSettings' | 'runDurableMutation'
     > | null,
-    private readonly notifyReposChanged: (() => void) | undefined = undefined
+    private readonly notifyReposChanged?: () => void,
+    private readonly sharingServices?: RuntimeSharingServicePresence
   ) {}
 
   get(): RuntimeClientSettings {
@@ -51,6 +61,9 @@ export class RuntimeClientSettingsController {
       throw new Error('runtime_unavailable')
     }
     const settings = this.store.getSettings()
+    if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+      throw new Error('runtime_unavailable')
+    }
     return {
       defaultTuiAgent: settings.defaultTuiAgent ?? null,
       newWorkspaceSetupOnly: false,
@@ -73,21 +86,27 @@ export class RuntimeClientSettingsController {
         : null,
       githubProjects: settings.githubProjects,
       experimentalNewWorktreeCardStyle: settings.experimentalNewWorktreeCardStyle === true,
-      experimentalNativeChat: settings.experimentalNativeChat === true,
+      nativeChatProviders: normalizeNativeChatProviders(settings.nativeChatProviders),
+      agentPermissionDefault: isAgentPermissionChoice(settings.agentPermissionDefault)
+        ? settings.agentPermissionDefault
+        : 'own',
+      agentPermissionOverrides: normalizeAgentPermissionOverrides(
+        settings.agentPermissionOverrides
+      ),
       compactWorktreeCards: settings.compactWorktreeCards === true,
       minimaxGroupId: settings.minimaxGroupId ?? '',
       minimaxUsageModels: settings.minimaxUsageModels ?? 'general',
       minimaxEndpoint: settings.minimaxEndpoint ?? 'overseas',
       zcodePlanSite: settings.zcodePlanSite ?? 'zai',
       prBotAuthorOverrides: settings.prBotAuthorOverrides ?? [],
-      artifactSharingEnabled: isArtifactSharingEnabled(settings),
+      ...(this.sharingServices?.artifacts() === false
+        ? {}
+        : { artifactSharingEnabled: isArtifactSharingEnabled(settings) }),
       worktreeVisibilityDefaults: settings.worktreeVisibilityDefaults ?? { external: 'hide' },
-      agentSkillSharingEnabled: isAgentSkillSharingEnabled(settings),
+      ...(this.sharingServices?.skills() === false
+        ? {}
+        : { agentSkillSharingEnabled: isAgentSkillSharingEnabled(settings) }),
       machineName: settings.machineName ?? '',
-      // Why projected: a web client's Settings → Chat edits this host's new-chat default.
-      ...(settings.nativeChatPermissionMode
-        ? { nativeChatPermissionMode: settings.nativeChatPermissionMode }
-        : {}),
       // Why projected: a paired client's AI buttons start these actions' agents, and must honour
       // the agent saved for each one as the desktop does. Absent on older hosts.
       sourceControlAi: projectSourceControlLaunchRecipes(settings),
@@ -104,6 +123,9 @@ export class RuntimeClientSettingsController {
       throw new Error('runtime_unavailable')
     }
     const beforeSettings = this.store.getSettings()
+    if (!beforeSettings || typeof beforeSettings !== 'object' || Array.isArray(beforeSettings)) {
+      throw new Error('runtime_unavailable')
+    }
     const before = beforeSettings.agentStatusHooksEnabled !== false
     // Legacy clients can select an agent or a shell, but cannot select None.
     this.store.updateSettings(
@@ -189,13 +211,6 @@ export class RuntimeClientSettingsController {
       throw new Error('runtime_unavailable')
     }
     const current = this.getTerminalQuickCommands()
-    if (
-      mutation.type === 'upsert' &&
-      !current.some((command) => command.id === mutation.command.id) &&
-      current.length >= MAX_QUICK_COMMANDS
-    ) {
-      throw new Error('Quick command limit reached')
-    }
     const next = applyTerminalQuickCommandMutation(current, mutation)
     this.store.updateSettings({ terminalQuickCommands: next }, { notifyListeners: true })
     return this.getTerminalQuickCommands()
@@ -251,12 +266,9 @@ export class RuntimeClientSettingsController {
 }
 
 function projectSourceControlLaunchRecipes(
-  settings: Partial<Pick<GlobalSettings, 'sourceControlAi' | 'commitMessageAi'>>
+  settings: Partial<Pick<GlobalSettings, 'sourceControlAi'>>
 ): RuntimeClientSourceControlAi {
-  const { actions } = normalizeSourceControlAiSettings(
-    settings.sourceControlAi,
-    settings.commitMessageAi
-  )
+  const { actions } = normalizeSourceControlAiSettings(settings.sourceControlAi)
   return {
     actions: Object.fromEntries(
       SOURCE_CONTROL_LAUNCH_ACTION_IDS.flatMap((actionId) => {

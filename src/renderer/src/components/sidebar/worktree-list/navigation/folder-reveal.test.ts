@@ -8,42 +8,7 @@ import {
   getKnownSidebarWorktreeById,
   sidebarWorkspaceStillExists
 } from './folder-reveal'
-import { getProjectGroupHeaderKey } from '../grouping/group-keys'
-import { getSidebarRowRevealAncestorKeys } from './reveal-ancestors'
-
-it('reveals only the owning host ancestors when workspace and group IDs collide', () => {
-  const root = makeProjectGroup({ id: 'root' })
-  const child = makeProjectGroup({ id: 'group-child', parentGroupId: root.id })
-  const remoteRoot = { ...root, executionHostId: 'runtime:other' }
-  const remoteChild = { ...child, executionHostId: 'runtime:other' }
-  const localWorkspace = makeFolderWorkspace()
-  const remoteWorkspace = makeFolderWorkspace({ executionHostId: 'runtime:other' })
-  const projectGroups = [root, child, remoteRoot, remoteChild]
-  expect(
-    getFolderWorkspaceRevealGroupKeys(
-      folderWorkspaceKey(localWorkspace.id),
-      [localWorkspace, remoteWorkspace],
-      projectGroups,
-      {
-        groupBy: 'repo',
-        executionHostId: 'runtime:other',
-        defaultHostId: 'local'
-      }
-    )
-  ).toEqual([
-    getProjectGroupHeaderKey(root.id, remoteRoot),
-    getProjectGroupHeaderKey(child.id, remoteChild),
-    'host:runtime:other'
-  ])
-  expect(
-    getSidebarRowRevealAncestorKeys({
-      rowKey: getProjectGroupHeaderKey(child.id, remoteChild),
-      repoMap: new Map(),
-      projectGroups,
-      offlineRuntimeEnvironmentIds: new Set()
-    })
-  ).toEqual([getProjectGroupHeaderKey(root.id, remoteRoot)])
-})
+import { getProjectGroupHeaderKey } from '../../../../../../shared/sidebar-list/group-keys'
 
 function makeFolderWorkspace(overrides: Partial<FolderWorkspace> = {}): FolderWorkspace {
   return {
@@ -105,36 +70,6 @@ function makeWorktree(id: string): Worktree {
 }
 
 describe('worktree list folder reveal', () => {
-  it('expands the offline directory before the remote folder ancestors', () => {
-    const root = makeProjectGroup({ id: 'root', executionHostId: 'runtime:remote' })
-    const child = makeProjectGroup({
-      id: 'group-child',
-      parentGroupId: root.id,
-      executionHostId: 'runtime:remote'
-    })
-    const folder = makeFolderWorkspace({ executionHostId: 'runtime:remote' })
-    expect(
-      getFolderWorkspaceRevealGroupKeys(folderWorkspaceKey(folder.id), [folder], [root, child], {
-        groupBy: 'repo',
-        defaultHostId: 'local',
-        executionHostId: 'runtime:remote',
-        offlineRuntimeEnvironmentIds: new Set(['remote'])
-      })
-    ).toEqual([
-      'runtime-offline',
-      getProjectGroupHeaderKey(root.id, root),
-      getProjectGroupHeaderKey(child.id, child),
-      'host:runtime:remote'
-    ])
-    expect(
-      getSidebarRowRevealAncestorKeys({
-        rowKey: getProjectGroupHeaderKey(child.id, child),
-        repoMap: new Map(),
-        projectGroups: [root, child],
-        offlineRuntimeEnvironmentIds: new Set(['remote'])
-      })
-    ).toEqual(['runtime-offline', getProjectGroupHeaderKey(root.id, root)])
-  })
   it('resolves synthetic folder workspace ids as known sidebar worktrees', () => {
     const folderWorkspace = makeFolderWorkspace()
     const folderWorktree = getKnownSidebarWorktreeById(
@@ -206,16 +141,40 @@ describe('worktree list folder reveal', () => {
         getFolderWorkspaceRevealGroupKeys(
           folderWorkspaceKey(folderWorkspace.id),
           [{ ...folderWorkspace, executionHostId: otherHostId }, folderWorkspace],
-          [root, child, otherRoot, otherChild],
+          [otherRoot, otherChild, root, child],
           { executionHostId, defaultHostId: 'local' }
         )
       ).toEqual([
-        getProjectGroupHeaderKey(root.id, root),
-        getProjectGroupHeaderKey(child.id, child),
+        getProjectGroupHeaderKey(root.id),
+        getProjectGroupHeaderKey(child.id),
         `host:${executionHostId}`
       ])
     }
   )
+
+  it('follows the parents the sidebar draws when same-id group copies disagree (#30045)', () => {
+    const localChild = makeProjectGroup({ id: 'group-child', executionHostId: 'local' })
+    const remoteRoot = makeProjectGroup({ id: 'remote-root', executionHostId: 'runtime:other' })
+    const remoteChild = makeProjectGroup({
+      id: localChild.id,
+      parentGroupId: remoteRoot.id,
+      executionHostId: 'runtime:other'
+    })
+    const folderWorkspace = makeFolderWorkspace({ executionHostId: 'local' })
+
+    expect(
+      getFolderWorkspaceRevealGroupKeys(
+        folderWorkspaceKey(folderWorkspace.id),
+        [folderWorkspace],
+        [localChild, remoteRoot, remoteChild],
+        { executionHostId: 'local', defaultHostId: 'local' }
+      )
+    ).toEqual([
+      getProjectGroupHeaderKey(remoteRoot.id),
+      getProjectGroupHeaderKey(localChild.id),
+      'host:local'
+    ])
+  })
 })
 
 describe('reveal keys under non-repo grouping', () => {
@@ -224,8 +183,6 @@ describe('reveal keys under non-repo grouping', () => {
   const workspaceKey = folderWorkspaceKey(folderWorkspace.id)
 
   it('returns the status lane key so a collapsed lane can be expanded', () => {
-    // Pre-fix only project-group headers came back, and those do not exist
-    // under status grouping, so the reveal could never expand the lane.
     const keys = getFolderWorkspaceRevealGroupKeys(workspaceKey, [folderWorkspace], [group], {
       groupBy: 'workspace-status',
       workspaceStatuses: [],
@@ -249,7 +206,7 @@ describe('reveal keys under non-repo grouping', () => {
       workspaceStatuses: [],
       defaultHostId: 'local'
     })
-    expect(keys).toContain(getProjectGroupHeaderKey(group.id, group))
+    expect(keys).toContain(getProjectGroupHeaderKey(group.id))
     expect(keys.some((key) => key.startsWith('workspace-status:'))).toBe(false)
   })
 })

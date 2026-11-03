@@ -1,4 +1,5 @@
-import { getLocalizedExecutionHostLabel } from '@/lib/localized-execution-host-label'
+import { translate } from '@/i18n/i18n'
+import { getExecutionHostLabel } from '../../../../shared/execution-host'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
 
 export type AutomationSourceDisplay = {
@@ -15,16 +16,32 @@ export function getAutomationSourceDisplay(
   }
   const providerLabel = getProviderLabel(sourceContext.provider)
   const hostLabel =
-    hostLabelById?.get(sourceContext.hostId) ?? getLocalizedExecutionHostLabel(sourceContext.hostId)
+    hostLabelById?.get(sourceContext.hostId) ?? getExecutionHostLabel(sourceContext.hostId)
   const identityLabel = getSourceIdentityLabel(sourceContext)
   const label = [providerLabel, hostLabel, identityLabel]
     .filter((part): part is string => Boolean(part))
     .join(' · ')
   const title = [
-    `${providerLabel} source`,
-    `Host: ${hostLabel}`,
-    sourceContext.accountLabel ? `Account: ${sourceContext.accountLabel}` : null,
-    identityLabel ? `Source: ${identityLabel}` : null
+    translate(
+      'auto.components.taskSourceContextSummary.providerSourceTitle',
+      '{{provider}} source',
+      { provider: providerLabel }
+    ),
+    translate('auto.components.taskSourceContextSummary.hostTitle', 'Host: {{hosts}}', {
+      hosts: hostLabel
+    }),
+    sourceContext.accountLabel
+      ? translate(
+          'auto.components.taskSourceContextSummary.accountTitle',
+          'Account: {{accounts}}',
+          { accounts: sourceContext.accountLabel }
+        )
+      : null,
+    identityLabel
+      ? translate('auto.components.taskSourceContextSummary.sourceTitle', 'Source: {{source}}', {
+          source: identityLabel
+        })
+      : null
   ]
     .filter((part): part is string => Boolean(part))
     .join(' · ')

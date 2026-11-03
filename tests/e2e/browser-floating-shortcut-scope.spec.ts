@@ -40,7 +40,7 @@ async function openFloatingBrowser(
       }
       const settings = store.getState().settings
       if (!settings) {
-        throw new Error('Settings unavailable')
+        throw new Error('Settings are not loaded')
       }
       store.setState({ settings: { ...settings, floatingTerminalEnabled: true } })
       const state = store.getState()

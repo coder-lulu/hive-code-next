@@ -1,3 +1,5 @@
+import { abandonStructuredAgentSessionHost } from './structured-agent-session-host-test-abandon'
+import { startStructuredAgentSessionAgentForOperation } from './structured-agent-session-agent-start'
 // What a client's retry sees around a failed attach settlement: a crash between
 // reserve and settlement replays into the original reservation, and a settled
 // failure refuses sends without ever re-dispatching on the user's behalf.
@@ -68,6 +70,7 @@ function accepted(): AgentSessionDispatchOutcome {
 
 function adapter(): StructuredAgentSessionAdapter {
   return {
+    open: async () => ({ reportedOptions: {} }),
     acquire,
     releaseAcquisition,
     dispatch,
@@ -96,6 +99,7 @@ beforeEach(async () => {
   publishFault.publishCount = 0
   resetHostTestOperationIds()
   acquire = vi.fn(async ({ fence }) => ({
+    acquisitionGeneration: globalThis.crypto.randomUUID(),
     process: {
       hostId: 'local',
       pid: 4242,
@@ -134,7 +138,7 @@ afterEach(async () => {
 
 /** The host starting the agent with no message to deliver, as an operation that needs it does. */
 function startAgent(): Promise<unknown> {
-  return host['serialize'](SESSION, () => host['mutationContext']().ensureAgent(SESSION))
+  return startStructuredAgentSessionAgentForOperation(host['attachContext'](), SESSION)
 }
 
 describe('settled attach retry', () => {
@@ -186,6 +190,7 @@ describe('settled attach retry', () => {
         throw new Error('reply lost')
       }
       return {
+        acquisitionGeneration: globalThis.crypto.randomUUID(),
         process: {
           hostId: 'local',
           pid: 4242,
@@ -231,6 +236,7 @@ describe('settled attach retry', () => {
         throw new Error('reply lost')
       }
       return {
+        acquisitionGeneration: globalThis.crypto.randomUUID(),
         process: {
           hostId: 'local',
           pid: 4242,
@@ -278,7 +284,7 @@ describe('settled attach retry', () => {
       ownerProcess: null
     })
 
-    await host.flushAllStreamedEvents()
+    await abandonStructuredAgentSessionHost(host)
     closeTestJournalHostDatabases()
     store = await openTestAgentSessionRecordStore(root)
     host = new StructuredAgentSessionHost({
@@ -297,7 +303,8 @@ describe('settled attach retry', () => {
       now: () => NOW
     })
 
-    await host.restoreReadableSessions()
+    await host.reconcileRestartLeases()
+    await host.seedSessionTabs([SESSION])
     expect(releaseAcquisition).toHaveBeenCalledTimes(1)
     // A missing committed identity cannot prove that the reserved process never started.
     expect(store.getRecord(SESSION)?.lease).toMatchObject({
@@ -329,7 +336,7 @@ describe('settled attach retry', () => {
     // Handed over before the host dies: that is what makes the restart's answer doubt.
     await vi.waitFor(() => expect(dispatch).toHaveBeenCalledTimes(1))
 
-    await host.flushAllStreamedEvents()
+    await abandonStructuredAgentSessionHost(host)
     closeTestJournalHostDatabases()
     store = await openTestAgentSessionRecordStore(root)
     host = new StructuredAgentSessionHost({
@@ -343,7 +350,8 @@ describe('settled attach retry', () => {
       probeOwner: async () => ({ outcome: 'pid-absent' }),
       now: () => NOW
     })
-    await host.restoreReadableSessions()
+    await host.reconcileRestartLeases()
+    await host.seedSessionTabs([SESSION])
     await startAgent()
     expect(store.getRecord(SESSION)?.lease).toMatchObject({
       claimStatus: 'live',

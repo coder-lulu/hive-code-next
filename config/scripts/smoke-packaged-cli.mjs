@@ -13,7 +13,7 @@ function readAppDirArg(argv) {
     return explicit.slice('--app-dir='.length)
   }
   if (process.platform === 'darwin') {
-    return 'dist/mac-arm64/HiveCode.app'
+    return 'dist/mac-arm64/Orca.app'
   }
   if (process.platform === 'win32') {
     return 'dist/win-unpacked'
@@ -23,12 +23,12 @@ function readAppDirArg(argv) {
 
 function getPackagedCliPath(appDir) {
   if (process.platform === 'darwin' || appDir.endsWith('.app')) {
-    return join(appDir, 'Contents', 'Resources', 'bin', 'hive')
+    return join(appDir, 'Contents', 'Resources', 'bin', 'orca')
   }
   if (process.platform === 'win32') {
-    return join(appDir, 'resources', 'bin', 'hive.exe')
+    return join(appDir, 'resources', 'bin', 'orca.exe')
   }
-  return join(appDir, 'resources', 'bin', 'hive')
+  return join(appDir, 'resources', 'bin', 'orca-ide')
 }
 
 const appDir = resolve(readAppDirArg(process.argv.slice(2)))
@@ -78,11 +78,7 @@ try {
   smokeFailure = error
 }
 
-// Why: on Windows the launcher above spawns the copied HiveCode.exe (and its crashpad/utility children)
-// once per command; those handles can outlive execFile's exit by a few ms, so this cleanup hits
-// EBUSY on our own just-exited process after every assertion already passed. Same retry treatment
-// as removeHostTree(); a lock that never clears still throws — unless the smoke run itself failed,
-// in which case surfacing EBUSY instead of the real assertion would hide the actual regression.
+// Retry Windows cleanup locks from just-exited Orca.exe/crashpad descendants; persistent lock still throws unless it would mask smoke’s original failure.
 const cleanupFailure = await rm(tempRoot, {
   recursive: true,
   force: true,

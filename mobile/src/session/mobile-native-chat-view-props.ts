@@ -2,14 +2,15 @@ import type {
   NativeChatLiveTurnIndicator,
   NativeChatSettledTurns
 } from '../../../src/shared/native-chat-turn-status'
-import type { AskAnswerSelection, AskPrompt } from '../../../src/shared/native-chat-ask'
+import type { AskAnswerSelection } from '../../../src/shared/native-chat-ask-answer'
+import type { AskPrompt } from '../../../src/shared/native-chat/input/native-chat-ask-types'
 import type { NativeChatMessage } from '../../../src/shared/native-chat-types'
 import type { NativeChatTurnJournal } from '../../../src/shared/native-chat-turn-membership'
-import type { ComposerTrayProps } from './use-mobile-native-chat-composer-tray'
-import type { PendingNativeChatImage } from './mobile-native-chat-image-attachment'
+import type { ComposerTrayProps } from './native-chat/composer/use-mobile-native-chat-composer-tray'
+import type { PendingNativeChatImage } from './native-chat/composer/mobile-native-chat-image-attachment'
 import type { MobileNativeChatSessionOptionPickersProps } from './MobileNativeChatSessionOptionPickers'
-import type { MobileChatPermission } from './mobile-native-chat-permission'
-import type { MobileChatQuestion } from './mobile-native-chat-question'
+import type { MobileChatPermission } from './native-chat/input/mobile-native-chat-permission'
+import type { MobileChatQuestion } from './native-chat/input/mobile-native-chat-question'
 import type { MobileNativeChatPendingItem } from './mobile-native-chat-render-data'
 import type { MobileNativeChatStatus } from './use-mobile-native-chat-session'
 

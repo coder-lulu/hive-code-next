@@ -1,14 +1,5 @@
-// Host-scoped workspace port scan and Stop, paired across two builds: current code against the
-// published v1.4.186 source before host-scoped methods.
-//
-// `workspacePorts.scanHost` / `killHost` are new methods, not new fields on `scan` / `kill`, because
-// an old host would strip a host field and scan or signal on itself. Each skew must hold:
-//
-//  - an old client keeps calling `scan` / `kill` with `{ repoId }`, which a new host parses as before;
-//  - an old host neither advertises the capability nor knows the methods, so a new client can only
-//    get "update server" from it, never a scan or Stop of the wrong machine.
-//
-// The old side uses its unmodified real registry and original dispatcher parser.
+// Use distinct host-scoped methods: old hosts strip unknown fields on scan/kill and could target the wrong machine.
+// Remove new methods/capabilities from release catalogs so rolling baselines keep the update-server refusal case.
 
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
@@ -18,10 +9,13 @@ import {
 import { RPC_PARAMS_BY_METHOD } from '../../../src/shared/rpc-contract/rpc-params-catalog.generated'
 import { parseRpcRequestParams } from '../../../src/main/runtime/rpc/dispatcher-request-parsing'
 import type { RpcAnyMethodDeclaration, RpcRequest } from '../../../src/main/runtime/rpc/core'
-import { resolveReleaseCheckoutCommit } from './release-checkout'
-import { loadReleasedRpcParams } from './released-rpc-params'
+import {
+  importReleaseCheckoutModule,
+  materializeReleaseCheckout,
+  resolveBaselineReleaseRef,
+  releaseModuleExport
+} from './release-checkout'
 
-// Why: a cold CI run extracts the baseline checkout before the first pairing.
 const SUITE_TIMEOUT_MS = 180_000
 const HOST_SCOPED_METHODS = ['workspacePorts.scanHost', 'workspacePorts.killHost']
 
@@ -61,10 +55,27 @@ let oldHost: HostBuild
 let newHost: HostBuild
 
 beforeAll(async () => {
-  const released = await loadReleasedRpcParams('v1.4.186')
-  expect(released.commit).toBe(resolveReleaseCheckoutCommit('v1.4.186'))
-  expect(released.capabilities).not.toContain(WORKSPACE_PORTS_HOST_SCOPED_RUNTIME_CAPABILITY)
-  oldHost = hostBuild(released.capabilities, released.catalog, released.parse)
+  const checkout = await materializeReleaseCheckout(resolveBaselineReleaseRef())
+  const [protocol, catalog, parsing] = await Promise.all([
+    importReleaseCheckoutModule(checkout, 'src/shared/protocol-version.ts'),
+    importReleaseCheckoutModule(
+      checkout,
+      'src/shared/rpc-contract/rpc-params-catalog.generated.ts'
+    ),
+    importReleaseCheckoutModule(checkout, 'src/main/runtime/rpc/dispatcher-request-parsing.ts')
+  ])
+  const oldCatalog = Object.fromEntries(
+    Object.entries(
+      releaseModuleExport<Record<string, unknown>>(catalog, 'RPC_PARAMS_BY_METHOD')
+    ).filter(([method]) => !HOST_SCOPED_METHODS.includes(method))
+  )
+  oldHost = hostBuild(
+    releaseModuleExport<readonly string[]>(protocol, 'RUNTIME_CAPABILITIES').filter(
+      (capability) => capability !== WORKSPACE_PORTS_HOST_SCOPED_RUNTIME_CAPABILITY
+    ),
+    oldCatalog,
+    releaseModuleExport<ParseParams>(parsing, 'parseRpcRequestParams')
+  )
   newHost = hostBuild(RUNTIME_CAPABILITIES, RPC_PARAMS_BY_METHOD, (request, method, meta) =>
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the parser only reads `params` from the declaration.
     parseRpcRequestParams(request, method as RpcAnyMethodDeclaration, meta as never)

@@ -25,6 +25,7 @@ export function createWebOrcaProfilesApi(): Partial<PreloadApi> {
         }),
       authStatus: webOrcaProfileAuthStatus,
       onAuthStatusChanged: () => noopUnsubscribe,
+      onSignInProgressChanged: () => noopUnsubscribe,
       createLocal: () =>
         Promise.resolve({
           activeProfileId: DEFAULT_LOCAL_ORCA_PROFILE_ID,
@@ -49,6 +50,8 @@ export function createWebOrcaProfilesApi(): Partial<PreloadApi> {
         status: 'unconfigured',
         auth: await webOrcaProfileAuthStatus()
       }),
+      signInProgress: async () => null,
+      cancelSignIn: async () => {},
       refreshAuth: async () => ({
         status: 'unconfigured',
         auth: await webOrcaProfileAuthStatus()

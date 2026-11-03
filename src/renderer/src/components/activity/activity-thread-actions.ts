@@ -1,22 +1,21 @@
-import { isFloatingTerminalWorkspaceId } from '@/lib/floating-terminal'
-import { resolveTemporarySessionOwner } from '@/lib/temporary-session-navigation'
 import { activateTabAndFocusPane } from '@/lib/activate-tab-and-focus-pane'
-import { activateStructuredAgentSessionTab } from '@/lib/structured-agent-session-tab-activation'
-import { jumpToWorktreeFromSidebar } from '@/lib/worktree-jump-navigation'
+import { revealFloatingWorkspacePanel } from '@/lib/floating-workspace-panel-reveal'
+import { activateStructuredAgentSessionTab } from '@/lib/agent-session/structured-agent-session-tab-activation'
 import { activateAndRevealWorkspace } from '@/lib/worktree-activation'
+import { jumpToWorktreeFromSidebar } from '@/lib/worktree-jump-navigation'
 import { useAppStore } from '@/store'
+import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
 import {
   getSettingsFocusedExecutionHostId,
   getWorktreeExecutionHostId,
   type ExecutionHostId
 } from '../../../../shared/execution-host'
+import { parsePaneKey } from '../../../../shared/stable-pane-id'
 import { findKnownWorktreeById } from '@/store/slices/worktrees/listing/detected-worktree-meta'
 import type { AppState } from '@/store/types'
 import type { AgentPaneThread } from './activity-thread-types'
-import { parsePaneKey } from '../../../../shared/stable-pane-id'
 
-// Same focused-host fallback the Agents scope filter uses; defaulting to `local` here would
-// look up a hostless runtime-owned workspace on the wrong host and silently drop the jump.
+// Use the scope filter’s focused-host fallback; local would misroute hostless runtime-owned workspaces.
 function getActivityThreadExecutionHostId(
   thread: AgentPaneThread,
   defaultHostId: ExecutionHostId
@@ -32,59 +31,6 @@ type ActivityThreadWorkspaceCatalog = Pick<
 function readActivityThreadWorkspaceCatalog(): ActivityThreadWorkspaceCatalog {
   const state = useAppStore.getState()
   return { ...state, defaultHostId: getSettingsFocusedExecutionHostId(state.settings) }
-}
-
-function openThreadTarget(thread: AgentPaneThread, executionHostId: ExecutionHostId): void {
-  const state = useAppStore.getState()
-
-  if (isFloatingTerminalWorkspaceId(thread.worktree.id)) {
-    const owner = resolveTemporarySessionOwner(state, {
-      ownerBucketKey: thread.worktree.id,
-      tabId: thread.tab.id,
-      executionHostId
-    })
-    const tabId = owner?.unifiedTabId ?? owner?.terminalTabId
-    // Use the same list and selection identity as the sidebar Sessions entry.
-    state.openSessionsPage({ kind: 'all' })
-    state.updateSessionsView({
-      navigation: 'sessions',
-      query: '',
-      scrollTop: 0,
-      selectedSessionKey: owner && tabId ? `${owner.bucketKey}|${tabId}` : null
-    })
-    return
-  }
-
-  // Reuse the existing Projects navigation surface. It owns the project/workspace
-  // hierarchy and the normal activation path selects the exact worktree there.
-  state.openSessionsPage()
-  state.updateSessionsView({ navigation: 'projects', query: '' })
-  if (hasActivityThreadWorkspace(thread)) {
-    if (activateAndRevealWorkspace(thread.worktree.id, { executionHostId }) === false) {
-      return
-    }
-    if (
-      activateStructuredAgentSessionTab({
-        worktreeId: thread.worktree.id,
-        tabId: thread.tab.id,
-        executionHostId
-      })
-    ) {
-      return
-    }
-    const activated = useAppStore.getState()
-    if (
-      !(activated.tabsByWorktree[thread.worktree.id] ?? []).some((tab) => tab.id === thread.tab.id)
-    ) {
-      return
-    }
-    activated.setActiveTabType('terminal', thread.worktree.id)
-    const parsed = parsePaneKey(thread.paneKey)
-    activateTabAndFocusPane(thread.tab.id, parsed?.tabId === thread.tab.id ? parsed.leafId : null, {
-      flashFocusedPane: true,
-      scrollToBottomIfOutputSinceLastView: true
-    })
-  }
 }
 
 export function hasActivityThreadWorkspace(
@@ -106,10 +52,7 @@ export function createActivityThreadActions({
   unacknowledgeAgents,
   setSelectedPaneKey
 }: {
-  /** Getter (not a snapshot) so the handlers keep one identity for the row memo
-   *  bail-outs while bulk actions still see the current thread set. This is the
-   *  badge-coherent set (child-filter only), not the search/scope-narrowed one,
-   *  so Mark all read always drives the Agents badge to zero. */
+  /** Read current badge-coherent threads through a stable handler; Mark all read ignores search/scope so the badge reaches zero. */
   getMarkAllReadThreads: () => AgentPaneThread[]
   acknowledgeAgents: (paneKeys: string[], reads?: undefined, intent?: 'explicit') => void
   unacknowledgeAgents: (paneKeys: string[]) => void
@@ -136,17 +79,57 @@ export function createActivityThreadActions({
   }
 
   const markThreadRead = (thread: AgentPaneThread): void => markThreadsRead([thread])
+
   const markThreadUnread = (thread: AgentPaneThread): void => markThreadsUnread([thread])
+
+  const activateThreadTarget = (thread: AgentPaneThread): void => {
+    const isFloatingTerminal = thread.worktree.id === FLOATING_TERMINAL_WORKTREE_ID
+    const executionHostId = getActivityThreadExecutionHostId(
+      thread,
+      getSettingsFocusedExecutionHostId(useAppStore.getState().settings)
+    )
+    // Activate before probing residency: cold SSH tabs are revived/seeded here; probing first made remote row clicks no-ops (#16731).
+    if (
+      !isFloatingTerminal &&
+      activateAndRevealWorkspace(thread.worktree.id, {
+        executionHostId,
+        revealInSidebar: false,
+        clearSidebarFilters: false
+      }) === false
+    ) {
+      return
+    }
+    if (
+      activateStructuredAgentSessionTab({ worktreeId: thread.worktree.id, tabId: thread.tab.id })
+    ) {
+      if (isFloatingTerminal) {
+        revealFloatingWorkspacePanel(useAppStore.getState())
+      }
+      return
+    }
+    // Read post-activation: the tab this thread points at may have only just been revived.
+    const activated = useAppStore.getState()
+    const liveTabs = activated.tabsByWorktree[thread.worktree.id] ?? []
+    if (!liveTabs.some((tab) => tab.id === thread.tab.id)) {
+      // Retained threads may outlive their tab; keep the workspace activated without focusing an unrelated sibling.
+      return
+    }
+    // Floating tabs have no catalog workspace; reveal their panel without changing the main workspace.
+    if (isFloatingTerminal) {
+      revealFloatingWorkspacePanel(activated)
+    }
+    activated.setActiveTabType('terminal', thread.worktree.id)
+    const parsed = parsePaneKey(thread.paneKey)
+    activateTabAndFocusPane(
+      thread.tab.id,
+      parsed && parsed.tabId === thread.tab.id ? parsed.leafId : null,
+      { flashFocusedPane: true, scrollToBottomIfOutputSinceLastView: true }
+    )
+  }
+
   const selectThread = (thread: AgentPaneThread): void => {
     setSelectedPaneKey(thread.paneKey)
-    markThreadRead(thread)
-    openThreadTarget(
-      thread,
-      getActivityThreadExecutionHostId(
-        thread,
-        getSettingsFocusedExecutionHostId(useAppStore.getState().settings)
-      )
-    )
+    activateThreadTarget(thread)
   }
 
   const jumpToWorkspace = (thread: AgentPaneThread): void => {

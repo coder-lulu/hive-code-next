@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight, Code2, Sparkles, Workflow } from 'lucide-react'
 import type { TuiAgent } from '../../../shared/tui-agent'
+import { agentPermissionChoiceForLaunchMode } from '../../../shared/tui-agent-permission-choice'
 import {
   supportsTuiAgentLaunchPermission,
   type AgentLaunchPermissionMode
@@ -188,6 +189,8 @@ export default function Landing(): React.JSX.Element {
   const agent = resolvedAgentSelection.quickAgent
   const resolvedPermissionMode =
     agent && supportsTuiAgentLaunchPermission(agent) ? permissionMode : 'default'
+  const permissionChoice = agentPermissionChoiceForLaunchMode(resolvedPermissionMode)
+  const sessionOptions = permissionChoice ? { permissionMode: permissionChoice } : undefined
   // A persisted selector value can briefly outlive the catalog row while a
   // host is hydrating. Keep that state from silently falling back to a
   // floating temporary session and losing the user's intended target.
@@ -298,7 +301,7 @@ export default function Landing(): React.JSX.Element {
           agent,
           worktreeId: FLOATING_TERMINAL_WORKTREE_ID,
           prompt,
-          agentPermissionMode: resolvedPermissionMode,
+          sessionOptions,
           promptDelivery: 'auto-submit',
           launchSource: 'desktop_home'
         })
@@ -307,7 +310,12 @@ export default function Landing(): React.JSX.Element {
         temporaryLaunchCleanup.current = null
         console.error('Could not launch temporary session', error)
       }
-      if (launched && tracker.markLaunched(launched.tabId ?? null)) {
+      if (
+        launched &&
+        tracker.markLaunched(
+          launched.surface.kind === 'host-published' ? null : launched.surface.tabId
+        )
+      ) {
         temporaryLaunchCleanup.current = null
       } else if (launched) {
         setHomeTaskDraft('')
@@ -336,9 +344,9 @@ export default function Landing(): React.JSX.Element {
       agent,
       worktreeId:
         selectedWorkspace.kind === 'folder' ? selectedWorkspace.workspaceKey : selectedWorkspace.id,
-      executionHostId: selectedWorkspace.executionHostId,
+      selectedExecutionHostId: selectedWorkspace.executionHostId,
       prompt,
-      agentPermissionMode: resolvedPermissionMode,
+      sessionOptions,
       promptDelivery: 'auto-submit',
       launchSource: 'desktop_home'
     })

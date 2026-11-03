@@ -8,11 +8,14 @@ import type { RpcCallerScope } from './rpc-caller-scope'
 export type RpcDispatchStreamingOptions = Pick<
   RpcContext,
   | 'authorizeRequest'
+  | 'mobileRelayHosts'
   | 'authenticatedAccountRuntimeSessionId'
   | 'authenticatedAccountOperationCallerKey'
   | 'authenticatedCallerFingerprint'
   | 'connectionId'
   | 'signal'
+  | 'deviceSelf'
+  | 'peerDesktops'
   | 'clientId'
   | 'pairedDeviceId'
   | 'pairedDeviceParentId'
@@ -26,6 +29,8 @@ export type RpcDispatchStreamingOptions = Pick<
 > & {
   /** What the transport proved the caller may do; absent means this host's owner. */
   callerScope?: RpcCallerScope
+  /** Connection cancellation bounds readiness waits without cancelling durable handlers. */
+  connectionSignal?: AbortSignal
 }
 
 export function rpcContextFromTransport(
@@ -37,11 +42,14 @@ export function rpcContextFromTransport(
 ): RpcContext {
   return {
     runtime,
+    mobileRelayHosts: options?.mobileRelayHosts,
     hiveRuntimeCloud,
     authorizeRequest: options?.authorizeRequest,
     authenticatedAccountRuntimeSessionId: options?.authenticatedAccountRuntimeSessionId,
     authenticatedAccountOperationCallerKey: options?.authenticatedAccountOperationCallerKey,
     signal: options?.signal,
+    deviceSelf: options?.deviceSelf,
+    peerDesktops: options?.peerDesktops,
     requestId: request.id,
     connectionId: options?.connectionId,
     // Session tabs always need this fence. COMPAT(terminal request-addressed unsubscribe): terminal only for phones without `requestId`.

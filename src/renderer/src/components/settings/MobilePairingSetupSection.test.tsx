@@ -65,7 +65,7 @@ describe('MobilePairingSetupSection', () => {
     })
   })
 
-  it('shows connection, address, and generate in a compact flow', () => {
+  it('shows direct address selection and generation without cloud sign-in', () => {
     renderSection()
     expect(screen.getByText('Direct address')).toBeVisible()
     expect(screen.getByText('This computer’s address')).toBeVisible()
@@ -74,7 +74,7 @@ describe('MobilePairingSetupSection', () => {
     expect(screen.getByText(/must be able to reach this address/i)).toBeVisible()
   })
 
-  it('shows the selected custom address', () => {
+  it('keeps a custom address visible for direct pairing', () => {
     const address = 'host.example:6768'
     renderSection({
       customAddresses: [address],
@@ -85,10 +85,35 @@ describe('MobilePairingSetupSection', () => {
     expect(screen.queryByRole('button', { name: /Also use a faster local path/i })).toBeNull()
   })
 
-  it('disables generate when no address is selected', () => {
+  it('disables generate on LAN when no advertise address is selected', () => {
     renderSection({ selectedAddress: undefined })
     expect(screen.getByText('This computer’s address')).toBeVisible()
     expect(screen.getByRole('button', { name: 'Generate QR code' })).toBeDisabled()
+  })
+
+  it('can move retry recovery into the persistent failure notice', () => {
+    renderSection({ showGenerateAction: false })
+    expect(screen.queryByRole('button', { name: 'Generate QR code' })).toBeNull()
+  })
+
+  it('keeps generation disabled while address discovery is unresolved', () => {
+    renderSection({ canGenerate: false })
+    expect(screen.getByRole('button', { name: 'Generate QR code' })).toBeDisabled()
+  })
+
+  it('keeps the custom-address dialog open when preflight rejects the address', async () => {
+    const beforeCustomAddressChange = vi.fn().mockResolvedValue(false)
+    const { user, onCustomAddressSelect } = renderSection({ beforeCustomAddressChange })
+    await user.click(screen.getByRole('combobox'))
+    await user.click(screen.getByRole('option', { name: 'Add custom address…' }))
+    await user.type(screen.getByRole('textbox', { name: 'Address' }), 'host.example:6768')
+    await user.click(screen.getByRole('button', { name: 'Use address' }))
+    expect(beforeCustomAddressChange).toHaveBeenCalledExactlyOnceWith('host.example:6768')
+    expect(onCustomAddressSelect).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog', { name: 'Custom network address' })).toBeVisible()
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'This address could not produce a scannable pairing code'
+    )
   })
 
   it('commits an OS interface picked from the list', async () => {

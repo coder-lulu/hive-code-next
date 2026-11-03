@@ -1,16 +1,16 @@
-import { registerDownloadedUpdateHandler } from './updater-downloaded-event'
 import { app } from 'electron'
-import { registerMacUpdaterEvents, resetMacInstallState } from './updater-mac-install'
-import { compareVersions } from './updater-fallback'
+import { getRetainedLinuxPackageManualInstallStatus } from './linux-package-downloaded-status'
+import * as linuxPackageRecovery from './linux-package-update-recovery'
+import { isExternallyManagedLinuxInstall } from './linux-update-package-type'
 import { fetchChangelog } from './updater-changelog'
+import { registerDownloadedUpdateHandler } from './updater-downloaded-event'
 import {
   AUTO_UPDATE_CHECK_INTERVAL_MS,
   AUTO_UPDATE_RETRY_INTERVAL_MS,
   type UpdaterHandlerContext
 } from './updater-events-context'
-import { getRetainedLinuxPackageManualInstallStatus } from './linux-package-downloaded-status'
-import { isExternallyManagedLinuxInstall } from './linux-update-package-type'
-import * as linuxPackageRecovery from './linux-package-update-recovery'
+import { compareVersions } from './updater-fallback'
+import { registerMacUpdaterEvents, resetMacInstallState } from './updater-mac-install'
 export function registerAutoUpdaterHandlers(context: UpdaterHandlerContext): void {
   const {
     autoUpdater,

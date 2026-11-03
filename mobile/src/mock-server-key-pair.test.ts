@@ -1,14 +1,5 @@
-import type * as FileSystem from 'node:fs'
-import { spawn } from 'node:child_process'
-import {
-  mkdtempSync,
-  openSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  statSync,
-  writeFileSync
-} from 'node:fs'
+import { spawnProcess } from '@orca/process-host'
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -16,16 +7,23 @@ import nacl from 'tweetnacl'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { loadOrCreateMockServerKeyPair } from '../scripts/mock-server-key-pair'
 
-vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof FileSystem>()
-  return { ...actual, openSync: vi.fn(actual.openSync) }
-})
-
 const temporaryDirectories: string[] = []
+
+// Why: this file runs under Node, but the program's RN libs type a timer handle as a number.
+function unrefTimer(timer: unknown): void {
+  if (
+    typeof timer === 'object' &&
+    timer !== null &&
+    'unref' in timer &&
+    typeof timer.unref === 'function'
+  ) {
+    timer.unref()
+  }
+}
 
 type ConcurrentCreator = {
   ready: Promise<void>
-  calling: Promise<void>
+  locked: Promise<void>
   start: () => void
   stop: () => void
   closed: Promise<void>
@@ -43,45 +41,60 @@ function runConcurrentCreator(keyFile: string): ConcurrentCreator {
     join(import.meta.dirname, '../scripts/mock-server-key-pair.ts')
   ).href
   const script = `
+    const fs = (await import('node:fs')).default
+    const { syncBuiltinESMExports } = await import('node:module')
+    const openSync = fs.openSync
+    let reportedLock = false
+    fs.openSync = (...args) => {
+      try {
+        return openSync(...args)
+      } catch (error) {
+        if (!reportedLock && args[0] === process.argv[2] + '.lock' && error.code === 'EEXIST') {
+          reportedLock = true
+          process.stdout.write('LOCKED\\n')
+        }
+        throw error
+      }
+    }
+    syncBuiltinESMExports()
     const { loadOrCreateMockServerKeyPair } = await import(process.argv[1])
     process.stdout.write('READY\\n')
     await new Promise((resolve) => process.stdin.once('data', resolve))
-    process.stdout.write('CALLING\\n')
     const keyPair = loadOrCreateMockServerKeyPair(process.argv[2], { warn() {} })
     process.stdout.write('KEY:' + Buffer.from(keyPair.secretKey).toString('base64') + '\\n')
   `
-  const child = spawn(
-    process.execPath,
-    ['--import', 'tsx', '--input-type=module', '--eval', script, moduleUrl, keyFile],
-    { stdio: ['pipe', 'pipe', 'pipe'] }
-  )
+  const child = spawnProcess({
+    program: process.execPath,
+    args: ['--import', 'tsx', '--input-type=module', '--eval', script, moduleUrl, keyFile],
+    stdio: 'pipe'
+  })
   let stdout = ''
   let stderr = ''
   let resolveReady!: () => void
   let rejectReady!: (error: Error) => void
-  let resolveCalling!: () => void
-  let rejectCalling!: (error: Error) => void
+  let resolveLocked!: () => void
+  let rejectLocked!: (error: Error) => void
   const ready = new Promise<void>((resolve, reject) => {
     resolveReady = resolve
     rejectReady = reject
   })
-  const calling = new Promise<void>((resolve, reject) => {
-    resolveCalling = resolve
-    rejectCalling = reject
+  const locked = new Promise<void>((resolve, reject) => {
+    resolveLocked = resolve
+    rejectLocked = reject
   })
   let resolveClosed!: () => void
   const closed = new Promise<void>((resolve) => {
     resolveClosed = resolve
   })
   const timeout = setTimeout(() => child.kill(), 5_000)
-  timeout.unref()
+  unrefTimer(timeout)
   child.stdout.on('data', (chunk) => {
     stdout += chunk.toString()
     if (stdout.includes('READY\n')) {
       resolveReady()
     }
-    if (stdout.includes('CALLING\n')) {
-      resolveCalling()
+    if (stdout.includes('LOCKED\n')) {
+      resolveLocked()
     }
   })
   child.stderr.on('data', (chunk) => {
@@ -90,7 +103,7 @@ function runConcurrentCreator(keyFile: string): ConcurrentCreator {
   const result = new Promise<string>((resolve, reject) => {
     child.on('error', (error) => {
       rejectReady(error)
-      rejectCalling(error)
+      rejectLocked(error)
       reject(error)
     })
     child.on('close', (code) => {
@@ -100,8 +113,8 @@ function runConcurrentCreator(keyFile: string): ConcurrentCreator {
       if (!stdout.includes('READY\n')) {
         rejectReady(error)
       }
-      if (!stdout.includes('CALLING\n')) {
-        rejectCalling(error)
+      if (!stdout.includes('LOCKED\n')) {
+        rejectLocked(error)
       }
       const key = stdout.match(/KEY:([A-Za-z0-9+/=]+)\n/)?.[1]
       if (code === 0 && key) {
@@ -114,7 +127,7 @@ function runConcurrentCreator(keyFile: string): ConcurrentCreator {
   void result.catch(() => {})
   return {
     ready,
-    calling,
+    locked,
     start: () => {
       if (!child.stdin.destroyed && !child.stdin.writableEnded) {
         child.stdin.end('go\n')
@@ -154,7 +167,6 @@ async function cleanupConcurrentCreators(
 }
 
 afterEach(() => {
-  vi.mocked(openSync).mockReset()
   for (const directory of temporaryDirectories.splice(0)) {
     rmSync(directory, { recursive: true, force: true })
   }
@@ -188,73 +200,6 @@ describe('mock server key persistence', () => {
     expect(readFileSync(keyFile, 'utf-8')).toBe(Buffer.from(loaded.secretKey).toString('base64'))
   })
 
-  it.skipIf(process.platform !== 'win32').each(['EPERM', 'EACCES', 'EBUSY'])(
-    'retries transient Windows lock contention %s without replacing the winner',
-    (code) => {
-      const keyFile = keyFilePath()
-      const winner = nacl.box.keyPair()
-      vi.mocked(openSync).mockImplementationOnce(() => {
-        // Another creator publishes a complete key while this open races its lock release.
-        writeFileSync(keyFile, Buffer.from(winner.secretKey).toString('base64'))
-        throw Object.assign(new Error('lock sharing conflict'), { code })
-      })
-      const loaded = loadOrCreateMockServerKeyPair(keyFile, { warn: vi.fn() })
-      expect(loaded.secretKey).toEqual(winner.secretKey)
-      expect(readFileSync(keyFile, 'utf8')).toBe(Buffer.from(winner.secretKey).toString('base64'))
-      expect(readdirSync(dirname(keyFile))).toEqual(['server-key'])
-    }
-  )
-
-  it.skipIf(process.platform !== 'win32').each(['EPERM', 'EACCES', 'EBUSY'])(
-    'acquires the lock after transient Windows denial %s ends',
-    (code) => {
-      const keyFile = keyFilePath()
-      vi.mocked(openSync).mockImplementationOnce(() => {
-        throw Object.assign(new Error('lock sharing conflict'), { code })
-      })
-      const loaded = loadOrCreateMockServerKeyPair(keyFile, { warn: vi.fn() })
-      expect(readFileSync(keyFile, 'utf8')).toBe(Buffer.from(loaded.secretKey).toString('base64'))
-      expect(readdirSync(dirname(keyFile))).toEqual(['server-key'])
-    }
-  )
-
-  it.skipIf(process.platform !== 'win32').each(['EPERM', 'EACCES', 'EBUSY'])(
-    'fails bounded persistent Windows lock denial %s without breaking the lock or key',
-    (code) => {
-      const keyFile = keyFilePath()
-      writeFileSync(keyFile, 'invalid-existing-key')
-      writeFileSync(`${keyFile}.lock`, 'other-owner')
-      vi.mocked(openSync).mockImplementation(() => {
-        throw Object.assign(new Error('lock denied'), { code })
-      })
-      expect(() => loadOrCreateMockServerKeyPair(keyFile)).toThrow('remained busy')
-      expect(vi.mocked(openSync).mock.calls.length).toBeLessThanOrEqual(51)
-      expect(readFileSync(keyFile, 'utf8')).toBe('invalid-existing-key')
-      expect(readFileSync(`${keyFile}.lock`, 'utf8')).toBe('other-owner')
-      expect(readdirSync(dirname(keyFile)).sort()).toEqual(['server-key', 'server-key.lock'])
-    }
-  )
-
-  it.each(['linux', 'darwin'] as const)(
-    'does not reinterpret permission errors on %s',
-    (platform) => {
-      const platformProbe = vi.spyOn(process, 'platform', 'get').mockReturnValue(platform)
-      try {
-        const keyFile = keyFilePath()
-        vi.mocked(openSync)
-          .mockClear()
-          .mockImplementation(() => {
-            throw Object.assign(new Error('permission denied'), { code: 'EPERM' })
-          })
-        expect(() => loadOrCreateMockServerKeyPair(keyFile)).toThrow('permission denied')
-        expect(openSync).toHaveBeenCalledTimes(1)
-        expect(readdirSync(dirname(keyFile))).toEqual([])
-      } finally {
-        platformProbe.mockRestore()
-      }
-    }
-  )
-
   it('makes concurrent creators converge on the persisted winner', async () => {
     const keyFile = keyFilePath()
     const lockFile = `${keyFile}.lock`
@@ -266,8 +211,8 @@ describe('mock server key persistence', () => {
     try {
       await Promise.all(creators.map((creator) => creator.ready))
       creators.forEach((creator) => creator.start())
-      await Promise.all(creators.map((creator) => creator.calling))
-      await new Promise((resolve) => setTimeout(resolve, 50))
+      await Promise.all(creators.map((creator) => creator.locked))
+      expect(readdirSync(dirname(keyFile))).toEqual(['server-key.lock'])
       rmSync(lockFile)
       parentOwnsLock = false
       const [first, second] = await Promise.all(creators.map((creator) => creator.result))

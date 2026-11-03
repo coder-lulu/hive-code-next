@@ -15,8 +15,7 @@ import { skillInstallResultLabel } from './skill-install-result-label'
 import type { ResolvedSkillShare } from './skill-share-version-summary'
 import { translate } from '@/i18n/i18n'
 
-/** Why: the submit lives in the dialog footer beside Close, so this is only the
- *  field; Enter still submits through the form. */
+/** Submit stays in the footer; Enter in this field still submits its form. */
 export function SkillShareLinkInputForm({
   link,
   onLinkChange,
@@ -79,10 +78,11 @@ export function SkillInstallOutcome({ result }: { result: SkillInstallResult }):
         <div>
           <p className="text-sm font-medium">{skillInstallResultLabel(result)}</p>
           <p className="text-xs text-muted-foreground">
-            {result.placements.length}{' '}
-            {translate('auto.components.skills.SkillInstallReviewContent.3fc62a61eb', 'placement')}
-            {result.placements.length === 1 ? '' : 's'}{' '}
-            {translate('auto.components.skills.SkillInstallReviewContent.1b6ad2ca5c', 'checked.')}
+            {translate(
+              'auto.components.skills.SkillInstallReviewContent.placementsChecked',
+              '{{count}} placements checked.',
+              { count: result.placements.length, defaultValue_one: '{{count}} placement checked.' }
+            )}
           </p>
         </div>
       </div>
@@ -181,7 +181,10 @@ export function SkillInstallReview({
             )}
           </div>
           <p className="text-xs leading-5 text-muted-foreground">
-            {translate('auto.components.skills.SkillInstallReviewContent.2a31912f14', 'Orca found')}{' '}
+            {translate(
+              'auto.components.skills.SkillInstallReviewContent.2a31912f14',
+              'HiveCode found'
+            )}{' '}
             {result?.conflict?.kind ||
               destinationPreview?.currentState ||
               translate(

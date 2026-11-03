@@ -6,7 +6,6 @@ import React from 'react'
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type * as I18nModule from '@/i18n/i18n'
 import type { AppState } from '../../store'
 import { createEmptyRateLimitState } from '../../../../shared/rate-limit-state-factory'
 
@@ -56,8 +55,8 @@ vi.mock('../ui/tooltip', () => ({
   TooltipTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>
 }))
 
-vi.mock('@/i18n/i18n', async () => ({
-  ...(await vi.importActual<typeof I18nModule>('@/i18n/i18n')),
+vi.mock('@/i18n/i18n', () => ({
+  getIntlLocale: () => 'en',
   translate: (_key: string, fallback: string, values?: Record<string, string>) =>
     values
       ? Object.entries(values).reduce(

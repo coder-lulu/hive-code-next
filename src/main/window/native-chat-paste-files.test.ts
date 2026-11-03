@@ -18,14 +18,9 @@ import { AGENT_SESSION_MAX_NEW_OPERATION_AGE_MS } from '../../shared/agent-sessi
 
 import type { Store } from '../persistence'
 import { resolveLocalFileRequestPath } from '../ipc/local-file-access-resolution'
-import { PATH_ACCESS_DENIED_MESSAGE } from '../ipc/filesystem-auth'
+import { PATH_ACCESS_DENIED_MESSAGE } from '../ipc/filesystem/filesystem-auth'
 import { readLocalFileContent } from '../ipc/filesystem/filesystem-file-content-inspection'
-import {
-  NATIVE_CHAT_PASTE_TTL_MS,
-  isInsideNativeChatPasteFolder,
-  restoreNativeChatPastes,
-  sweepExpiredNativeChatPastes
-} from './native-chat-paste-files'
+import { isInsideNativeChatPasteFolder, restoreNativeChatPastes } from './native-chat-paste-files'
 
 function fileSymlinksAvailable(): boolean {
   if (process.platform !== 'win32') {
@@ -50,6 +45,7 @@ function fileSymlinksAvailable(): boolean {
 
 const hasFileSymlinks = fileSymlinksAvailable()
 const directoryLinkType = process.platform === 'win32' ? 'junction' : 'dir'
+const PAST_SEND_RECEIPT_AGE_MS = AGENT_SESSION_MAX_NEW_OPERATION_AGE_MS + 30 * 86_400_000
 
 // A store with no projects: nothing but an access kind decides what a read may reach.
 const NO_PROJECTS: Store = Object.assign(Object.create(null), {
@@ -263,10 +259,10 @@ describe('native-chat paste folder on disk', () => {
     }
   )
 
-  it('neither restores from nor sweeps a paste folder that is itself a link', async () => {
+  it('does not restore from or mutate a paste folder that is itself a link', async () => {
     const outside = path.join(root, 'Documents')
     mkdirSync(outside)
-    const old = (Date.now() - NATIVE_CHAT_PASTE_TTL_MS - 60_000) / 1000
+    const old = (Date.now() - PAST_SEND_RECEIPT_AGE_MS) / 1000
     for (const name of ['orca-paste-1.png', 'tax-return.pdf']) {
       writeFileSync(path.join(outside, name), 'x')
       utimesSync(path.join(outside, name), old, old)
@@ -278,21 +274,22 @@ describe('native-chat paste folder on disk', () => {
     await expect(restoreNativeChatPastes([path.join(folder, 'orca-paste-1.png')])).resolves.toEqual(
       [{ path: path.join(folder, 'orca-paste-1.png'), kept: false, exists: false }]
     )
-    await sweepExpiredNativeChatPastes()
     expect(existsSync(path.join(outside, 'orca-paste-1.png'))).toBe(true)
     expect(existsSync(path.join(outside, 'tax-return.pdf'))).toBe(true)
   })
 
-  it('expires only Orca paste files, whatever else is in the folder', async () => {
-    const old = (Date.now() - NATIVE_CHAT_PASTE_TTL_MS - 60_000) / 1000
+  it('restores pasted images after send receipts expire and leaves unrelated files alone', async () => {
+    const old = (Date.now() - PAST_SEND_RECEIPT_AGE_MS) / 1000
     for (const name of ['orca-paste-old.png', 'notes.txt']) {
       writeFileSync(path.join(folder, name), 'x')
       utimesSync(path.join(folder, name), old, old)
     }
 
-    await sweepExpiredNativeChatPastes()
-
-    expect(existsSync(path.join(folder, 'orca-paste-old.png'))).toBe(false)
+    const paste = path.join(folder, 'orca-paste-old.png')
+    await expect(restoreNativeChatPastes([paste])).resolves.toEqual([
+      { path: paste, kept: true, exists: true }
+    ])
+    expect(existsSync(paste)).toBe(true)
     expect(existsSync(path.join(folder, 'notes.txt'))).toBe(true)
   })
 
@@ -303,9 +300,9 @@ describe('native-chat paste folder on disk', () => {
     )
   })
 
-  it('expires old pastes only and never enters a folder', async () => {
+  it('restores old and new pastes without modifying nested files', async () => {
     const now = Date.now()
-    const old = (now - NATIVE_CHAT_PASTE_TTL_MS - 60_000) / 1000
+    const old = (now - PAST_SEND_RECEIPT_AGE_MS) / 1000
     const oldPaste = path.join(folder, 'orca-paste-old.png')
     const newPaste = path.join(folder, 'orca-paste-new.png')
     writeFileSync(oldPaste, 'png')
@@ -317,18 +314,20 @@ describe('native-chat paste folder on disk', () => {
     writeFileSync(nestedOld, 'png')
     utimesSync(nestedOld, old, old)
 
-    await sweepExpiredNativeChatPastes(now)
-
-    expect(existsSync(oldPaste)).toBe(false)
+    await expect(restoreNativeChatPastes([oldPaste, newPaste])).resolves.toEqual([
+      { path: oldPaste, kept: true, exists: true },
+      { path: newPaste, kept: true, exists: true }
+    ])
+    expect(existsSync(oldPaste)).toBe(true)
     expect(existsSync(newPaste)).toBe(true)
     expect(existsSync(nestedOld)).toBe(true)
   })
 
   it.skipIf(!hasFileSymlinks)(
-    'never sweeps an old paste symlink or its outside target',
+    'refuses an old paste symlink without modifying it or its outside target',
     async () => {
       const now = Date.now()
-      const old = (now - NATIVE_CHAT_PASTE_TTL_MS - 60_000) / 1000
+      const old = (now - PAST_SEND_RECEIPT_AGE_MS) / 1000
       const outsideOld = path.join(root, 'outside-old.png')
       writeFileSync(outsideOld, 'png')
       utimesSync(outsideOld, old, old)
@@ -336,18 +335,11 @@ describe('native-chat paste folder on disk', () => {
       symlinkSync(outsideOld, link, 'file')
       lutimesSync(link, old, old)
       expect(lstatSync(link).isSymbolicLink()).toBe(true)
-      await sweepExpiredNativeChatPastes(now)
+      await expect(restoreNativeChatPastes([link])).resolves.toEqual([
+        { path: link, kept: false, exists: false }
+      ])
       expect(existsSync(outsideOld)).toBe(true)
       expect(existsSync(link)).toBe(true)
     }
   )
-
-  it('does nothing, and does not throw, when the folder is missing', async () => {
-    rmSync(folder, { recursive: true })
-    await expect(sweepExpiredNativeChatPastes()).resolves.toBeUndefined()
-  })
-
-  it('keeps a paste longer than one send id stays valid on the host', () => {
-    expect(NATIVE_CHAT_PASTE_TTL_MS).toBeGreaterThan(AGENT_SESSION_MAX_NEW_OPERATION_AGE_MS)
-  })
 })

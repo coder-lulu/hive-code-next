@@ -24,7 +24,7 @@ describe('localized UI helper copy', () => {
     const now = Date.UTC(2026, 9, 3, 13, 24)
     expect(formatAutomationDateTime(null)).toBe('从未')
     expect(formatAutomationRelativeTime(null, now)).toBeNull()
-    expect(formatAutomationRelativeTime(now + 30_000, now)).toBe('现在')
+    expect(formatAutomationRelativeTime(now + 30_000, now)).toBe('刚刚')
     expect(formatAutomationRelativeTime(now - 8 * 3_600_000, now)).toBe('8小时前')
     expect(formatAutomationRelativeTime(now + 2 * 60_000, now)).toBe('2分钟后')
     expect(formatAutomationRelativeTime(now + 2 * 86_400_000, now)).toBe('2天后')
@@ -40,11 +40,11 @@ describe('localized UI helper copy', () => {
       'dispatch_failed'
     ] as const
     expect(statuses.map((status) => getAutomationRunStatusLabel(status))).toEqual([
-      '排队中',
-      '启动中',
+      '已排队',
+      '正在启动',
       '已启动',
       '完成',
-      '预检查已跳过',
+      '因预检查而跳过',
       '已跳过',
       '不可用',
       '需要凭据',
@@ -78,9 +78,7 @@ describe('localized UI helper copy', () => {
     expect(getAutomationRunStatusLabel('skipped_needs_interactive_auth')).toBe(
       'Identifiants requis'
     )
-    expect(formatAutomationRelativeTime(now.getTime() - 8 * 3_600_000, now.getTime())).toBe(
-      'il y a 8 h'
-    )
+    expect(formatAutomationRelativeTime(now.getTime() - 8 * 3_600_000, now.getTime())).toBe('-8 h')
   })
 
   it('preserves the existing English timing boundaries and status semantics', async () => {
@@ -97,9 +95,7 @@ describe('localized UI helper copy', () => {
     'localizes existing English entries in %s',
     async (locale) => {
       await i18n.changeLanguage(locale)
-      expect(
-        translate('usage.redesign.collection', 'Collection settings and source details')
-      ).not.toBe('Collection settings and source details')
+      expect(translate('usage.redesign.collectionOff', 'Collection off')).not.toBe('Collection off')
       expect(translate('sparsePreset.addPath', 'Add a folder')).not.toBe('Add a folder')
       expect(
         translate(

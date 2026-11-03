@@ -1,7 +1,7 @@
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { AgentLaunchPermissionMode } from '../../../../shared/tui-agent-permissions'
 import type { LaunchSource } from '../../../../shared/telemetry-events'
-import type { SessionOptionValue } from '../../../../shared/native-chat-session-options'
+import type { SessionOptionValue } from '../../../../shared/native-chat/input/native-chat-session-options'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { LinkedWorkItemSummary } from '@/lib/new-workspace'

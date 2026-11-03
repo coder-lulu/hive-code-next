@@ -163,7 +163,7 @@ test.describe('Native chat transcript anchoring', () => {
         .toBeGreaterThan(3)
 
       const initialTotalSize = await transcriptWindow.evaluate(
-        (element) => (element as HTMLElement).offsetHeight
+        (element: HTMLElement) => element.offsetHeight
       )
       const anchor = await scroll.evaluate(async (element) => {
         element.scrollTop = element.scrollHeight * 0.55
@@ -205,11 +205,10 @@ test.describe('Native chat transcript anchoring', () => {
         throw new Error('Expected a fully visible measured row to anchor')
       }
 
-      // The button stays off-screen so invoking it here exercises the real pagination
-      // handler without Playwright first scrolling the reader to the transcript head.
+      // Invoke the off-screen button directly so Playwright cannot scroll the reader to the head before paging.
       await loadEarlier.evaluate((button: HTMLButtonElement) => button.click())
       await expect
-        .poll(() => transcriptWindow.evaluate((element) => (element as HTMLElement).offsetHeight))
+        .poll(() => transcriptWindow.evaluate((element: HTMLElement) => element.offsetHeight))
         .toBeGreaterThan(initialTotalSize)
       await expect(loadEarlier).toBeAttached({ timeout: 30_000 })
 
@@ -292,7 +291,18 @@ test.describe('Native chat transcript anchoring', () => {
           )
         )
         .toBeGreaterThan(1_000)
-      const readingAt = await scroll.evaluate((element) => element.scrollTop)
+      // Rows the wheel mounted above the reader settle their measured heights frames later.
+      const readingAt = await scroll.evaluate(async (element) => {
+        let previousGeometry = ''
+        let stableFrames = 0
+        for (let frame = 0; frame < 120 && stableFrames < 5; frame += 1) {
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+          const geometry = `${element.scrollHeight}:${element.scrollTop}`
+          stableFrames = geometry === previousGeometry ? stableFrames + 1 : 0
+          previousGeometry = geometry
+        }
+        return element.scrollTop
+      })
       await expect(jump).toBeVisible()
 
       await activateNewTerminalTab(orcaPage, descriptor.worktreeId)

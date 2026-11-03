@@ -1,17 +1,18 @@
-import { TaskPageJiraStatusFilters } from '../../TaskPageJiraStatusFilters'
+import { TaskPageJiraStatusFilters } from './TaskPageJiraStatusFilters'
 import { TaskPageJiraSavedFilters } from '../../TaskPageJiraSavedFilters'
-import type { TaskPageComposerActionsModel } from '../../use-task-page-composer-actions'
+import { TaskPageJiraFavouriteFilters } from './TaskPageJiraFavouriteFilters'
+import type { TaskPageComposerActionsModel } from '../use-task-page-composer-actions'
 import { cn } from '@/lib/utils'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import { useAppStore } from '@/store'
-import { getJiraProjectSelectionKey } from '@/components/task-page-jira-project-selection'
+import { getJiraProjectSelectionKey } from '@/components/task-page/jira/task-page-jira-project-selection'
 import { translate } from '@/i18n/i18n'
 import { LoaderCircle, Plus, RefreshCw, Search, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { shouldSuppressEnterSubmit } from '@/lib/new-workspace-enter-guard'
 import { JiraProjectPicker } from '@/components/jira-project-picker'
-import { matchesJiraProject } from '../../../../../shared/jira-project-reference'
+import { matchesJiraProject } from '../../../../../shared/jira/jira-project-reference'
 export function TaskPageJiraFilters({
   model
 }: {
@@ -66,7 +67,11 @@ export function TaskPageJiraFilters({
             />
           </div>
           {jiraPresets.map((preset) => {
-            const active = !jiraHasWorkspace && !jiraSearchInput && activeJiraPreset === preset.id
+            const active =
+              !jiraHasWorkspace &&
+              !jiraSearchInput &&
+              !model.jiraFavouriteFilter &&
+              activeJiraPreset === preset.id
             return (
               <button
                 key={preset.id}
@@ -110,6 +115,7 @@ export function TaskPageJiraFilters({
           </Button>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <TaskPageJiraFavouriteFilters key={model.jiraTaskSourceScopeKey} model={model} />
           <TaskPageJiraSavedFilters
             filters={jiraSavedFilters}
             activeFilterId={jiraActiveSavedFilterId}

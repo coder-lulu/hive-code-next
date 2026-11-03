@@ -1,39 +1,35 @@
+import { launchRecordStore } from '../runtime/structured-agent-launch-composition.test-support'
 import { createClaudeStructuredLaunchResolver } from '../runtime/structured-agent-launch-composition.test-support'
 import { describe, expect, it, vi } from 'vitest'
+import { agentSessionRecordFixture } from '../native-chat/agent-session-record-test-fixture'
 import type { AgentSessionRecord } from '../../shared/agent-session-record'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 
 const SESSION_ID = 'orca-session-auth'
-const IDENTITY = { sessionId: SESSION_ID } as Parameters<
-  ReturnType<typeof createClaudeStructuredLaunchResolver>
->[0]['identity']
+const IDENTITY: Parameters<ReturnType<typeof createClaudeStructuredLaunchResolver>>[0]['identity'] =
+  {
+    sessionId: SESSION_ID,
+    workspaceId: 'workspace-1',
+    hostId: LOCAL_EXECUTION_HOST_ID,
+    agent: 'claude',
+    providerHandle: null
+  }
 
 function record(): AgentSessionRecord {
-  return {
-    sessionId: SESSION_ID,
-    provider: 'claude',
-    location: {
-      executionHostId: LOCAL_EXECUTION_HOST_ID,
-      wslDistro: null,
-      workspaceId: 'workspace-1',
-      workspaceKind: 'folder'
-    },
-    accountHome: { variable: 'CLAUDE_CONFIG_DIR', path: '/home/work/.claude' },
-    providerHandleChain: []
-  } as unknown as AgentSessionRecord
+  return agentSessionRecordFixture({ sessionId: SESSION_ID })
 }
-
 function resolverFor(options: {
   account: 'managed' | 'system'
   overlay?: Record<string, string>
 }): ReturnType<typeof createClaudeStructuredLaunchResolver> {
+  const overlay = options.overlay
   return createClaudeStructuredLaunchResolver({
     resolveLaunchArgs: () => [],
-    store: { getRecord: () => record(), pinLaunchDirectory: vi.fn() },
+    store: launchRecordStore(() => record(), vi.fn()),
     resolveWorkspacePath: async (id) => `/repos/${id}`,
-    resolveCommand: () => '/usr/local/bin/claude',
+    resolveCommand: () => ({ command: '/usr/local/bin/claude', prefixArgs: [] }),
     resolveAuthPolicy: () => ({ account: options.account }),
-    ...(options.overlay ? { resolveEnv: () => options.overlay as Record<string, string> } : {})
+    ...(overlay ? { resolveEnv: () => overlay } : {})
   })
 }
 

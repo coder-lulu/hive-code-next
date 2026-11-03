@@ -8,7 +8,11 @@ import type {
   RuntimeCreateAgentSessionResult
 } from '../../shared/agent-session-host-authority'
 import { OrcaRuntimeService } from './orca-runtime'
+import { buildAgentStartupPlan, buildAgentResumeStartupPlan } from '../../shared/tui-agent-startup'
+import { tokenizeStartupCommand } from '../../shared/tui-agent-startup-shell'
+import type { TerminalCreateOptions } from './runtime-terminal-contracts'
 import type { IPtyProvider } from '../providers/pty-provider-contract'
+import type { AgentStartupSettings } from '../../shared/agent-startup-plan-inputs'
 
 function operationId(now = Date.now()): string {
   return `${now}-0123456789abcdef0123456789abcdef`
@@ -45,22 +49,17 @@ function createRuntime(
     IPtyProvider,
     'supportsAgentSessionClaims' | 'supportsAgentSessionCreateOperations'
   >,
-  settings?: {
-    disabledTuiAgents: string[]
-    agentCmdOverrides: Record<string, string>
-    agentDefaultArgs: Record<string, string>
-    agentDefaultEnv: Record<string, Record<string, string>>
-  }
+  launchSettings: AgentStartupSettings = {}
 ) {
   const runtime = new OrcaRuntimeService(
     {
-      getSettings: () =>
-        settings ?? {
-          disabledTuiAgents: [],
-          agentCmdOverrides: {},
-          agentDefaultArgs: {},
-          agentDefaultEnv: {}
-        }
+      getSettings: () => ({
+        disabledTuiAgents: [],
+        agentCmdOverrides: {},
+        agentDefaultArgs: {},
+        agentDefaultEnv: {},
+        ...launchSettings
+      })
     } as never,
     undefined,
     provider ? { getLocalProvider: () => provider as never } : undefined
@@ -76,7 +75,7 @@ function createRuntime(
   return runtime
 }
 
-// Why: an SSH-backed workspace whose spawn response was lost — the leak in #17929.
+// #17929: lost SSH spawn responses must remain reclaimable.
 function installRemoteReclaimHarness(
   runtime: OrcaRuntimeService,
   listProcesses: ReturnType<typeof vi.fn>
@@ -120,33 +119,80 @@ async function fenceRemoteAgentSessionSpawn(runtime: OrcaRuntimeService) {
 }
 
 describe('agent-session execution namespace', () => {
-  it('retains the original method owner, defaults and native async functions', () => {
-    const runtime = createRuntime()
-    let owner = Object.getPrototypeOf(runtime)
-    while (!Object.hasOwn(owner, 'ensureAgentSession')) {
-      owner = Object.getPrototypeOf(owner)
-    }
-    expect(owner.constructor.name).toBe('OrcaRuntimeWithGetAgentSessionExecutionNamespace')
-    expect(Object.getOwnPropertyNames(owner)).toEqual([
-      'constructor',
-      'getAgentSessionExecutionNamespace',
-      'executionOwnerSupportsAgentSessionOperation',
-      'toAgentSessionOptions',
-      'ensureAgentSession'
-    ])
-    for (const [name, length, constructor] of [
-      ['getAgentSessionExecutionNamespace', 2, 'Function'],
-      ['executionOwnerSupportsAgentSessionOperation', 3, 'AsyncFunction'],
-      ['toAgentSessionOptions', 1, 'Function'],
-      ['ensureAgentSession', 1, 'AsyncFunction']
-    ]) {
-      const descriptor = Object.getOwnPropertyDescriptor(owner, name)
-      expect(descriptor?.value.length).toBe(length)
-      expect(descriptor?.value.constructor.name).toBe(constructor)
-    }
+  it('does not inject the host default bypass when a resumed Claude session explicitly chooses own', async () => {
+    const runtime = createRuntime(undefined, {
+      agentPermissionDefault: 'full-access',
+      agentDefaultArgs: { claude: '--verbose' }
+    })
+    const createTerminal = vi.spyOn(runtime, 'createTerminal').mockResolvedValue(terminal())
+    await runtime.ensureAgentSession({
+      kind: 'explicit',
+      worktree: 'id:worktree-1',
+      agent: 'claude',
+      providerSession: { key: 'session_id', id: 'resume-claude-own' },
+      launchPreferences: { mode: 'own' }
+    })
+    expect(createTerminal.mock.calls[0]?.[1]?.command).toContain('--verbose')
+    expect(createTerminal.mock.calls[0]?.[1]?.command).not.toContain(
+      '--dangerously-skip-permissions'
+    )
   })
 
-  it('calls the selected provider probe with its receiver and caller signal', async () => {
+  it('rejects unsupported automatic permission before resuming Gemini', async () => {
+    const runtime = createRuntime()
+    const createTerminal = vi.spyOn(runtime, 'createTerminal').mockResolvedValue(terminal())
+    await expect(
+      runtime.ensureAgentSession({
+        kind: 'explicit',
+        worktree: 'id:worktree-1',
+        agent: 'gemini',
+        providerSession: { key: 'session_id', id: 'resume-gemini-auto' },
+        launchPreferences: { mode: 'auto' }
+      })
+    ).rejects.toThrow('Automatic approval is unavailable')
+    expect(createTerminal).not.toHaveBeenCalled()
+  })
+  it.each([
+    { explicitArgs: true, permissionDefault: 'full-access', explicitOwn: true },
+    { explicitArgs: false, permissionDefault: 'full-access', explicitOwn: true },
+    { explicitArgs: false, permissionDefault: 'own', explicitOwn: false }
+  ] as const)(
+    'preserves current user Codex arguments through Own resume: %j',
+    async ({ explicitArgs, permissionDefault, explicitOwn }) => {
+      const userArgs = '--dangerously-bypass-approvals-and-sandbox --model gpt-5.5'
+      const runtime = createRuntime(undefined, {
+        agentPermissionDefault: permissionDefault,
+        agentDefaultArgs: { codex: explicitArgs ? '--model configured' : userArgs }
+      })
+      const createTerminal = vi.spyOn(runtime, 'createTerminal').mockResolvedValue(terminal())
+      await runtime.ensureAgentSession({
+        kind: 'explicit',
+        worktree: 'id:worktree-1',
+        agent: 'codex',
+        providerSession: { key: 'session_id', id: 'resume-codex-own' },
+        ...(explicitArgs ? { agentArgs: userArgs } : {}),
+        ...(explicitOwn ? { launchPreferences: { mode: 'own' } } : {})
+      })
+      const options = createTerminal.mock.calls[0]?.[1]
+      expect(tokenizeStartupCommand(options?.command ?? '', 'posix')).toMatchObject({
+        ok: true,
+        tokens: expect.arrayContaining([
+          '--dangerously-bypass-approvals-and-sandbox',
+          '--model',
+          'gpt-5.5',
+          'resume',
+          'resume-codex-own'
+        ])
+      })
+      expect(tokenizeStartupCommand(options?.launchConfig?.agentArgs ?? '', 'posix')).toMatchObject(
+        {
+          ok: true,
+          tokens: ['--dangerously-bypass-approvals-and-sandbox', '--model', 'gpt-5.5']
+        }
+      )
+    }
+  )
+  it('admits the selected provider before forwarding the saved-resume marker and caller signal', async () => {
     const signal = new AbortController().signal
     const provider: Pick<IPtyProvider, 'supportsAgentSessionClaims'> = {
       async supportsAgentSessionClaims(options) {
@@ -162,14 +208,86 @@ describe('agent-session execution namespace', () => {
         kind: 'explicit',
         worktree: 'id:worktree-1',
         agent: 'codex',
-        providerSession: { key: 'session_id', id: 'provider-session-1' }
+        providerSession: { key: 'session_id', id: 'provider-session-1' },
+        resumeOrigin: 'saved'
       },
       { signal }
     )
     expect(createTerminal).toHaveBeenCalledWith(
       'id:worktree-1',
-      expect.objectContaining({ signal })
+      expect.objectContaining({ signal, resumeOrigin: 'saved' })
     )
+  })
+
+  it('retains compiled policy through args-only host reconstruction and repeated recorded resume', async () => {
+    const launch = buildAgentStartupPlan({
+      agent: 'codex',
+      prompt: '',
+      allowEmptyPromptLaunch: true,
+      cmdOverrides: {},
+      platform: process.platform,
+      agentArgs: '-m old-model -c model_reasoning_effort=low -c model_verbosity=low',
+      sessionOptions: { model: 'gpt-5.5', effort: 'high', permissionMode: 'ask' },
+      sessionOptionsOverrideAgentArgs: true
+    })
+    expect(launch?.sessionOptions).toEqual({
+      model: 'gpt-5.5',
+      effort: 'high',
+      permissionMode: 'ask'
+    })
+    expect(launch?.launchCommand).not.toContain('old-model')
+    const terminalInputTokens =
+      process.platform === 'win32' ? [] : ['-c', 'disable_paste_burst=true']
+    const policyTokens = [
+      'codex',
+      '-c',
+      'model_verbosity=low',
+      '-a',
+      'on-request',
+      '-s',
+      'read-only',
+      '-c',
+      'approvals_reviewer=user'
+    ]
+    expect(tokenizeStartupCommand(launch?.launchConfig.agentCommand ?? '', 'posix')).toMatchObject({
+      ok: true,
+      tokens: policyTokens
+    })
+    const runtime = createRuntime()
+    const createTerminal = vi.spyOn(runtime, 'createTerminal').mockResolvedValue(terminal())
+    const providerSession = { key: 'session_id' as const, id: 'provider-session-1' }
+    await runtime.ensureAgentSession({
+      kind: 'explicit',
+      worktree: 'id:worktree-1',
+      agent: 'codex',
+      providerSession,
+      agentArgs: launch?.launchConfig.agentArgs
+    })
+    const host = createTerminal.mock.calls[0]?.[1]
+    expect(tokenizeStartupCommand(host?.command ?? '', 'posix')).toMatchObject({
+      ok: true,
+      tokens: [
+        policyTokens[0],
+        ...terminalInputTokens,
+        ...policyTokens.slice(1),
+        'resume',
+        providerSession.id
+      ]
+    })
+    expect(host?.launchConfig).toEqual(launch?.launchConfig)
+    const resumeInputs = {
+      agent: 'codex' as const,
+      providerSession,
+      platform: process.platform,
+      cmdOverrides: {}
+    }
+    const resumed = buildAgentResumeStartupPlan({ ...resumeInputs, ...host?.launchConfig })
+    const resumedAgain = buildAgentResumeStartupPlan({ ...resumeInputs, ...resumed?.launchConfig })
+    expect(resumedAgain?.launchConfig).toEqual(launch?.launchConfig)
+    expect(tokenizeStartupCommand(resumedAgain?.launchCommand ?? '', 'posix')).toMatchObject({
+      ok: true,
+      tokens: [...policyTokens, ...terminalInputTokens, 'resume', providerSession.id]
+    })
   })
 
   it('propagates probe getter failure before entering the probe failure fallback', async () => {
@@ -216,6 +334,21 @@ describe('agent-session execution namespace', () => {
 })
 
 describe('agent-session create operation ledger', () => {
+  it.each(['auto-submit', 'draft', undefined] as const)(
+    'suppresses startup updates only for auto-submitted launches: %s',
+    async (promptDelivery) => {
+      const runtime = createRuntime()
+      const createTerminal = vi.spyOn(runtime, 'createTerminal').mockResolvedValue(terminal())
+      await runtime.createAgentSession(
+        request(operationId(), { prompt: undefined, promptDelivery })
+      )
+      expect(createTerminal).toHaveBeenCalledWith(
+        'id:worktree-1',
+        expect.objectContaining({ suppressStartupUpdatePrompt: promptDelivery === 'auto-submit' })
+      )
+    }
+  )
+
   it.each([true, false, undefined])(
     'forwards renderer keyboard support on create and resume: %s',
     async (terminalKittyKeyboardProtocol) => {
@@ -267,7 +400,8 @@ describe('agent-session create operation ledger', () => {
         kind: 'explicit',
         worktree: 'id:worktree-1',
         agent: 'codex',
-        providerSession: { key: 'session_id', id: 'provider-session-1' }
+        providerSession: { key: 'session_id', id: 'provider-session-1' },
+        resumeOrigin: 'saved'
       })
     ).rejects.toThrow('agent_session_legacy_required')
 
@@ -285,8 +419,7 @@ describe('agent-session create operation ledger', () => {
   })
 
   it('shapes the launch for the route it resolved, not a repo row on another host', async () => {
-    // `scope.repo` is display metadata and can be a row from a different host than the worktree
-    // names (#11163). Reading it made a locally-routed launch emit the SSH relay shim name.
+    // #11163: scope.repo is display metadata, possibly from another host; never derive launch routing from it.
     const runtime = createRuntime({
       supportsAgentSessionClaims: () => true,
       supportsAgentSessionCreateOperations: () => true
@@ -298,7 +431,6 @@ describe('agent-session create operation ledger', () => {
       id: 'worktree-1',
       path: '/repo/worktree-1',
       connectionId: null,
-      // The rival row names openclaw while the worktree resolved to no SSH route at all.
       repo: {
         id: 'repo-1',
         connectionId: 'openclaw',
@@ -307,19 +439,23 @@ describe('agent-session create operation ledger', () => {
       },
       folderWorkspace: null
     })
-    const createTerminal = vi.spyOn(runtime, 'createTerminal').mockResolvedValue(terminal())
+    let planned: TerminalCreateOptions | undefined
+    vi.spyOn(runtime, 'createTerminal').mockImplementation(async (selector = '', opts = {}) => {
+      const scope = await runtime.resolveTerminalWorkspaceLaunchScope(selector)
+      planned = await runtime.resolveAgentTerminalCreateOptions(scope, opts)
+      return terminal()
+    })
 
     await runtime.createAgentSession(
       request(operationId(), { agent: 'claude-agent-teams', prompt: '' })
     )
 
-    expect(createTerminal).toHaveBeenCalledWith(
-      'id:worktree-1',
-      expect.objectContaining({
-        command: expect.stringContaining(
-          `${process.platform === 'win32' ? 'orca.cmd' : 'orca-ide'} claude-teams`
-        )
-      })
+    expect(planned?.command).toContain(
+      process.platform === 'linux'
+        ? 'orca-ide claude-teams'
+        : process.platform === 'win32'
+          ? 'orca.cmd claude-teams'
+          : 'orca claude-teams'
     )
   })
 
@@ -363,134 +499,6 @@ describe('agent-session create operation ledger', () => {
       expect.objectContaining({
         command: expect.stringContaining("'resume' 'provider-session-1'"),
         startupCommandDelivery: 'shell-ready'
-      })
-    )
-  })
-
-  it('re-resolves a manual Codex resume against Host defaults', async () => {
-    const runtime = createRuntime(undefined, {
-      disabledTuiAgents: [],
-      agentCmdOverrides: {},
-      agentDefaultArgs: {
-        codex: '--model host --dangerously-bypass-approvals-and-sandbox'
-      },
-      agentDefaultEnv: {}
-    })
-    const createTerminal = vi.spyOn(runtime, 'createTerminal').mockResolvedValue(terminal())
-
-    await runtime.ensureAgentSession({
-      kind: 'explicit',
-      worktree: 'id:worktree-1',
-      agent: 'codex',
-      providerSession: { key: 'session_id', id: 'provider-session-1' },
-      agentPermissionMode: 'manual'
-    })
-
-    const command = createTerminal.mock.calls[0]?.[1]?.command
-    expect(command).toContain("'--model' 'host'")
-    expect(command).toContain("'--ask-for-approval' 'on-request'")
-    expect(command).toContain("'resume' 'provider-session-1'")
-    expect(command).not.toContain('dangerously-bypass')
-  })
-
-  it('resolves manual permission against host defaults without dropping unrelated arguments', async () => {
-    const runtime = createRuntime(undefined, {
-      disabledTuiAgents: [],
-      agentCmdOverrides: {},
-      agentDefaultArgs: {
-        codex: '--model gpt-5 --dangerously-bypass-approvals-and-sandbox'
-      },
-      agentDefaultEnv: {}
-    })
-    const createTerminal = vi.spyOn(runtime, 'createTerminal').mockResolvedValue(terminal())
-
-    await runtime.createAgentSession(request(operationId(), { agentPermissionMode: 'manual' }))
-
-    expect(createTerminal).toHaveBeenCalledWith(
-      'id:worktree-1',
-      expect.objectContaining({
-        command: expect.stringContaining(
-          "'--model' 'gpt-5' '--ask-for-approval' 'on-request' '--sandbox' 'workspace-write'"
-        ),
-        launchConfig: expect.objectContaining({
-          agentArgs:
-            "'--model' 'gpt-5' '--ask-for-approval' 'on-request' '--sandbox' 'workspace-write'"
-        })
-      })
-    )
-    expect(createTerminal.mock.calls[0]?.[1]?.command).not.toContain(
-      'dangerously-bypass-approvals-and-sandbox'
-    )
-  })
-
-  it('removes host command-override auto approval in manual mode', async () => {
-    const runtime = createRuntime(undefined, {
-      disabledTuiAgents: [],
-      agentCmdOverrides: {
-        codex: 'codex --dangerously-bypass-approvals-and-sandbox --profile work'
-      },
-      agentDefaultArgs: {},
-      agentDefaultEnv: {}
-    })
-    const createTerminal = vi.spyOn(runtime, 'createTerminal').mockResolvedValue(terminal())
-
-    await runtime.createAgentSession(request(operationId(), { agentPermissionMode: 'manual' }))
-
-    const command = createTerminal.mock.calls[0]?.[1]?.command
-    expect(command).toContain('--profile work')
-    expect(command).not.toContain('dangerously-bypass-approvals-and-sandbox')
-  })
-
-  it('resolves environment-backed auto approval on the execution host', async () => {
-    const runtime = createRuntime(undefined, {
-      disabledTuiAgents: [],
-      agentCmdOverrides: {},
-      agentDefaultArgs: {},
-      agentDefaultEnv: { goose: { GOOSE_PROFILE: 'review' } }
-    })
-    const createTerminal = vi.spyOn(runtime, 'createTerminal').mockResolvedValue(terminal())
-
-    await runtime.createAgentSession(
-      request(operationId(), { agent: 'goose', agentPermissionMode: 'yolo' })
-    )
-
-    expect(createTerminal).toHaveBeenCalledWith(
-      'id:worktree-1',
-      expect.objectContaining({
-        env: expect.objectContaining({ GOOSE_MODE: 'auto', GOOSE_PROFILE: 'review' }),
-        launchConfig: expect.objectContaining({
-          agentEnv: expect.objectContaining({ GOOSE_MODE: 'auto', GOOSE_PROFILE: 'review' })
-        })
-      })
-    )
-  })
-
-  it('clears inherited Goose auto approval in manual mode', async () => {
-    const runtime = createRuntime(undefined, {
-      disabledTuiAgents: [],
-      agentCmdOverrides: {},
-      agentDefaultArgs: {},
-      agentDefaultEnv: { goose: { GOOSE_MODE: 'auto', GOOSE_PROFILE: 'review' } }
-    })
-    const createTerminal = vi.spyOn(runtime, 'createTerminal').mockResolvedValue(terminal())
-
-    await runtime.createAgentSession(
-      request(operationId(), { agent: 'goose', agentPermissionMode: 'manual' })
-    )
-
-    const manualCommand =
-      process.platform === 'win32'
-        ? 'Remove-Item Env:GOOSE_MODE -ErrorAction SilentlyContinue; goose'
-        : 'env -u GOOSE_MODE goose'
-    expect(createTerminal).toHaveBeenCalledWith(
-      'id:worktree-1',
-      expect.objectContaining({
-        command: manualCommand,
-        env: { GOOSE_PROFILE: 'review' },
-        launchConfig: expect.objectContaining({
-          agentCommand: manualCommand,
-          agentEnv: { GOOSE_PROFILE: 'review' }
-        })
       })
     )
   })
@@ -558,11 +566,6 @@ describe('agent-session create operation ledger', () => {
         clientId: 'device-a'
       })
     ).rejects.toThrow('agent_session_operation_conflict')
-    await expect(
-      runtime.createAgentSession(request(id, { agentPermissionMode: 'manual' }), {
-        clientId: 'device-a'
-      })
-    ).rejects.toThrow('agent_session_operation_conflict')
     finish(terminal())
     await expect(first).resolves.toMatchObject({ disposition: 'created' })
     await expect(joined).resolves.toMatchObject({ disposition: 'replayed' })
@@ -580,7 +583,7 @@ describe('agent-session create operation ledger', () => {
   })
 
   it('starts a create however many unexpired operations are held, and still replays the first', async () => {
-    // Why: a count limit (512 per caller, 4,096 in all) refused a user's create for unrelated traffic.
+    // Per-caller/global count caps rejected unrelated user creates.
     const runtime = createRuntime()
     const createTerminal = vi.spyOn(runtime, 'createTerminal').mockResolvedValue(terminal())
     const now = Date.now()

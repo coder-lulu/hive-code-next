@@ -1,26 +1,17 @@
-import { productNameText } from '@/product-brand'
-import { useLocalSearchParams, useRouter } from 'expo-router'
-import { AlertTriangle, ChevronLeft } from 'lucide-react-native'
 import { useCallback, useEffect, useState } from 'react'
-import { Linking, ScrollView, StyleSheet, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { PairingActionButton } from '../src/components/pairing/PairingActionButton'
-import {
-  PairingConnectingState,
-  PairingScreenContent
-} from '../src/components/pairing/PairingScreenContent'
-import { MobileIconButton } from '../src/components/ui/MobileIconButton'
-import { MobileScreenHeader } from '../src/components/ui/MobileScreenHeader'
-import type { MobileTheme } from '../src/theme/mobile-theme'
-import { useMobileTheme, useMobileThemeStyles } from '../src/theme/mobile-theme-provider'
+import { ActivityIndicator, Linking, Pressable, Text, View } from 'react-native'
+import { useLocalSearchParams, useRouter } from 'expo-router'
+import { colors, radii, spacing, typography } from '../src/theme/mobile-theme'
+import { themedStyleSheet } from '../src/theme/themed-styles'
+import { useMobileColorScheme } from '../src/theme/use-mobile-color-scheme'
+import { useMobileTranslation } from '../src/i18n/use-mobile-translation'
 import { extractPairingCodeFromUrl } from '../src/transport/pairing'
 
 export default function PairRedirectScreen() {
+  useMobileColorScheme()
+  const t = useMobileTranslation()
   const router = useRouter()
   const params = useLocalSearchParams<{ code?: string }>()
-  const insets = useSafeAreaInsets()
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createStyles)
   const [missingCode, setMissingCode] = useState(false)
 
   const goHome = useCallback(() => {
@@ -55,47 +46,47 @@ export default function PairRedirectScreen() {
     }
   }, [params.code, router])
 
-  const bottomPadding = { paddingBottom: insets.bottom + theme.spacing.space20 }
   return (
     <View style={styles.container}>
-      <MobileScreenHeader
-        leading={
-          <MobileIconButton accessibilityLabel="返回首页" icon={ChevronLeft} onPress={goHome} />
-        }
-        title="设备授权"
-      />
-      <ScrollView contentContainerStyle={[styles.content, bottomPadding]}>
-        {missingCode ? (
-          <PairingScreenContent
-            description={productNameText(
-              '配对链接中没有有效的设备凭据，请返回电脑版 Orca 重新生成。'
-            )}
-            icon={AlertTriangle}
-            title="配对链接无效"
-            tone="danger"
-          >
-            <View style={styles.actions}>
-              <PairingActionButton label="返回首页" onPress={goHome} />
-            </View>
-          </PairingScreenContent>
-        ) : (
-          <PairingConnectingState description="正在读取并校验设备凭据…" title="正在验证配对链接" />
-        )}
-      </ScrollView>
+      {missingCode ? (
+        <>
+          <Text style={styles.errorText}>{t('app.pair.missingCode', 'Missing pairing code')}</Text>
+          <Pressable style={styles.primaryButton} onPress={goHome}>
+            <Text style={styles.primaryButtonText}>{t('app.pair.backToHome', 'Back to home')}</Text>
+          </Pressable>
+        </>
+      ) : (
+        <ActivityIndicator size="large" color={colors.textSecondary} />
+      )}
     </View>
   )
 }
 
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.color.bg.canvas },
-    content: {
-      flexGrow: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: theme.spacing.space20,
-      paddingTop: theme.spacing.space24
-    },
-    actions: { width: '100%', marginTop: theme.spacing.space24 }
-  })
-}
+const styles = themedStyleSheet(() => ({
+  container: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bgBase,
+    padding: spacing.lg
+  },
+  errorText: {
+    color: colors.statusRed,
+    fontSize: typography.bodySize,
+    lineHeight: 20,
+    marginBottom: spacing.xl,
+    textAlign: 'center'
+  },
+  primaryButton: {
+    alignItems: 'center',
+    backgroundColor: colors.textPrimary,
+    borderRadius: radii.button,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.sm + 2
+  },
+  primaryButtonText: {
+    color: colors.bgBase,
+    fontSize: typography.bodySize,
+    fontWeight: '600'
+  }
+}))

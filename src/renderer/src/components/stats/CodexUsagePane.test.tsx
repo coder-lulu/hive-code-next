@@ -4,7 +4,6 @@ import '@testing-library/jest-dom/vitest'
 
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type * as I18nModule from '@/i18n/i18n'
 import type { CodexUsageSummary } from '../../../../shared/codex-usage-types'
 import type { AppState } from '../../store'
 import { CodexUsagePane } from './CodexUsagePane'
@@ -51,8 +50,8 @@ vi.mock('./ShareUsageButton', () => ({
   ShareUsageButton: () => <button type="button">Share</button>
 }))
 
-vi.mock('@/i18n/i18n', async () => ({
-  ...(await vi.importActual<typeof I18nModule>('@/i18n/i18n')),
+vi.mock('@/i18n/i18n', () => ({
+  getIntlLocale: () => 'en',
   translate: (_key: string, fallback: string) => fallback
 }))
 

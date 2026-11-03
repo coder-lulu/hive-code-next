@@ -1,11 +1,13 @@
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { X } from 'lucide-react-native'
+import { colors } from '../theme/mobile-theme'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { BottomDrawer } from '../components/BottomDrawer'
 import { MobileSyntaxSegments } from '../components/MobileSyntaxSegments'
-import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { mobileDiffLineNumber, mobileDiffLinePrefix } from './mobile-diff-format'
 import type { MobileBranchDiffPreviewState } from './mobile-source-control-screen-state'
-import { createMobileSourceControlStyles } from './mobile-source-control-styles'
+import { styles } from './mobile-source-control-styles'
 
 type Props = {
   branchDiffPreview: MobileBranchDiffPreviewState | null
@@ -13,8 +15,8 @@ type Props = {
 }
 
 export function MobileBranchDiffPreviewDrawer({ branchDiffPreview, onClose }: Props) {
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createMobileSourceControlStyles)
+  useMobileColorScheme()
+  const t = useMobileTranslation()
   if (!branchDiffPreview) {
     return null
   }
@@ -34,31 +36,41 @@ export function MobileBranchDiffPreviewDrawer({ branchDiffPreview, onClose }: Pr
           <Text style={styles.diffDrawerMeta} numberOfLines={1}>
             {branchDiffPreview.kind === 'ready'
               ? `${branchDiffPreview.summary.baseRef}..HEAD`
-              : '分支上的已提交更改'}
+              : t('sourceControl.branchDiffPreviewDrawer.committedOnBranch', 'Committed on branch')}
           </Text>
         </View>
         <Pressable
           style={({ pressed }) => [styles.diffCloseButton, pressed && styles.iconButtonPressed]}
           onPress={onClose}
           hitSlop={8}
-          accessibilityLabel="关闭已提交更改预览"
+          accessibilityLabel={t(
+            'sourceControl.branchDiffPreviewDrawer.closePreview',
+            'Close committed diff preview'
+          )}
         >
-          <X size={20} color={theme.color.text.secondary} strokeWidth={2} />
+          <X size={18} color={colors.textSecondary} strokeWidth={2.1} />
         </Pressable>
       </View>
       {branchDiffPreview.kind === 'loading' ? (
         <View style={styles.diffState}>
-          <ActivityIndicator size="small" color={theme.color.text.secondary} />
+          <ActivityIndicator size="small" color={colors.textSecondary} />
         </View>
       ) : branchDiffPreview.kind === 'error' ? (
         <View style={styles.diffState}>
-          <Text style={styles.stateTitle}>无法加载差异</Text>
+          <Text style={styles.stateTitle}>
+            {t('sourceControl.branchDiffPreviewDrawer.loadFailed', 'Unable to Load Diff')}
+          </Text>
           <Text style={styles.stateText}>{branchDiffPreview.message}</Text>
         </View>
       ) : (
         <View style={styles.diffLines}>
           {branchDiffPreview.truncated ? (
-            <Text style={styles.diffTruncatedText}>移动端预览已截断部分差异。</Text>
+            <Text style={styles.diffTruncatedText}>
+              {t(
+                'sourceControl.branchDiffPreviewDrawer.truncated',
+                'Diff truncated for mobile preview.'
+              )}
+            </Text>
           ) : null}
           {branchDiffPreview.lines.map((line, index) => (
             <View

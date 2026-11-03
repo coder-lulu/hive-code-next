@@ -96,9 +96,9 @@ describe('Chat settings page', () => {
     expect(results.some((entry) => entry.targetSectionId === 'chat-inline-visuals')).toBe(false)
   })
 
-  it.each([false, undefined])('is absent with structured chat set to %s', (enabled) => {
+  it.each([false, undefined])('keeps Chat settings available with legacy value %s', (enabled) => {
     const { container } = renderChat(enabled)
-    expect(container.querySelector('#chat')).toBeNull()
+    expect(container.querySelector('#chat')).toBeTruthy()
   })
 
   it('renders the existing controls under Appearance and writes the same settings', async () => {
@@ -280,12 +280,12 @@ describe('Chat settings page', () => {
     expect(results.some((entry) => entry.targetSectionId && entry.title === 'Behavior')).toBe(false)
   })
 
-  it('unmounts the page when the opt-in is disabled while it is selected', () => {
+  it('keeps the Chat page mounted when a legacy opt-in value is disabled', () => {
     const { container, rerender } = renderChat(true)
     rerender(
       <ActiveSettingsSectionProvider value="chat">
         <ChatSettingsSection
-          settings={{ ...getDefaultSettings('/tmp'), experimentalNativeChat: false }}
+          settings={getDefaultSettings('/tmp')}
           updateSettings={vi.fn()}
           writeSourceControlAiSettings={async () => {}}
           searchEntries={[]}
@@ -294,7 +294,7 @@ describe('Chat settings page', () => {
         />
       </ActiveSettingsSectionProvider>
     )
-    expect(container.querySelector('#chat')).toBeNull()
+    expect(container.querySelector('#chat')).toBeTruthy()
   })
 
   it.each(['Chat', 'Appearance'])('shows every row for the %s heading search', (query) => {

@@ -1,15 +1,14 @@
 import { View } from 'react-native'
 import { getRepoExecutionHostId } from '../../../src/shared/execution-host'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import type { SmartModeAvailabilityInput } from '../tasks/mobile-smart-source-modes'
 import type { PasteRepoCandidate } from '../tasks/smart-source-paste-intent'
 import type { useMobileComposerSource } from '../tasks/use-mobile-composer-source'
-import { MobileRuntimeSelector } from '../runtime-directory/MobileRuntimeSelector'
-import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { HostKindIcon } from './HostKindIcon'
 import { MobileAgentIcon } from './MobileAgentIcon'
 import type { NewWorktreeAgentOption } from './new-worktree-agent-selection'
-import { createNewWorktreeModalStyles } from './new-worktree-modal-styles'
-import type { MobileWorkspaceRepo, WorkspaceRuntimeSelection } from './new-worktree-modal-types'
+import { newWorktreeFormStyles as styles } from './new-worktree-form-styles'
+import type { MobileWorkspaceRepo } from './new-worktree-modal-types'
 import type {
   NewWorkspaceProjectOption,
   NewWorkspaceRunTargetOption
@@ -18,17 +17,12 @@ import { getMobileWorkspaceRepoBadgeColor } from './new-worktree-modal-types'
 import { PickerListDrawer } from './PickerListDrawer'
 import { SetupHookTrustDrawer, type SetupTrustPrompt } from './SetupHookTrustDrawer'
 import { SmartWorkspaceSourceDrawer } from './SmartWorkspaceSourceDrawer'
-import type { JiraSite, JiraSiteSelection } from '../../../src/shared/jira-types'
+import type { JiraSite, JiraSiteSelection } from '../../../src/shared/jira/jira-types'
 import type { NewWorktreeDrawerView } from './use-new-worktree-drawer-navigation'
 
 type Composer = ReturnType<typeof useMobileComposerSource>
 
 export function NewWorktreeModalDrawers(props: {
-  runtimeSelection?: WorkspaceRuntimeSelection
-  hostId?: string
-  onOpenRuntime: () => void
-  onSelectRuntime: (runtimeId: string) => void
-  onPairRuntime: () => void
   visible: boolean
   drawerView: NewWorktreeDrawerView
   client: Parameters<typeof SmartWorkspaceSourceDrawer>[0]['client']
@@ -56,22 +50,7 @@ export function NewWorktreeModalDrawers(props: {
   onSkipSetupTrust: () => void
   onCloseSetupTrust: () => void
 }) {
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createNewWorktreeModalStyles)
-  const runTargets = [
-    ...props.runTargetPickerItems,
-    ...(props.runtimeSelection
-      ? [
-          {
-            id: 'switch-runtime',
-            hostId: undefined,
-            label: '切换 Runtime',
-            detail: '选择账号中的电脑；切换后重新选择项目',
-            repo: null
-          }
-        ]
-      : [])
-  ]
+  const t = useMobileTranslation()
   return (
     <>
       <SmartWorkspaceSourceDrawer
@@ -95,7 +74,7 @@ export function NewWorktreeModalDrawers(props: {
 
       <PickerListDrawer
         visible={props.visible && props.drawerView === 'project'}
-        title="Project"
+        title={t('components.newWorktreeModalDrawers.project', 'Project')}
         items={props.projectPickerItems}
         selectedId={props.selectedProjectId ?? ''}
         onSelect={(item) => props.onRepoChange(item.repo)}
@@ -112,36 +91,23 @@ export function NewWorktreeModalDrawers(props: {
 
       <PickerListDrawer
         visible={props.visible && props.drawerView === 'runTarget'}
-        title="Run on"
-        items={runTargets}
+        title={t('components.newWorktreeModalDrawers.runOn', 'Run on')}
+        items={props.runTargetPickerItems}
         selectedId={props.selectedRepo ? getRepoExecutionHostId(props.selectedRepo) : ''}
-        onSelect={(item) => (item.repo ? props.onRepoChange(item.repo) : props.onOpenRuntime())}
+        onSelect={(item) => props.onRepoChange(item.repo)}
         onClose={props.onTransitionToForm}
         renderIcon={(item) => <HostKindIcon hostId={item.hostId} size={16} />}
       />
 
       <PickerListDrawer
         visible={props.visible && props.drawerView === 'agent'}
-        title="Agent"
+        title={t('components.newWorktreeModalDrawers.agent', 'Agent')}
         items={props.pickerAgentOptions}
         selectedId={props.selectedAgent.id}
         onSelect={props.onAgentChange}
         onClose={props.onTransitionToForm}
         renderIcon={(agent) => <MobileAgentIcon agentId={agent.id} size={18} />}
       />
-
-      {props.runtimeSelection ? (
-        <MobileRuntimeSelector
-          visible={props.visible && props.drawerView === 'runtime'}
-          catalog={props.runtimeSelection.catalog}
-          connectionStates={props.runtimeSelection.connectionStates}
-          selectedId={props.hostId ?? null}
-          theme={theme}
-          onClose={props.onTransitionToForm}
-          onSelect={props.onSelectRuntime}
-          onPair={props.onPairRuntime}
-        />
-      ) : null}
 
       <SetupHookTrustDrawer
         visible={props.visible && props.drawerView === 'trust' && props.setupTrustPrompt != null}

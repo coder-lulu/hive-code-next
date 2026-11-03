@@ -3,9 +3,9 @@ import type { SshRemotePtyLease } from '../../../shared/ssh-types'
 import { normalizeFeatureInteractionTelemetryBuckets } from '../../../shared/feature-interactions'
 import { normalizeFolderWorkspaceDiffComments } from '../../folder-workspace-diff-comments'
 import { normalizeFolderWorkspaces } from '../../../shared/folder-workspaces'
-import { normalizeOrcadMigrationEvictedReceipts } from '../../../shared/orcad-migration-evicted-receipts'
-import { normalizeOrcadMigrationImportReceipts } from '../../../shared/orcad-migration-manifest-validation'
-import { normalizeOrcadMigrationStagedCatalogs } from '../../../shared/orcad-migration-staged-catalog-validation'
+import { normalizeOrcadMigrationEvictedReceipts } from '../../../shared/orcad-migration/orcad-migration-evicted-receipts'
+import { normalizeOrcadMigrationImportReceipts } from '../../../shared/orcad-migration/orcad-migration-manifest-validation'
+import { normalizeOrcadMigrationStagedCatalogs } from '../../../shared/orcad-migration/orcad-migration-staged-catalog-validation'
 import { normalizeWorkspaceLineageByChildKey } from '../applying-settings/ui-interaction-merge'
 import {
   normalizeSshRemotePtyLease,
@@ -36,7 +36,7 @@ export function normalizeLoadedProfileState(
   profile: PreparedLoadedProfileSettings,
   markNeedsSave: () => void
 ): PersistedState {
-  const { defaults, migratedExternalVisibility, osc52ClipboardNoticePending } = terminal
+  const { defaults, repos } = terminal
   const { normalizedOnboarding, normalizedProjectGroups, loadedCompactWorktreeCards } = profile
   const projectCatalog = normalizeLoadedProjectCatalog(parsed, markNeedsSave)
   // Ordered: the host partitions drop the global fields this slice already owns.
@@ -49,7 +49,7 @@ export function normalizeLoadedProfileState(
       parsed.featureInteractionTelemetryBuckets
     ),
     projectGroups: normalizedProjectGroups,
-    repos: migratedExternalVisibility.repos,
+    repos,
     // Why: persisted catalog rows are untrusted JSON; consumers call string methods on fields the type says are strings.
     projects: projectCatalog.projects,
     projectHostSetups: projectCatalog.projectHostSetups,
@@ -78,7 +78,7 @@ export function normalizeLoadedProfileState(
       defaults,
       normalizedOnboarding,
       loadedCompactWorktreeCards,
-      osc52ClipboardNoticePending,
+      parsed.ui?.osc52ClipboardDefaultOnNoticePending === true,
       markNeedsSave
     ),
     // Why: volatile schema; zod-validate workspaceSession at read so a bad payload falls to defaults, not a renderer crash.
@@ -91,7 +91,19 @@ export function normalizeLoadedProfileState(
       markNeedsSave
     ),
     claudeLivePtySessionIds: normalizeClaudeLivePtySessionIds(parsed.claudeLivePtySessionIds),
-    sshTargets: (parsed.sshTargets ?? []).map(normalizeSshTarget),
+    sshTargets: (parsed.sshTargets ?? []).map((rawTarget) => {
+      const target = normalizeSshTarget(rawTarget)
+      const migrated =
+        parsed.settings &&
+        'sshRemoteCliControlExistingHostsMigrated' in parsed.settings &&
+        parsed.settings.sshRemoteCliControlExistingHostsMigrated === true
+      if (target.allowRemoteCliControl === undefined) {
+        markNeedsSave()
+        // Materialize the effective choice before retiring the historical marker.
+        return { ...target, allowRemoteCliControl: migrated === true }
+      }
+      return target
+    }),
     deletedSshConfigAliases: Array.isArray(parsed.deletedSshConfigAliases)
       ? parsed.deletedSshConfigAliases.filter((alias): alias is string => typeof alias === 'string')
       : [],

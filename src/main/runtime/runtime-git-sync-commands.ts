@@ -19,13 +19,20 @@ export class RuntimeGitSyncCommands {
    * Why (#17828 review follow-up): this class deliberately materializes with no store (see the
    * `undefined` arg below) to avoid unrelated ownership-inheritance/refspec-migration side effects
    * on the RPC path -- so persistence goes through the host callback instead, using
-   * `target.worktree.id` already resolved here rather than threading a store through.
+   * the resolved worktree identity rather than threading a store through.
    */
   private async prepareRemoteSync(
     target: RuntimeGitTarget,
     pushTarget: GitPushTarget | undefined
   ): Promise<{ provider: LocalGitProvider; pushTarget: GitPushTarget | undefined }> {
     const provider = requireRuntimeGitProvider(target)
+    // The host owner must revalidate this identity against live metadata after materialization.
+    // Capture before awaiting: a refreshed row or selection must not redirect the write.
+    const persist = this.host.captureMaterializedPushTargetPersistence?.({
+      ...target,
+      worktree: { ...target.worktree },
+      localGitOptions: { ...target.localGitOptions }
+    })
     const materialized = pushTarget
       ? await materializeWorktreePushTargetRemote(
           target.worktree.path,
@@ -36,7 +43,7 @@ export class RuntimeGitSyncCommands {
         )
       : undefined
     if (materialized?.remoteCreated) {
-      this.host.persistMaterializedPushTarget?.(target.worktree.id, materialized)
+      await persist?.(materialized)
     }
     return { provider, pushTarget: materialized }
   }
@@ -45,6 +52,13 @@ export class RuntimeGitSyncCommands {
     const target = await this.host.resolveRuntimeGitTarget(worktreeSelector)
     await requireRuntimeGitProvider(target).abortMerge(target.worktree.path)
     return { ok: true }
+  }
+
+  async completeRuntimeGitMerge(
+    worktreeSelector: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const target = await this.host.resolveRuntimeGitTarget(worktreeSelector)
+    return requireRuntimeGitProvider(target).completeMerge(target.worktree.path)
   }
 
   async abortRuntimeGitRebase(worktreeSelector: string): Promise<{ ok: true }> {

@@ -19,7 +19,8 @@ import {
   type ServeSupervisorBrake
 } from './serve-supervisor-brake'
 import type { ServeInstallEvidence } from './serve-install-hold'
-import { serveSignalExitError } from './serve-signal-exit-diagnostic'
+import { resolveOrcadExitCode } from '../../main/orcad/orcad-exit-code'
+import { OrcadInstanceLockError } from '../../main/orcad/orcad-data-root-privacy'
 
 /** Virtual clock: timers fire in order as soon as the loop awaits them. */
 function harness(overrides: Partial<SupervisedServeOptions> & { userDataPath: string }) {
@@ -87,7 +88,6 @@ describe('superviseServeService', () => {
     const record = readServeSupervisorBrake(userDataPath)
     expect(record?.gaveUp?.reason).toContain('exited with code 1')
 
-    // A restart by the service manager must not start the loop again.
     let rerun = 0
     const again = harness({
       userDataPath,
@@ -217,6 +217,27 @@ describe('superviseServeService', () => {
     expect(Math.max(...h.sleeps)).toBe(60_000)
   })
 
+  // #32177: a lock this machine cannot judge (a shared home) is a peer, not a fault to give up on.
+  it('waits on a lock holder it cannot judge, without giving up', async () => {
+    const holderUnverifiable = resolveOrcadExitCode(
+      new OrcadInstanceLockError('orcad_instance_lock_holder_unverifiable', 'shared home')
+    )
+    let runs = 0
+    const h = harness({
+      userDataPath,
+      runOnce: async () => {
+        runs++
+        if (runs === 10) {
+          h.stop()
+        }
+        return holderUnverifiable
+      }
+    })
+    await expect(superviseServeService(h.options)).resolves.toBe(0)
+    expect(runs).toBe(10)
+    expect(readServeSupervisorBrake(userDataPath)).toBeNull()
+  })
+
   it('counts a thrown child failure and keeps supervising', async () => {
     let runs = 0
     const h = harness({
@@ -224,7 +245,7 @@ describe('superviseServeService', () => {
       runOnce: async () => {
         runs++
         if (runs === 1) {
-          throw serveSignalExitError('SIGKILL')
+          throw new Error('Orca serve exited via SIGKILL.')
         }
         h.stop()
         return 0
@@ -232,7 +253,7 @@ describe('superviseServeService', () => {
     })
     await expect(superviseServeService(h.options)).resolves.toBe(0)
     expect(runs).toBe(2)
-    expect(h.logs).toContain('[serve] HiveCode serve exited via SIGKILL; restarting in 1s.')
+    expect(h.logs).toContain('[serve] Orca serve exited via SIGKILL; restarting in 1s.')
   })
 
   it('restarts from a replaced AppImage before starting a child, not after it', async () => {

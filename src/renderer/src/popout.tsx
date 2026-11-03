@@ -1,3 +1,4 @@
+// Install the import-free hook before react-dom reads it during evaluation; the observer below wraps a per-commit property and can load later.
 import './lib/react-devtools-commit-hook-shim'
 import './lib/react-commit-cascade-observer'
 import './assets/main.css'
@@ -17,21 +18,18 @@ import { translate } from './i18n/i18n'
 import { useAppStore } from './store'
 import type { GlobalSettings } from '../../shared/global-settings-types'
 import { getOrCreateRendererRoot } from './lib/react-renderer-root'
-import { APP_DISPLAY_NAME } from './product-brand'
-
-document.title = `${APP_DISPLAY_NAME} Agent Dashboard`
 import { setReactCommitCascadeRendererSurface } from './lib/react-commit-cascade-telemetry'
 import { installOsFileDropCancellationGuard } from './lib/os-file-drop-cancellation-guard'
+import { installBodyOverlayAttributes } from './lib/body-overlay-attributes'
 
-setReactCommitCascadeRendererSurface('dashboard-popout')
 const disposeOsFileDropGuard = installOsFileDropCancellationGuard()
 import.meta.hot?.dispose(disposeOsFileDropGuard)
-// Why: the pop-out window is a separate BrowserWindow with its own React root,
-// so it must run the same renderer bootstrap as main.tsx (crash diagnostics,
-// theme, i18n, error boundary) rather than inheriting anything from the main
-// window. It shares the preload/window.api but not the DOM or JS context.
+const disposeBodyOverlayAttributes = installBodyOverlayAttributes()
+import.meta.hot?.dispose(disposeBodyOverlayAttributes)
+// Each popout has a separate React root/DOM/JS context; run full renderer bootstrap despite sharing preload/window.api.
 recordRendererCrashBreadcrumb('popout_bootstrap_started', { dev: import.meta.env.DEV })
 installRendererCrashDiagnostics('dashboard-popout')
+setReactCommitCascadeRendererSurface('dashboard-popout')
 
 function applyPopoutAppearance(settings: GlobalSettings | null): void {
   applyDocumentTheme(settings?.theme ?? 'system', { disableTransitions: false })
@@ -41,8 +39,7 @@ function applyPopoutAppearance(settings: GlobalSettings | null): void {
   )
 }
 
-// Why: the popout owns a separate renderer store; seed appearance synchronously
-// so a forced light/dark theme does not flash the OS theme before first paint.
+// Seed this separate store synchronously to prevent OS-theme flash before async appearance hydration.
 let startupSettings: GlobalSettings | null = null
 try {
   startupSettings = window.api.settings.getSync()
@@ -65,8 +62,7 @@ function PopoutSettingsSync(): null {
 
   useEffect(() => {
     let disposed = false
-    // Why: the preview terminal's copy/paste chords honor user keybinding
-    // overrides, which live in a separate file from settings.
+    // Preview-terminal copy/paste overrides live in a separate keybinding file.
     void useAppStore.getState().fetchKeybindings()
     const setSettings = (next: GlobalSettings): void => {
       if (!disposed) {

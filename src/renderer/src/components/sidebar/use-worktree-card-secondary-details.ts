@@ -1,4 +1,6 @@
+import { useProjectTree } from './project-tree-context'
 import React, { useCallback } from 'react'
+import { captureWorktreeGitHubLinkBase } from '../../../../shared/worktree/github-link-base'
 import { getWorkspaceAttachments } from '../../../../shared/workspace-attachments'
 import { toast } from 'sonner'
 
@@ -89,10 +91,12 @@ export function useWorktreeCardSecondaryDetails({
   const metaAutomationProvenance = showAutomation ? worktree.automationProvenance : null
   const metaCliProvenance = showCli ? worktree.cliProvenance : null
   const metaComment = showComment ? hoverComment : null
-  const showInlineAgentList = cardProps.includes('inline-agents') && (newCardStyle || !compactCards)
+  const projectTree = useProjectTree()
+  const showInlineAgentList =
+    projectTree || (cardProps.includes('inline-agents') && (newCardStyle || !compactCards))
   const compactInlineAgentRows = useWorktreeAgentRows(
     worktree.id,
-    showInlineAgentList && agentActivityDisplayMode === 'compact'
+    showInlineAgentList && (projectTree || agentActivityDisplayMode === 'compact')
   )
   const compactInlineAgentRowsVisible =
     showInlineAgentList &&
@@ -187,7 +191,10 @@ export function useWorktreeCardSecondaryDetails({
     (hoverReviewProvider === 'azure-devops' && linkedAzureDevOpsPR !== null) ||
     (hoverReviewProvider === 'gitea' && linkedGiteaPR !== null)
   const handleUnlinkReview = useCallback(async () => {
-    const options = { executionHostId: worktree.hostId ?? 'local' }
+    const options = {
+      executionHostId: worktree.hostId,
+      githubLinkBase: captureWorktreeGitHubLinkBase(worktree)
+    }
     switch (hoverReviewProvider) {
       case 'github':
         if (hoverReview) {
@@ -217,7 +224,7 @@ export function useWorktreeCardSecondaryDetails({
       case undefined:
         break
     }
-  }, [hoverReview, hoverReviewProvider, updateWorktreeMeta, worktree.hostId, worktree.id])
+  }, [hoverReview, hoverReviewProvider, updateWorktreeMeta, worktree])
   const handleOpenLinearIssueInOrca = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation()

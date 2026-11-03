@@ -1,49 +1,84 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ReleaseChannel } from '../shared/release-channel'
 
-const { defaultNetFetchMock, fetchMock, fromPartitionMock } = vi.hoisted(() => ({
-  defaultNetFetchMock: vi.fn(),
-  fetchMock: vi.fn(),
-  fromPartitionMock: vi.fn()
+const fetchMock = vi.fn()
+vi.mock('./product/product-updater-session', () => ({
+  fetchWithProductUpdaterSession: (...args: unknown[]) => fetchMock(...args)
 }))
-vi.mock('electron', () => ({
-  net: { fetch: defaultNetFetchMock },
-  session: { fromPartition: fromPartitionMock }
-}))
-
-const updateSourceState = vi.hoisted(() => ({
-  value: {
-    channel: 'stable',
-    feedUrl: 'https://github.com/stablyai/orca/releases/latest/download',
-    github: {
-      repo: 'stablyai/orca',
-      atomFeedUrl: 'https://github.com/stablyai/orca/releases.atom',
-      releasesDownloadBase: 'https://github.com/stablyai/orca/releases/download',
-      releasesApiUrl: 'https://api.github.com/repos/stablyai/orca/releases'
-    }
-  } as unknown
-}))
-
+const productSource = vi.hoisted(() => ({ repo: null as string | null }))
 vi.mock('../shared/product-update-source', () => ({
-  resolveProductUpdateSource: () => updateSourceState.value
+  resolveProductUpdateSource: () =>
+    productSource.repo
+      ? {
+          provider: 'github',
+          channel: 'stable',
+          github: {
+            repo: productSource.repo,
+            releasesApiUrl: `https://api.github.com/repos/${productSource.repo}/releases`,
+            releasesDownloadBase: `https://github.com/${productSource.repo}/releases/download`
+          }
+        }
+      : null
 }))
 
-const { describeRateLimitReset, listReleaseBuilds, rateLimitResetAtMs, resolveTargetBuild } =
-  await import('./updater-release-builds')
+const tokenMock = vi.fn<() => Promise<string | null>>()
+let tokenScope = 'native:github.com'
+const rejectTokenMock = vi.fn()
+vi.mock('./updater-release-api-token', () => ({
+  resolveReleaseApiToken: async () => {
+    const token = await tokenMock()
+    return token === null ? null : { token, rateLimitScope: tokenScope }
+  },
+  rejectReleaseApiToken: () => rejectTokenMock()
+}))
+
+const blockedUntilMock = vi.fn<(bucket: string, now: number, scope: string) => number | null>()
+const recordRateLimitMock = vi.fn()
+vi.mock('./git/gh-rate-limit-breaker', () => ({
+  getGhRateLimitBlockedUntilMs: (...args: Parameters<typeof blockedUntilMock>) =>
+    blockedUntilMock(...args),
+  recordGhPrimaryRateLimit: (...args: unknown[]) => recordRateLimitMock(...args)
+}))
+
+const {
+  listReleaseBuilds: listReleaseBuildsRaw,
+  rateLimitResetAtMs,
+  resolveTargetBuild: resolveTargetBuildRaw
+} = await import('./updater-release-builds')
+
+const repositories: Record<ReleaseChannel, string> = {
+  stable: 'stablyai/orca',
+  rc: 'stablyai/orca',
+  beta: 'stablyai/orca',
+  internal: 'stablyai/orca',
+  adhoc: 'stablyai/orca-adhoc',
+  hourly: 'stablyai/orca-hourly',
+  daily: 'stablyai/orca-daily'
+}
+function listReleaseBuilds(channel: ReleaseChannel, platform: NodeJS.Platform) {
+  productSource.repo = repositories[channel]
+  return listReleaseBuildsRaw(channel, platform)
+}
+function resolveTargetBuild(channel: ReleaseChannel, tag: string) {
+  productSource.repo = repositories[channel]
+  return resolveTargetBuildRaw(channel, tag)
+}
 
 function jsonResponse(
   body: unknown,
   init: { ok?: boolean; status?: number; headers?: Record<string, string> } = {}
 ) {
-  return {
-    ok: init.ok ?? true,
-    status: init.status ?? 200,
-    headers: new Headers(init.headers ?? {}),
-    text: () => Promise.resolve(JSON.stringify(body))
-  }
+  return new Response(JSON.stringify(body), {
+    status: init.status ?? (init.ok === false ? 500 : 200),
+    headers: init.headers
+  })
 }
 
-/** Every platform's manifest by default, so a case that is not about asset
- *  filtering stays readable and stays green whatever platform is passed. */
+function requestHeaders(call = 0): Record<string, string> {
+  return fetchMock.mock.calls[call][1].headers
+}
+
+// Non-filtering cases need installable assets on every tested platform.
 const allPlatformAssets = [
   { name: 'latest-mac.yml' },
   { name: 'orca-macos-arm64.dmg' },
@@ -64,92 +99,82 @@ const release = (tag: string, extra: Record<string, unknown> = {}) => ({
 
 describe('listReleaseBuilds', () => {
   beforeEach(() => {
+    tokenScope = 'native:github.com'
     fetchMock.mockReset()
-    defaultNetFetchMock.mockReset()
-    defaultNetFetchMock.mockImplementation((...args: unknown[]) => fetchMock(...args))
-    fromPartitionMock.mockReset()
-    fromPartitionMock.mockReturnValue({ fetch: fetchMock })
-    updateSourceState.value = {
-      channel: 'stable',
-      feedUrl: 'https://github.com/stablyai/orca/releases/latest/download',
-      github: {
-        repo: 'stablyai/orca',
-        atomFeedUrl: 'https://github.com/stablyai/orca/releases.atom',
-        releasesDownloadBase: 'https://github.com/stablyai/orca/releases/download',
-        releasesApiUrl: 'https://api.github.com/repos/stablyai/orca/releases'
-      }
-    }
+    rejectTokenMock.mockReset()
+    recordRateLimitMock.mockReset()
+    tokenMock.mockReset()
+    tokenMock.mockResolvedValue(null)
+    blockedUntilMock.mockReset()
+    blockedUntilMock.mockReturnValue(null)
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  it('performs no network request when the product update source is disabled', async () => {
-    updateSourceState.value = null
-
-    await expect(listReleaseBuilds('stable')).resolves.toEqual([])
+  it('does not read credentials or fetch when product repository authority is absent', async () => {
+    productSource.repo = null
+    await expect(listReleaseBuildsRaw('stable', 'win32')).resolves.toEqual([])
+    expect(tokenMock).not.toHaveBeenCalled()
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('uses the isolated electron-updater session instead of default net.fetch', async () => {
-    fetchMock.mockResolvedValue(jsonResponse([]))
-
-    await expect(listReleaseBuilds('stable')).resolves.toEqual([])
-
-    expect(fromPartitionMock).toHaveBeenCalledWith('electron-updater', { cache: false })
-    expect(defaultNetFetchMock).not.toHaveBeenCalled()
-  })
-
-  it('cancels an unread release API body before reporting a non-success status', async () => {
-    const cancel = vi.fn(() => Promise.resolve())
-    fetchMock.mockResolvedValue({
-      ok: false,
-      status: 503,
-      body: { cancel }
-    })
-
-    await expect(listReleaseBuilds('stable')).rejects.toThrow('HTTP 503')
-    expect(cancel).toHaveBeenCalledTimes(1)
-  })
-
-  it('rejects an oversized release API body before parsing it', async () => {
-    const json = vi.fn(() => Promise.resolve([]))
-    const text = vi.fn(() => Promise.resolve('[]'))
-    fetchMock.mockResolvedValue({
-      ok: true,
-      status: 200,
-      headers: {
-        get: (name: string) => (name.toLowerCase() === 'content-length' ? '10000000' : null)
-      },
-      json,
-      text
-    })
-
-    await expect(listReleaseBuilds('stable')).rejects.toThrow(/too large/i)
-    expect(json).not.toHaveBeenCalled()
-    expect(text).not.toHaveBeenCalled()
-  })
-
-  it('performs no network request for a channel without a configured product repository', async () => {
-    updateSourceState.value = {
-      channel: 'stable',
-      feedUrl: 'https://github.com/coder-lulu/hive-code/releases/latest/download',
-      github: {
-        repo: 'coder-lulu/hive-code',
-        atomFeedUrl: 'https://github.com/coder-lulu/hive-code/releases.atom',
-        releasesDownloadBase: 'https://github.com/coder-lulu/hive-code/releases/download',
-        releasesApiUrl: 'https://api.github.com/repos/coder-lulu/hive-code/releases'
-      }
-    }
-    await expect(listReleaseBuilds('hourly')).resolves.toEqual([])
-    await expect(listReleaseBuilds('daily')).resolves.toEqual([])
-    await expect(listReleaseBuilds('adhoc')).resolves.toEqual([])
+  it('rejects an unconfigured historical channel before reading credentials', async () => {
+    productSource.repo = 'coder-lulu/hive-code'
+    await expect(listReleaseBuildsRaw('hourly', 'win32')).resolves.toEqual([])
+    expect(tokenMock).not.toHaveBeenCalled()
     expect(fetchMock).not.toHaveBeenCalled()
+    expect(() => resolveTargetBuildRaw('hourly', 'v1.4.160-hourly.202607281400')).toThrow(
+      /not configured/
+    )
   })
 
-  // Why: the main repo serves stable and rc from one endpoint, so an unfiltered
-  // list would offer RC tags under the Stable channel.
+  it('refuses a release list above the response limit', async () => {
+    fetchMock.mockResolvedValue(
+      new Response('[]', { headers: { 'content-length': String(1024 * 1024 + 1) } })
+    )
+    await expect(listReleaseBuilds('stable', 'win32')).rejects.toThrow(/Could not read/)
+  })
+
+  it('lists beta builds from the configured product repo, newest first', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse([
+        release('v1.4.160-beta.202607280900'),
+        release('v1.4.160-beta.202607281400'),
+        release('v1.4.160-beta.202607281000')
+      ])
+    )
+
+    const builds = await listReleaseBuilds('beta', 'darwin')
+
+    expect(fetchMock.mock.calls[0][0]).toContain('stablyai/orca')
+    expect(builds.map((build) => build.version)).toEqual([
+      '1.4.160-beta.202607281400',
+      '1.4.160-beta.202607281000',
+      '1.4.160-beta.202607280900'
+    ])
+  })
+
+  it('lists internal builds from the configured product repo, newest first', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse([
+        release('v1.4.160-internal.202607271300'),
+        release('v1.4.160-internal.202607291300'),
+        release('v1.4.160-internal.202607281300')
+      ])
+    )
+
+    const builds = await listReleaseBuilds('internal', 'darwin')
+
+    expect(fetchMock.mock.calls[0][0]).toContain('stablyai/orca')
+    expect(builds.map((build) => build.version)).toEqual([
+      '1.4.160-internal.202607291300',
+      '1.4.160-internal.202607281300',
+      '1.4.160-internal.202607271300'
+    ])
+  })
+
   it('separates stable from rc in the shared main repo', async () => {
     fetchMock.mockResolvedValue(
       jsonResponse([release('v1.4.160-rc.2'), release('v1.4.159'), release('v1.4.158')])
@@ -167,8 +192,6 @@ describe('listReleaseBuilds', () => {
     ).resolves.toEqual(['1.4.160-rc.2'])
   })
 
-  // Why: a draft release has no downloadable assets; offering it makes the
-  // switch action fail with a 404 after the user commits to it.
   it('skips drafts and unparseable tags', async () => {
     fetchMock.mockResolvedValue(
       jsonResponse([
@@ -183,89 +206,79 @@ describe('listReleaseBuilds', () => {
     expect(builds.map((build) => build.version)).toEqual(['1.4.159'])
   })
 
-  it('derives release links from the approved repository instead of trusting API html_url', async () => {
-    fetchMock.mockResolvedValue(
-      jsonResponse([
-        release('v1.4.159', {
-          html_url: 'https://evil.example.test/phishing'
-        })
-      ])
-    )
-
-    await expect(listReleaseBuilds('stable')).resolves.toEqual([
-      expect.objectContaining({
-        releaseUrl: 'https://github.com/stablyai/orca/releases/tag/v1.4.159'
-      })
-    ])
-  })
-
-  // Why: the picker renders a release title verbatim. A title that only repeats
-  // the tag says nothing the version beside it does not.
   it('keeps a composed release title and drops one that repeats the tag', async () => {
     fetchMock.mockResolvedValue(
       jsonResponse([
-        release('v1.4.163', { name: 'Product 1.4.163' }),
-        release('v1.4.162', { name: 'v1.4.162' }),
-        release('v1.4.161', { name: '   ' }),
-        release('v1.4.160', { name: 42 })
+        release('v1.4.163-beta.202607312054', { name: '1.4.163 • 01 • 07-31 13:54 • e698241' }),
+        release('v1.4.163-beta.202607311933', { name: 'v1.4.163-beta.202607311933' }),
+        release('v1.4.163-beta.202607311835', { name: '   ' }),
+        release('v1.4.163-beta.202607311735', { name: 42 })
       ])
     )
 
-    const builds = await listReleaseBuilds('stable')
-    expect(builds.map((build) => build.name)).toEqual(['Product 1.4.163', null, null, null])
+    const builds = await listReleaseBuilds('beta', 'darwin')
+    expect(builds.map((build) => build.name)).toEqual([
+      '1.4.163 • 01 • 07-31 13:54 • e698241',
+      null,
+      null,
+      null
+    ])
   })
 
-  // Why: a release can publish one platform before another. The picker must not
-  // offer a row whose current platform download would 404.
   it('hides builds that published no artifact for this platform', async () => {
     fetchMock.mockResolvedValue(
       jsonResponse([
-        release('v1.4.163'),
-        release('v1.4.162', {
+        release('v1.4.163-beta.202607312054'),
+        release('v1.4.163-beta.202607311933', {
           assets: [{ name: 'latest-mac.yml' }, { name: 'orca-macos-arm64.dmg' }]
         })
       ])
     )
 
     await expect(
-      listReleaseBuilds('stable', 'win32').then((builds) => builds.map((build) => build.version))
-    ).resolves.toEqual(['1.4.163'])
+      listReleaseBuilds('beta', 'win32').then((builds) => builds.map((build) => build.version))
+    ).resolves.toEqual(['1.4.163-beta.202607312054'])
   })
 
   it('returns an empty list when no build has this platform artifact', async () => {
     fetchMock.mockResolvedValue(
-      jsonResponse([release('v1.4.163', { assets: [{ name: 'latest-mac.yml' }] })])
+      jsonResponse([
+        release('v1.4.163-beta.202607312054', { assets: [{ name: 'latest-mac.yml' }] })
+      ])
     )
 
-    await expect(listReleaseBuilds('stable', 'win32')).resolves.toEqual([])
+    await expect(listReleaseBuilds('beta', 'win32')).resolves.toEqual([])
   })
 
   it('keeps mac builds visible on macOS regardless of the Windows leg', async () => {
     fetchMock.mockResolvedValue(
-      jsonResponse([release('v1.4.163', { assets: [{ name: 'latest-mac.yml' }] })])
+      jsonResponse([
+        release('v1.4.163-beta.202607312054', { assets: [{ name: 'latest-mac.yml' }] })
+      ])
     )
 
     await expect(
-      listReleaseBuilds('stable', 'darwin').then((builds) => builds.map((build) => build.version))
-    ).resolves.toEqual(['1.4.163'])
+      listReleaseBuilds('beta', 'darwin').then((builds) => builds.map((build) => build.version))
+    ).resolves.toEqual(['1.4.163-beta.202607312054'])
   })
 
+  // Signed Windows builds cannot switch to unsigned channels in-app; offer the direct installer.
   it('resolves the platform installer download url', async () => {
-    fetchMock.mockResolvedValue(jsonResponse([release('v1.4.163')]))
+    fetchMock.mockResolvedValue(jsonResponse([release('v1.4.163-beta.202607312054')]))
 
-    const [build] = await listReleaseBuilds('stable', 'win32')
+    const [build] = await listReleaseBuilds('beta', 'win32')
 
     expect(build.installerUrl).toBe(
-      'https://github.com/stablyai/orca/releases/download/v1.4.163/orca-windows-setup.exe'
+      'https://github.com/stablyai/orca/releases/download/v1.4.163-beta.202607312054/orca-windows-setup.exe'
     )
   })
 
   it('leaves the installer url null when the release published no installer', async () => {
     fetchMock.mockResolvedValue(
-      jsonResponse([release('v1.4.163', { assets: [{ name: 'latest.yml' }] })])
+      jsonResponse([release('v1.4.163-beta.202607312054', { assets: [{ name: 'latest.yml' }] })])
     )
 
-    const [build] = await listReleaseBuilds('stable', 'win32')
+    const [build] = await listReleaseBuilds('beta', 'win32')
 
     expect(build.installerUrl).toBeNull()
   })
@@ -273,26 +286,83 @@ describe('listReleaseBuilds', () => {
   it('tolerates a release whose assets are missing or malformed', async () => {
     fetchMock.mockResolvedValue(
       jsonResponse([
-        release('v1.4.163', { assets: undefined }),
-        release('v1.4.162', { assets: [null, { name: 7 }] })
+        release('v1.4.163-beta.202607312054', { assets: undefined }),
+        release('v1.4.163-beta.202607311933', { assets: [null, { name: 7 }] })
       ])
     )
 
-    await expect(listReleaseBuilds('stable', 'win32')).resolves.toEqual([])
+    await expect(listReleaseBuilds('beta', 'win32')).resolves.toEqual([])
   })
 
-  it('uses the configured product updater session without a personal auth token', async () => {
+  it('sends the local gh token as a bearer header when one is available', async () => {
+    tokenMock.mockResolvedValue('gho_abc')
     fetchMock.mockResolvedValue(jsonResponse([release('v1.4.159')]))
+
     await listReleaseBuilds('stable', 'darwin')
-    expect(fetchMock.mock.calls[0][1].headers).toEqual({
-      Accept: 'application/vnd.github+json'
+
+    expect(requestHeaders()).toEqual({
+      Accept: 'application/vnd.github+json',
+      Authorization: 'Bearer gho_abc'
     })
-    expect(defaultNetFetchMock).not.toHaveBeenCalled()
   })
 
-  it('reports a secondary limit without retrying before Retry-After', async () => {
+  it('sends no authorization header when gh has no token', async () => {
+    fetchMock.mockResolvedValue(jsonResponse([release('v1.4.159')]))
+
+    await listReleaseBuilds('stable', 'darwin')
+
+    expect(requestHeaders()).toEqual({ Accept: 'application/vnd.github+json' })
+  })
+
+  it('retries unauthenticated once when GitHub rejects the token', async () => {
+    tokenMock.mockResolvedValue('gho_stale')
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(null, { ok: false, status: 401 }))
+      .mockResolvedValueOnce(jsonResponse([release('v1.4.159')]))
+
+    await expect(
+      listReleaseBuilds('stable', 'darwin').then((builds) => builds.map((build) => build.version))
+    ).resolves.toEqual(['1.4.159'])
+
+    expect(rejectTokenMock).toHaveBeenCalledTimes(1)
+    expect(requestHeaders(1)).toEqual({ Accept: 'application/vnd.github+json' })
+  })
+
+  it('does not retry a 401 that was already unauthenticated', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(null, { ok: false, status: 401 }))
+
+    await expect(listReleaseBuilds('stable', 'darwin')).rejects.toThrow(/HTTP 401/)
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(rejectTokenMock).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the per-IP bucket when the token is rate limited and tells the gh breaker', async () => {
+    tokenMock.mockResolvedValue('gho_abc')
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse(null, {
+          ok: false,
+          status: 403,
+          headers: { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1800000600' }
+        })
+      )
+      .mockResolvedValueOnce(jsonResponse([release('v1.4.159')]))
+
+    await expect(
+      listReleaseBuilds('stable', 'darwin').then((builds) => builds.map((build) => build.version))
+    ).resolves.toEqual(['1.4.159'])
+
+    expect(recordRateLimitMock).toHaveBeenCalledWith('core', 1_800_000_600_000, 'native:github.com')
+    expect(rejectTokenMock).not.toHaveBeenCalled()
+    expect(requestHeaders(1)).toEqual({ Accept: 'application/vnd.github+json' })
+  })
+
+  // Secondary limits can also report zero remaining; Retry-After forbids even an unauthenticated retry.
+  it('reports a secondary limit carrying retry-after without retrying or tripping the breaker', async () => {
     const nowMs = 1_800_000_000_000
     vi.spyOn(Date, 'now').mockReturnValue(nowMs)
+    tokenMock.mockResolvedValue('gho_abc')
     fetchMock.mockResolvedValue(
       jsonResponse(null, {
         ok: false,
@@ -304,13 +374,76 @@ describe('listReleaseBuilds', () => {
         }
       })
     )
+
     await expect(listReleaseBuilds('stable', 'darwin')).rejects.toThrow(
       'GitHub rate limit reached. Try again in about a minute.'
     )
+
     expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(recordRateLimitMock).not.toHaveBeenCalled()
   })
 
-  it('surfaces a rate limit with its reset time', async () => {
+  it.each(['native:github.com', 'wsl:ubuntu:github.com'])(
+    'records a primary limit in the token scope %s',
+    async (scope) => {
+      tokenScope = scope
+      tokenMock.mockResolvedValue('gho_abc')
+      fetchMock
+        .mockResolvedValueOnce(
+          jsonResponse(null, {
+            ok: false,
+            status: 403,
+            headers: { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1800000600' }
+          })
+        )
+        .mockResolvedValueOnce(jsonResponse([release('v1.4.159')]))
+
+      await listReleaseBuilds('stable', 'win32')
+
+      expect(recordRateLimitMock).toHaveBeenCalledExactlyOnceWith('core', 1_800_000_600_000, scope)
+    }
+  )
+
+  it.each([
+    ['native:github.com', 'wsl:ubuntu:github.com'],
+    ['wsl:ubuntu:github.com', 'native:github.com'],
+    ['wsl:ubuntu:github.com', 'wsl:debian:github.com']
+  ])('keeps %s authenticated when only %s is blocked', async (scope, blockedScope) => {
+    tokenScope = scope
+    tokenMock.mockResolvedValue('gho_abc')
+    blockedUntilMock.mockImplementation((_bucket, now, queriedScope) =>
+      queriedScope === blockedScope ? now + 60_000 : null
+    )
+    fetchMock.mockResolvedValue(jsonResponse([release('v1.4.159')]))
+
+    await listReleaseBuilds('stable', 'win32')
+
+    expect(blockedUntilMock).toHaveBeenCalledWith('core', expect.any(Number), scope)
+    expect(requestHeaders().Authorization).toBe('Bearer gho_abc')
+  })
+
+  it.each(['native:github.com', 'wsl:ubuntu:github.com'])(
+    'skips the token while its scope %s is blocked',
+    async (scope) => {
+      tokenScope = scope
+      blockedUntilMock.mockReturnValue(Date.now() + 60_000)
+      tokenMock.mockResolvedValue('gho_abc')
+      fetchMock.mockResolvedValue(
+        jsonResponse(null, { ok: false, status: 403, headers: { 'x-ratelimit-remaining': '0' } })
+      )
+
+      const failure = listReleaseBuilds('stable', 'darwin')
+      await expect(failure).rejects.toThrow(/rate limit reached/)
+      await expect(failure).rejects.not.toThrow(/gh auth login/)
+
+      expect(tokenMock).toHaveBeenCalledTimes(1)
+      expect(blockedUntilMock).toHaveBeenCalledWith('core', expect.any(Number), scope)
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(requestHeaders()).toEqual({ Accept: 'application/vnd.github+json' })
+    }
+  )
+
+  it('surfaces a rate limit with its reset time and a sign-in hint when unauthenticated', async () => {
     const nowMs = 1_800_000_000_000
     vi.spyOn(Date, 'now').mockReturnValue(nowMs)
     fetchMock.mockResolvedValue(
@@ -324,8 +457,23 @@ describe('listReleaseBuilds', () => {
       })
     )
 
-    await expect(listReleaseBuilds('stable', 'darwin')).rejects.toThrow(
-      'GitHub rate limit reached. Try again in about 28 minutes.'
+    const failure = listReleaseBuilds('beta', 'darwin')
+    await expect(failure).rejects.toThrow(
+      "GitHub rate limit reached. Try again in about 28 minutes, or run `gh auth login` so Orca can use your account's higher limit."
+    )
+    await expect(failure).rejects.toMatchObject({
+      coded: { messageCode: 'rateLimitedInMinutesSignedOut', messageParams: { count: 28 } }
+    })
+  })
+
+  it('omits the sign-in hint when the rate-limited request was authenticated', async () => {
+    tokenMock.mockResolvedValue('gho_abc')
+    fetchMock.mockResolvedValue(
+      jsonResponse(null, { ok: false, status: 403, headers: { 'x-ratelimit-remaining': '0' } })
+    )
+
+    await expect(listReleaseBuilds('beta', 'darwin')).rejects.toThrow(
+      /^GitHub rate limit reached\. Try again in a few minutes\.$/
     )
   })
 
@@ -334,21 +482,20 @@ describe('listReleaseBuilds', () => {
       jsonResponse(null, { ok: false, status: 429, headers: { 'retry-after': '90' } })
     )
 
-    await expect(listReleaseBuilds('stable', 'darwin')).rejects.toThrow(/in about 2 minutes/)
+    await expect(listReleaseBuilds('beta', 'darwin')).rejects.toThrow(/in about 2 minutes/)
   })
 
-  // Why: a 403 without rate-limit headers is a permission or access problem, and
-  // telling the user to wait would send them waiting for a reset that never comes.
   it('reports a 403 without rate-limit headers as a plain HTTP error', async () => {
     fetchMock.mockResolvedValue(jsonResponse(null, { ok: false, status: 403 }))
-    const failure = listReleaseBuilds('stable', 'darwin')
+
+    const failure = listReleaseBuilds('beta', 'darwin')
     await expect(failure).rejects.toThrow(/HTTP 403/)
     await expect(failure).rejects.not.toThrow(/rate limit/)
   })
 
-  it('reports a missing configured releases repository distinctly', async () => {
+  it('reports a missing beta repo distinctly', async () => {
     fetchMock.mockResolvedValue(jsonResponse(null, { ok: false, status: 404 }))
-    await expect(listReleaseBuilds('stable')).rejects.toThrow(/No releases repository/i)
+    await expect(listReleaseBuilds('beta', 'darwin')).rejects.toThrow(/No releases repository/i)
   })
 })
 
@@ -359,8 +506,6 @@ describe('rateLimitResetAtMs', () => {
     expect(rateLimitResetAtMs(new Headers(), nowMs)).toBeNull()
   })
 
-  // Why: a secondary limit sends both, and only Retry-After is the wait GitHub asked
-  // for — quoting the hour-out primary window would tell the user to wait far too long.
   it('prefers retry-after over the primary reset epoch', () => {
     const headers = new Headers({
       'x-ratelimit-reset': String(nowMs / 1000 + 10 * 60),
@@ -378,55 +523,33 @@ describe('rateLimitResetAtMs', () => {
     expect(rateLimitResetAtMs(new Headers({ 'retry-after': '90' }), nowMs)).toBe(nowMs + 90_000)
   })
 
-  // Why: secondary limits may send Retry-After as an HTTP date (RFC 9110).
   it('reads retry-after as an HTTP date', () => {
     const headers = new Headers({ 'retry-after': new Date(nowMs + 5 * 60_000).toUTCString() })
     expect(rateLimitResetAtMs(headers, nowMs)).toBe(nowMs + 5 * 60_000)
   })
 })
 
-describe('describeRateLimitReset', () => {
-  const nowMs = 1_800_000_000_000
-
-  it('falls back to a vague wait when the reset is unknown', () => {
-    expect(describeRateLimitReset(null, nowMs)).toBe('in a few minutes')
-  })
-
-  it('rounds a sub-minute reset up to a minute', () => {
-    expect(describeRateLimitReset(nowMs + 20_000, nowMs)).toBe('in about a minute')
-  })
-
-  it('rounds a partial minute up', () => {
-    expect(describeRateLimitReset(nowMs + 9 * 60_000 + 1, nowMs)).toBe('in about 10 minutes')
-  })
-})
-
 describe('resolveTargetBuild', () => {
-  it('rejects a target from an unconfigured dev channel', () => {
-    expect(() => resolveTargetBuild('hourly', 'v1.4.160-hourly.202607281400')).toThrow(
-      /not configured/i
-    )
+  it('pins an beta tag at the beta repo download path', () => {
+    expect(resolveTargetBuild('beta', 'v1.4.160-beta.202607281400')).toEqual({
+      tag: 'v1.4.160-beta.202607281400',
+      version: '1.4.160-beta.202607281400',
+      feedUrl: 'https://github.com/stablyai/orca/releases/download/v1.4.160-beta.202607281400'
+    })
   })
 
-  it('rejects a daily tag while no product daily repository is configured', () => {
-    expect(() => resolveTargetBuild('daily', 'v1.4.160-daily.202607281300')).toThrow(
-      /not configured/i
-    )
+  it('pins a internal tag at the internal repo download path', () => {
+    expect(resolveTargetBuild('internal', 'v1.4.160-internal.202607281300')).toEqual({
+      tag: 'v1.4.160-internal.202607281300',
+      version: '1.4.160-internal.202607281300',
+      feedUrl: 'https://github.com/stablyai/orca/releases/download/v1.4.160-internal.202607281300'
+    })
   })
 
   it('pins a stable tag at the main repo download path', () => {
     expect(resolveTargetBuild('stable', 'v1.4.159').feedUrl).toBe(
       'https://github.com/stablyai/orca/releases/download/v1.4.159'
     )
-  })
-
-  it.each([
-    ['stable', 'v1.4.160-rc.2'],
-    ['rc', 'v1.4.159'],
-    ['stable', 'v1.4.160-hourly.202607281400'],
-    ['rc', 'v1.4.160-adhoc.20260728140533']
-  ] as const)('rejects a %s request for the mismatched tag %s', (channel, tag) => {
-    expect(() => resolveTargetBuild(channel, tag)).toThrow(/does not belong to the .* channel/i)
   })
 
   it('rejects a tag that is not a version', () => {

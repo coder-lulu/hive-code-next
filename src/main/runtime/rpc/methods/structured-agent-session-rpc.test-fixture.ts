@@ -122,7 +122,7 @@ function statusFeed(): StructuredAgentSessionStatusFeed {
         }
       ]
     ]),
-    getRecord: () => null,
+    getConversation: () => null,
     now: () => 1_000
   })
 }
@@ -247,7 +247,7 @@ export function dispatcher(
   })
   const runtime = {
     getRuntimeId: () => 'runtime-1',
-    getClientSettings: () => ({ experimentalNativeChat: true }),
+    getClientSettings: () => ({ nativeChatProviders: {} }),
     registerSubscriptionCleanup: vi.fn(),
     cleanupSubscription: vi.fn(),
     cleanupSubscriptionsByPrefix: vi.fn(),
@@ -268,7 +268,7 @@ export async function call(
   client?: {
     clientId?: string
     clientKind?: 'mobile' | 'runtime'
-    clientCapabilities?: string[]
+    clientCapabilities?: readonly string[]
     signal?: AbortSignal
   },
   runtimeOverrides: Record<string, unknown> = {},

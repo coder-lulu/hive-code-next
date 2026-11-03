@@ -26,6 +26,7 @@ export type OrcaRuntimeRpcServerOptions = {
   enableWebSocket?: boolean
   wsPort?: number
   // Why: true when the caller pinned a port (`orca serve --port`) so bind order prefers it over a stale STA-1511 fallback (#8535).
+  requirePinnedWsPort?: boolean
   preferPinnedWsPort?: boolean
   // Why: STA-2370 — bind the WS listener to all interfaces at startup instead of loopback-until-paired.
   // Only `orca serve` (explicit remote opt-in) and E2E set this; the desktop app widens lazily on pairing.
@@ -64,6 +65,7 @@ export type PairingOfferUnavailable = {
 }
 
 export type MobilePairingOfferAvailable = {
+  connectionMode: 'local-only'
   available: true
   pairingUrl: string
   endpoint: string

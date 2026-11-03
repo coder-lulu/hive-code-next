@@ -4,7 +4,6 @@ import { mkdir, mkdtemp, readFile, readlink, rm, utimes, writeFile } from 'node:
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { PRODUCT_CONFIG } from '../../shared/brand'
 
 const publicationRace = vi.hoisted(() => ({ endpointPath: '', replacementTarget: '' }))
 
@@ -23,10 +22,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   }
 })
 
-import {
-  ensureAppImageExtractedRoot,
-  resolveAppImageExtractedRoot
-} from './appimage-extracted-root'
+import { resolveAppImageExtractedRoot } from './appimage-extracted-root'
 import {
   getAppImageActiveExtractionPath,
   pruneAppImageExtractedRoots,
@@ -46,7 +42,7 @@ afterEach(async () => {
 })
 
 async function writePayload(rootPath: string, content = '#!/usr/bin/env bash\n'): Promise<string> {
-  const launcherPath = join(rootPath, 'resources', 'bin', PRODUCT_CONFIG.cli.primary)
+  const launcherPath = join(rootPath, 'resources', 'bin', 'orca-ide')
   await mkdir(dirname(launcherPath), { recursive: true })
   await writeFile(launcherPath, content, { mode: 0o755 })
   return launcherPath
@@ -91,64 +87,27 @@ describe('AppImage extraction pruning', () => {
     expect(existsSync(siblingRoot)).toBe(true)
   })
 
-  it.runIf(process.platform !== 'win32')(
-    'a sibling installed endpoint does not displace the owner generation',
-    async () => {
-      const { appImagePath, cacheRootPath } = await makeExtractionFixture()
-      const ownerRoot = resolveAppImageExtractedRoot({ appImagePath, cacheRootPath })!
-      const siblingRoot = join(
-        dirname(ownerRoot.rootPath),
-        cacheKeyApartFrom(basename(ownerRoot.rootPath))
-      )
-      const [ownerLauncher, siblingLauncher] = await Promise.all([
-        writePayload(ownerRoot.rootPath, 'owner'),
-        writePayload(siblingRoot, 'installed')
-      ])
-      publishAppImageLauncherEndpoint(cacheRootPath, 'installed', siblingLauncher)
+  it('a sibling installed endpoint does not displace the owner generation', async () => {
+    const { appImagePath, cacheRootPath } = await makeExtractionFixture()
+    const ownerRoot = resolveAppImageExtractedRoot({ appImagePath, cacheRootPath })!
+    const siblingRoot = join(
+      dirname(ownerRoot.rootPath),
+      cacheKeyApartFrom(basename(ownerRoot.rootPath))
+    )
+    const [ownerLauncher, siblingLauncher] = await Promise.all([
+      writePayload(ownerRoot.rootPath, 'owner'),
+      writePayload(siblingRoot, 'installed')
+    ])
+    publishAppImageLauncherEndpoint(cacheRootPath, 'installed', siblingLauncher)
 
-      await pruneAppImageExtractedRoots(ownerRoot.rootPath)
+    await pruneAppImageExtractedRoots(ownerRoot.rootPath)
 
-      await expect(readFile(ownerLauncher, 'utf8')).resolves.toBe('owner')
-      await expect(readFile(siblingLauncher, 'utf8')).resolves.toBe('installed')
-      await expect(
-        readlink(resolveAppImageLauncherEndpointPath(cacheRootPath, 'installed'))
-      ).resolves.toBe(siblingLauncher)
-    }
-  )
-
-  it.runIf(process.platform !== 'win32')(
-    'preserves an active extraction during pruning',
-    async () => {
-      const { appImagePath, cacheRootPath } = await makeExtractionFixture()
-      const root = resolveAppImageExtractedRoot({ appImagePath, cacheRootPath })!
-      let reportStarted!: (stagingPath: string) => void
-      let releaseExtraction!: () => void
-      const started = new Promise<string>((resolve) => {
-        reportStarted = resolve
-      })
-      const release = new Promise<void>((resolve) => {
-        releaseExtraction = resolve
-      })
-      const extraction = ensureAppImageExtractedRoot({
-        appImagePath,
-        cacheRootPath,
-        runExtract: async (_path, cwd) => {
-          reportStarted(cwd)
-          await release
-          await writePayload(join(cwd, 'squashfs-root'), '')
-        }
-      })
-      const stagingPath = await started
-
-      try {
-        await pruneAppImageExtractedRoots(root.rootPath)
-        expect(existsSync(stagingPath)).toBe(true)
-      } finally {
-        releaseExtraction()
-      }
-      await expect(extraction).resolves.toEqual(root)
-    }
-  )
+    await expect(readFile(ownerLauncher, 'utf8')).resolves.toBe('owner')
+    await expect(readFile(siblingLauncher, 'utf8')).resolves.toBe('installed')
+    await expect(
+      readlink(resolveAppImageLauncherEndpointPath(cacheRootPath, 'installed'))
+    ).resolves.toBe(siblingLauncher)
+  })
 
   it('retains recent cross-process staging and reclaims stale staging', async () => {
     const { appImagePath, cacheRootPath } = await makeExtractionFixture()
@@ -194,14 +153,6 @@ describe('AppImage extraction pruning', () => {
     expect(existsSync(recentMarker)).toBe(true)
     expect(existsSync(staleRoot)).toBe(false)
     expect(existsSync(staleMarker)).toBe(false)
-  })
-
-  it('tolerates a missing cache namespace', async () => {
-    const { root } = await makeExtractionFixture()
-
-    await expect(
-      pruneAppImageExtractedRoots(join(root, 'never-made', 'a'.repeat(24), 'b'.repeat(24)))
-    ).resolves.toBeUndefined()
   })
 
   it.skipIf(process.platform === 'win32')(

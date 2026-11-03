@@ -1,3 +1,5 @@
+import { OFFLINE_RUNTIME_GROUP_KEY } from '../grouping/group-keys'
+import { isOfflineRuntimeOwner } from '@/lib/runtime-offline-directory'
 import type { FolderWorkspace } from '../../../../../../shared/folder-workspace-types'
 import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import type { WorkspaceStatusDefinition, Worktree } from '../../../../../../shared/worktree/types'
@@ -13,17 +15,15 @@ import {
   composeWorktreeHostIdentity,
   getExecutionHostIdFromWorktreeHostIdentity
 } from '../../../../../../shared/worktree/host-qualified-identity'
-import { OFFLINE_RUNTIME_GROUP_KEY, getProjectGroupHeaderKey } from '../grouping/group-keys'
-import { isOfflineRuntimeOwner } from '@/lib/runtime-offline-directory'
-import type { ExecutionHostId } from '../../../../../../shared/execution-host'
+import { getProjectGroupHeaderKey } from '../../../../../../shared/sidebar-list/group-keys'
 import {
-  getFolderWorkspaceLaneKey,
-  getProjectGroupIdentity,
-  getRenderableFolderWorkspaces
-} from '../grouping/folder-workspace-lanes'
-import type { WorktreeGroupBy } from '../grouping/row-types'
-import { getFolderWorkspaceHostId } from '../../folder-workspace-host-id'
-import { getHostSectionCollapseKey } from '../../host-section-collapse'
+  getRepoExecutionHostId,
+  type ExecutionHostId
+} from '../../../../../../shared/execution-host'
+import { getFolderWorkspaceLaneKey } from '../../../../../../shared/sidebar-list/folder-workspace-lanes'
+import type { WorktreeGroupBy } from '../../../../../../shared/sidebar-list/row-types'
+import { getFolderWorkspaceHostId } from '../../../../../../shared/sidebar-list/folder-workspace-host-id'
+import { getHostSectionCollapseKey } from '../../../../../../shared/sidebar-list/host-section-collapse'
 
 function findFolderWorkspaceByKey(
   worktreeId: string,
@@ -92,55 +92,47 @@ export function getFolderWorkspaceRevealGroupKeys(
     groupBy?: WorktreeGroupBy
     workspaceStatuses?: readonly WorkspaceStatusDefinition[]
     defaultHostId?: ExecutionHostId
+    hostScopedGroups?: boolean
     executionHostId?: ExecutionHostId
     offlineRuntimeEnvironmentIds?: ReadonlySet<string>
-    hostScopedGroups?: boolean
   }
 ): string[] {
-  const scope = parseWorkspaceKey(worktreeId)
-  if (scope?.type !== 'folder') {
-    return []
-  }
-  const pair = getRenderableFolderWorkspaces(
-    folderWorkspaces.filter((workspace) => workspace.id === scope.folderWorkspaceId),
-    projectGroups
-  ).find(
-    ({ folderWorkspace, projectGroup }) =>
-      !options?.executionHostId ||
-      getFolderWorkspaceHostId(folderWorkspace, projectGroup, options.defaultHostId ?? 'local') ===
-        options.executionHostId
+  const folderWorkspace = findFolderWorkspaceByKey(
+    worktreeId,
+    folderWorkspaces,
+    options?.executionHostId
   )
-  if (!pair) {
+  if (!folderWorkspace) {
     return []
   }
-  const { folderWorkspace, projectGroup: owningGroup } = pair
-  const groupsById = new Map(projectGroups.map((group) => [getProjectGroupIdentity(group), group]))
+
+  const groupsById = new Map(
+    projectGroups
+      .filter(
+        (group) =>
+          !options?.executionHostId || getRepoExecutionHostId(group) === options.executionHostId
+      )
+      .map((group) => [group.id, group])
+  )
+  // Resolve parents from the unfiltered last same-ID group copy, matching the hostless headers the sidebar renders.
+  const renderedGroupsById = new Map(projectGroups.map((group) => [group.id, group]))
   const keys: string[] = []
   const seen = new Set<string>()
-  let groupId: string | null = folderWorkspace.projectGroupId
+  let groupId: string | null = groupsById.has(folderWorkspace.projectGroupId)
+    ? folderWorkspace.projectGroupId
+    : null
   while (groupId && !seen.has(groupId)) {
     seen.add(groupId)
-    const group = owningGroup && groupsById.get(getProjectGroupIdentity(owningGroup, groupId))
+    const group = renderedGroupsById.get(groupId)
     if (!group) {
       break
     }
-    keys.unshift(getProjectGroupHeaderKey(group.id, group))
+    keys.unshift(getProjectGroupHeaderKey(group.id))
     groupId = group.parentGroupId
   }
 
-  if (
-    options?.offlineRuntimeEnvironmentIds &&
-    isOfflineRuntimeOwner(
-      getFolderWorkspaceHostId(folderWorkspace, owningGroup, options.defaultHostId ?? 'local'),
-      options.offlineRuntimeEnvironmentIds
-    )
-  ) {
-    keys.unshift(OFFLINE_RUNTIME_GROUP_KEY)
-  }
-
-  // Under non-repo grouping the project-group headers above do not exist, so the
-  // lane and host headers are the ones actually hiding the row (#15362). Lane
-  // keys come from the same function grouping uses, so the two cannot disagree.
+  // Non-repo modes hide folders behind lane/host headers; derive their reveal keys from the grouping function.
+  const owningGroup = groupsById.get(folderWorkspace.projectGroupId)
   if (options?.groupBy && options.groupBy !== 'repo' && owningGroup) {
     const laneKey = getFolderWorkspaceLaneKey(
       { folderWorkspace, projectGroup: owningGroup },
@@ -155,6 +147,16 @@ export function getFolderWorkspaceRevealGroupKeys(
           )
         : laneKey
     )
+  }
+  if (
+    owningGroup &&
+    options?.offlineRuntimeEnvironmentIds &&
+    isOfflineRuntimeOwner(
+      getFolderWorkspaceHostId(folderWorkspace, owningGroup, options.defaultHostId ?? 'local'),
+      options.offlineRuntimeEnvironmentIds
+    )
+  ) {
+    keys.unshift(OFFLINE_RUNTIME_GROUP_KEY)
   }
   if (owningGroup && options?.defaultHostId) {
     keys.push(

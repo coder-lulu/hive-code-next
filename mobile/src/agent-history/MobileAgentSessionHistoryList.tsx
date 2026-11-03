@@ -1,17 +1,17 @@
 import { useCallback, useMemo, useState } from 'react'
 import { ActivityIndicator, Pressable, RefreshControl, SectionList, Text, View } from 'react-native'
 import { Play } from 'lucide-react-native'
-import type { MobileTheme } from '../theme/mobile-theme'
+import { colors } from '../theme/mobile-theme'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { MobileAgentIcon } from '../components/MobileAgentIcon'
 import { recentSessionConversationTurns } from '../../../src/shared/ai-vault-session-display'
 import type { AiVaultSession } from '../../../src/shared/ai-vault-types'
 import type { MobileAgentHistorySection } from './agent-history-sections'
 import type { MobileAgentHistoryCard } from './agent-history-session-card'
-import { createAgentHistoryStyles } from './agent-history-styles'
+import { styles } from './agent-history-styles'
 
-// Lazy-render at most this many preview turns when a card is tapped — the
-// scanner already bounds preview text, but rendering them only on tap keeps the
-// list cheap.
+// Render bounded preview turns only on card tap to keep list cheap.
 const PREVIEW_TURN_LIMIT = 5
 
 type Props = {
@@ -22,7 +22,6 @@ type Props = {
   resumeActionStateBySessionId?: ReadonlyMap<string, { disabled: boolean; loading: boolean }>
   onResume?: (session: AiVaultSession) => void | Promise<void>
   onRefresh: () => void
-  theme: MobileTheme
 }
 
 export function MobileAgentSessionHistoryList({
@@ -32,11 +31,11 @@ export function MobileAgentSessionHistoryList({
   showCurrentWorktreeBadges,
   resumeActionStateBySessionId,
   onResume,
-  onRefresh,
-  theme
+  onRefresh
 }: Props) {
+  const colorScheme = useMobileColorScheme()
+  useMobileTranslation()
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const styles = useMemo(() => createAgentHistoryStyles(theme), [theme])
 
   const toggleExpanded = useCallback((id: string) => {
     setExpandedId((prev) => (prev === id ? null : id))
@@ -52,8 +51,6 @@ export function MobileAgentSessionHistoryList({
         resumeActionState={resumeActionStateBySessionId?.get(item.id)}
         onResume={onResume}
         onPress={() => toggleExpanded(item.id)}
-        theme={theme}
-        styles={styles}
       />
     ),
     [
@@ -62,8 +59,6 @@ export function MobileAgentSessionHistoryList({
       resumeActionStateBySessionId,
       sessionsById,
       showCurrentWorktreeBadges,
-      styles,
-      theme,
       toggleExpanded
     ]
   )
@@ -71,6 +66,7 @@ export function MobileAgentSessionHistoryList({
   return (
     <SectionList
       sections={sections}
+      extraData={colorScheme}
       keyExtractor={(card) => card.id}
       stickySectionHeadersEnabled={false}
       contentContainerStyle={styles.list}
@@ -78,7 +74,7 @@ export function MobileAgentSessionHistoryList({
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          tintColor={theme.color.text.secondary}
+          tintColor={colors.textSecondary}
         />
       }
       renderSectionHeader={({ section }) => (
@@ -101,9 +97,7 @@ function AgentHistoryCardRow({
   showCurrentWorktreeBadge,
   resumeActionState,
   onResume,
-  onPress,
-  theme,
-  styles
+  onPress
 }: {
   card: MobileAgentHistoryCard
   expanded: boolean
@@ -112,9 +106,10 @@ function AgentHistoryCardRow({
   resumeActionState?: { disabled: boolean; loading: boolean }
   onResume?: (session: AiVaultSession) => void | Promise<void>
   onPress: () => void
-  theme: MobileTheme
-  styles: ReturnType<typeof createAgentHistoryStyles>
 }) {
+  useMobileColorScheme()
+  const t = useMobileTranslation()
+  const count = card.messageCount
   const previewTurns = useMemo(
     () => (expanded && session ? recentSessionConversationTurns(session, PREVIEW_TURN_LIMIT) : []),
     [expanded, session]
@@ -140,11 +135,15 @@ function AgentHistoryCardRow({
       <View style={styles.cardMetaRow}>
         <Text style={styles.cardMetaText}>{card.agentLabel}</Text>
         <Text style={styles.cardMetaText}>
-          {card.messageCount} {card.messageCount === 1 ? 'message' : 'messages'}
+          {count === 1
+            ? t('agentHistory.sessionHistoryList.messages_one', '{{count}} message', { count })
+            : t('agentHistory.sessionHistoryList.messages_other', '{{count}} messages', { count })}
         </Text>
         {showCurrentWorktreeBadge && card.isCurrentWorktree ? (
           <View style={styles.currentBadge}>
-            <Text style={styles.currentBadgeText}>current worktree</Text>
+            <Text style={styles.currentBadgeText}>
+              {t('agentHistory.sessionHistoryList.currentWorktree', 'current worktree')}
+            </Text>
           </View>
         ) : null}
         {session && onResume ? (
@@ -163,12 +162,15 @@ function AgentHistoryCardRow({
             disabled={resumeActionState?.disabled}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel="Resume agent session"
+            accessibilityLabel={t(
+              'agentHistory.sessionHistoryList.resumeSession',
+              'Resume agent session'
+            )}
           >
             {resumeActionState?.loading ? (
-              <ActivityIndicator size="small" color={theme.color.text.primary} />
+              <ActivityIndicator size="small" color={colors.textPrimary} />
             ) : (
-              <Play size={17} color={theme.color.text.primary} strokeWidth={2.4} />
+              <Play size={17} color={colors.textPrimary} strokeWidth={2.4} />
             )}
           </Pressable>
         ) : null}
@@ -177,7 +179,13 @@ function AgentHistoryCardRow({
         <View style={styles.preview}>
           {previewTurns.map((turn, index) => (
             <View key={`${card.id}-turn-${index}`} style={styles.previewTurn}>
-              <Text style={styles.previewRole}>{turn.role}</Text>
+              <Text style={styles.previewRole}>
+                {turn.role === 'user'
+                  ? t('agentHistory.sessionHistoryList.userRole', 'user')
+                  : turn.role === 'assistant'
+                    ? t('agentHistory.sessionHistoryList.assistantRole', 'assistant')
+                    : turn.role}
+              </Text>
               <Text style={styles.previewText}>{turn.text}</Text>
             </View>
           ))}

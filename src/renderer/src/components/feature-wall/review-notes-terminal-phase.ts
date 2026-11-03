@@ -1,15 +1,5 @@
 import { NOTE_TARGETS } from './review-animated-visual-shared'
-import { APP_DISPLAY_NAME } from '@/product-brand'
 
-// Why: terminal-phase logic for the Notes panel lives here so the imperative
-// loop in ReviewNotesAnimatedVisual stays under the per-file lint cap. The
-// caller passes the live DOM nodes plus a `wait` + `cancelled` getter so
-// these helpers can interleave with the rest of the loop's beats.
-//
-// Mirrors docs/feature-wall-review-tile-mock.html: the panel auto-starts a
-// Claude Code session (no `$ claude` command, no typed prompt), shows
-// "Loaded N review notes from HiveCode", lists each ack with its line number,
-// and ends on "Fixing both issues..." with a spinner.
 export type TerminalPhaseContext = {
   term: HTMLDivElement
   diffScroll: HTMLDivElement
@@ -70,13 +60,7 @@ export async function runTerminalPhase(ctx: TerminalPhaseContext): Promise<void>
   }
   const loadedEl = term.querySelector<HTMLDivElement>('[data-term-line-loaded]')
   if (loadedEl) {
-    const check = document.createElement('span')
-    check.className = 'ravs-term-check'
-    check.textContent = '✓'
-    const message = document.createElement('span')
-    message.className = 'ravs-term-muted'
-    message.textContent = `Loaded ${NOTE_TARGETS.length} review notes from ${APP_DISPLAY_NAME}`
-    loadedEl.replaceChildren(check, message)
+    loadedEl.innerHTML = `<span class="ravs-term-check">✓</span><span class="ravs-term-muted">Loaded ${NOTE_TARGETS.length} review notes from Orca</span>`
   }
   await wait(520)
   if (isCancelled()) {

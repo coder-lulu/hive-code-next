@@ -14,7 +14,7 @@ import {
 } from './orchestration-worker-start-mode'
 
 const STRUCTURED_DEFAULT = {
-  experimentalNativeChat: true
+  nativeChatProviders: {}
 }
 
 function decide(
@@ -39,10 +39,27 @@ describe('worker start mode from the user default', () => {
   })
 
   it.each([
-    ['native chat off', { ...STRUCTURED_DEFAULT, experimentalNativeChat: false }],
-    ['chat-by-default off', { ...STRUCTURED_DEFAULT, experimentalNativeChat: false }],
-    ['structured off', { ...STRUCTURED_DEFAULT, experimentalNativeChat: false }],
-    ['no settings at all', null]
+    [
+      'native chat off',
+      {
+        ...STRUCTURED_DEFAULT,
+        nativeChatProviders: { claude: false, codex: false, opencode: false }
+      }
+    ],
+    [
+      'chat-by-default off',
+      {
+        ...STRUCTURED_DEFAULT,
+        nativeChatProviders: { claude: false, codex: false, opencode: false }
+      }
+    ],
+    [
+      'structured off',
+      {
+        ...STRUCTURED_DEFAULT,
+        nativeChatProviders: { claude: false, codex: false, opencode: false }
+      }
+    ]
   ])('starts a terminal worker when %s', (_name, settings) => {
     expect(decide({ settings })).toMatchObject({
       mode: 'terminal',

@@ -1,8 +1,9 @@
 import type { AgentType } from './agent-status-types'
 import {
   AGENT_CHAT_PERMISSION_MODE_OPTION_ID,
-  isAgentChatPermissionMode,
-  newChatPermissionMode
+  isAgentChatPermissionChoice,
+  newChatPermissionModeForSettings,
+  type NewChatPermissionSettings
 } from './agent-chat-permission-mode'
 import type { GlobalSettings } from './global-settings-types'
 import { sessionOptionValueIsValid } from './agent-session-option-catalog'
@@ -10,7 +11,7 @@ import type {
   NativeChatSessionOptionSettingsMutation,
   PersistedNativeChatSessionOptions,
   SessionOptionValue
-} from './native-chat-session-options'
+} from './native-chat/input/native-chat-session-options'
 import {
   decodeStructuredAgentSessionOptionValue,
   encodeStructuredAgentSessionOptionValue
@@ -101,7 +102,7 @@ export function parseStructuredLaunchSeedOptions(
     }
   }
   const permissionMode = entries.get(AGENT_CHAT_PERMISSION_MODE_OPTION_ID)
-  if (isAgentChatPermissionMode(permissionMode)) {
+  if (isAgentChatPermissionChoice(permissionMode)) {
     parsed[AGENT_CHAT_PERMISSION_MODE_OPTION_ID] = permissionMode
   }
   return Object.keys(parsed).length > 0 ? parsed : undefined
@@ -118,13 +119,13 @@ export function resolveStructuredLaunchSeedOptions(
 /** A new chat's seed: the saved selection plus the permission default narrowed to the agent. */
 export function structuredLaunchSeedOptions(
   settings:
-    | Pick<GlobalSettings, 'nativeChatSessionOptions' | 'nativeChatPermissionMode'>
+    | (Pick<GlobalSettings, 'nativeChatSessionOptions'> & NewChatPermissionSettings)
     | null
     | undefined,
   agent: AgentType
 ): Record<string, string> | undefined {
   const selection = resolveStructuredLaunchSeedOptions(settings?.nativeChatSessionOptions, agent)
-  const permissionMode = newChatPermissionMode(agent, settings?.nativeChatPermissionMode)
+  const permissionMode = newChatPermissionModeForSettings(agent, settings)
   return permissionMode
     ? { ...selection, [AGENT_CHAT_PERMISSION_MODE_OPTION_ID]: permissionMode }
     : selection

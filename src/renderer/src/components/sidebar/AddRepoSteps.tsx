@@ -18,8 +18,6 @@ import { upsertAddedRepoWithProjectHostSetup } from './add-repo-store-upsert'
 import { worktreeRefreshOptions } from './add-repo-runtime-owner'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
 
-// ── A paired server's SSH host project hook ─────────────────────────
-
 export function useRemoteRepo(
   fetchWorktrees: (
     repoId: string,
@@ -103,7 +101,7 @@ export function useRemoteRepo(
       ? s.sshStateByEnvironment.get(serverEnvironmentId)?.connectionStates
       : undefined
   )
-  // Why derived: the server pushes SSH state changes into the store while this step is open.
+  // Derive display from pushed server SSH state while the step remains open.
   const displayedSshTargets = useMemo(
     () => withServerSshStates(sshTargets, serverSshStates),
     [serverSshStates, sshTargets]
@@ -193,8 +191,7 @@ export function useRemoteRepo(
         translate('auto.components.sidebar.AddRepoSteps.df8b0e6c22', 'Project added on SSH host'),
         { description: repo.displayName }
       )
-      // Why: the repo is already persisted here; if SSH refresh is temporarily
-      // non-authoritative, finish onto the project row instead of stranding the dialog.
+      // The repo is persisted; a non-authoritative SSH refresh must not strand the dialog.
       const ownerOptions = worktreeRefreshOptions(serverEnvironmentId)
       await fetchWorktrees(repo.id, ownerOptions)
       if (!mountedRef.current || gen !== remoteGenRef.current) {
@@ -207,9 +204,7 @@ export function useRemoteRepo(
         return
       }
       if (message.includes('Not a valid git repository')) {
-        // Why: match the local add-project flow — show confirmation dialog so
-        // users understand git features will be unavailable, rather than
-        // silently adding as a folder.
+        // Match local adds: confirm non-git feature limits before handing off to a folder workspace.
         closeModal()
         useAppStore.getState().openModal('confirm-non-git-folder', {
           folderPath: trimmedRemotePath,

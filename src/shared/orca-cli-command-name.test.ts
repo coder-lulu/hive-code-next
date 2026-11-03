@@ -1,55 +1,24 @@
 import { describe, expect, it } from 'vitest'
-import {
-  getCompatibilityCliCommandNamesForPlatform,
-  getGlobalCliCommandNamesForPlatform,
-  getHiveCodeCliCommandNameForPlatform,
-  getOrcaCliCommandNameForPlatform
-} from './orca-cli-command-name'
+import { installFakeAppEnvironment } from '../../config/scripts/vitest-host-ports-setup'
+import { getTuiAgentLaunchCommand, TUI_AGENT_CONFIG } from './tui-agent-config'
 
-describe('CLI command name', () => {
-  it('uses the HiveCode primary command on Unix platforms', () => {
-    expect(getHiveCodeCliCommandNameForPlatform('linux')).toBe('hive')
-    expect(getHiveCodeCliCommandNameForPlatform('darwin')).toBe('hive')
+const agentTeams = TUI_AGENT_CONFIG['claude-agent-teams']
+
+describe('Claude Agent Teams launch name on the launching host', () => {
+  it('uses plain orca on a headless Linux server, whose PATH has no orca-ide (#33920)', () => {
+    installFakeAppEnvironment({ getCliLauncherPath: () => '/home/u/.orca/cli/bin/orca' })
+    expect(getTuiAgentLaunchCommand(agentTeams, 'linux')).toBe('orca claude-teams')
   })
 
-  it('uses the Windows command shim suffix', () => {
-    expect(getHiveCodeCliCommandNameForPlatform('win32')).toBe('hive.cmd')
+  it('keeps the orca-ide rename on a Linux desktop', () => {
+    installFakeAppEnvironment({ getCliLauncherPath: undefined })
+    expect(getTuiAgentLaunchCommand(agentTeams, 'linux')).toBe('orca-ide claude-teams')
   })
 
-  it('keeps the old helper on compatibility commands for internal launch shims', () => {
-    expect(getOrcaCliCommandNameForPlatform('linux')).toBe('orca-ide')
-    expect(getOrcaCliCommandNameForPlatform('darwin')).toBe('orca')
-    expect(getOrcaCliCommandNameForPlatform('win32')).toBe('orca.cmd')
-  })
-
-  it('defines safe global compatibility aliases per platform', () => {
-    expect(getCompatibilityCliCommandNamesForPlatform('darwin')).toEqual([
-      'hivecode',
-      'orca',
-      'orca-ide'
-    ])
-    expect(getCompatibilityCliCommandNamesForPlatform('linux')).toEqual(['hivecode', 'orca-ide'])
-    expect(getCompatibilityCliCommandNamesForPlatform('win32')).toEqual([
-      'hivecode.cmd',
-      'orca.cmd',
-      'orca-ide.cmd'
-    ])
-  })
-
-  it('never claims the GNOME orca command in the Linux global command set', () => {
-    expect(getGlobalCliCommandNamesForPlatform('linux')).toEqual(['hive', 'hivecode', 'orca-ide'])
-    expect(getGlobalCliCommandNamesForPlatform('linux')).not.toContain('orca')
-    expect(getGlobalCliCommandNamesForPlatform('darwin')).toEqual([
-      'hive',
-      'hivecode',
-      'orca',
-      'orca-ide'
-    ])
-    expect(getGlobalCliCommandNamesForPlatform('win32')).toEqual([
-      'hive.cmd',
-      'hivecode.cmd',
-      'orca.cmd',
-      'orca-ide.cmd'
-    ])
+  it('keeps the orca-ide rename for WSL under a Windows server', () => {
+    installFakeAppEnvironment({
+      getCliLauncherPath: () => 'C:\\Users\\u\\.orca\\cli\\bin\\orca.exe'
+    })
+    expect(getTuiAgentLaunchCommand(agentTeams, 'linux')).toBe('orca-ide claude-teams')
   })
 })

@@ -1,4 +1,3 @@
-import { cancelUnreadResponseBody } from '../../lib/unread-response-body'
 import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
 import {
   logMiniMaxFetchFailure,
@@ -13,10 +12,6 @@ import {
   type MiniMaxModelList,
   type MiniMaxUsageSnapshot
 } from './minimax-fetcher-data'
-
-// Why: split out of minimax-fetcher.ts so the transport + routing file
-// stays under the 300-line cap (AGENTS.md disallows max-lines disables).
-// Owns response consumption and translates the payload into ProviderRateLimits.
 
 export type MiniMaxUsageResponse = {
   base_resp?: {
@@ -35,8 +30,7 @@ export type MiniMaxUsageResponse = {
   }[]
 }
 
-// Why: MiniMax answers an expired cookie/key with HTTP 200 + base_resp.status_code 1004,
-// so the credential-expiry signal has to be read from the payload, not the status line.
+// Expired MiniMax credentials return HTTP 200 with payload status_code 1004.
 const MINIMAX_UNAUTHENTICATED_STATUS_CODE = 1004
 
 function makeMiniMaxExpiredCredentialError(fetchResult: MiniMaxFetchResponse): ProviderRateLimits {
@@ -101,51 +95,44 @@ export async function parseMiniMaxUsageResponse(
   fetchResult: MiniMaxFetchResponse,
   models: MiniMaxModelList
 ): Promise<ProviderRateLimits> {
+  const httpError = handleMiniMaxHttpError(fetchResult)
+  if (httpError) {
+    return httpError
+  }
+  let payload: MiniMaxUsageResponse
   try {
-    const httpError = handleMiniMaxHttpError(fetchResult)
-    if (httpError) {
-      return httpError
+    const value: unknown = await fetchResult.response.json()
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return makeMiniMaxError('Invalid MiniMax usage response', 'parse')
     }
-    let payload: MiniMaxUsageResponse
-    try {
-      const value: unknown = await fetchResult.response.json()
-      if (!value || typeof value !== 'object' || Array.isArray(value)) {
-        return makeMiniMaxError('Invalid MiniMax usage response', 'parse')
-      }
-      payload = value
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Invalid MiniMax usage response'
-      return makeMiniMaxError(redactMiniMaxSecret(message), 'parse')
-    }
-    const payloadError = handleMiniMaxPayloadError(fetchResult, payload)
-    if (payloadError) {
-      return payloadError
-    }
-    // Why: a non-array `model_remains` (object / string) throws inside `.map`
-    // and surfaces as a 'network' error rather than 'parse'. Treat any
-    // non-array as an empty list and let the snapshot selection flag the
-    // missing usage.
-    const rawItems = Array.isArray(payload.model_remains) ? payload.model_remains : []
-    const snapshots = rawItems
-      .map(parseMiniMaxUsageItem)
-      .filter((snapshot): snapshot is MiniMaxUsageSnapshot => snapshot !== null)
-    const selected = selectMiniMaxSnapshot(snapshots, parseMiniMaxModels(models))
-    if (!selected) {
-      return makeMiniMaxError(
-        'MiniMax usage data for the configured model was not found',
-        'usage-unavailable'
-      )
-    }
-    return {
-      provider: 'minimax',
-      session: selected.session,
-      weekly: selected.weekly,
-      updatedAt: Date.now(),
-      error: null,
-      status: 'ok',
-      usageMetadata: { source: 'web' }
-    }
-  } finally {
-    await cancelUnreadResponseBody(fetchResult.response)
+    payload = value
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Invalid MiniMax usage response'
+    return makeMiniMaxError(redactMiniMaxSecret(message), 'parse')
+  }
+  const payloadError = handleMiniMaxPayloadError(fetchResult, payload)
+  if (payloadError) {
+    return payloadError
+  }
+  // Non-array model_remains must become a parse failure, not a thrown .map/network error.
+  const rawItems = Array.isArray(payload.model_remains) ? payload.model_remains : []
+  const snapshots = rawItems
+    .map(parseMiniMaxUsageItem)
+    .filter((snapshot): snapshot is MiniMaxUsageSnapshot => snapshot !== null)
+  const selected = selectMiniMaxSnapshot(snapshots, parseMiniMaxModels(models))
+  if (!selected) {
+    return makeMiniMaxError(
+      'MiniMax usage data for the configured model was not found',
+      'usage-unavailable'
+    )
+  }
+  return {
+    provider: 'minimax',
+    session: selected.session,
+    weekly: selected.weekly,
+    updatedAt: Date.now(),
+    error: null,
+    status: 'ok',
+    usageMetadata: { source: 'web' }
   }
 }

@@ -1,9 +1,9 @@
 import { isAntigravityReferenceSession } from '../../../shared/antigravity-session-origin'
 import {
-  canResumeAiVaultSessionOnTarget,
   getAiVaultResumeWorkspaceExecutionHostId,
   getAiVaultResumeWorkspaceTargetStatus
 } from './ai-vault-resume-target'
+import { canResumeAiVaultSessionOnTarget } from '../../../shared/ai-vault-resume-target'
 import { getAiVaultResumeWorkspaceWslDistro } from './ai-vault-resume-shell'
 import { buildAiVaultResumeCommand } from '../../../shared/ai-vault-resume-command'
 import { buildAgentStartupPlan } from '../../../shared/tui-agent-startup'
@@ -39,8 +39,8 @@ export function buildAntigravityReferenceStartup(args: {
       ...args.settings?.agentCmdOverrides,
       ...(args.commandOverride?.trim() ? { antigravity: args.commandOverride } : {})
     },
-    agentArgs: resolveTuiAgentLaunchArgs('antigravity', args.settings?.agentDefaultArgs),
-    agentEnv: resolveTuiAgentLaunchEnv('antigravity', args.settings?.agentDefaultEnv)
+    agentArgs: resolveTuiAgentLaunchArgs('antigravity', args.settings),
+    agentEnv: resolveTuiAgentLaunchEnv('antigravity', args.settings)
   })
   if (!plan) {
     return null

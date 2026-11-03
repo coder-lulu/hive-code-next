@@ -1,7 +1,8 @@
-import { execFileSync } from 'node:child_process'
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { runProcessSync } from '@orca/process-host'
+import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { isDirectInvocation } from './script-entry-detection.mjs'
 
@@ -21,8 +22,16 @@ describe('isDirectInvocation', () => {
     expect(isDirectInvocation(import.meta.url, '')).toBe(false)
   })
 
-  // Why an injected converter: a win32 path cannot be exercised through node:url's pathToFileURL
-  // on a posix runner, and CI is ubuntu.
+  it('compares the literal entry path when realpath cannot resolve it', () => {
+    const entry = join(tmpdir(), 'unresolved entry # %.mjs')
+    const realpath = () => {
+      throw new Error('unresolvable fixture path')
+    }
+    expect(isDirectInvocation(pathToFileURL(entry).href, entry, { realpath })).toBe(true)
+    expect(isDirectInvocation(import.meta.url, entry, { realpath })).toBe(false)
+  })
+
+  // Inject converter to exercise Windows URLs from POSIX CI.
   const toWin32FileUrl = (windowsPath) => new URL(`file:///${windowsPath.replaceAll('\\', '/')}`)
 
   it('matches a Windows entry path, which the file:// template form never does', () => {
@@ -35,42 +44,31 @@ describe('isDirectInvocation', () => {
         realpath: keepAsIs
       })
     ).toBe(true)
-    // The regression this guards: `file://${argv[1]}` yields file://C:\orca\... on Windows,
-    // so the builder exited 0 having written nothing and packaging failed downstream.
-    expect(`file://${scriptPath}`).not.toBe(moduleUrl)
   })
 })
 
 describe('running a builder through a symlink', () => {
-  // Node resolves symlinks in import.meta.url but not in argv[1]. Before the guard realpath'd the
-  // entry path, `node /tmp/<link>` compared /tmp against /private/tmp and the builder exited 0
-  // having written nothing — a green packaging job with no bundle in it.
+  // Canonicalize argv symlink: /tmp versus /private/tmp otherwise exits 0 without producing bundle.
   it('still recognises the entry module', async () => {
-    const scratchRoot = fileURLToPath(
-      new URL('../../logs/script-entry-detection/', import.meta.url)
-    )
-    await mkdir(scratchRoot, { recursive: true })
-    const scratch = await mkdtemp(join(scratchRoot, 'entry-link-'))
+    const scratch = await mkdtemp(join(tmpdir(), 'orca-script-entry-link-'))
     try {
       const moduleUrl = new URL('./script-entry-detection.mjs', import.meta.url).href
-      const realDirectory = join(scratch, 'real')
-      await mkdir(realDirectory)
-      const real = join(realDirectory, 'entry.mjs')
+      const real = join(scratch, 'entry.mjs')
       await writeFile(
         real,
         `import { isDirectInvocation } from ${JSON.stringify(moduleUrl)}\n` +
-          "import { pathToFileURL } from 'node:url'\n" +
-          'if (import.meta.url === pathToFileURL(process.argv[1]).href) {\n' +
-          '  throw new Error("fixture must start through an aliased directory")\n' +
-          '}\n' +
           'process.stdout.write(String(isDirectInvocation(import.meta.url, process.argv[1])))\n',
         'utf8'
       )
-      const linkDirectory = join(scratch, 'linked')
-      // Windows junctions exercise realpath without requiring file-symlink privileges.
-      await symlink(realDirectory, linkDirectory, process.platform === 'win32' ? 'junction' : 'dir')
-      const link = join(linkDirectory, 'entry.mjs')
-      expect(execFileSync(process.execPath, [link], { encoding: 'utf8' })).toBe('true')
+      const link = join(scratch, 'entry-link.mjs')
+      await symlink(real, link)
+      const result = runProcessSync({
+        program: process.execPath,
+        args: [link],
+        timeoutMs: 10_000
+      })
+      expect(result.code, result.stderr).toBe(0)
+      expect(result.stdout).toBe('true')
     } finally {
       await rm(scratch, { recursive: true, force: true })
     }

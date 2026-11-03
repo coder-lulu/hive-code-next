@@ -85,6 +85,21 @@ function attachParams(
   }
 }
 
+function adapterForAcquire(
+  acquire: StructuredAgentSessionAdapter['acquire']
+): StructuredAgentSessionAdapter {
+  return {
+    open: async () => ({
+      reportedOptions: { model: '' }
+    }),
+    acquire,
+    dispatch: vi.fn(),
+    cancelTurn: vi.fn(),
+    answerPrompt: vi.fn(),
+    setOption: vi.fn()
+  }
+}
+
 describe('processless structured session reservation', () => {
   it('refuses an adapter that declares no create support before reserving a lease', async () => {
     root = await mkdtemp(join(tmpdir(), 'orca-unsupported-attach-'))
@@ -92,13 +107,9 @@ describe('processless structured session reservation', () => {
     const reserveOwner = vi.spyOn(store, 'reserveOwner')
     const acquire = vi.fn<StructuredAgentSessionAdapter['acquire']>()
     const adapter = {
-      supportsCreate: vi.fn(() => false),
-      acquire,
-      dispatch: vi.fn(),
-      cancelTurn: vi.fn(),
-      answerPrompt: vi.fn(),
-      setOption: vi.fn()
-    } as unknown as StructuredAgentSessionAdapter
+      ...adapterForAcquire(acquire),
+      supportsCreate: vi.fn(() => false)
+    }
 
     await expect(
       performAttach({
@@ -114,7 +125,6 @@ describe('processless structured session reservation', () => {
           probe: { outcome: 'reservation-unused' }
         },
         callerKey: 'client-1',
-        optionRevision: () => 0,
         params: attachParams(),
         now: () => NOW,
         onAttached: () => {}
@@ -135,10 +145,11 @@ describe('processless structured session reservation', () => {
       .mockReturnValueOnce(true)
       .mockReturnValueOnce(true)
       .mockReturnValueOnce(false)
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the attach reaches only `supportsCreate` and `acquire` on this fake adapter.
     const adapter = {
+      ...adapterForAcquire(vi.fn()),
       supportsCreate,
       acquire: vi.fn(async ({ fence, spawnToken }) => ({
+        acquisitionGeneration: globalThis.crypto.randomUUID(),
         process: { hostId: 'local', pid: 4242, processStartTimeMs: NOW, spawnToken },
         link: {
           linkId: 'link-1',
@@ -148,7 +159,7 @@ describe('processless structured session reservation', () => {
           observedAt: NOW
         }
       }))
-    } as unknown as StructuredAgentSessionAdapter
+    }
     const input = {
       agents: NO_STRUCTURED_AGENTS,
       logger: createStructuredAgentSessionLogger(),
@@ -163,7 +174,6 @@ describe('processless structured session reservation', () => {
         probe: { outcome: 'reservation-unused' as const }
       },
       callerKey: 'client-1',
-      optionRevision: () => 0,
       params: attachParams(),
       now: () => NOW,
       onAttached: () => {}
@@ -188,7 +198,7 @@ describe('processless structured session reservation', () => {
       .mockReturnValueOnce(true)
       .mockReturnValueOnce(true)
     const acquire = vi.fn<StructuredAgentSessionAdapter['acquire']>()
-    const adapter = { supportsCreate, acquire } as unknown as StructuredAgentSessionAdapter
+    const adapter = { ...adapterForAcquire(acquire), supportsCreate }
     const input = {
       agents: NO_STRUCTURED_AGENTS,
       logger: createStructuredAgentSessionLogger(),
@@ -203,7 +213,6 @@ describe('processless structured session reservation', () => {
         probe: { outcome: 'reservation-unused' as const }
       },
       callerKey: 'client-1',
-      optionRevision: () => 0,
       params: attachParams(),
       now: () => NOW,
       onAttached: () => {}
@@ -236,11 +245,11 @@ describe('processless structured session reservation', () => {
   it('settles a pre-spawn failure and its processless evidence in one durable transaction', async () => {
     root = await mkdtemp(join(tmpdir(), 'orca-processless-reservation-'))
     const store = await openTestAgentSessionRecordStore(root)
-    const adapter = {
-      acquire: vi.fn(async () => {
+    const adapter = adapterForAcquire(
+      vi.fn(async () => {
         throw new AgentSessionPreSpawnError(new Error('workspace no longer exists'))
       })
-    } as unknown as StructuredAgentSessionAdapter
+    )
     const settlement = vi.spyOn(store, 'settleFailedAcquisition')
 
     await expect(
@@ -257,7 +266,6 @@ describe('processless structured session reservation', () => {
           probe: { outcome: 'reservation-unused' }
         },
         callerKey: 'client-1',
-        optionRevision: () => 0,
         params: attachParams(),
         now: () => NOW,
         onAttached: () => {}
@@ -291,12 +299,13 @@ describe('processless structured session reservation', () => {
   it('does not rerun a settled pre-spawn failure and admits a fresh operation', async () => {
     root = await mkdtemp(join(tmpdir(), 'orca-processless-retry-'))
     const store = await openTestAgentSessionRecordStore(root)
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the attach reaches only the members this fake adapter defines.
     const adapter = {
+      ...adapterForAcquire(vi.fn()),
       acquire: vi
         .fn<StructuredAgentSessionAdapter['acquire']>()
         .mockRejectedValueOnce(new AgentSessionPreSpawnError(new Error('launch not ready')))
         .mockImplementationOnce(async ({ fence, spawnToken }) => ({
+          acquisitionGeneration: globalThis.crypto.randomUUID(),
           process: {
             hostId: 'local',
             pid: 4242,
@@ -312,7 +321,7 @@ describe('processless structured session reservation', () => {
           }
         })),
       releaseAcquisition: vi.fn(async () => true)
-    } as unknown as StructuredAgentSessionAdapter
+    }
     const input = {
       agents: NO_STRUCTURED_AGENTS,
       logger: createStructuredAgentSessionLogger(),
@@ -327,7 +336,6 @@ describe('processless structured session reservation', () => {
         probe: { outcome: 'reservation-unused' as const }
       },
       callerKey: 'client-1',
-      optionRevision: () => 0,
       params: attachParams(),
       now: () => NOW,
       onAttached: () => {}

@@ -10,8 +10,6 @@ import { LOCAL_COMMIT_MESSAGE_HOST_KEY } from './commit-message-host-key'
 import type { GlobalSettings } from './global-settings-types'
 import type { Repo } from './repo-types'
 import type { TuiAgent } from './tui-agent'
-import { mergeLegacyCommitMessageAiIntoSourceControlAi as mergeLegacySettings } from './source-control-ai-legacy-reconciliation'
-import { projectSourceControlAiToLegacyCommitMessageAi as projectLegacySettings } from './source-control-ai-legacy-projection'
 import {
   clearSourceControlAiModelChoiceForHost as clearModelChoice,
   getDiscoveredModels,
@@ -34,8 +32,7 @@ import { normalizeRepoSourceControlAiOverrides as normalizeRepoOverrides } from 
 import {
   DEFAULT_SOURCE_CONTROL_AI_PR_CREATION_DEFAULTS as DEFAULT_PR_CREATION_DEFAULTS,
   getDefaultSourceControlAiSettings as getDefaultSettings,
-  normalizeSourceControlAiSettings as normalizeSettings,
-  sourceControlAiSettingsFromLegacy as settingsFromLegacy
+  normalizeSourceControlAiSettings as normalizeSettings
 } from './source-control-ai-settings'
 import { hasActionAgentRecipe } from './source-control-ai-command-template'
 import type { AiTextOperation, SourceControlAiPrCreationDefaults } from './source-control-ai-types'
@@ -64,7 +61,7 @@ export type ResolveSourceControlAiResult =
   | { ok: false; error: string }
 
 type ResolveSourceControlAiInput = {
-  settings: Pick<GlobalSettings, 'commitMessageAi' | 'sourceControlAi'> &
+  settings: Pick<GlobalSettings, 'sourceControlAi'> &
     Partial<Pick<GlobalSettings, 'agentCmdOverrides' | 'defaultTuiAgent' | 'disabledTuiAgents'>>
   repo?: Pick<Repo, 'sourceControlAi'> | null
   operation: AiTextOperation
@@ -73,20 +70,17 @@ type ResolveSourceControlAiInput = {
 }
 
 export type ResolveSourceControlAiPrCreationDefaultsInput = {
-  settings: Pick<GlobalSettings, 'commitMessageAi' | 'sourceControlAi'>
+  settings: Pick<GlobalSettings, 'sourceControlAi'>
   repo?: Pick<Repo, 'sourceControlAi'> | null
   prCreationProductDefaults?: SourceControlAiPrCreationDefaults
 }
 
 export const normalizeRepoSourceControlAiOverrides = normalizeRepoOverrides
 export const getDefaultSourceControlAiSettings = getDefaultSettings
-export const sourceControlAiSettingsFromLegacy = settingsFromLegacy
-export const mergeLegacyCommitMessageAiIntoSourceControlAi = mergeLegacySettings
 export const normalizeSourceControlAiSettings = normalizeSettings
 export const readSourceControlAiModelChoiceForHost = readModelChoice
 export const selectSourceControlAiModelChoiceForHost = selectModelChoice
 export const clearSourceControlAiModelChoiceForHost = clearModelChoice
-export const projectSourceControlAiToLegacyCommitMessageAi = projectLegacySettings
 export const resolveSourceControlAiInstructions = resolveInstructions
 export const hasConfiguredSourceControlAiInstructions = hasConfiguredInstructions
 export const resolveSourceControlAiPrCreationDefaults = resolvePrDefaults
@@ -109,8 +103,7 @@ function supportedAgentSummary(): string {
 export function resolveSourceControlAiForOperation(
   input: ResolveSourceControlAiInput
 ): ResolveSourceControlAiResult {
-  const legacy = input.settings.commitMessageAi
-  const source = normalizeSettings(input.settings.sourceControlAi, legacy)
+  const source = normalizeSettings(input.settings.sourceControlAi)
   const repoOverrides =
     input.operation === 'conversationName'
       ? null
@@ -148,12 +141,7 @@ export function resolveSourceControlAiForOperation(
   const customAgentCommand =
     repoOverrides?.customAgentCommand?.trim() || source.customAgentCommand.trim()
   const commonParams = {
-    customPrompt: resolveInstructionsFromNormalized(
-      source,
-      repoOverrides,
-      input.operation,
-      legacy?.customPrompt
-    ),
+    customPrompt: resolveInstructionsFromNormalized(source, repoOverrides, input.operation),
     commandInputTemplate: actionRecipe.commandInputTemplate,
     ...(actionRecipe.agentArgs !== undefined ? { agentArgs: actionRecipe.agentArgs } : {})
   }
@@ -204,14 +192,13 @@ export function resolveSourceControlAiForOperation(
   const hostKey = input.discoveryHostKey ?? LOCAL_COMMIT_MESSAGE_HOST_KEY
   const persistedModelId = selectPersistedModelId({
     source,
-    legacy,
     repoOverrides,
     operation: input.operation,
     hostKey,
     agentId: resolvedAgent,
     defaultModelId: spec.defaultModelId
   })
-  const discoveredModels = getDiscoveredModels(source, legacy, hostKey, resolvedAgent)
+  const discoveredModels = getDiscoveredModels(source, hostKey, resolvedAgent)
   const model =
     spec.models.find((candidate) => candidate.id === persistedModelId) ??
     discoveredModels.find((candidate) => candidate.id === persistedModelId) ??
@@ -222,7 +209,6 @@ export function resolveSourceControlAiForOperation(
   const thinkingLevel = resolveThinkingLevel({
     model,
     source,
-    legacy,
     repoOverrides,
     operation: input.operation
   })

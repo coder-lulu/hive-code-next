@@ -25,6 +25,7 @@ export function nodeServerTestPaths({ artifact = false, template = false } = {})
     'src/main/orcad/orcad-stop-request-listener.test.ts',
     'src/main/orcad/orcad-managed-stop.test.ts',
     'src/main/orcad/orcad-managed-stop-cancellation.test.ts',
+    'src/main/orcad/orcad-daemon-teardown-linux.test.ts',
     // The directory, not a prefix: its siblings are POSIX-host unit tests pr.yml already runs.
     'src/main/daemon/pty-subprocess/',
     'src/main/daemon/pty-subprocess-spawn-file-foreground.test.ts',
@@ -42,6 +43,7 @@ export function nodeServerTestPaths({ artifact = false, template = false } = {})
           'src/main/orcad/orcad-stop-request-shutdown.integration.test.ts',
           'src/main/orcad/orcad-windows-conpty-breakaway.integration.test.ts',
           'src/main/orcad/orcad-serve-parity.integration.test.ts',
+          'src/main/orcad/orcad-idle-memory-budget.integration.test.ts',
           'config/scripts/zip-extractor-command.test.mjs'
         ]
       : []),

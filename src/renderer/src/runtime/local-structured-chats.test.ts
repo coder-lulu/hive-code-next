@@ -1,3 +1,4 @@
+import { TUI_AGENT_AUTO_PICK_ORDER } from '../../../shared/tui-agent-selection'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ held: false, isWebClient: false }))
@@ -10,11 +11,12 @@ vi.mock('./local-structured-session-tabs-sync/inventory-refresh', () => ({
 
 import {
   resetLocalStructuredChatsForTests,
+  localStructuredChatsInUse,
   restoreLocalStructuredChatsAtStartup
 } from './local-structured-chats'
 
-const SETTING_OFF = { experimentalNativeChat: false }
-const SETTING_ON = { experimentalNativeChat: true }
+const SETTING_OFF = { nativeChatProviders: Object.fromEntries(TUI_AGENT_AUTO_PICK_ORDER.map(agent => [agent, false])) }
+const SETTING_ON = { nativeChatProviders: {} }
 
 beforeEach(() => {
   mocks.held = false
@@ -31,7 +33,20 @@ beforeEach(() => {
 })
 
 describe("startup's restore of this machine's structured chats", () => {
-  it('runs no session-tab census for a default user who never held a chat', async () => {
+  it('waits for settings unless the host already holds chats, and cleans up after the last one', async () => {
+    expect(await localStructuredChatsInUse(null)).toBe(false)
+    expect(await localStructuredChatsInUse(undefined)).toBe(false)
+    mocks.held = true
+    expect(await localStructuredChatsInUse(null)).toBe(true)
+    expect(await localStructuredChatsInUse(SETTING_OFF)).toBe(true)
+    mocks.held = false
+    expect(await localStructuredChatsInUse(SETTING_OFF)).toBe(false)
+  })
+
+  it('one provider remaining default-on keeps the local subscription in use', async () => {
+    expect(await localStructuredChatsInUse({nativeChatProviders: {...SETTING_OFF.nativeChatProviders, pi: true}})).toBe(true)
+  })
+  it('runs no session-tab census when all defaults are false and no chat is held', async () => {
     const step = vi.fn(async () => undefined)
 
     await restoreLocalStructuredChatsAtStartup(SETTING_OFF, step)

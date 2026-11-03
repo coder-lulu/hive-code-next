@@ -15,6 +15,8 @@ import { AgentVersionInformation, getAgentUpdateStatus } from './AgentVersionInf
 import { AgentInstallationFeedback } from './AgentInstallationFeedback'
 import type { AgentInstallationSnapshot } from './use-agent-installation'
 import { AgentLifecycleActionButton } from './AgentLifecycleActionButton'
+import type { AgentOpensAs } from './native-chat-provider-choice'
+import { AgentOpensAsControl } from './AgentChatChoiceControls'
 
 const AGENT_UPGRADE_GUIDES: Partial<Record<TuiAgent, string>> = {
   claude: 'https://code.claude.com/docs/en/setup#update-claude-code',
@@ -67,7 +69,7 @@ export type AgentCatalogRowProps = {
   onSetEnabled: (enabled: boolean) => void
   onSaveOverride: (value: string) => void | Promise<void>
   onSaveArgs: (value: string) => void | Promise<void>
-  onSaveEnv: (value: Record<string, string>) => void
+  onSaveEnv: (value: Record<string, string>) => void | Promise<void>
   sessionSourceHome?: AgentSessionSourceHomeControl
   environmentNames?: readonly string[]
   environmentEditor?: React.ReactNode
@@ -79,10 +81,13 @@ export type AgentCatalogRowProps = {
   onUpgrade?: (installation: AgentInstallation) => void
   installDisabled?: boolean
   installationTarget?: AgentVersionTarget
+  opensAs?: AgentOpensAs
+  chatRuntime?: React.ReactNode
 }
 
 export function AgentCatalogRow(props: AgentCatalogRowProps) {
   const [showInstallations, setShowInstallations] = useState(false)
+  const [showChatRuntime, setShowChatRuntime] = useState(false)
   const {
     agentId,
     label,
@@ -172,6 +177,25 @@ export function AgentCatalogRow(props: AgentCatalogRowProps) {
           </Tooltip>
         )}
       </div>
+      {props.opensAs ? <AgentOpensAsControl label={label} opensAs={props.opensAs} /> : null}
+      {props.chatRuntime ? (
+        <div>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-expanded={showChatRuntime}
+            aria-label={translate(
+              showChatRuntime ? 'settings.agents.collapse' : 'settings.agents.expand',
+              showChatRuntime ? 'Collapse agent settings' : 'Expand agent settings'
+            )}
+            onClick={() => setShowChatRuntime((value) => !value)}
+          >
+            <Settings2 className="size-4" />
+            {translate('settings.agents.agentSettings', 'Agent settings')}
+          </Button>
+          {showChatRuntime ? <div className="mt-3 space-y-3">{props.chatRuntime}</div> : null}
+        </div>
+      ) : null}
       {isDetected ? (
         <AgentVersionInformation
           snapshot={versionSnapshot}

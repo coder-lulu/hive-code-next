@@ -1,63 +1,26 @@
 import { EventEmitter } from 'node:events'
 import { afterAll, vi } from 'vitest'
-import { applyProductBranding } from '../shared/brand'
 import { createProductUpdaterTestMocks } from './updater-product-test-harness'
 import type {
   AppMock,
   AutoUpdaterMock,
+  LinuxPackageType,
   UpdaterMocks,
   UpdaterModuleFactories
-} from './updater-electron-test-types'
-export type { ProductUpdateSource } from './updater-product-test-harness'
-export type { UpdaterMocks } from './updater-electron-test-types'
+} from './updater-test-harness-types'
 import { clearTrackedRealTimers, trackRealTimers } from './updater-test-timer-tracking'
-type LinuxPackageType = 'deb' | 'rpm' | 'non-root' | 'unusable'
+export type { ProductUpdateSource } from './updater-product-test-harness'
+export type { UpdaterMocks } from './updater-test-harness-types'
 
-// Why: macOS keeps the restart advice because quitting does re-stage a Squirrel update.
+// Quitting re-stages Squirrel updates on macOS, so restart advice remains useful there.
 export const PRE_COMMIT_INSTALL_FAILURE =
   process.platform === 'darwin'
-    ? applyProductBranding(
-        'Could not restart to install the update. Quit and reopen Orca, then try again.'
-      )
-    : applyProductBranding('Could not start the update installer. Orca remains open.')
+    ? 'Could not restart to install the update. Quit and reopen Orca, then try again.'
+    : 'Could not start the update installer. Orca remains open.'
 
-/**
- * Builds the electron/electron-updater mock graph `updater.ts` runs against, plus the module
- * factories each test file feeds to its own hoisted `vi.mock` calls. Call it from an awaited
- * `vi.hoisted` block so the mocks exist before the mock factories run.
- */
+/** Call from an awaited vi.hoisted block so module factories see initialized mocks. */
 export function createUpdaterMocks(): UpdaterMocks {
-  afterAll(() => {
-    vi.useRealTimers()
-    clearTrackedRealTimers()
-  })
-
-  const createHttpExecutorMock = () => ({
-    request: vi.fn(),
-    doApiRequest: vi.fn(),
-    doDownload: vi.fn(),
-    addRedirectHandlers: vi.fn()
-  })
-
-  const respondToProductUpdaterRequest = async (input: unknown): Promise<Response> => {
-    const url = input instanceof URL ? input.href : String(input)
-    if (url.includes('/hive/v1/updates/check')) {
-      return new Response(
-        JSON.stringify({
-          hasUpdate: true,
-          updateRequired: false,
-          blockReason: null,
-          currentBuild: 2,
-          minimumSupportedBuild: 1,
-          latest: null
-        }),
-        { headers: { 'content-type': 'application/json' } }
-      )
-    }
-    return new Response('version: 1.0.61\n')
-  }
-  const productUpdaterSessionFetchMock = vi.fn(respondToProductUpdaterRequest)
-
+  const productMocks = createProductUpdaterTestMocks()
   const appEvents = new EventEmitter()
   const updaterEvents = new EventEmitter()
   const appOn = vi.fn((event: string, handler: (...args: unknown[]) => void) => {
@@ -79,17 +42,9 @@ export function createUpdaterMocks(): UpdaterMocks {
     updaterEvents.emit(event, ...args)
   }
 
-  // Why: `vi.resetModules()` abandons the previous test's `updater` module instance but cannot cancel
-  // the real timers it armed (1s silent-settle, 45s stall, 24h auto-check). Those fire during a later
-  // test — re-arming on that test's fake clock — and drove these shared spies, so a stale instance
-  // could land an extra `checkForUpdates()` inside the window under assertion.
+  // resetModules cannot cancel old timers; fence stale module instances from shared spies.
   let currentGeneration = 0
 
-  /**
-   * Hands each `updater` module instance an autoUpdater view stamped with the generation that loaded
-   * it. Once `resetUpdaterMocks` bumps the generation, the abandoned instance's calls and property
-   * writes are dropped instead of reaching the spies the running test asserts on.
-   */
   const loadGenerationScopedAutoUpdater = (): AutoUpdaterMock => {
     const loadedGeneration = currentGeneration
     return new Proxy(autoUpdaterMock, {
@@ -124,23 +79,18 @@ export function createUpdaterMocks(): UpdaterMocks {
     autoUpdaterMock.disableDifferentialDownload = false
     autoUpdaterMock.autoRunAppAfterInstall = true
     autoUpdaterMock.logger = undefined
-    // The production network boundary replaces these methods with guarded
-    // implementations. Recreate the executor between tests instead of
-    // trying to reset functions that may no longer be Vitest mocks.
-    autoUpdaterMock.httpExecutor = createHttpExecutorMock()
     delete (autoUpdaterMock as Record<string, unknown>).verifyUpdateCodeSignature
   }
 
   const autoUpdaterMock: AutoUpdaterMock = {
+    httpExecutor: null,
     autoDownload: false,
     autoInstallOnAppQuit: false,
     autoRunAppAfterInstall: true,
     allowPrerelease: false,
     allowDowngrade: false,
     disableDifferentialDownload: false,
-    // Why: setup installs the diagnostic logger adapter here; tests drive child stderr through it.
     logger: undefined as { error: (message: unknown) => void } | undefined,
-    httpExecutor: createHttpExecutorMock(),
     on,
     checkForUpdates: vi.fn(),
     downloadUpdate: vi.fn(),
@@ -163,10 +113,8 @@ export function createUpdaterMocks(): UpdaterMocks {
     getAllWindows: vi.fn(() => [])
   }
   const nativeUpdaterMock = {
-    on: vi.fn(),
-    checkForUpdates: vi.fn()
+    on: vi.fn()
   }
-  const isMock = { dev: false }
   const killAllPtyMock = vi.fn()
   const powerMonitorOnMock = vi.fn()
   const getLinuxRootPackageTypeMock = vi.fn<() => 'deb' | 'rpm' | null>(() => null)
@@ -181,39 +129,26 @@ export function createUpdaterMocks(): UpdaterMocks {
   const armExitWatchdogMock = vi.fn()
   const disarmExitWatchdogMock = vi.fn()
   const fetchNewerReleaseTagsMock = vi.fn()
+  const fetchLatestStableReleaseTagMock = vi.fn<() => Promise<string | null>>()
   const chooseLocalBuildMock = vi.fn()
   const startLocalBuildFeedMock = vi.fn()
   const closeLocalBuildFeedMock = vi.fn()
-  const { productUpdaterModuleFactories, resetProductUpdaterMocks, ...productUpdaterTestState } =
-    createProductUpdaterTestMocks()
-  const { productUpdateSourceState } = productUpdaterTestState
 
-  /** One factory per module `updater.ts` pulls in; test files pass these to their own `vi.mock`. */
   const moduleFactories: UpdaterModuleFactories = {
+    ...productMocks.productUpdaterModuleFactories,
+    electronToolkitUtils: () => ({ is: { dev: false } }),
     electron: () => ({
       app: appMock,
       BrowserWindow: browserWindowMock,
       autoUpdater: nativeUpdaterMock,
-      session: {
-        fromPartition: vi.fn(() => ({
-          fetch: productUpdaterSessionFetchMock,
-          webRequest: {
-            onBeforeRequest: vi.fn(),
-            onHeadersReceived: vi.fn()
-          }
-        }))
-      },
       powerMonitor: { on: powerMonitorOnMock },
       shell: { showItemInFolder: vi.fn() },
       net: { fetch: vi.fn() }
     }),
-    electronUpdater: () => ({ autoUpdater: loadGenerationScopedAutoUpdater() }),
-    // Vitest retains mock factories across resetModules. Capture the generation when the
-    // updater first loads its dependency, just as the production lazy loader does.
+    electronUpdater: () => ({ autoUpdater: autoUpdaterMock }),
     electronUpdaterLoader: () => ({ loadElectronAutoUpdater: loadGenerationScopedAutoUpdater }),
-    electronToolkitUtils: () => ({ is: isMock }),
     ptyKillAll: () => ({ killAllPty: killAllPtyMock }),
-    // Why: only the marker resolver is faked so the real artifact capture/redaction path stays under test.
+    // Keep real artifact capture/redaction under test; fake only package-type detection.
     linuxUpdatePackageType: () => ({
       getLinuxPackageType: getLinuxPackageTypeMock,
       getLinuxRootPackageType: getLinuxRootPackageTypeMock,
@@ -227,58 +162,37 @@ export function createUpdaterMocks(): UpdaterMocks {
       disarmUpdateInstallExitWatchdog: disarmExitWatchdogMock
     }),
     updaterPrereleaseFeed: () => ({
+      fetchLatestStableReleaseTag: fetchLatestStableReleaseTagMock,
       fetchNewerReleaseTagsWithReadiness: async (...args: unknown[]) => {
-        const result = (await fetchNewerReleaseTagsMock(...args)) as
-          | unknown[]
-          | { state?: string; currentTag?: string }
-        const currentVersion = typeof args[0] === 'string' ? args[0] : null
-        const options = args[2] as
-          | { includePrerelease?: boolean; releaseFilter?: string }
-          | undefined
-        const currentMatchesFilter =
-          currentVersion !== null &&
-          (options?.releaseFilter === 'perf'
-            ? currentVersion.includes('.perf')
-            : options?.includePrerelease || !currentVersion.includes('-'))
-        const noNewerResult = currentMatchesFilter
-          ? { tags: [], state: 'no-newer', currentTag: `v${currentVersion}` }
-          : { tags: [], state: 'no-newer' }
+        const result = await fetchNewerReleaseTagsMock(...args)
         return Array.isArray(result)
-          ? result.length > 0
-            ? { tags: result, state: 'ready' }
-            : noNewerResult
-          : result?.state === 'no-newer' && !result.currentTag
-            ? { ...result, ...noNewerResult }
-            : result
+          ? { tags: result, state: result.length > 0 ? 'ready' : 'no-newer' }
+          : result
       },
       getReleaseDownloadUrl: (tag: string) => {
-        const github = productUpdateSourceState.value?.github
-        return github ? `${github.releasesDownloadBase}/${tag}` : null
+        const github = productMocks.productUpdateSourceState.value?.github
+        return github ? `${github.releasesDownloadBase}/${encodeURIComponent(tag)}` : null
       }
     }),
     localBuildSwitch: () => ({ chooseLocalBuild: chooseLocalBuildMock }),
-    localBuildFeedServer: () => ({ startLocalBuildFeed: startLocalBuildFeedMock }),
-    ...productUpdaterModuleFactories
+    localBuildFeedServer: () => ({ startLocalBuildFeed: startLocalBuildFeedMock })
   }
 
-  /** Shared `beforeEach` body: fresh module registry plus every mock back to its default. */
   const resetUpdaterMocks = () => {
-    currentGeneration += 1
+    productMocks.resetProductUpdaterMocks()
     vi.clearAllTimers()
+    vi.useRealTimers()
+    // The generation fence ignores stale calls but does not cancel their timers.
     clearTrackedRealTimers()
     vi.resetModules()
     autoUpdaterMock.reset()
-    productUpdaterSessionFetchMock.mockReset().mockImplementation(respondToProductUpdaterRequest)
     nativeUpdaterMock.on.mockReset()
-    nativeUpdaterMock.checkForUpdates.mockReset()
     browserWindowMock.getAllWindows.mockReset()
     browserWindowMock.getAllWindows.mockReturnValue([])
     appMock.getVersion.mockReset()
     appMock.getVersion.mockReturnValue('1.0.51')
     appMock.quit.mockReset()
     appMock.isPackaged = true
-    resetProductUpdaterMocks()
-    isMock.dev = false
     killAllPtyMock.mockReset()
     armExitWatchdogMock.mockReset()
     disarmExitWatchdogMock.mockReset()
@@ -293,6 +207,7 @@ export function createUpdaterMocks(): UpdaterMocks {
     shouldApplyNudgeMock.mockReset().mockReturnValue(false)
     fetchChangelogMock.mockReset().mockResolvedValue(null)
     fetchNewerReleaseTagsMock.mockReset().mockResolvedValue([])
+    fetchLatestStableReleaseTagMock.mockReset().mockResolvedValue('v1.0.51')
     chooseLocalBuildMock.mockReset()
     closeLocalBuildFeedMock.mockReset()
     startLocalBuildFeedMock.mockReset().mockResolvedValue({
@@ -300,16 +215,21 @@ export function createUpdaterMocks(): UpdaterMocks {
       close: closeLocalBuildFeedMock
     })
     vi.unstubAllGlobals()
-    vi.useRealTimers()
     trackRealTimers()
   }
 
+  // Drop fake timers before restoring real globals, or the wrapper's identity guard cannot restore them.
+  afterAll(() => {
+    vi.useRealTimers()
+    clearTrackedRealTimers()
+  })
+
   return {
+    ...productMocks,
     appMock,
     browserWindowMock,
     nativeUpdaterMock,
     autoUpdaterMock,
-    isMock,
     killAllPtyMock,
     powerMonitorOnMock,
     getLinuxPackageTypeMock,
@@ -322,10 +242,10 @@ export function createUpdaterMocks(): UpdaterMocks {
     armExitWatchdogMock,
     disarmExitWatchdogMock,
     fetchNewerReleaseTagsMock,
+    fetchLatestStableReleaseTagMock,
     chooseLocalBuildMock,
     startLocalBuildFeedMock,
     closeLocalBuildFeedMock,
-    ...productUpdaterTestState,
     moduleFactories,
     resetUpdaterMocks
   }

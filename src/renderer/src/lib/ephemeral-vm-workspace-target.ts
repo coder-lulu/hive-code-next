@@ -17,7 +17,7 @@ import {
   WORKTREE_PROVISIONED_ROOT_RUNTIME_CAPABILITY
 } from '../../../shared/protocol-version'
 import { translate } from '@/i18n/i18n'
-import { APP_DISPLAY_NAME } from '@/product-brand'
+import { ephemeralVmErrorText } from '@/lib/ephemeral-vm-error-copy'
 import { assertRuntimeEnvironmentCapability } from '@/runtime/runtime-rpc-client'
 
 export type PrepareEphemeralVmWorkspaceTargetArgs = {
@@ -63,11 +63,7 @@ export async function prepareEphemeralVmWorkspaceTarget(
     ...(args.provisionId ? { provisionId: args.provisionId } : {})
   })
   if (!provisioned.ok) {
-    return {
-      ok: false,
-      error: provisioned.error,
-      stderr: provisioned.stderr
-    }
+    return { ok: false, error: ephemeralVmErrorText(provisioned), stderr: provisioned.stderr }
   }
 
   const checkoutMode = getEphemeralVmRecipeResultCheckoutMode(provisioned.runtime.recipeResult)
@@ -90,13 +86,13 @@ export async function prepareEphemeralVmWorkspaceTarget(
       await assertRuntimeEnvironmentCapability(
         environmentId,
         PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
-        `The recipe-created ${APP_DISPLAY_NAME} server does not support project setup.`
+        'The recipe-created Orca server does not support project setup.'
       )
       if (checkoutMode === 'provisioned-root') {
         await assertRuntimeEnvironmentCapability(
           environmentId,
           WORKTREE_PROVISIONED_ROOT_RUNTIME_CAPABILITY,
-          'The HiveCode server on this VM cannot adopt a provisioned root. Update HiveCode on the VM.'
+          'The Orca server on this VM cannot adopt a provisioned root. Update Orca on the VM.'
         )
       }
     } catch (error) {
@@ -139,8 +135,7 @@ export async function prepareEphemeralVmWorkspaceTarget(
     ...setup,
     setup: {
       ...setup.setup,
-      // Why: the sandbox reports its own checkout as "local"; the desktop app
-      // must route follow-up worktree operations back through this runtime.
+      // The sandbox calls its checkout local; desktop follow-up operations must still route through this runtime.
       hostId
     }
   }

@@ -25,7 +25,7 @@ import {
 import { OrcaRuntimeService } from '../../orca-runtime'
 import type { RpcResponse } from '../core'
 import { RpcDispatcher } from '../dispatcher'
-import { closeStructuredAgentSessionChild } from '../../structured-agent-session-close'
+import { closeStructuredAgentSessionChild } from '../../agent-session/structured-agent-session-close'
 import { discardStructuredWorkerSession } from './orchestration-structured-worker-session'
 import { STRUCTURED_AGENT_SESSION_METHODS } from './structured-agent-session'
 import {
@@ -81,7 +81,7 @@ beforeEach(async () => {
   vi.spyOn(runtime, 'getClientSettings').mockImplementation(
     () =>
       // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the RPC gate reads only this one setting.
-      ({ experimentalNativeChat: true }) as ReturnType<OrcaRuntimeService['getClientSettings']>
+      ({ nativeChatProviders: {} }) as ReturnType<OrcaRuntimeService['getClientSettings']>
   )
   dispatcher = new RpcDispatcher({ runtime, methods: STRUCTURED_AGENT_SESSION_METHODS })
 })

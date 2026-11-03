@@ -1,3 +1,6 @@
+import { useMobileTranslation } from '../src/i18n/use-mobile-translation'
+import { useFollowDeviceUiLocale } from '../src/i18n/use-follow-device-ui-locale'
+import { startMobileUiLanguage } from '../src/i18n/ui-language-preference'
 import { readNativeNotificationData } from '../src/notifications/native-notification-data'
 import { handleForegroundNotificationPresentation } from '../src/notifications/native-push-notification-presentation'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
@@ -44,7 +47,10 @@ Notifications.setNotificationHandler({
   handleNotification: handleForegroundNotificationPresentation
 })
 
+void startMobileUiLanguage()
+
 export default function RootLayout() {
+  useFollowDeviceUiLocale()
   return (
     <MobileThemeProvider>
       <MobileAuthSessionProvider>
@@ -55,6 +61,8 @@ export default function RootLayout() {
 }
 
 function ThemedRootLayout() {
+  const t = useMobileTranslation()
+
   const router = useRouter()
   const { hydrated, signIn } = useMobileAuthSession()
   const handledProviderCallbackUrlsRef = useRef<Set<string>>(new Set())
@@ -98,7 +106,10 @@ function ThemedRootLayout() {
           }
           if (!disposed) {
             router.replace('/login')
-            Alert.alert('登录失败', mobileProviderLoginErrorMessage(failure))
+            Alert.alert(
+              t('auto.mobile.app.layout.0bb85bb190', 'Sign-in failed'),
+              mobileProviderLoginErrorMessage(failure)
+            )
           }
         })
     }

@@ -10,7 +10,7 @@ describe('ACP agents in the runtime registrations', () => {
   it('registers Grok beside Claude and Codex with its declared capabilities', () => {
     expect(
       STRUCTURED_AGENT_RUNTIME_REGISTRATIONS.map(({ definition }) => definition.agent)
-    ).toEqual(['pi', 'codex', 'claude', 'grok', 'opencode', 'omp'])
+    ).toEqual(['pi', 'codex', 'claude', 'grok', 'opencode', 'opencode2', 'omp', 'antigravity'])
     expect(structuredAgentRuntimeRegistration('grok')?.definition).toMatchObject({
       handleTransport: 'acp',
       accountHomeVariable: 'GROK_HOME',
@@ -19,7 +19,7 @@ describe('ACP agents in the runtime registrations', () => {
         compact: true,
         threadGoal: false,
         contextUsage: true,
-        imagePrompts: false,
+        imagePrompts: true,
         steering: 'queue',
         approvalEnforcement: 'orca'
       }
@@ -37,8 +37,12 @@ describe('ACP agents in the runtime registrations', () => {
     expect(definition?.accountHomeVariable).toBeUndefined()
   })
 
-  it('leaves the `opencode2` agent on its terminal-backed chat, and asks `opencode` its version', () => {
-    expect(structuredAgentRuntimeRegistration('opencode2')).toBeNull()
+  it('registers both OpenCode agents on ACP and asks their versions', () => {
+    expect(structuredAgentRuntimeRegistration('opencode2')?.definition).toMatchObject({
+      agent: 'opencode2',
+      handleTransport: 'acp'
+    })
+    expect(structuredAgentRuntimeRegistration('opencode2')?.launchCheck).toBeDefined()
     expect(structuredAgentRuntimeRegistration('opencode')?.launchCheck).toBeDefined()
     // Grok runs whatever is installed: its create asks nothing of the binary.
     expect(structuredAgentRuntimeRegistration('grok')?.launchCheck).toBeUndefined()
@@ -50,14 +54,14 @@ describe('ACP agents in the runtime registrations', () => {
       agent: 'omp',
       handleTransport: 'acp',
       accountHomeVariable: 'PI_CODING_AGENT_DIR',
-      capabilities: { imagePrompts: false, steering: 'queue', approvalEnforcement: 'orca' }
+      capabilities: { imagePrompts: true, steering: 'queue', approvalEnforcement: 'orca' }
     })
     expect(registration?.launchCheck).toBeDefined()
   })
 
   it('opens OMP as a structured chat with Chat UI on', () => {
     const settings = {
-      experimentalNativeChat: true
+      nativeChatProviders: {}
     }
     const placement = { agent: 'omp', workspaceKind: 'git-worktree' } as const
     expect(decideAgentLaunchMode({ placement, settings }).mode).toBe('structured')
@@ -65,7 +69,7 @@ describe('ACP agents in the runtime registrations', () => {
     expect(
       decideAgentLaunchMode({
         placement,
-        settings: { experimentalNativeChat: false }
+        settings: { nativeChatProviders: { omp: false } }
       })
     ).toMatchObject({ mode: 'terminal', reason: 'user_default' })
   })
@@ -79,6 +83,7 @@ describe('ACP agents in the runtime registrations', () => {
       resolveAccountHome(
         { launchEnv, location: null, purpose: 'read', workspacePath: null },
         {
+          stateDirectory: '/runtime-state',
           getClaudeConfigDirectory: unused,
           prepareCodexLaunchHome: unused,
           readCodexLaunchHome: unused,
@@ -108,6 +113,7 @@ describe('ACP agents in the runtime registrations', () => {
       throw new Error('Grok resolves its account home without the runtime')
     }
     const services: StructuredAgentAccountHomeServices = {
+      stateDirectory: '/runtime-state',
       getClaudeConfigDirectory: unused,
       prepareCodexLaunchHome: unused,
       readCodexLaunchHome: unused,

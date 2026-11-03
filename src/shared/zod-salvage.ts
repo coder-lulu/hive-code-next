@@ -5,6 +5,11 @@ const MAX_REPORTED_SALVAGE_PATHS = 100
 
 type DropCollector = { paths: string[]; count: number }
 
+// Parsing crosses package boundaries; schema implementation details do not.
+type SynchronousParser<T> = {
+  safeParse(raw: unknown): { success: true; data: T } | { success: false }
+}
+
 let dropCollector: DropCollector | null = null
 const dropPath: (string | number)[] = []
 
@@ -38,13 +43,13 @@ function reportDrop(segment: string | number): void {
   }
 }
 
-function parseEntry<T extends z.ZodType>(
-  schema: T,
+function parseEntry<T>(
+  schema: SynchronousParser<T>,
   raw: unknown
-): { success: true; data: z.output<T> } | { success: false } {
+): { success: true; data: T } | { success: false } {
   try {
     const parsed = schema.safeParse(raw)
-    return parsed.success ? { success: true, data: parsed.data as z.output<T> } : { success: false }
+    return parsed.success ? { success: true, data: parsed.data } : { success: false }
   } catch {
     return { success: false }
   }
@@ -52,11 +57,11 @@ function parseEntry<T extends z.ZodType>(
 
 /** parseEntry with `segment` on the diagnostic path. Takes the schema and value rather than a
  *  thunk: this runs once per persisted record, and a closure per entry is the dominant load cost. */
-function parseEntryAt<T extends z.ZodType>(
+function parseEntryAt<T>(
   segment: string | number,
-  schema: T,
+  schema: SynchronousParser<T>,
   raw: unknown
-): { success: true; data: z.output<T> } | { success: false } {
+): { success: true; data: T } | { success: false } {
   dropPath.push(segment)
   try {
     return parseEntry(schema, raw)
@@ -169,7 +174,11 @@ export function salvagingRecord<K extends z.ZodType<string>, V extends z.ZodType
   }) as z.ZodType<Record<string, z.output<V>>, unknown>
 }
 
-function salvaged(name: string, schema: z.ZodType, fallback: () => unknown): z.ZodType {
+function salvaged(
+  name: string,
+  schema: SynchronousParser<unknown>,
+  fallback: () => unknown
+): z.ZodType {
   return z.unknown().transform((raw, ctx) => {
     if (raw === undefined) {
       ctx.addIssue({ code: 'custom', message: 'required', input: raw })
@@ -194,12 +203,9 @@ export function salvagedField<T extends z.ZodType>(
 }
 
 /** Drop an invalid optional field without reporting legitimate absence. */
-export function salvagedOptional<T extends z.ZodType>(
+export function salvagedOptional<T>(
   name: string,
-  schema: T
-): z.ZodType<z.output<T> | undefined, unknown> {
-  return salvaged(name, schema, () => undefined).optional() as z.ZodType<
-    z.output<T> | undefined,
-    unknown
-  >
+  schema: SynchronousParser<T>
+): z.ZodType<T | undefined, unknown> {
+  return salvaged(name, schema, () => undefined).optional() as z.ZodType<T | undefined, unknown>
 }

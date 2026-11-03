@@ -1,6 +1,8 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
 import { createHash } from 'node:crypto'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { runProcessSync } from '@orca/process-host'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   javascriptInventory,
@@ -9,19 +11,14 @@ import {
   releaseJavascriptConfiguration,
   restoreReleaseJavascript
 } from './release-javascript-artifact.mjs'
-import { releaseJavascriptSupport } from './release-javascript-support.mjs'
-import { runProcessSync } from '@orca/process-host'
-import { describeProcessFailure } from './process-failure-message.mjs'
-import { getTarProgram } from './zip-extractor-command.mjs'
 
 const directories = []
 const configuration = {
   sourceSha: 'a'.repeat(40),
   version: '1.2.3-rc.4',
-  packageManager: 'pnpm@12.8.1',
+  packageManager: 'pnpm@12.14.0',
   identity: 'rc',
   diagnosticsTokenUrl: 'https://example.test/diagnostics',
-  telemetryEndpoint: 'https://example.test/telemetry',
   telemetryKeySha256: 'b'.repeat(64)
 }
 
@@ -32,9 +29,7 @@ afterEach(() => {
 })
 
 function fixture() {
-  const fixtureDirectory = join(process.cwd(), 'logs', 'release-javascript-tests')
-  mkdirSync(fixtureDirectory, { recursive: true })
-  const root = mkdtempSync(join(fixtureDirectory, 'artifact-'))
+  const root = mkdtempSync(join(tmpdir(), 'orca-release-javascript-test-'))
   directories.push(root)
   for (const file of [
     'cli/index.js',
@@ -42,6 +37,7 @@ function fixture() {
     'preload/index.js',
     'renderer/index.html',
     'renderer/.vite/manifest.json',
+    'renderer/.orca-web-client-files.json',
     'web/web-index.html',
     'mobile-web/manifest.json',
     'package.json',
@@ -52,19 +48,142 @@ function fixture() {
     mkdirSync(dirname(destination), { recursive: true })
     writeFileSync(destination, file === 'cli/index.js' ? '#!/usr/bin/env node\n' : file)
   }
-  writeFileSync(
-    join(root, 'package.json'),
-    JSON.stringify({
-      version: configuration.version,
-      packageManager: configuration.packageManager,
-      scripts: { 'build:release:javascript': 'compile', 'build:release:host': 'host' }
-    })
-  )
   const artifactDir = join(root, '.build', 'artifact')
   return { root, artifactDir, configuration }
 }
 
+function configurationFixture(version = '1.2.3') {
+  const root = mkdtempSync(join(tmpdir(), 'orca-javascript-configuration-test-'))
+  directories.push(root)
+  const hooks = join(root, 'empty-hooks')
+  mkdirSync(hooks)
+  writeFileSync(
+    join(root, 'package.json'),
+    JSON.stringify({ version, packageManager: 'pnpm@12.14.0' })
+  )
+  for (const args of [
+    ['init', '--quiet'],
+    [
+      '-c',
+      'user.name=Build test',
+      '-c',
+      'user.email=build@example.test',
+      '-c',
+      'commit.gpgsign=false',
+      '-c',
+      `core.hooksPath=${hooks}`,
+      'commit',
+      '--allow-empty',
+      '--quiet',
+      '-m',
+      'Build fixture'
+    ]
+  ]) {
+    const result = runProcessSync({ program: 'git', args, cwd: root, timeoutMs: 10_000 })
+    expect(result.code, result.stderr).toBe(0)
+  }
+  const env = {
+    ORCA_BUILD_IDENTITY: 'stable',
+    ORCA_DIAGNOSTICS_TOKEN_URL: 'https://example.test/diagnostics',
+    ORCA_POSTHOG_WRITE_KEY: 'release-key'
+  }
+  return { root, env }
+}
+
+describe('release JavaScript configuration', () => {
+  it.each([
+    ['1.2.3', 'stable'],
+    ['1.2.3-rc.4.perf', 'rc']
+  ])('preserves official build checks for %s', (version, identity) => {
+    const { root, env } = configurationFixture(version)
+    const result = releaseJavascriptConfiguration(root, { ...env, ORCA_BUILD_IDENTITY: identity })
+    expect(result.identity).toBe(identity)
+    expect(result.telemetryKeySha256).toBe(
+      createHash('sha256').update(env.ORCA_POSTHOG_WRITE_KEY).digest('hex')
+    )
+    expect(result.sourceSha).toMatch(/^[a-f0-9]{40}$/)
+  })
+
+  it('requires explicit development mode and unset official constants', () => {
+    const { root, env } = configurationFixture('0.0.0-adhoc.test')
+    const devEnv = {
+      ...env,
+      ORCA_RELEASE_JAVASCRIPT_BUILD_IDENTITY: 'dev',
+      ORCA_BUILD_IDENTITY: '',
+      ORCA_POSTHOG_WRITE_KEY: ''
+    }
+    expect(releaseJavascriptConfiguration(root, devEnv)).toMatchObject({
+      identity: 'dev',
+      version: '0.0.0-adhoc.test',
+      telemetryKeySha256: null,
+      diagnosticsTokenUrl: env.ORCA_DIAGNOSTICS_TOKEN_URL
+    })
+    expect(() =>
+      releaseJavascriptConfiguration(root, { ...devEnv, ORCA_BUILD_IDENTITY: 'stable' })
+    ).toThrow('must not set an official build identity')
+    expect(() =>
+      releaseJavascriptConfiguration(root, { ...devEnv, ORCA_POSTHOG_WRITE_KEY: 'release-key' })
+    ).toThrow('must not set a release telemetry key')
+    expect(() =>
+      releaseJavascriptConfiguration(root, {
+        ...devEnv,
+        ORCA_RELEASE_JAVASCRIPT_BUILD_IDENTITY: ''
+      })
+    ).toThrow('Invalid desktop release tag')
+  })
+
+  it('does not downgrade an official build when its identity or telemetry key is missing', () => {
+    const { root, env } = configurationFixture()
+    expect(() => releaseJavascriptConfiguration(root, { ...env, ORCA_BUILD_IDENTITY: '' })).toThrow(
+      'Release build identity differs from version'
+    )
+    expect(() =>
+      releaseJavascriptConfiguration(root, { ...env, ORCA_POSTHOG_WRITE_KEY: '' })
+    ).toThrow('Missing release telemetry key')
+    expect(() =>
+      releaseJavascriptConfiguration(root, { ...env, ORCA_RELEASE_JAVASCRIPT_BUILD_IDENTITY: 'rc' })
+    ).toThrow('Invalid JavaScript build identity')
+    expect(() =>
+      releaseJavascriptConfiguration(root, {
+        ...env,
+        ORCA_RELEASE_JAVASCRIPT_BUILD_IDENTITY: 'typo'
+      })
+    ).toThrow('Invalid JavaScript build identity')
+  })
+
+  it('checks the source checkout and diagnostics endpoint in development mode', () => {
+    const { root, env } = configurationFixture()
+    const devEnv = {
+      ...env,
+      ORCA_RELEASE_JAVASCRIPT_BUILD_IDENTITY: 'dev',
+      ORCA_BUILD_IDENTITY: '',
+      ORCA_POSTHOG_WRITE_KEY: ''
+    }
+    expect(() =>
+      releaseJavascriptConfiguration(root, {
+        ...devEnv,
+        ORCA_RELEASE_JAVASCRIPT_SOURCE_SHA: 'b'.repeat(40)
+      })
+    ).toThrow('Release checkout differs from bundle source')
+    expect(() =>
+      releaseJavascriptConfiguration(root, { ...devEnv, ORCA_DIAGNOSTICS_TOKEN_URL: '' })
+    ).toThrow('Missing release diagnostics URL')
+  })
+})
+
 describe('release JavaScript transfer', () => {
+  it('restores development bundles and rejects them for an official build', () => {
+    const options = fixture()
+    const devConfiguration = { ...configuration, identity: 'dev', telemetryKeySha256: null }
+    packReleaseJavascript({ ...options, configuration: devConfiguration })
+    expect(() => restoreReleaseJavascript(options)).toThrow(
+      'JavaScript build configuration differs'
+    )
+    expect(
+      restoreReleaseJavascript({ ...options, configuration: devConfiguration }).configuration
+    ).toEqual(devConfiguration)
+  })
+
   it('preserves hidden manifests, source maps and portable WASM while replacing stale outputs', () => {
     const options = fixture()
     const before = javascriptInventory(join(options.root, 'out'))
@@ -80,20 +199,20 @@ describe('release JavaScript transfer', () => {
     'packageManager',
     'identity',
     'diagnosticsTokenUrl',
-    'telemetryEndpoint',
     'telemetryKeySha256'
   ])('rejects a different %s before replacing the current build', (field) => {
     const options = fixture()
     packReleaseJavascript(options)
+    writeFileSync(join(options.root, 'out', 'main', 'index.js'), 'current build')
+    writeFileSync(join(options.root, 'out', 'current-only.js'), 'current only')
+    const current = javascriptInventory(join(options.root, 'out'))
     expect(() =>
       restoreReleaseJavascript({
         ...options,
         configuration: { ...configuration, [field]: 'different' }
       })
     ).toThrow('JavaScript build configuration differs')
-    expect(readFileSync(join(options.root, 'out', 'main', 'index.js'), 'utf8')).toBe(
-      'main/index.js'
-    )
+    expect(javascriptInventory(join(options.root, 'out'))).toEqual(current)
   })
 
   it('rejects a damaged archive before replacing the current build', () => {
@@ -109,9 +228,13 @@ describe('release JavaScript transfer', () => {
   it('rejects a file inventory that no longer describes the archive', () => {
     const options = fixture()
     const manifest = packReleaseJavascript(options)
+    writeFileSync(join(options.root, 'out', 'main', 'index.js'), 'current build')
+    writeFileSync(join(options.root, 'out', 'current-only.js'), 'current only')
+    const current = javascriptInventory(join(options.root, 'out'))
     manifest.files[0].sha256 = 'c'.repeat(64)
     writeFileSync(join(options.artifactDir, 'manifest.json'), JSON.stringify(manifest))
     expect(() => restoreReleaseJavascript(options)).toThrow('JavaScript file inventory differs')
+    expect(javascriptInventory(join(options.root, 'out'))).toEqual(current)
   })
 
   it.each([
@@ -133,10 +256,9 @@ describe('release JavaScript transfer', () => {
     'rejects symlinks instead of following files outside the build',
     () => {
       const options = fixture()
-      symlinkSync(
-        join(options.root, 'out', 'main', 'index.js'),
-        join(options.root, 'out', 'linked.js')
-      )
+      const outside = join(options.root, 'outside.js')
+      writeFileSync(outside, 'outside the build')
+      symlinkSync(outside, join(options.root, 'out', 'linked.js'))
       expect(() => packReleaseJavascript(options)).toThrow('contains a symlink')
     }
   )
@@ -152,195 +274,6 @@ describe('release JavaScript transfer', () => {
   it('classifies stable and suffixed RC versions and rejects other tag families', () => {
     expect(releaseBuildIdentity('v1.2.3')).toBe('stable')
     expect(releaseBuildIdentity('v1.2.3-rc.4.perf')).toBe('rc')
-    expect(releaseBuildIdentity('v1.5.0-beta.24')).toBe('rc')
-    expect(() => releaseBuildIdentity('v1.5.0-beta.24.perf')).toThrow('Invalid desktop release tag')
     expect(() => releaseBuildIdentity('mobile-v1.2.3')).toThrow('Invalid desktop release tag')
   })
-})
-
-function configurationFixture(endpoints = { diagnostics: null, telemetry: null }) {
-  const { root } = fixture()
-  const manifestDirectory = join(root, 'config', 'product')
-  mkdirSync(manifestDirectory, { recursive: true })
-  writeFileSync(join(manifestDirectory, 'hivecode.product.json'), JSON.stringify({ endpoints }))
-  writeFileSync(
-    join(root, 'package.json'),
-    JSON.stringify({
-      version: '1.5.0-beta.24',
-      packageManager: 'pnpm@12.8.1',
-      scripts: { 'build:release:javascript': 'compile', 'build:release:host': 'host' }
-    })
-  )
-  for (const args of [
-    ['init', '--quiet'],
-    [
-      '-c',
-      'user.name=fixture',
-      '-c',
-      'user.email=fixture@example.test',
-      '-c',
-      'commit.gpgsign=false',
-      'commit',
-      '--quiet',
-      '--allow-empty',
-      '-m',
-      'fixture'
-    ]
-  ]) {
-    const result = runProcessSync({ program: 'git', args, cwd: root, timeoutMs: 30_000 })
-    expect(result.code, describeProcessFailure(result)).toBe(0)
-  }
-  return root
-}
-
-describe('HiveCode JavaScript release service configuration', () => {
-  it('roundtrips a beta release with both external services disabled and no foreign secrets', () => {
-    const root = configurationFixture()
-    const config = releaseJavascriptConfiguration(root, { ORCA_BUILD_IDENTITY: 'rc' })
-    expect(config).toMatchObject({
-      version: '1.5.0-beta.24',
-      identity: 'rc',
-      diagnosticsTokenUrl: null,
-      telemetryEndpoint: null,
-      telemetryKeySha256: null
-    })
-    const artifactDir = join(root, '.build', 'nullable-artifact')
-    packReleaseJavascript({ root, artifactDir, configuration: config })
-    restoreReleaseJavascript({ root, artifactDir, configuration: config })
-  })
-
-  it('refuses a foreign diagnostics endpoint when product diagnostics are unavailable', () => {
-    const root = configurationFixture()
-    expect(() =>
-      releaseJavascriptConfiguration(root, {
-        ORCA_BUILD_IDENTITY: 'rc',
-        ORCA_DIAGNOSTICS_TOKEN_URL: 'https://www.onorca.dev/diagnostics/token'
-      })
-    ).toThrow('Release diagnostics URL differs from product configuration')
-  })
-
-  it('refuses a telemetry key when the product has no telemetry endpoint', () => {
-    const root = configurationFixture()
-    expect(() =>
-      releaseJavascriptConfiguration(root, {
-        ORCA_BUILD_IDENTITY: 'rc',
-        ORCA_POSTHOG_WRITE_KEY: 'phc_foreign'
-      })
-    ).toThrow('Product telemetry is disabled')
-  })
-
-  it('requires credentials for a configured product telemetry service', () => {
-    const root = configurationFixture({
-      diagnostics: null,
-      telemetry: 'https://telemetry.example.test'
-    })
-    expect(() => releaseJavascriptConfiguration(root, { ORCA_BUILD_IDENTITY: 'rc' })).toThrow(
-      'Missing configured product telemetry key'
-    )
-  })
-
-  it('binds enabled service configuration into the exact artifact transfer identity', () => {
-    const endpoints = {
-      diagnostics: 'https://diagnostics.example.test/token',
-      telemetry: 'https://telemetry.example.test'
-    }
-    const root = configurationFixture(endpoints)
-    const config = releaseJavascriptConfiguration(root, {
-      ORCA_BUILD_IDENTITY: 'rc',
-      ORCA_DIAGNOSTICS_TOKEN_URL: endpoints.diagnostics,
-      ORCA_POSTHOG_WRITE_KEY: 'phc_owned'
-    })
-    expect(config.diagnosticsTokenUrl).toBe(endpoints.diagnostics)
-    expect(config.telemetryEndpoint).toBe(endpoints.telemetry)
-    expect(config.telemetryKeySha256).toMatch(/^[a-f0-9]{64}$/)
-    const artifactDir = join(root, '.build', 'owned-artifact')
-    packReleaseJavascript({ root, artifactDir, configuration: config })
-    expect(() =>
-      restoreReleaseJavascript({
-        root,
-        artifactDir,
-        configuration: { ...config, telemetryEndpoint: 'https://foreign.example.test' }
-      })
-    ).toThrow('JavaScript build configuration differs')
-  })
-})
-
-const retiredOutputVariants = [
-  'native-pi',
-  'managed-pi',
-  'paperclip-service',
-  'paperclip-adapter',
-  'paperclip-runtime'
-].flatMap((name) => [
-  name,
-  name.toUpperCase(),
-  name.replace(/(^|-)[a-z]/g, (letter) => letter.toUpperCase())
-])
-
-it.each(retiredOutputVariants)('excludes retired %s outputs from portable transfer', (runtime) => {
-  const options = fixture()
-  const files = runtime.toLowerCase().startsWith('paperclip-')
-    ? ['index.cjs', 'package.json', 'LICENSE', 'dist/server.d.ts', 'nested/extensionless']
-    : [
-        'linux-x64/node',
-        'win32-x64/node.exe',
-        'darwin-arm64/node_modules/addon.node',
-        'linux-x64/agent.cjs',
-        'linux-x64/pack-index.json'
-      ]
-  for (const file of files) {
-    const destination = join(options.root, 'out', runtime, file)
-    mkdirSync(dirname(destination), { recursive: true })
-    writeFileSync(destination, 'host-specific runtime')
-  }
-  const manifest = packReleaseJavascript(options)
-  expect(manifest.files.some((file) => file.path.startsWith(`${runtime}/`))).toBe(false)
-  const listing = runProcessSync({
-    program: getTarProgram(),
-    args: ['-tzf', join(options.artifactDir, 'release-javascript.tar.gz')],
-    cwd: options.root
-  })
-  expect(listing.code, describeProcessFailure(listing)).toBe(0)
-  expect(listing.stdout.toLowerCase()).not.toContain(`out/${runtime.toLowerCase()}/`)
-  restoreReleaseJavascript(options)
-  expect(javascriptInventory(join(options.root, 'out'))).toEqual(manifest.files)
-})
-
-it.each(retiredOutputVariants)('refuses a retired %s slot in a portable inventory', (runtime) => {
-  const options = fixture()
-  const directory = join(options.root, 'out', runtime, 'linux-x64')
-  mkdirSync(directory, { recursive: true })
-  writeFileSync(join(directory, 'node'), 'extensionless foreign executable')
-  expect(() => javascriptInventory(join(options.root, 'out'))).toThrow('host output')
-})
-
-it.each(retiredOutputVariants)(
-  'rejects an archive carrying retired %s before replacing output',
-  (runtime) => {
-    const options = fixture()
-    const manifest = packReleaseJavascript(options)
-    const directory = join(options.root, 'out', runtime, 'linux-x64')
-    mkdirSync(directory, { recursive: true })
-    writeFileSync(join(directory, 'agent.cjs'), 'retired runtime')
-    writeFileSync(join(directory, 'extensionless'), 'retired runtime')
-    const archive = join(options.artifactDir, 'release-javascript.tar.gz')
-    const result = runProcessSync({
-      program: getTarProgram(),
-      args: ['-czf', archive, '-C', options.root, 'out'],
-      cwd: options.root
-    })
-    expect(result.code, describeProcessFailure(result)).toBe(0)
-    manifest.archiveSha256 = createHash('sha256').update(readFileSync(archive)).digest('hex')
-    writeFileSync(join(options.artifactDir, 'manifest.json'), JSON.stringify(manifest))
-    expect(() => restoreReleaseJavascript(options)).toThrow(/retired runtime/)
-    expect(readFileSync(join(options.root, 'out', 'main', 'index.js'), 'utf8')).toBe(
-      'main/index.js'
-    )
-  }
-)
-
-it('allows portable release JavaScript builds', () => {
-  const options = fixture()
-  expect(releaseJavascriptSupport(options.root)).toEqual({ supported: true, reason: '' })
-  packReleaseJavascript(options)
 })

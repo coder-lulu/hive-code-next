@@ -1,7 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import ts from 'typescript-api'
-import * as zod from 'zod'
 import { nativeMountingSubstitutes } from './native-mounting-substitutes'
 import { observeSalvagedReads } from './salvage-observation'
 import * as deliveryAmbiguity from '../../transport/rpc-delivery-ambiguity'
@@ -19,9 +18,7 @@ export type OperationMutation = {
 /** Source appended to a mounted module after transpile, keyed by the file suffix it applies to. */
 export type OperationExposure = readonly [suffix: string, source: string]
 
-// Why shared rather than evaluated: the delivery-unknown mark is a WeakSet keyed on the rejection
-// object, so a second copy of the module has a second, empty registry and every marked rejection
-// reads as a definite failure inside the mounted operation. Same reason React is shared.
+// Share delivery ambiguity’s WeakSet registry; evaluating another copy would turn marked unknown deliveries into definite failures.
 const SHARED_MODULE = 'mobile/src/transport/rpc-delivery-ambiguity.ts'
 
 // Only mounting boundaries are substituted; every operation and projection is loaded from source.
@@ -45,21 +42,6 @@ export function operationModuleLoader(
     }
     return file
   }
-  function moduleReference(file: string): object {
-    return new Proxy(
-      {},
-      {
-        get: (_target, key) => load(file)[String(key)],
-        // CommonJS star exports enumerate a module before binding its members. Keeping only `get`
-        // silently drops every capability moved from a monolith into a re-exported leaf.
-        ownKeys: () => Reflect.ownKeys(load(file)),
-        getOwnPropertyDescriptor: (_target, key) => {
-          const descriptor = Object.getOwnPropertyDescriptor(load(file), key)
-          return descriptor ? { ...descriptor, configurable: true } : undefined
-        }
-      }
-    )
-  }
   function imported(base: string, name: string): unknown {
     // Most registered adapters are never mounted in this recording.
     natives ??= new Map([...nativeMountingSubstitutes(), ...declared])
@@ -67,21 +49,11 @@ export function operationModuleLoader(
     if (native !== undefined) {
       return native
     }
-    if (name === 'zod') {
-      return zod
-    }
-    if (name.startsWith('@/')) {
-      const target = pathFor(resolve(root, 'mobile/src', name.slice(2)))
-      return moduleReference(target)
-    }
     if (!name.startsWith('.')) {
       return new Proxy(
         {},
         {
-          // Answering `__esModule` binds this trap as the module itself in every import form; the
-          // rule is in the `__esModule` paragraph of `native-module-traps.ts`. The refusal then
-          // lands on the first member the emit reads, which for a default import is `.default`
-          // rather than whichever member the product went on to touch.
+          // Preserve the import proxy through interop; refuse the first member actually read, including .default.
           get: (_target, key) => {
             if (key === '__esModule') {
               return true
@@ -91,11 +63,29 @@ export function operationModuleLoader(
         }
       )
     }
+    if (name.endsWith('.json')) {
+      // Catalogs and other data modules carry no behavior; hand over their parsed value.
+      return {
+        __esModule: true,
+        default: JSON.parse(readFileSync(resolve(dirname(base), name), 'utf8'))
+      }
+    }
     const file = pathFor(resolve(dirname(base), name))
     if (file === sharedModulePath) {
       return deliveryAmbiguity
     }
-    return moduleReference(file)
+    return new Proxy(
+      {},
+      {
+        get: (_target, key) => load(file)[String(key)],
+        // CommonJS star reexports enumerate the imported module's own exports.
+        ownKeys: () => Reflect.ownKeys(load(file)),
+        getOwnPropertyDescriptor: (_target, key) => {
+          const descriptor = Reflect.getOwnPropertyDescriptor(load(file), key)
+          return descriptor && { ...descriptor, configurable: true }
+        }
+      }
+    )
   }
   function barrel(file: string, source: string): OperationModule {
     const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
@@ -158,13 +148,14 @@ export function operationModuleLoader(
       return cached
     }
     let source = readFileSync(file, 'utf8')
+    const sourceIdentity = file.replaceAll('\\', '/')
     if (/mobile-tasks-(dependencies|legacy-foundation)\.tsx?$/.test(file)) {
       const result = barrel(file, source)
       cache.set(file, result)
       return result
     }
-    if (mutation && file.endsWith(mutation.file)) {
-      // Counting occurrences, not replace calls: `replace` would silently take only the first.
+    if (mutation && sourceIdentity.endsWith(mutation.file.replaceAll('\\', '/'))) {
+      // Require exactly one anchor occurrence; replace alone would silently ignore duplicates.
       const occurrences = source.split(mutation.before).length - 1
       if (occurrences !== 1) {
         throw new Error(`Mutant anchor matched ${occurrences} sites, expected 1: ${mutation.name}`)
@@ -174,10 +165,11 @@ export function operationModuleLoader(
     }
     const exports: OperationModule = {}
     cache.set(file, exports)
-    const exposure = exposures.find(([suffix]) => file.endsWith(suffix))?.[1] ?? ''
+    const exposure =
+      exposures.find(([suffix]) => sourceIdentity.endsWith(suffix.replaceAll('\\', '/')))?.[1] ?? ''
     const evaluate = compiledOperationModule(file, source, exposure)
     evaluate((name: string) => imported(file, name), exports)
-    observeSalvagedReads(file, exports)
+    observeSalvagedReads(sourceIdentity, exports)
     return exports
   }
   return {

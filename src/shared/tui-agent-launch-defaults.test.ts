@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { buildAgentStartupPlan } from './tui-agent-startup'
 import {
   resolvedTuiAgentArgsBypassPermissions,
   resolveTuiAgentLaunchArgs,
@@ -125,13 +126,47 @@ describe('resolveTuiAgentLaunchArgs', () => {
   it('hands the configured arguments to a terminal launch unchanged', () => {
     expect(
       resolveTuiAgentLaunchArgs('claude', {
-        claude: '--dangerously-skip-permissions --model Opus'
+        agentDefaultArgs: { claude: '--dangerously-skip-permissions --model Opus' }
       })
     ).toBe('--dangerously-skip-permissions --model Opus')
   })
 
-  it('falls back to the agent default when nothing is configured', () => {
-    expect(resolveTuiAgentLaunchArgs('claude', {})).toBe('--dangerously-skip-permissions')
-    expect(resolveTuiAgentLaunchArgs('claude', { claude: '' })).toBe('')
+  it('adds no permission flags when nothing is configured', () => {
+    expect(resolveTuiAgentLaunchArgs('claude', {})).toBe('')
+    expect(resolveTuiAgentLaunchArgs('claude', { agentDefaultArgs: { claude: '' } })).toBe('')
+  })
+})
+
+describe('Codex explicit permission override sanitization', () => {
+  it('removes an assigned auto-approval flag from an override in manual mode', () => {
+    const plan = buildAgentStartupPlan({
+      agent: 'codex',
+      prompt: 'fix it',
+      cmdOverrides: {
+        codex: 'codex --dangerously-bypass-approvals-and-sandbox=true --profile work'
+      },
+      agentPermissionMode: 'manual',
+      platform: 'linux'
+    })
+
+    expect(plan?.launchCommand).toBe(
+      "codex --profile work '--ask-for-approval' 'on-request' '--sandbox' 'workspace-write' '-c' 'disable_paste_burst=true' 'fix it'"
+    )
+  })
+
+  it('replaces alternate Codex bypass options in an override with explicit safe options', () => {
+    const plan = buildAgentStartupPlan({
+      agent: 'codex',
+      prompt: 'fix it',
+      cmdOverrides: {
+        codex: 'codex -a never -s danger-full-access --approve-for-me --profile work'
+      },
+      agentPermissionMode: 'manual',
+      platform: 'linux'
+    })
+
+    expect(plan?.launchCommand).toBe(
+      "codex --profile work '--ask-for-approval' 'on-request' '--sandbox' 'workspace-write' '-c' 'disable_paste_burst=true' 'fix it'"
+    )
   })
 })

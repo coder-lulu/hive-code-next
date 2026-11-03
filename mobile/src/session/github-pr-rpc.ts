@@ -107,7 +107,12 @@ export function fetchHostedReviewForBranch(
 export function fetchPRForBranch(
   client: RpcOperationSender,
   worktreeId: string,
-  args: { branch: string; linkedPRNumber?: number | null }
+  args: {
+    branch: string
+    linkedPRNumber?: number | null
+    fallbackPRNumber?: number | null
+    currentHeadOid?: string | null
+  }
 ): Promise<GitHubPrReadOutcome<PRInfo | null>> {
   return settleGithubPrRead(
     {
@@ -119,7 +124,11 @@ export function fetchPRForBranch(
         client,
         githubPrRequestParams(githubPrForBranchRead.operation.method, worktreeId, {
           branch: args.branch,
-          linkedPRNumber: args.linkedPRNumber ?? null
+          linkedPRNumber: args.linkedPRNumber ?? null,
+          ...(args.fallbackPRNumber !== undefined
+            ? { fallbackPRNumber: args.fallbackPRNumber }
+            : {}),
+          ...(args.currentHeadOid !== undefined ? { currentHeadOid: args.currentHeadOid } : {})
         })
       )
   )

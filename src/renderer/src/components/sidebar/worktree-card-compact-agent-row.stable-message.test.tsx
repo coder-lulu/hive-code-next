@@ -6,6 +6,16 @@ import type { DashboardAgentRow as DashboardAgentRowData } from '@/components/da
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { CompactAgentExpansion } from './worktree-card-compact-agents'
 import { CompactAgentRow } from './worktree-card-compact-agent-row'
+import { ProjectTreeContext } from './project-tree-context'
+import type { ComponentProps } from 'react'
+
+function ProjectTreeAgentRow(props: ComponentProps<typeof CompactAgentRow>) {
+  return (
+    <ProjectTreeContext.Provider value={true}>
+      <CompactAgentRow {...props} />
+    </ProjectTreeContext.Provider>
+  )
+}
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -86,7 +96,7 @@ describe('CompactAgentRow stable assistant message', () => {
     act(() =>
       root!.render(
         <TooltipProvider>
-          <CompactAgentRow projectTree agent={agent} now={2000} onActivate={onActivate} />
+          <ProjectTreeAgentRow agent={agent} now={2000} onActivate={onActivate} />
         </TooltipProvider>
       )
     )
@@ -145,8 +155,7 @@ it.each(['eligible', 'disabled', 'sending'] as const)(
     act(() =>
       root!.render(
         <TooltipProvider>
-          <CompactAgentRow
-            projectTree
+          <ProjectTreeAgentRow
             agent={makeAgent({ stateStartedAt: 1000 })}
             now={2000}
             onActivate={onActivate}
@@ -179,8 +188,7 @@ it.each([false, true])(
               Workspace
             </button>
             <div className="project-tree-sessions">
-              <CompactAgentRow
-                projectTree
+              <ProjectTreeAgentRow
                 agent={agent}
                 now={2000}
                 onActivate={() => {}}
@@ -190,8 +198,7 @@ it.each([false, true])(
               />
               <CompactAgentExpansion expanded>
                 <div className="worktree-agent-lineage-children">
-                  <CompactAgentRow
-                    projectTree
+                  <ProjectTreeAgentRow
                     agent={agent}
                     now={2000}
                     onActivate={() => {}}

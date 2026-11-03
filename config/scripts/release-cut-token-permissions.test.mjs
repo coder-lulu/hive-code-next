@@ -5,6 +5,9 @@ import { parse } from 'yaml'
 
 const RELEASE_WORKFLOW = '.github/workflows/release-cut.yml'
 const EXPECTED_MATRIX = {
+  '.github/workflows/docs.yml#check': { contents: 'read' },
+  '.github/workflows/docs.yml#production': { contents: 'read' },
+  '.github/workflows/docs.yml#release_gate': { contents: 'read' },
   '.github/workflows/e2e.yml#build': { contents: 'read' },
   '.github/workflows/e2e.yml#changed-e2e': { contents: 'read' },
   '.github/workflows/e2e.yml#e2e': { contents: 'read' },
@@ -13,22 +16,51 @@ const EXPECTED_MATRIX = {
   '.github/workflows/e2e.yml#orcad-ssh-docker': { contents: 'read' },
   '.github/workflows/e2e.yml#ssh-browser-network-route': { contents: 'read' },
   '.github/workflows/homebrew-bump.yml#bump-cask': { contents: 'read' },
-  '.github/workflows/node-server-tests.yml#changes': { contents: 'read' },
-  '.github/workflows/node-server-tests.yml#desktop_template': { contents: 'read' },
-  '.github/workflows/node-server-tests.yml#linux_glibc217_compat': { contents: 'read' },
-  '.github/workflows/node-server-tests.yml#linux_glibc_floor': { contents: 'read' },
-  '.github/workflows/node-server-tests.yml#linux_musl': { contents: 'read' },
-  '.github/workflows/node-server-tests.yml#persistence': { contents: 'read' },
-  '.github/workflows/release-mac-build.yml#build-mac': {
+  '.github/workflows/release-mac-build.yml#build-mac': { actions: 'read', contents: 'write' },
+  '.github/workflows/release-mac-build.yml#qualification-template': {
     actions: 'read',
-    contents: 'write',
-    'id-token': 'write'
+    contents: 'read'
   },
+  ...Object.fromEntries(
+    [
+      'changes',
+      'desktop_template',
+      'linux_glibc217_compat',
+      'linux_glibc_floor',
+      'linux_musl',
+      'mobile_web_bundle',
+      'persistence'
+    ].map((job) => [
+      `.github/workflows/release-mac-build.yml#qualification-template -> .github/workflows/qualified-orcad-template.yml#qualify -> .github/workflows/node-server-tests.yml#${job}`,
+      job === 'desktop_template' ? { actions: 'read', contents: 'read' } : { contents: 'read' }
+    ])
+  ),
+  ...Object.fromEntries(
+    [
+      '.github/workflows/release-mac-build.yml#qualification-template',
+      `${RELEASE_WORKFLOW}#orcad-template`
+    ].flatMap((caller) =>
+      ['cache', 'qualify', 'save'].map((job) => [
+        `${caller} -> .github/workflows/qualified-orcad-template.yml#${job}`,
+        job === 'qualify' ? { actions: 'read', contents: 'read' } : { contents: 'read' }
+      ])
+    )
+  ),
   [`${RELEASE_WORKFLOW}#build`]: { actions: 'read', contents: 'write' },
   [`${RELEASE_WORKFLOW}#build-mac`]: { actions: 'write', contents: 'read' },
   [`${RELEASE_WORKFLOW}#verify-mac-build`]: { actions: 'read', contents: 'read' },
   [`${RELEASE_WORKFLOW}#create-release`]: { contents: 'write' },
   [`${RELEASE_WORKFLOW}#cut`]: { contents: 'write' },
+  [`${RELEASE_WORKFLOW}#dependency-security`]: { contents: 'read' },
+  [`${RELEASE_WORKFLOW}#dependency-security -> .github/workflows/dependency-security.yml#javascript`]:
+    { contents: 'read' },
+  [`${RELEASE_WORKFLOW}#dependency-security -> .github/workflows/dependency-security.yml#rust`]: {
+    contents: 'read'
+  },
+  [`${RELEASE_WORKFLOW}#dependency-security -> .github/workflows/dependency-security.yml#notify`]: {
+    contents: 'read'
+  },
+  [`${RELEASE_WORKFLOW}#docs-production-dispatch`]: { actions: 'write' },
   [`${RELEASE_WORKFLOW}#homebrew-bump`]: { contents: 'read' },
   [`${RELEASE_WORKFLOW}#homebrew-bump -> .github/workflows/homebrew-bump.yml#bump-cask`]: {
     contents: 'read'
@@ -38,28 +70,36 @@ const EXPECTED_MATRIX = {
     {
       contents: 'read'
     },
-  [`${RELEASE_WORKFLOW}#orcad-template`]: { contents: 'read' },
-  [`${RELEASE_WORKFLOW}#orcad-template -> .github/workflows/node-server-tests.yml#changes`]: {
-    contents: 'read'
-  },
-  [`${RELEASE_WORKFLOW}#orcad-template -> .github/workflows/node-server-tests.yml#desktop_template`]:
+  [`${RELEASE_WORKFLOW}#orcad-template`]: { actions: 'read', contents: 'read' },
+  [`${RELEASE_WORKFLOW}#orcad-template -> .github/workflows/qualified-orcad-template.yml#qualify -> .github/workflows/node-server-tests.yml#changes`]:
     {
       contents: 'read'
     },
-  [`${RELEASE_WORKFLOW}#orcad-template -> .github/workflows/node-server-tests.yml#linux_glibc217_compat`]:
+  [`${RELEASE_WORKFLOW}#orcad-template -> .github/workflows/qualified-orcad-template.yml#qualify -> .github/workflows/node-server-tests.yml#desktop_template`]:
+    {
+      actions: 'read',
+      contents: 'read'
+    },
+  [`${RELEASE_WORKFLOW}#orcad-template -> .github/workflows/qualified-orcad-template.yml#qualify -> .github/workflows/node-server-tests.yml#linux_glibc217_compat`]:
     {
       contents: 'read'
     },
-  [`${RELEASE_WORKFLOW}#orcad-template -> .github/workflows/node-server-tests.yml#linux_glibc_floor`]:
+  [`${RELEASE_WORKFLOW}#orcad-template -> .github/workflows/qualified-orcad-template.yml#qualify -> .github/workflows/node-server-tests.yml#linux_glibc_floor`]:
     {
       contents: 'read'
     },
-  [`${RELEASE_WORKFLOW}#orcad-template -> .github/workflows/node-server-tests.yml#linux_musl`]: {
-    contents: 'read'
-  },
-  [`${RELEASE_WORKFLOW}#orcad-template -> .github/workflows/node-server-tests.yml#persistence`]: {
-    contents: 'read'
-  },
+  [`${RELEASE_WORKFLOW}#orcad-template -> .github/workflows/qualified-orcad-template.yml#qualify -> .github/workflows/node-server-tests.yml#linux_musl`]:
+    {
+      contents: 'read'
+    },
+  [`${RELEASE_WORKFLOW}#orcad-template -> .github/workflows/qualified-orcad-template.yml#qualify -> .github/workflows/node-server-tests.yml#mobile_web_bundle`]:
+    {
+      contents: 'read'
+    },
+  [`${RELEASE_WORKFLOW}#orcad-template -> .github/workflows/qualified-orcad-template.yml#qualify -> .github/workflows/node-server-tests.yml#persistence`]:
+    {
+      contents: 'read'
+    },
   [`${RELEASE_WORKFLOW}#post-release-e2e`]: { actions: 'write' },
   [`${RELEASE_WORKFLOW}#publish-release`]: { contents: 'write' },
   [`${RELEASE_WORKFLOW}#release-javascript`]: { contents: 'read' },
@@ -100,7 +140,9 @@ function normalizePermissions(permissions) {
   )
 }
 
-function intersectPermissions(granted, requested) {
+const permissionEscalations = []
+
+function intersectPermissions(granted, requested, identity) {
   const rank = { none: 0, read: 1, write: 2 }
   const scopes = new Set([...Object.keys(granted), ...Object.keys(requested)])
   return Object.fromEntries(
@@ -108,6 +150,14 @@ function intersectPermissions(granted, requested) {
       .map((scope) => {
         const grantedLevel = granted[scope] ?? 'none'
         const requestedLevel = requested[scope] ?? 'none'
+        if (rank[requestedLevel] > rank[grantedLevel]) {
+          permissionEscalations.push({
+            identity,
+            scope,
+            granted: grantedLevel,
+            requested: requestedLevel
+          })
+        }
         return [scope, rank[grantedLevel] < rank[requestedLevel] ? grantedLevel : requestedLevel]
       })
       .filter(([, level]) => level !== 'none')
@@ -125,12 +175,12 @@ function resolveWorkflowMatrix(workflow, workflowPath, inheritedPermissions, pre
     if (!requested) {
       throw new Error(`${workflowPath}#${jobName} has no resolvable permissions`)
     }
-    const effective = inheritedPermissions
-      ? intersectPermissions(inheritedPermissions, requested)
-      : requested
     const identity = prefix
       ? `${prefix} -> ${workflowPath}#${jobName}`
       : `${workflowPath}#${jobName}`
+    const effective = inheritedPermissions
+      ? intersectPermissions(inheritedPermissions, requested, identity)
+      : requested
     matrix[identity] = effective
 
     if (job.uses?.startsWith('./.github/workflows/')) {
@@ -208,12 +258,8 @@ describe('release-cut token permissions', () => {
     resolveWorkflowMatrix(workflow, RELEASE_WORKFLOW)
   )
 
-  it('keeps private documentation deployment outside the product release chain', () => {
-    expect(workflow.jobs).not.toHaveProperty('docs-production-dispatch')
-    expect(reachedWorkflowPaths).not.toContain('.github/workflows/docs.yml')
-  })
-
   it('keeps the complete effective job and reusable-workflow matrix least-privileged', () => {
+    expect(permissionEscalations).toEqual([])
     expect(matrix).toEqual(EXPECTED_MATRIX)
   })
 
@@ -222,7 +268,11 @@ describe('release-cut token permissions', () => {
     expect(tagJobs.map(([jobName]) => jobName).sort()).toEqual(RELEASE_TAG_EXECUTION_JOBS)
     for (const [jobName] of tagJobs) {
       if (!PUBLISH_TAG_JOBS.has(jobName)) {
-        expect(matrix[`${RELEASE_WORKFLOW}#${jobName}`]).toEqual({ contents: 'read' })
+        expect(matrix[`${RELEASE_WORKFLOW}#${jobName}`]).toEqual(
+          jobName === 'orcad-template'
+            ? { actions: 'read', contents: 'read' }
+            : { contents: 'read' }
+        )
       }
     }
   })
@@ -236,9 +286,7 @@ describe('release-cut token permissions', () => {
     for (const [jobName] of releaseTagExecutionJobs(workflow)) {
       if (!PUBLISH_TAG_JOBS.has(jobName)) {
         expect(workflow.jobs[jobName].needs).toBe('cut')
-        expect(workflow.jobs[jobName].if).toBe(
-          "github.repository == 'stablyai/orca' && needs.cut.outputs.should_release == 'true'"
-        )
+        expect(workflow.jobs[jobName].if).toBe("needs.cut.outputs.should_release == 'true'")
       }
     }
     for (const jobName of REUSABLE_CALL_JOBS) {
@@ -248,24 +296,10 @@ describe('release-cut token permissions', () => {
 
     const macWorkflow = readWorkflow('.github/workflows/release-mac-build.yml')
     expect(macWorkflow.jobs['build-mac'].if).toBe(
-      "(inputs.batch_id == '' || inputs.source_sha == github.sha) && github.repository == 'coder-lulu/hive-code-next'"
+      "${{ !cancelled() && (!inputs.qualification_only || needs.qualification-template.result == 'success') && github.repository == 'stablyai/orca' }}"
     )
     expect(checkoutRef(macWorkflow.jobs['build-mac'])).toBe(
-      "${{ inputs.source_sha || format('refs/tags/{0}', inputs.tag) }}"
-    )
-    const macSteps = macWorkflow.jobs['build-mac'].steps
-    const signature = macSteps.findIndex(
-      (step) => step.name === 'Verify macOS application signatures and certificates'
-    )
-    const upload = macSteps.findIndex((step) =>
-      step.run?.includes('publish-hivecloud-desktop-release.mjs')
-    )
-    expect(signature).toBeGreaterThan(-1)
-    expect(upload).toBeGreaterThan(signature)
-    expect(macSteps[signature]['continue-on-error']).toBeUndefined()
-    expect(macSteps[upload].if).toBe("inputs.batch_id != ''")
-    expect(macSteps[upload].env.HIVECODE_PUBLISH).toBe(
-      "${{ inputs.batch_id != '' && 'false' || 'true' }}"
+      "${{ inputs.qualification_only && github.sha || format('refs/tags/{0}', inputs.tag) }}"
     )
 
     const e2eWorkflow = readWorkflow('.github/workflows/e2e.yml')

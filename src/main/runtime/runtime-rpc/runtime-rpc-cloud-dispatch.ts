@@ -44,7 +44,6 @@ export class RuntimeRpcCloudDispatch extends RuntimeRpcRequestAdmission {
 
   protected handleCloudSocketReady(socket: AuthenticatedCloudManagedSocket): void {
     this.scheduleCloudSessionExpiry(socket)
-    this.runtime.activateRecentPtyPathCandidateTracking?.()
   }
 
   private scheduleCloudSessionExpiry(socket: AuthenticatedCloudManagedSocket): void {
@@ -75,7 +74,6 @@ export class RuntimeRpcCloudDispatch extends RuntimeRpcRequestAdmission {
     this.abortWebSocketDispatches(socket.ws)
     this.runtime.releaseUntitledPlaceholdersForClient?.(socket.connectionId)
     this.runtime.cleanupSubscriptionsForConnection(socket.connectionId)
-    this.runtime.cancelMobileDictationForConnection(socket.connectionId)
     this.binaryMessageRouter.deleteConnection(socket.connectionId)
   }
 

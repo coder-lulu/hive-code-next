@@ -14,7 +14,7 @@ import {
 } from '../../../../shared/feature-wall-setup-steps'
 import type { FeatureWallSetupProgress } from '../feature-wall/feature-wall-setup-progress'
 import { SetupGuideProgressRing } from '../setup-guide/SetupGuideProgressRing'
-import { useSetupGuideProgressSnapshot } from '../setup-guide/setup-guide-progress-snapshot'
+import { useSetupGuideProgress } from '../setup-guide/use-setup-guide-progress'
 import { translate } from '@/i18n/i18n'
 
 export type SetupGuideEntryVisibilityInput = {
@@ -44,7 +44,8 @@ export function SetupGuideSidebarEntry(): React.JSX.Element | null {
   const persistedUIReady = useAppStore((s) => s.persistedUIReady)
   const setupGuideSidebarDismissed = useAppStore((s) => s.setupGuideSidebarDismissed)
   const setSetupGuideSidebarDismissed = useAppStore((s) => s.setSetupGuideSidebarDismissed)
-  const setupProgress = useSetupGuideProgressSnapshot()
+  // Warm progress before click so lazy modal mounting cannot change the displayed count.
+  const setupProgress = useSetupGuideProgress(true, false, false)
   const setupComplete = isSetupGuideSidebarComplete(setupProgress)
   const setupActive = activeModal === 'setup-guide'
   const showSetupGuideEntry = shouldShowSetupGuideEntry({
@@ -56,8 +57,7 @@ export function SetupGuideSidebarEntry(): React.JSX.Element | null {
   if (showSetupGuideEntry) {
     lastVisibleProgressRef.current = setupProgress
   }
-  // Why: host/workspace switches can briefly refresh setup probes. Once the
-  // checklist is visibly available, keep that stable row through the refresh.
+  // Keep an already-visible checklist row stable through host/workspace probe refreshes.
   const renderedProgress = showSetupGuideEntry
     ? setupProgress
     : !setupProgress.ready && !setupGuideSidebarDismissed

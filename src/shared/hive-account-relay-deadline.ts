@@ -1,4 +1,4 @@
-import { RemoteRuntimeClientError } from './remote-runtime-client-error'
+import { RemoteRuntimeClientError } from './remote-runtime/remote-runtime-client-error'
 import { abortSignalReason } from './abort-signal-reason'
 import { toHiveAccountRelayClientError } from './hive-account-relay-errors'
 

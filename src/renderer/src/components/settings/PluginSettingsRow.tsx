@@ -10,7 +10,7 @@ import {
 import type { PluginHostListEntry, PluginHostLogLine } from '../../../../preload/api-types'
 import { getIntlLocale, translate } from '@/i18n/i18n'
 import { PluginCatalogAvatar } from '../plugin-catalog/PluginCatalogAvatar'
-import { invalidPluginErrorMessage } from './plugin-error-presentation'
+import { invalidPluginErrorMessage } from '../plugins/presentation/plugin-error-presentation'
 import { cn } from '@/lib/utils'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
@@ -106,16 +106,13 @@ function PluginLogs({ pluginKey, state }: { pluginKey: string; state?: PluginLog
                       `${new Date(entry.ts).toLocaleTimeString(getIntlLocale())} ${entry.level.padEnd(5)} ${entry.line}`
                   )
                   .join('\n')
-              : translate(
-                  'auto.components.settings.PluginSettingsRow.noLogs',
-                  'No log lines recorded.'
-                )}
+              : translate('auto.components.settings.PluginSettingsRow.noLogs', 'No logs yet')}
           </pre>
           <div className="flex flex-wrap justify-between gap-2 border-t border-border/50 px-3 py-1.5 text-[11px] text-muted-foreground">
             <span>
               {translate(
                 'auto.components.settings.PluginSettingsRow.logCount',
-                'Last {{value0}} of up to 200 retained lines',
+                'Last {{value0}} lines',
                 { value0: state?.lines?.length ?? 0 }
               )}
             </span>

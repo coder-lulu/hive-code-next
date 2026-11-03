@@ -4,7 +4,7 @@ import type { Store } from '../persistence'
 import {
   clearRuntimeEnvironmentManualDisconnect,
   isRuntimeEnvironmentManuallyDisconnected
-} from './runtime-environment-manual-disconnect'
+} from './runtime-environments/runtime-environment-manual-disconnect'
 
 const mocks = vi.hoisted(() => ({
   handle: vi.fn(),
@@ -38,7 +38,7 @@ vi.mock('../wsl/wsl-orcad-host-environments', () => ({}))
 vi.mock('../wsl/wsl-host-service-instance', () => ({}))
 vi.mock('../wsl/wsl-host-gate', () => ({}))
 
-import { registerRuntimeEnvironmentConnectivityHandlers } from './runtime-environment-connectivity-handlers'
+import { registerRuntimeEnvironmentConnectivityHandlers } from './runtime-environments/runtime-environment-connectivity-handlers'
 
 const userDataPath = 'relay-reconnect-test-profile'
 const claim: NonNullable<PublicKnownRuntimeEnvironment['accountClaim']> = {

@@ -6,12 +6,16 @@ import {
 import { exposeTerminalOutputSchedulerDebugApi as exposeDebugApi } from './pane-terminal-output-scheduler-debug'
 import { flushTerminalOutputImpl } from './pane-terminal-output-flusher'
 import { writeTerminalOutputImpl } from './pane-terminal-output-writer'
+import { writeXtermParseBarrier } from './xterm-parse-barrier'
+import { noteTerminalOutputArrival } from './terminal-output-arrival-observer'
 import {
   requestRegisteredTerminalBacklogRecovery,
   type TerminalOutputTarget,
   type WriteTerminalOutputOptions
 } from './pane-terminal-output-queue-registry'
+// Import for registration: drain installs the runner used by scheduleDrain; this facade is every consumer’s graph entry point.
 import './pane-terminal-output-drain'
+
 export {
   ALWAYS_REFRESH_FOREGROUND_SYNCHRONOUSLY,
   BACKGROUND_BACKLOG_WARNING,
@@ -34,7 +38,6 @@ export {
   registerTerminalBacklogRecovery,
   requestRegisteredTerminalBacklogRecovery,
   scheduleDrain,
-  setUseMessageChannelDrainForTesting,
   type QueueEntry,
   type QueuedWrite,
   type TerminalOutputBeforeWrite,
@@ -42,33 +45,43 @@ export {
   type TerminalOutputTarget,
   type WriteTerminalOutputOptions
 } from './pane-terminal-output-queue-registry'
+
 const PARSE_SETTLE_TIMEOUT_MS = 250
+
 export function writeTerminalOutput(
   terminal: TerminalOutputTarget,
   data: string,
   options: WriteTerminalOutputOptions
 ): void {
+  if (data) {
+    noteTerminalOutputArrival(terminal)
+  }
   writeTerminalOutputImpl(terminal, data, options)
 }
+
 export function flushTerminalOutput(
   terminal: TerminalOutputTarget,
   options?: { maxChars?: number }
 ): void {
   flushTerminalOutputImpl(terminal, options)
 }
+
 export function requestTerminalBacklogRecovery(terminal: TerminalOutputTarget): void {
   exposeDebugApi()
   requestRegisteredTerminalBacklogRecovery(terminal)
 }
+
 export function waitForTerminalOutputParsed(terminal: TerminalOutputTarget): Promise<void> {
   flushTerminalOutput(terminal)
   if (isTerminalWritePipelineCertifiedDead(terminal)) {
+    // Why: a dead pipeline cannot settle; recovery owns it and serializers must not enqueue probe writes during a pending remount retry.
     return Promise.resolve()
   }
+
   return new Promise((resolve) => {
     let settled = false
     let timer: ReturnType<typeof setTimeout> | null = null
-    const finish = () => {
+    const finish = (): void => {
       if (settled) {
         return
       }
@@ -78,17 +91,20 @@ export function waitForTerminalOutputParsed(terminal: TerminalOutputTarget): Pro
       }
       resolve()
     }
-    const finishParsed = () => {
+    const finishParsed = (): void => {
+      // Why: serializer/startup probes share xterm's FIFO with replay guards; their completion is real parser progress despite carrying no bytes.
       recordTerminalParseProgress(terminal)
       finish()
     }
     timer = setTimeout(finish, PARSE_SETTLE_TIMEOUT_MS)
     try {
-      terminal.write('', finishParsed)
+      writeXtermParseBarrier(terminal, finishParsed)
     } catch {
+      // Why: a synchronous rejection means this xterm can't accept even an empty FIFO probe; recovery must replace it before reuse.
       failTerminalWriteStallWatch(terminal)
       finish()
     }
   })
 }
+
 exposeDebugApi()

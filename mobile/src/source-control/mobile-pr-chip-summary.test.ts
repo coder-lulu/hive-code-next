@@ -26,7 +26,17 @@ function check(
 }
 
 function ready(prInfo: PRInfo, checks: PRCheckDetail[]): PrSidebarState {
-  return { kind: 'ready', data: { pr: prInfo, checks, details: null, checksError: null } }
+  return {
+    kind: 'ready',
+    data: {
+      pr: prInfo,
+      pushTarget: null,
+      githubLinkBase: null,
+      checks,
+      details: null,
+      checksError: null
+    }
+  }
 }
 
 describe('buildMobilePrChipSummary', () => {
@@ -51,7 +61,7 @@ describe('buildMobilePrChipSummary', () => {
       return
     }
     expect(summary.number).toBe(7701)
-    expect(summary.stateLabel).toBe('草稿')
+    expect(summary.stateLabel).toBe('Draft')
   })
 
   // Why: a skipped job is a deliberate "not applicable" — desktop and the tasks grid call this 3/3.

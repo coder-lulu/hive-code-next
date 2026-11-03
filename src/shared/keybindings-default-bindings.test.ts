@@ -7,7 +7,6 @@ import {
   formatKeybindingList,
   getEffectiveKeybindingsForAction,
   keybindingFromInput,
-  LEGACY_TAB_SWITCH_BINDINGS,
   keybindingMatchesAction
 } from './keybindings'
 import type { KeybindingActionId } from './keybindings'
@@ -196,25 +195,6 @@ describe('keybindings', () => {
     expect(getEffectiveKeybindingsForAction('tab.previousSameType', 'darwin')).toEqual([
       'Mod+Alt+BracketLeft'
     ])
-  })
-
-  it('pins the pre-swap chords via LEGACY_TAB_SWITCH_BINDINGS for upgrading installs', () => {
-    // These are what the seed migration writes so pre-existing users keep the
-    // shortcuts they learned; overriding an action with its legacy value must
-    // reproduce the old effective binding.
-    expect(LEGACY_TAB_SWITCH_BINDINGS).toEqual({
-      'tab.nextSameType': ['Mod+Shift+BracketRight'],
-      'tab.previousSameType': ['Mod+Shift+BracketLeft'],
-      'tab.nextAllTypes': ['Mod+Alt+BracketRight'],
-      'tab.previousAllTypes': ['Mod+Alt+BracketLeft']
-    })
-    for (const [actionId, bindings] of Object.entries(LEGACY_TAB_SWITCH_BINDINGS)) {
-      expect(
-        getEffectiveKeybindingsForAction(actionId as KeybindingActionId, 'darwin', {
-          [actionId]: bindings
-        })
-      ).toEqual(bindings)
-    }
   })
 
   it('defines browser history shortcuts for Logitech side-button remaps', () => {

@@ -13,15 +13,24 @@ import { adoptFromEndpoint } from '../adopt-from-endpoint'
 import { getRuntimeTargetHostId } from '../../runtime/runtime-client-target'
 import { fetchProjectHostSetupCatalog } from '../projects/project-host-routing'
 import { mergeFetchedReposForHost } from './repo-catalog-identity'
+import {
+  reconcileRepoCatalogWorktrees,
+  type RepoCatalogWorktreeRemoval
+} from './repo-catalog-worktree-removal'
+import { getRepoHostIdentity } from '../slices/repo-host-identity'
+import { withoutPendingRuntimeRepoRemovals } from './pending-runtime-repo-removals'
 
 export type FetchedRepoCatalog = {
   repos: readonly Repo[]
   projectHostSetupCompatibility: ProjectHostSetupProjection
   hostId: ReturnType<typeof getRuntimeTargetHostId>
+  /** This store's repo rows when the request went out; a registration added since is not its to drop. */
+  reposAtRequest: readonly Repo[]
 }
 
 export async function fetchRepoCatalogForTarget(
-  target: RuntimeClientTarget
+  target: RuntimeClientTarget,
+  reposAtRequest: readonly Repo[]
 ): Promise<FetchedRepoCatalog> {
   const fetchedRepos =
     target.kind === 'local'
@@ -36,7 +45,8 @@ export async function fetchRepoCatalogForTarget(
   return {
     repos,
     projectHostSetupCompatibility: await fetchProjectHostSetupCatalog(target),
-    hostId: getRuntimeTargetHostId(target)
+    hostId: getRuntimeTargetHostId(target),
+    reposAtRequest
   }
 }
 
@@ -48,7 +58,19 @@ export function mergeFetchedRepoCatalog(
   projectHostSetupCompatibility: ProjectHostSetupProjection
   hostId: ReturnType<typeof getRuntimeTargetHostId>
 } {
-  const repos = mergeFetchedReposForHost(currentRepos, catalog.repos, catalog.hostId)
+  const requested = new Set(catalog.reposAtRequest.map(getRepoHostIdentity))
+  const returned = new Set(catalog.repos.map(getRepoHostIdentity))
+  const addedSinceRequest = currentRepos.filter(
+    (repo) =>
+      getRepoExecutionHostId(repo) === catalog.hostId &&
+      !requested.has(getRepoHostIdentity(repo)) &&
+      !returned.has(getRepoHostIdentity(repo))
+  )
+  const repos = mergeFetchedReposForHost(
+    currentRepos,
+    withoutPendingRuntimeRepoRemovals([...catalog.repos, ...addedSinceRequest], catalog.hostId),
+    catalog.hostId
+  )
   return {
     repos,
     projectHostSetupCompatibility: catalog.projectHostSetupCompatibility,
@@ -76,8 +98,7 @@ export function filterSetupsForPrunedRepoRows(
       .filter((repo) => !survivingOwners.has(`${getRepoExecutionHostId(repo)}:${repo.id}`))
       .map((repo) => `${getRepoExecutionHostId(repo)}:${repo.id}`)
   )
-  // Why: this result feeds the compat merge as `previous`, so an unconditional copy would discard
-  // the identity that merge is about to try to preserve.
+  // Compat merge receives this as previous; unconditional copying defeats the identity it tries to retain.
   if (prunedOwners.size === 0) {
     return setups
   }
@@ -113,6 +134,24 @@ export function reconcileReadoptedSshWorktreeState(
     detectedWorktreesByRepo,
     sortEpoch: worktreesByRepo === state.worktreesByRepo ? state.sortEpoch : state.sortEpoch + 1
   }
+}
+
+/** The worktree rows a fetched catalog leaves: re-adopted SSH rows moved, dropped repos' rows gone. */
+export function reconcileFetchedCatalogWorktreeState(
+  state: AppState,
+  catalog: Pick<FetchedRepoCatalog, 'reposAtRequest' | 'hostId'>,
+  nextRepos: readonly Repo[],
+  onRemoval: (removal: RepoCatalogWorktreeRemoval) => void
+): Partial<AppState> {
+  const readopted = reconcileReadoptedSshWorktreeState(state, state.pendingSshRepoReadoptions)
+  const removal = reconcileRepoCatalogWorktrees(
+    { ...state, ...readopted },
+    nextRepos,
+    catalog.hostId,
+    catalog.reposAtRequest
+  )
+  onRemoval(removal)
+  return { ...readopted, ...removal.patch }
 }
 
 export function filterTrustedOrcaHooksToValidRepos(

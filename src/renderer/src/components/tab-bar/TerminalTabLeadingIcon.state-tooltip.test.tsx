@@ -10,7 +10,7 @@ vi.mock('@/components/AgentStateDot', () => ({
   }
 }))
 
-import { TerminalTabActivityIndicator, TerminalTabLeadingIcon } from './TerminalTabLeadingIcon'
+import { TerminalTabLeadingIcon } from './TerminalTabLeadingIcon'
 
 describe('TerminalTabLeadingIcon agent-state glyph', () => {
   it('renders the state glyph without a hover tooltip', () => {
@@ -20,9 +20,9 @@ describe('TerminalTabLeadingIcon agent-state glyph', () => {
           agent="claude"
           activityStatus="working"
           shell={undefined}
+          showUnreadActivity={false}
           isActive
         />
-        <TerminalTabActivityIndicator activityStatus="working" showUnreadActivity={false} />
       </>
     )
 

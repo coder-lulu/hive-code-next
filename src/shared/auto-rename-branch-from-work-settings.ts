@@ -1,21 +1,9 @@
 import type { GlobalSettings } from './global-settings-types'
 
-type AutoRenameBranchFromWorkSettings = Pick<
-  GlobalSettings,
-  'autoRenameBranchFromWork' | 'autoRenameBranchFromWorkDefaultedOn'
->
+type AutoRenameBranchFromWorkSettings = Pick<GlobalSettings, 'autoRenameBranchFromWork'>
 
 export function normalizeAutoRenameBranchFromWorkDefaultOn(
-  settings: Partial<AutoRenameBranchFromWorkSettings> | undefined,
-  options: { preserveExplicitValue?: boolean } = {}
+  settings: Partial<AutoRenameBranchFromWorkSettings> | undefined
 ): AutoRenameBranchFromWorkSettings {
-  const defaultedOn =
-    settings?.autoRenameBranchFromWorkDefaultedOn === true || options.preserveExplicitValue === true
-
-  return {
-    // Why: old persisted profiles may contain the former default `false`;
-    // only guarded profiles or live user updates represent an intentional opt-out.
-    autoRenameBranchFromWork: defaultedOn ? (settings?.autoRenameBranchFromWork ?? true) : true,
-    autoRenameBranchFromWorkDefaultedOn: true
-  }
+  return { autoRenameBranchFromWork: settings?.autoRenameBranchFromWork ?? true }
 }

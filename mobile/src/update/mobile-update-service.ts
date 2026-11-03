@@ -1,3 +1,4 @@
+import { translate } from '../i18n/mobile-i18n'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Platform } from 'react-native'
 import { hasApkInstallPermission } from '@hivecode/expo-hivecode-updater'
@@ -58,7 +59,10 @@ export async function checkMobileUpdate(options?: {
     return publish({
       ...INITIAL_SNAPSHOT,
       state: 'not-available',
-      message: '商店更新将在 iOS 阶段接入。'
+      message: translate(
+        'auto.mobile.src.update.mobile.update.service.b38a8aef12',
+        'Store updates will be added during the iOS phase.'
+      )
     })
   }
   if (updateOperations.check) {

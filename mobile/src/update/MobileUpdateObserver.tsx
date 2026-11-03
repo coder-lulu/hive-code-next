@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { Modal, Platform, Pressable, ScrollView, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useMobileTheme } from '../theme/mobile-theme-provider'
@@ -5,6 +6,8 @@ import { useMobileUpdate } from './use-mobile-update'
 import { downloadPercent, updateIsBusy } from './mobile-update-presentation'
 
 export function MobileUpdateObserver() {
+  const t = useMobileTranslation()
+
   const theme = useMobileTheme()
   const insets = useSafeAreaInsets()
   const { snapshot, install, dismiss } = useMobileUpdate(true)
@@ -61,15 +64,29 @@ export function MobileUpdateObserver() {
             accessibilityRole="header"
             style={[theme.typography.pageTitle, { color: theme.color.text.primary }]}
           >
-            {snapshot.mandatory ? '需要更新' : '发现新版本'}
+            {snapshot.mandatory
+              ? t('auto.mobile.src.update.MobileUpdateObserver.1b50fb0344', 'Update required')
+              : t(
+                  'auto.mobile.src.update.MobileUpdateObserver.66d34b5ad9',
+                  'New version available'
+                )}
           </Text>
           <Text style={[theme.typography.body, { color: theme.color.text.secondary }]}>
             {snapshot.mandatory
-              ? '此版本已停止支持，请更新后继续使用 HiveCode。'
-              : '有新版本可用，是否现在更新 HiveCode？'}
+              ? t(
+                  'auto.mobile.src.update.MobileUpdateObserver.476d9f2adb',
+                  'This version is no longer supported. Update HiveCode to continue.'
+                )
+              : t(
+                  'auto.mobile.src.update.MobileUpdateObserver.9e88d386de',
+                  'A new version is available. Update HiveCode now?'
+                )}
           </Text>
           <Text style={[theme.typography.caption, { color: theme.color.text.secondary }]}>
-            版本 {snapshot.version} · 构建 {snapshot.buildNumber}
+            {t('auto.mobile.src.update.MobileUpdateObserver.e77c1f1e0a', 'Version')}
+            {snapshot.version}{' '}
+            {t('auto.mobile.src.update.MobileUpdateObserver.a0f52e2b59', '· build')}
+            {snapshot.buildNumber}
           </Text>
           {snapshot.state === 'available' && snapshot.message ? (
             <Text style={[theme.typography.body, { color: theme.color.text.secondary }]}>
@@ -80,7 +97,10 @@ export function MobileUpdateObserver() {
             <View style={{ gap: theme.spacing.space8 }}>
               <View
                 accessibilityRole="progressbar"
-                accessibilityLabel="更新下载进度"
+                accessibilityLabel={t(
+                  'auto.mobile.src.update.MobileUpdateObserver.1ef9deb1e2',
+                  'Update download progress'
+                )}
                 accessibilityValue={{ min: 0, max: 100, now: percent }}
                 style={{
                   height: theme.spacing.space4,
@@ -99,11 +119,15 @@ export function MobileUpdateObserver() {
               </View>
               <Text style={[theme.typography.caption, { color: theme.color.text.secondary }]}>
                 {percent}% · {(snapshot.downloadedBytes / 1048576).toFixed(1)} /{' '}
-                {(snapshot.totalBytes / 1048576).toFixed(1)} MB
+                {(snapshot.totalBytes / 1048576).toFixed(1)}{' '}
+                {t('auto.mobile.src.update.MobileUpdateObserver.9f9725a451', 'MB')}
               </Text>
               {percent === 100 ? (
                 <Text style={[theme.typography.caption, { color: theme.color.text.secondary }]}>
-                  正在校验安装包…
+                  {t(
+                    'auto.mobile.src.update.MobileUpdateObserver.8778b40aff',
+                    'Verifying installation package…'
+                  )}
                 </Text>
               ) : null}
             </View>
@@ -111,8 +135,14 @@ export function MobileUpdateObserver() {
           {snapshot.state === 'ready-to-install' ? (
             <Text style={[theme.typography.body, { color: theme.color.text.secondary }]}>
               {Platform.OS === 'ios'
-                ? '请在商店中完成更新。'
-                : '安装包已准备好，点击打开系统安装器完成更新，无需重复下载。'}
+                ? t(
+                    'auto.mobile.src.update.MobileUpdateObserver.11edae944e',
+                    'Finish updating in the store.'
+                  )
+                : t(
+                    'auto.mobile.src.update.MobileUpdateObserver.b135e976be',
+                    'The installation package is ready. Open the system installer to finish updating without downloading it again.'
+                  )}
             </Text>
           ) : null}
           {['error', 'awaiting-permission'].includes(snapshot.state) ? (
@@ -154,7 +184,14 @@ export function MobileUpdateObserver() {
           {!snapshot.mandatory ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={snapshot.state === 'downloading' ? '后台下载' : '稍后更新'}
+              accessibilityLabel={
+                snapshot.state === 'downloading'
+                  ? t(
+                      'auto.mobile.src.update.MobileUpdateObserver.2ed60903a6',
+                      'Download in background'
+                    )
+                  : t('auto.mobile.src.update.MobileUpdateObserver.2b1dde6193', 'Update later')
+              }
               onPress={dismiss}
               style={({ pressed }) => ({
                 minHeight: theme.size.minimumTouchTarget,
@@ -165,7 +202,12 @@ export function MobileUpdateObserver() {
               })}
             >
               <Text style={[theme.typography.label, { color: theme.color.text.secondary }]}>
-                {snapshot.state === 'downloading' ? '后台下载' : '稍后'}
+                {snapshot.state === 'downloading'
+                  ? t(
+                      'auto.mobile.src.update.MobileUpdateObserver.2ed60903a6',
+                      'Download in background'
+                    )
+                  : t('auto.mobile.src.update.MobileUpdateObserver.f4e2a195c5', 'Later')}
               </Text>
             </Pressable>
           ) : null}

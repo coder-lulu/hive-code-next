@@ -1,21 +1,18 @@
-// End-to-end exits from latched recovery states: no shape a user cannot get out of.
-
+import { openTestChats } from './structured-agent-session-open-test-chats.test-support'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { spawnProcess } from '@orca/process-host'
 import { ORCA_AGENT_SESSION_SPAWN_TOKEN_ENV } from '../../../shared/agent-session-caller-env'
-import { AgentSessionRecordStore } from '../../runtime/agent-session-record-store'
+import type { AgentSessionRecordStore } from '../../runtime/agent-session-record-store'
 import { openTestAgentSessionRecordStore } from '../../runtime/agent-session-record-store-test-harness'
-import { readProcessStartTimeMs } from '../../runtime/agent-session-process-identity-probe'
+import { readProcessStartTimeMs } from '../../runtime/agent-session/ownership/agent-session-process-identity-probe'
 import { createStructuredAgentSessionOwnerProbe } from '../../runtime/structured-agent-session-owner-probe'
 import type { StructuredAgentSessionAdapter } from './structured-agent-session-adapter'
 import { StructuredAgentSessionHost } from './structured-agent-session-host'
 import { abandonStructuredAgentSessionHost } from './structured-agent-session-host-test-abandon'
 import type { StructuredAgentSessionHostDeps } from './structured-agent-session-host-types'
-import { JournalHostDatabase } from '../agent-session-journal/journal-host-database'
-import { NO_LEGACY_JOURNAL_RECORDS } from '../agent-session-journal/journal-database'
 import {
   HOST_TEST_NOW as NOW,
   HOST_TEST_SESSION as SESSION,
@@ -23,10 +20,7 @@ import {
   hostTestAttachParams,
   resetHostTestOperationIds
 } from './structured-agent-session-host-test-data'
-import {
-  closeTestJournalHostDatabases,
-  openTestJournalHostDatabase
-} from '../agent-session-journal/journal-host-database-test-support'
+import { openTestJournalHostDatabase } from '../agent-session-journal/journal-host-database-test-support'
 import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
 import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
 import { NO_STRUCTURED_AGENTS } from './structured-agent-session-adapter-router-test-support'
@@ -39,9 +33,8 @@ let host: StructuredAgentSessionHost
 let acquire: Mock<StructuredAgentSessionAdapter['acquire']>
 const spawnedOwners = new Set<ReturnType<typeof spawnProcess>>()
 const supersededHosts = new Set<StructuredAgentSessionHost>()
-const replacementDatabases = new Set<JournalHostDatabase>()
 
-async function spawnOwner(spawnToken: string) {
+async function acquireOwner(spawnToken: string) {
   const child = spawnProcess({
     program: process.execPath,
     args: ['-e', 'setInterval(() => {}, 1_000)'],
@@ -71,7 +64,6 @@ async function stopOwner(child: ReturnType<typeof spawnProcess>): Promise<void> 
   spawnedOwners.delete(child)
 }
 
-/** What a send's delivery or `agentSession.ensure` does: attach at the record's current fence. */
 async function startAgent(): Promise<void> {
   const fence = store.getRecord(SESSION)?.lease.runtimeFence ?? null
   expect((await host.attach(CALLER, hostTestAttachParams(fence))).ok).toBe(true)
@@ -79,18 +71,20 @@ async function startAgent(): Promise<void> {
 
 function adapter(): StructuredAgentSessionAdapter {
   return {
+    open: async () => ({
+      reportedOptions: { model: '' }
+    }),
     acquire,
-    releaseAcquisition: vi.fn(async () => undefined),
+    releaseAcquisition: vi.fn(async () => false),
     dispatch: vi.fn(),
     cancelTurn: vi.fn(),
     answerPrompt: vi.fn(),
     setOption: vi.fn()
-  } as unknown as StructuredAgentSessionAdapter
+  }
 }
 
 function openHost(overrides: Partial<StructuredAgentSessionHostDeps> = {}): void {
   host = new StructuredAgentSessionHost({
-    platform: 'linux',
     agents: NO_STRUCTURED_AGENTS,
     logger: createStructuredAgentSessionLogger(),
     store,
@@ -105,14 +99,14 @@ function openHost(overrides: Partial<StructuredAgentSessionHostDeps> = {}): void
 
 async function reopenStore(): Promise<void> {
   await abandonStructuredAgentSessionHost(host)
-  closeTestJournalHostDatabases()
-  store = await openTestAgentSessionRecordStore(root)
+  store = await openTestAgentSessionRecordStore(root, { legacySessionTabIds: [SESSION] })
 }
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'orca-recovery-exits-'))
   resetHostTestOperationIds()
   acquire = vi.fn(async ({ fence }) => ({
+    acquisitionGeneration: globalThis.crypto.randomUUID(),
     process: {
       hostId: 'local',
       pid: 4242,
@@ -127,7 +121,7 @@ beforeEach(async () => {
       observedAt: NOW
     }
   }))
-  store = await openTestAgentSessionRecordStore(root)
+  store = await openTestAgentSessionRecordStore(root, { legacySessionTabIds: [SESSION] })
   openHost()
 })
 
@@ -136,11 +130,6 @@ afterEach(async () => {
   await Promise.all([...supersededHosts].map(abandonStructuredAgentSessionHost))
   supersededHosts.clear()
   await Promise.all([...spawnedOwners].map((child) => stopOwner(child)))
-  for (const database of replacementDatabases) {
-    database.close()
-  }
-  replacementDatabases.clear()
-  closeTestJournalHostDatabases()
   await rm(root, { recursive: true, force: true })
 })
 
@@ -150,7 +139,6 @@ describe('recovery exits', () => {
     await expect(host.attach(CALLER, hostTestAttachParams(null))).rejects.toThrow(
       'agent_session_acquisition_exit_unproven'
     )
-    // No owner was recorded, and the adapter closed the stdio of anything it spawned.
     expect(store.getRecord(SESSION)?.lease).toMatchObject({
       claimStatus: 'released',
       handoffStage: null,
@@ -169,13 +157,11 @@ describe('recovery exits', () => {
   })
 
   it('releases an unproven acquisition whose owner later dies, without replaying it as a handoff', async () => {
-    // A real session first, so restart restore has a journal to read and runs the
-    // handoff restorer over the residue instead of skipping the record.
+    // Seed readable history so restore processes the failed acquisition’s residue.
     expect((await host.attach(CALLER, hostTestAttachParams(null))).ok).toBe(true)
     await reopenStore()
 
-    // The resume fails at owner proof and cleanup cannot prove exit: the settlement
-    // keeps the reservation latched at `recovering` with its committed owner identity.
+    // Failed owner proof without cleanup proof leaves the committed reservation recovering.
     vi.spyOn(store, 'proveOwner').mockRejectedValueOnce(new Error('handle proof lost'))
     openHost({
       mintSpawnToken: () => 'spawn-b',
@@ -193,16 +179,13 @@ describe('recovery exits', () => {
       reservedSpawnToken: 'spawn-b'
     })
 
-    // The unproven owner dies before the next launch; reconciliation and handoff restore run.
     await reopenStore()
     openHost({
       mintSpawnToken: () => 'spawn-c',
       probeOwner: async () => ({ outcome: 'pid-absent' })
     })
-    await host.restoreReadableSessions()
+    await openTestChats(host)
 
-    // Death proof releases the residue outright: no handoff continuation, no spawned child,
-    // no stage a user would have to clear by hand.
     expect(acquire).toHaveBeenCalledTimes(2)
     expect(store.getRecord(SESSION)?.lease).toMatchObject({
       claimStatus: 'released',
@@ -213,7 +196,6 @@ describe('recovery exits', () => {
       runtimeFence: 4
     })
 
-    // The ordinary native recovery path remains: the next start resumes it.
     await startAgent()
     expect(acquire).toHaveBeenCalledTimes(3)
     expect(store.getRecord(SESSION)?.lease).toMatchObject({
@@ -249,7 +231,6 @@ describe('recovery exits', () => {
     expect(stopOwnerProcess).toHaveBeenCalledWith(4242, 'SIGTERM')
     const retried = await host.attach(CALLER, hostTestAttachParams(2))
     expect(retried).toMatchObject({ ok: true })
-    // A fresh child was spawned; the orphan pid's lease did not survive as the owner.
     expect(acquire).toHaveBeenCalledTimes(2)
     expect(store.getRecord(SESSION)?.lease).toMatchObject({
       runtimeFence: 3,
@@ -258,7 +239,7 @@ describe('recovery exits', () => {
     })
   })
 
-  it('heals a stranded native owner during startup restore, and spawns nothing until work asks', async () => {
+  it('heals a stranded native owner on explicit recovery, and spawns nothing until work asks', async () => {
     expect((await host.attach(CALLER, hostTestAttachParams(null))).ok).toBe(true)
     await reopenStore()
 
@@ -275,10 +256,9 @@ describe('recovery exits', () => {
       stopOwnerProcess
     })
 
-    await host.restoreReadableSessions()
+    await openTestChats(host)
 
-    // Healing is startup's job; spawning is not. The orphan is stopped and the lease is free, but
-    // nothing has asked this session for work, so no replacement child exists yet.
+    // Explicit recovery heals ownership without spawning; only later work starts a replacement child.
     expect(stopOwnerProcess).toHaveBeenCalledWith(4242, 'SIGTERM')
     expect(acquire).toHaveBeenCalledTimes(1)
     expect(store.getRecord(SESSION)?.lease).toMatchObject({
@@ -299,8 +279,9 @@ describe('recovery exits', () => {
   })
 
   it('recovers when the outgoing runtime writes after the replacement probes its dying owner', async () => {
-    const outgoing = await spawnOwner('spawn-a')
+    const outgoing = await acquireOwner('spawn-a')
     acquire.mockResolvedValueOnce({
+      acquisitionGeneration: globalThis.crypto.randomUUID(),
       process: outgoing.process,
       link: {
         linkId: 'link-outgoing',
@@ -315,13 +296,10 @@ describe('recovery exits', () => {
     const outgoingHost = host
     const outgoingStore = store
     supersededHosts.add(outgoingHost)
-    const replacementDatabase = JournalHostDatabase.openWith(root, NO_LEGACY_JOURNAL_RECORDS)
-    replacementDatabases.add(replacementDatabase)
-    store = AgentSessionRecordStore.open({ journalDatabase: replacementDatabase, hostId: 'local' })
+    store = await openTestAgentSessionRecordStore(root, { legacySessionTabIds: [SESSION] })
     const realProbe = createStructuredAgentSessionOwnerProbe('local')
     let overlapDriven = false
     openHost({
-      journalDatabase: replacementDatabase,
       mintSpawnToken: () => 'spawn-b',
       probeOwner: async (record) => {
         const probe = await realProbe(record)
@@ -339,7 +317,7 @@ describe('recovery exits', () => {
       }
     })
 
-    await host.restoreReadableSessions()
+    await openTestChats(host)
     expect(store.getRecord(SESSION)?.lease).toMatchObject({
       runtimeFence: 2,
       claimStatus: 'released',
@@ -347,8 +325,9 @@ describe('recovery exits', () => {
     })
     expect(acquire).toHaveBeenCalledOnce()
 
-    const replacement = await spawnOwner('spawn-b')
+    const replacement = await acquireOwner('spawn-b')
     acquire.mockResolvedValueOnce({
+      acquisitionGeneration: globalThis.crypto.randomUUID(),
       process: replacement.process,
       link: {
         linkId: 'link-replacement',

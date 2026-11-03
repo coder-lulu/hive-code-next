@@ -32,7 +32,7 @@ export function ChatBehaviorSetting({
   const hostQueuesMessages = useStructuredAgentSessionHostQueuesMessages(STRUCTURED_CHAT_HOST)
   const entries = getChatBehaviorEntriesByKey()
   const rows = [
-    ...(settings.nativeChatPermissionMode !== undefined ? [getChatPermissionSearchEntry()] : []),
+    getChatPermissionSearchEntry(),
     entries.resumeOnRestart,
     ...(hostQueuesMessages ? [entries.queueFollowUps] : []),
     entries.shellEnvironment

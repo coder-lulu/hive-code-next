@@ -3,9 +3,9 @@ import { Button } from '@/components/ui/button'
 import { useOrcaProfileAuthStatusRefresh } from '@/hooks/use-orca-profile-auth-status-refresh'
 import { translate } from '@/i18n/i18n'
 import { isWebClientLocation } from '@/lib/web-client-location'
-import { APP_DISPLAY_NAME } from '@/product-brand'
 import { useAppStore } from '@/store'
 import { SettingsSwitchRow } from './SettingsFormControls'
+import { OrcaSignInButton, OrcaSignInWaitNotice } from '../OrcaSignInProgress'
 
 type HowToStep = { key: string; title: string; description: string }
 
@@ -15,7 +15,6 @@ export function ShareSkillsSettingsPane(): React.JSX.Element {
   const settings = useAppStore((state) => state.settings)
   const updateSettings = useAppStore((state) => state.updateSettings)
   const authStatus = useAppStore((state) => state.orcaProfileAuthStatus)
-  const connect = useAppStore((state) => state.connectCurrentOrcaProfile)
   const signedIn = authStatus?.state === 'connected'
   const isWebClient = isWebClientLocation()
   const agentSharingEnabled = settings?.agentSkillSharingEnabled === true
@@ -72,7 +71,7 @@ export function ShareSkillsSettingsPane(): React.JSX.Element {
         <p className="text-xs leading-relaxed text-muted-foreground">
           {translate(
             'auto.components.settings.shareSkills.linkDescription',
-            `Shared bundles are not searchable or listed in ${APP_DISPLAY_NAME}. The link is the credential, so send it only to people you trust.`
+            'Shared bundles are not searchable or listed in Orca. The link is the credential, so send it only to people you trust.'
           )}
         </p>
       </section>
@@ -80,7 +79,7 @@ export function ShareSkillsSettingsPane(): React.JSX.Element {
       <SettingsSwitchRow
         label={translate(
           'auto.components.settings.shareSkills.allowAgentPublishing',
-          `Allow agents and the ${APP_DISPLAY_NAME} CLI to publish skill links`
+          'Allow agents and the Orca CLI to publish skill links'
         )}
         description={
           isWebClient
@@ -100,7 +99,7 @@ export function ShareSkillsSettingsPane(): React.JSX.Element {
 
       {!isWebClient ? (
         <SettingsSwitchRow
-          label={translate('auto.components.settings.shareSkills.showButton', 'Show Skills Button')}
+          label={translate('auto.components.settings.shareSkills.showButton', 'Show Skills button')}
           description={translate(
             'auto.components.settings.shareSkills.showButtonDescription',
             'Show the Skills shortcut in the sidebar.'
@@ -123,7 +122,7 @@ export function ShareSkillsSettingsPane(): React.JSX.Element {
               {isWebClient
                 ? translate(
                     'auto.components.settings.shareSkills.signInWebDescription',
-                    `Publishing and link management are available in the ${APP_DISPLAY_NAME} desktop app.`
+                    'Publishing and link management are available in the Orca desktop app.'
                   )
                 : translate(
                     'auto.components.settings.shareSkills.signInDescription',
@@ -132,25 +131,17 @@ export function ShareSkillsSettingsPane(): React.JSX.Element {
             </p>
           </div>
           {!isWebClient ? (
-            <Button
-              type="button"
-              size="sm"
-              disabled={authStatus?.configured !== true}
-              onClick={() => void connect()}
-            >
+            <OrcaSignInButton size="sm" disabled={authStatus?.configured !== true}>
               {authStatus?.state === 'reconnect-required'
                 ? translate('auto.components.settings.shareSkills.signInAgain', 'Sign in again')
-                : translate(
-                    'auto.components.settings.shareSkills.signIn',
-                    'Sign in to HiveCloud'
-                  )}
-            </Button>
+                : translate('auto.components.settings.shareSkills.signIn', 'Sign in to HiveCloud')}
+            </OrcaSignInButton>
           ) : null}
+          {!isWebClient ? <OrcaSignInWaitNotice className="basis-full" /> : null}
         </section>
       ) : null}
 
-      {/* Why: the link inventory grows without bound and belongs with the page
-          that publishes it; settings keeps the preference and the way over. */}
+      {/* Keep unbounded link inventory on its publishing page; Settings retains the preference and navigation. */}
       {signedIn && !isWebClient ? (
         <section className="flex flex-wrap items-center gap-4 py-5">
           <div className="min-w-0 flex-1 space-y-1">

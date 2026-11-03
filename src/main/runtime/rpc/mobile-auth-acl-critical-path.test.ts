@@ -16,7 +16,7 @@ import {
 import { createFakeWindowsSecurity } from '../../../shared/windows-security-addon.test-fixture'
 import { DEVICE_REGISTRY_FILENAME } from '../mobile-pairing-files'
 import { DeviceRegistry, type DeviceEntry } from '../device-registry'
-import { generateKeyPair } from './e2ee-crypto'
+import { generateKeyPair } from '../../../shared/e2ee-crypto'
 import { RuntimeE2EEClientSession } from '../../../shared/runtime-e2ee-client-session'
 import { MobileSocketWiring, type MobileSocketTransport } from './mobile-socket-wiring'
 
@@ -90,6 +90,9 @@ describe('mobile auth critical path', () => {
   })
 
   function authenticate(registry: DeviceRegistry, device: DeviceEntry): { ws: FakeSocket } {
+    if (!device.token) {
+      throw new Error('expected token credential')
+    }
     const desktop = generateKeyPair()
     const phone = RuntimeE2EEClientSession.create({
       desktopPublicKeyB64: Buffer.from(desktop.publicKey).toString('base64'),

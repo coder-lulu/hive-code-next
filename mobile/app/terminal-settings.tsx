@@ -1,6 +1,5 @@
-import { APP_DISPLAY_NAME } from '@/product-brand'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Switch, Text, View } from 'react-native'
+import { View, Text, Pressable, Switch } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import Animated, {
@@ -10,94 +9,123 @@ import Animated, {
 } from 'react-native-reanimated'
 import { useRouter } from 'expo-router'
 import { ChevronLeft, ChevronRight, Smartphone, Type } from 'lucide-react-native'
-import {
-  MobileGroupedList,
-  MobileGroupedListRow,
-  MobileIconButton,
-  MobileScreenHeader
-} from '../src/components/ui'
-import { useAccountVisibleHostCatalog } from '../src/runtime-directory/use-account-visible-host-catalog'
-import { selectConnectableHostProfiles } from '../src/transport/host-catalog-selection'
+import { colors, spacing } from '../src/theme/mobile-theme'
+import { useMobileColorScheme } from '../src/theme/use-mobile-color-scheme'
+import type { Translate } from '../src/i18n/mobile-i18n'
+import { useMobileTranslation } from '../src/i18n/use-mobile-translation'
+import { loadHosts } from '../src/transport/host-store'
+import type { HostProfile } from '../src/transport/types'
 import { useFocusedSettingsHostClients } from '../src/transport/settings-host-client-connections'
 import type { RpcClient } from '../src/transport/rpc-client'
 import { PickerModal, type PickerOption } from '../src/components/PickerModal'
 import { TerminalShortcutSettings } from '../src/components/TerminalShortcutSettings'
-import { setTerminalAutoRestoreFitMsForHost } from '../src/terminal/terminal-auto-restore-fit-state'
-import { createTerminalSettingsScreenStyles } from '../src/terminal/terminal-settings-screen-styles'
+import {
+  readTerminalAutoRestoreFitMs,
+  saveTerminalAutoRestoreFitMs,
+  setTerminalAutoRestoreFitMsForHost
+} from '../src/terminal/terminal-auto-restore-fit-state'
+import { terminalSettingsScreenStyles as styles } from '../src/terminal/terminal-settings-screen-styles'
 import { setTerminalSettingsScrollEnabled } from '../src/terminal/terminal-settings-scroll-lock'
+import { useTerminalTextScaleSetting } from '../src/terminal/use-terminal-text-scale-setting'
 import {
   loadTerminalAutocompleteEnabled,
-  loadTerminalTextScale,
-  saveTerminalAutocompleteEnabled,
-  saveTerminalTextScale
+  saveTerminalAutocompleteEnabled
 } from '../src/storage/preferences'
-import { useMobileTheme, useMobileThemeStyles } from '../src/theme/mobile-theme-provider'
 
 type RestoreValue = 'indefinite' | '60s' | '5m' | '30m'
 
 type TextSizeValue = 'smallest' | 'smaller' | 'default' | 'large' | 'larger' | 'largest'
 
-// scale = baseline zoom the terminal WebView applies on top of fit-to-width.
-// Keep in sync with TERMINAL_TEXT_SCALES; pinch-to-zoom snaps to these values.
-const TEXT_SIZE_OPTIONS: (PickerOption<TextSizeValue> & { scale: number })[] = [
-  { value: 'smallest', label: '最小（50%）', scale: 0.5 },
-  { value: 'smaller', label: '较小（75%）', scale: 0.75 },
-  { value: 'default', label: '默认（100%）', scale: 1 },
-  { value: 'large', label: '较大（125%）', scale: 1.25 },
-  { value: 'larger', label: '更大（150%）', scale: 1.5 },
-  { value: 'largest', label: '最大（200%）', scale: 2 }
-]
-
-function textSizeValueFromScale(scale: number): TextSizeValue {
-  return TEXT_SIZE_OPTIONS.find((option) => option.scale === scale)?.value ?? 'default'
+// Baseline zoom sits above fit-to-width; keep presets in sync with TERMINAL_TEXT_SCALES and pinch snapping.
+function textSizeOptions(t: Translate): (PickerOption<TextSizeValue> & { scale: number })[] {
+  return [
+    {
+      value: 'smallest',
+      label: t('app.terminalSettings.smallestText', 'Smallest (50%)'),
+      scale: 0.5
+    },
+    {
+      value: 'smaller',
+      label: t('app.terminalSettings.smallerText', 'Smaller (75%)'),
+      scale: 0.75
+    },
+    { value: 'default', label: t('app.terminalSettings.defaultText', 'Default (100%)'), scale: 1 },
+    { value: 'large', label: t('app.terminalSettings.largeText', 'Large (125%)'), scale: 1.25 },
+    { value: 'larger', label: t('app.terminalSettings.largerText', 'Larger (150%)'), scale: 1.5 },
+    { value: 'largest', label: t('app.terminalSettings.largestText', 'Largest (200%)'), scale: 2 }
+  ]
 }
 
-function textSizeSummary(scale: number): string {
-  return (TEXT_SIZE_OPTIONS.find((option) => option.scale === scale) ?? TEXT_SIZE_OPTIONS[0]!).label
+function textSizeValueFromScale(scale: number, t: Translate): TextSizeValue {
+  return textSizeOptions(t).find((o) => o.scale === scale)?.value ?? 'default'
 }
 
-const AUTO_RESTORE_FIT_OPTIONS: (PickerOption<RestoreValue> & { ms: number | null })[] = [
-  { value: 'indefinite', label: '保持手机尺寸（默认）', ms: null },
-  { value: '60s', label: '1 分钟后', ms: 60_000 },
-  { value: '5m', label: '5 分钟后', ms: 5 * 60_000 },
-  { value: '30m', label: '30 分钟后', ms: 30 * 60_000 }
-]
+function textSizeSummary(scale: number, t: Translate): string {
+  const options = textSizeOptions(t)
+  return (options.find((o) => o.scale === scale) ?? options[0]!).label
+}
 
-function valueFromMs(ms: number | null | undefined): RestoreValue {
+function restoreAfterMinutes(t: Translate, count: number): string {
+  return count === 1
+    ? t('app.terminalSettings.restoreAfterMinutes_one', 'After {{count}} minute', { count })
+    : t('app.terminalSettings.restoreAfterMinutes_other', 'After {{count}} minutes', { count })
+}
+
+function autoRestoreFitOptions(
+  t: Translate
+): (PickerOption<RestoreValue> & { ms: number | null })[] {
+  return [
+    {
+      value: 'indefinite',
+      label: t('app.terminalSettings.keepPhoneSize', 'Keep at phone size (default)'),
+      ms: null
+    },
+    { value: '60s', label: restoreAfterMinutes(t, 1), ms: 60_000 },
+    { value: '5m', label: restoreAfterMinutes(t, 5), ms: 5 * 60_000 },
+    { value: '30m', label: restoreAfterMinutes(t, 30), ms: 30 * 60_000 }
+  ]
+}
+
+function valueFromMs(ms: number | null | undefined, t: Translate): RestoreValue {
   if (ms == null) {
     return 'indefinite'
   }
-  const exact = AUTO_RESTORE_FIT_OPTIONS.find((option) => option.ms === ms)
+  const options = autoRestoreFitOptions(t)
+  const exact = options.find((o) => o.ms === ms)
   if (exact) {
     return exact.value
   }
-  // Why: server may return a non-preset ms (custom value, future preset,
-  // or server-side clamp). Snap to the closest finite preset so the
-  // picker's selected radio agrees with the row sublabel.
-  let closest: (typeof AUTO_RESTORE_FIT_OPTIONS)[number] | null = null
+  // Snap custom/future/clamped server durations to nearest finite preset so picker agrees with autoRestoreSummary.
+  let closest: (typeof options)[number] | null = null
   let bestDelta = Infinity
-  for (const option of AUTO_RESTORE_FIT_OPTIONS) {
-    if (option.ms == null) {
+  for (const opt of options) {
+    if (opt.ms == null) {
       continue
     }
-    const delta = Math.abs(option.ms - ms)
+    const delta = Math.abs(opt.ms - ms)
     if (delta < bestDelta) {
       bestDelta = delta
-      closest = option
+      closest = opt
     }
   }
   return closest ? closest.value : 'indefinite'
 }
 
-function autoRestoreSummary(ms: number | null | undefined): string {
+function autoRestoreSummary(ms: number | null | undefined, t: Translate): string {
   if (ms === undefined) {
     return '…'
   }
   if (ms === null) {
-    return AUTO_RESTORE_FIT_OPTIONS[0]!.label
+    return autoRestoreFitOptions(t)[0]!.label
   }
-  const exact = AUTO_RESTORE_FIT_OPTIONS.find((option) => option.ms === ms)
-  return exact ? exact.label : `${Math.round(ms / 1000)} 秒后`
+  const exact = autoRestoreFitOptions(t).find((o) => o.ms === ms)
+  if (exact) {
+    return exact.label
+  }
+  const count = Math.round(ms / 1000)
+  return count === 1
+    ? t('app.terminalSettings.restoreAfterSeconds_one', 'After {{count}}s', { count })
+    : t('app.terminalSettings.restoreAfterSeconds_other', 'After {{count}}s', { count })
 }
 
 function HostFitRow({
@@ -111,58 +139,58 @@ function HostFitRow({
   ms: number | null | undefined
   onPress: () => void
 }): React.JSX.Element {
-  const theme = useMobileTheme()
+  useMobileColorScheme()
+  const t = useMobileTranslation()
   return (
-    <MobileGroupedListRow
-      accessibilityLabel={`${hostName}，${autoRestoreSummary(ms)}`}
-      detail={autoRestoreSummary(ms)}
-      disabled={!client}
-      leading={<Smartphone color={theme.color.text.secondary} size={20} strokeWidth={2} />}
+    <Pressable
+      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
       onPress={onPress}
-      title={hostName}
-      trailing={<ChevronRight color={theme.color.text.tertiary} size={20} strokeWidth={2} />}
-    />
+      disabled={!client}
+    >
+      <Smartphone size={16} color={colors.textSecondary} />
+      <View style={styles.rowContent}>
+        <Text style={styles.rowLabel}>{hostName}</Text>
+        <Text style={styles.rowSublabel}>{autoRestoreSummary(ms, t)}</Text>
+      </View>
+      <ChevronRight size={16} color={colors.textMuted} />
+    </Pressable>
   )
 }
 
-export default function TerminalSettingsScreen(): React.JSX.Element {
+export default function TerminalSettingsScreen() {
+  useMobileColorScheme()
+  const t = useMobileTranslation()
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createTerminalSettingsScreenStyles)
-  const { catalog: hostCatalog } = useAccountVisibleHostCatalog()
-  const hosts = useMemo(() => selectConnectableHostProfiles(hostCatalog), [hostCatalog])
-  const hostIds = useMemo(() => hosts.map((host) => host.id), [hosts])
+  const [hosts, setHosts] = useState<HostProfile[]>([])
+  useEffect(() => {
+    void loadHosts().then(setHosts)
+  }, [])
+  const hostIds = useMemo(() => hosts.map((h) => h.id), [hosts])
   const { clients: hostClients } = useFocusedSettingsHostClients(hostIds)
   const hostClientsById = useMemo(
     () => new Map(hostClients.map((entry) => [entry.hostId, entry.client])),
     [hostClients]
   )
 
-  // Why: per-host current value, lazily fetched. We keep state at the
-  // screen level rather than per-row so the picker can render at root
-  // level — embedding PickerModal inside a row clipped its BottomDrawer
-  // absoluteFill backdrop to the ScrollView content frame.
+  // Keep host values/picker at screen root: row-nested PickerModal clips drawer backdrop to ScrollView content.
   const [hostMs, setHostMs] = useState<Record<string, number | null | undefined>>({})
   const [pickerHostId, setPickerHostId] = useState<string | null>(null)
 
-  const [textScale, setTextScale] = useState(1)
+  const [textScale, selectTextScale] = useTerminalTextScaleSetting()
   const [textSizePickerOpen, setTextSizePickerOpen] = useState(false)
-  useEffect(() => {
-    void loadTerminalTextScale().then(setTextScale)
-  }, [])
-  const selectTextSize = useCallback((value: TextSizeValue) => {
-    const opt = TEXT_SIZE_OPTIONS.find((option) => option.value === value)
-    if (!opt) {
-      return
-    }
-    setTextScale(opt.scale)
-    void saveTerminalTextScale(opt.scale)
-  }, [])
+  const selectTextSize = useCallback(
+    (value: TextSizeValue) => {
+      const opt = textSizeOptions(t).find((o) => o.value === value)
+      if (opt) {
+        selectTextScale(opt.scale)
+      }
+    },
+    [selectTextScale, t]
+  )
 
   const [autocompleteEnabled, setAutocompleteEnabled] = useState(false)
-  // Why: a fast toggle before the initial load resolves must win — otherwise the
-  // delayed read would clobber the user's choice with the stored (stale) value.
+  // Fast toggle must win over delayed initial load.
   const userToggledAutocompleteRef = useRef(false)
   useEffect(() => {
     let stale = false
@@ -188,20 +216,12 @@ export default function TerminalSettingsScreen(): React.JSX.Element {
       if (!client) {
         continue
       }
-      void client
-        .sendRequest('terminal.getAutoRestoreFit')
-        .then((resp) => {
-          if (cancelled) {
-            return
-          }
-          const value = (resp as { ms?: number | null } | null)?.ms
-          // Why: reconnect/status ticks can replay the same value; preserving
-          // object identity avoids rerendering every settings row again.
-          setHostMs((previous) => setTerminalAutoRestoreFitMsForHost(previous, host.id, value))
-        })
-        .catch(() => {
+      void readTerminalAutoRestoreFitMs(client)
+        .catch(() => null)
+        .then((value) => {
           if (!cancelled) {
-            setHostMs((previous) => setTerminalAutoRestoreFitMsForHost(previous, host.id, null))
+            // Preserve object identity on repeated reconnect/status values to avoid rerendering every row.
+            setHostMs((prev) => setTerminalAutoRestoreFitMsForHost(prev, host.id, value))
           }
         })
     }
@@ -215,29 +235,25 @@ export default function TerminalSettingsScreen(): React.JSX.Element {
     if (!client) {
       return
     }
-    const opt = AUTO_RESTORE_FIT_OPTIONS.find((option) => option.value === value)
+    const opt = autoRestoreFitOptions(t).find((o) => o.value === value)
     if (!opt) {
       return
     }
-    setHostMs((previous) => setTerminalAutoRestoreFitMsForHost(previous, hostId, opt.ms))
+    setHostMs((prev) => setTerminalAutoRestoreFitMsForHost(prev, hostId, opt.ms))
     try {
-      const resp = (await client.sendRequest('terminal.setAutoRestoreFit', {
-        ms: opt.ms
-      })) as { ms?: number | null } | null
-      setHostMs((previous) => setTerminalAutoRestoreFitMsForHost(previous, hostId, resp?.ms))
+      const saved = await saveTerminalAutoRestoreFitMs(client, opt.ms)
+      setHostMs((prev) => setTerminalAutoRestoreFitMsForHost(prev, hostId, saved))
     } catch {
       try {
-        const resp = (await client.sendRequest('terminal.getAutoRestoreFit')) as {
-          ms?: number | null
-        } | null
-        setHostMs((previous) => setTerminalAutoRestoreFitMsForHost(previous, hostId, resp?.ms))
+        const current = await readTerminalAutoRestoreFitMs(client)
+        setHostMs((prev) => setTerminalAutoRestoreFitMsForHost(prev, hostId, current))
       } catch {
-        // Give up silently; the next mount retries.
+        // give up silently — the next mount retries
       }
     }
   }
 
-  const pickerHost = pickerHostId ? hosts.find((host) => host.id === pickerHostId) : null
+  const pickerHost = pickerHostId ? hosts.find((h) => h.id === pickerHostId) : null
 
   const scrollRef = useAnimatedRef<Animated.ScrollView>()
   const scrollOffsetY = useSharedValue(0)
@@ -245,8 +261,7 @@ export default function TerminalSettingsScreen(): React.JSX.Element {
   const scrollHandler = useAnimatedScrollHandler((event) => {
     scrollOffsetY.value = event.contentOffset.y
   })
-  // Why: imperative toggle instead of state — a re-render while a drag gesture
-  // is active would rebuild the row gestures and could cancel the drag.
+  // Toggle imperatively: rerendering during drag rebuilds row gestures and can cancel it.
   const setScrollEnabled = useCallback(
     (enabled: boolean) => {
       setTerminalSettingsScrollEnabled(scrollRef, enabled)
@@ -259,25 +274,23 @@ export default function TerminalSettingsScreen(): React.JSX.Element {
   )
 
   return (
-    <GestureHandlerRootView style={styles.screen}>
-      <MobileScreenHeader
-        leading={
-          <MobileIconButton
-            accessibilityLabel="返回"
-            icon={ChevronLeft}
-            iconSize={24}
-            onPress={() => router.back()}
-          />
-        }
-        title="终端"
-      />
+    <GestureHandlerRootView style={[styles.container, { paddingTop: insets.top + spacing.sm }]}>
+      <View style={styles.topRow}>
+        <Pressable
+          style={styles.backButton}
+          onPress={() => router.back()}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.back', 'Back')}
+        >
+          <ChevronLeft size={22} color={colors.textSecondary} />
+        </Pressable>
+        <Text style={styles.heading}>{t('app.terminalSettings.title', 'Terminal')}</Text>
+      </View>
 
       <Animated.ScrollView
         ref={scrollRef}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: insets.bottom + theme.spacing.space32 }
-        ]}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         onScroll={scrollHandler}
         scrollEventThrottle={16}
@@ -285,83 +298,95 @@ export default function TerminalSettingsScreen(): React.JSX.Element {
           scrollContentHeight.value = height
         }}
       >
-        <View style={styles.settingsGroup}>
-          <Text maxFontSizeMultiplier={1.3} style={styles.groupHeading}>
-            离开应用时
-          </Text>
-          <Text maxFontSizeMultiplier={1.3} style={styles.groupDescription}>
-            在手机上使用终端时，{APP_DISPLAY_NAME}
-            会将终端缩小以适应屏幕。离开应用后，你可以让终端保持手机尺寸，避免交互式命令行工具重新排版；也可以在稍后恢复为电脑尺寸。电脑端终端横幅仍可随时手动恢复尺寸。
-          </Text>
-          <MobileGroupedList>
-            {hosts.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Text maxFontSizeMultiplier={1.3} style={styles.emptyText}>
-                  尚未配对电脑。配对后可设置终端尺寸恢复行为。
-                </Text>
-              </View>
-            ) : (
-              hosts.map((host) => (
-                <HostFitRow
-                  key={host.id}
-                  client={hostClientsById.get(host.id) ?? null}
-                  hostName={host.name}
-                  ms={hostMs[host.id]}
-                  onPress={() => setPickerHostId(host.id)}
-                />
-              ))
-            )}
-          </MobileGroupedList>
+        <Text style={styles.groupHeading}>
+          {t('app.terminalSettings.leaveAppHeading', 'WHEN YOU LEAVE THE APP')}
+        </Text>
+        <Text style={styles.groupDescription}>
+          {t(
+            'app.terminalSettings.leaveAppDescription',
+            "While you're using a terminal on your phone, HiveCode shrinks it to fit your screen. When you close the app or switch away, this controls whether it stays at phone size (so interactive CLI tools don't reflow) or resizes back to your desktop. You can always use Restore on the desktop banner to resize manually."
+          )}
+        </Text>
+
+        {hosts.length === 0 ? (
+          <View style={[styles.section, styles.sectionTopGap]}>
+            <Text style={styles.emptyText}>
+              {t(
+                'app.terminalSettings.noPairedDesktops',
+                'No paired desktops yet. Pair one to control terminal behavior.'
+              )}
+            </Text>
+          </View>
+        ) : (
+          <View style={[styles.section, styles.sectionTopGap]}>
+            {hosts.map((host, idx) => {
+              const client = hostClientsById.get(host.id) ?? null
+              return (
+                <View key={host.id}>
+                  {idx > 0 && <View style={styles.separator} />}
+                  <HostFitRow
+                    client={client}
+                    hostName={host.name}
+                    ms={hostMs[host.id]}
+                    onPress={() => setPickerHostId(host.id)}
+                  />
+                </View>
+              )
+            })}
+          </View>
+        )}
+
+        <Text style={[styles.groupHeading, styles.inputGroupGap]}>
+          {t('app.terminalSettings.textSizeHeading', 'TEXT SIZE')}
+        </Text>
+        <Text style={styles.groupDescription}>
+          {t(
+            'app.terminalSettings.textSizeDescription',
+            "Scale the terminal text. Smaller sizes fit more columns with side margins; larger sizes show fewer columns — drag sideways to pan. You can also pinch to zoom in the terminal itself, which updates this setting. Per-device display only; doesn't change the desktop terminal."
+          )}
+        </Text>
+        <View style={[styles.section, styles.sectionTopGap]}>
+          <Pressable
+            style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+            onPress={() => setTextSizePickerOpen(true)}
+          >
+            <Type size={16} color={colors.textSecondary} />
+            <View style={styles.rowContent}>
+              <Text style={styles.rowLabel}>{t('app.terminalSettings.textSize', 'Text size')}</Text>
+              <Text style={styles.rowSublabel}>{textSizeSummary(textScale, t)}</Text>
+            </View>
+            <ChevronRight size={16} color={colors.textMuted} />
+          </Pressable>
         </View>
 
-        <View style={styles.settingsGroup}>
-          <Text maxFontSizeMultiplier={1.3} style={styles.groupHeading}>
-            文字大小
-          </Text>
-          <Text maxFontSizeMultiplier={1.3} style={styles.groupDescription}>
-            调整终端文字缩放。较小字号可显示更多列；较大字号会显示更少列，可横向拖动查看。你也可以在终端中双指缩放，此设置会同步更新。该偏好仅影响此设备，不会改变电脑端终端。
-          </Text>
-          <MobileGroupedList>
-            <MobileGroupedListRow
-              accessibilityLabel={`终端文字大小，当前为${textSizeSummary(textScale)}`}
-              detail={textSizeSummary(textScale)}
-              leading={<Type color={theme.color.text.secondary} size={20} strokeWidth={2} />}
-              onPress={() => setTextSizePickerOpen(true)}
-              title="终端文字大小"
-              trailing={
-                <ChevronRight color={theme.color.text.tertiary} size={20} strokeWidth={2} />
-              }
+        <Text style={[styles.groupHeading, styles.inputGroupGap]}>
+          {t('app.terminalSettings.keyboardInputHeading', 'KEYBOARD INPUT')}
+        </Text>
+        <Text style={styles.groupDescription}>
+          {t(
+            'app.terminalSettings.keyboardInputDescription',
+            'Autocomplete, autocorrect, and spelling suggestions apply only to buffered command input. Use the double-chevron button above the keyboard to switch from live input, then edit your command before tapping Send. Off by default to avoid rewriting commands, flags, or paths.'
+          )}
+        </Text>
+        <View style={[styles.section, styles.sectionTopGap]}>
+          <View style={styles.row}>
+            <View style={styles.rowContent}>
+              <Text style={styles.rowLabel}>
+                {t('app.terminalSettings.autocomplete', 'Autocomplete & autocorrect')}
+              </Text>
+              <Text style={styles.rowSublabel}>
+                {autocompleteEnabled
+                  ? t('app.terminalSettings.autocompleteOn', 'On')
+                  : t('app.terminalSettings.autocompleteOff', 'Off')}
+              </Text>
+            </View>
+            <Switch
+              value={autocompleteEnabled}
+              onValueChange={toggleAutocomplete}
+              trackColor={{ false: colors.bgRaised, true: colors.textSecondary }}
+              thumbColor={colors.textPrimary}
             />
-          </MobileGroupedList>
-        </View>
-
-        <View style={styles.settingsGroup}>
-          <Text maxFontSizeMultiplier={1.3} style={styles.groupHeading}>
-            键盘输入
-          </Text>
-          <Text maxFontSizeMultiplier={1.3} style={styles.groupDescription}>
-            为终端命令栏启用手机键盘的自动补全、自动更正和拼写建议。默认关闭，避免键盘改写命令、参数或路径。直接输入模式会将原始按键发送到终端，不受此设置影响。
-          </Text>
-          <MobileGroupedList>
-            <MobileGroupedListRow
-              detail={autocompleteEnabled ? '已开启' : '已关闭'}
-              title="自动补全与自动更正"
-              trailing={
-                <Switch
-                  accessibilityLabel="自动补全与自动更正"
-                  value={autocompleteEnabled}
-                  onValueChange={toggleAutocomplete}
-                  trackColor={{
-                    false: theme.color.bg.subtle,
-                    true: theme.color.bg.selected
-                  }}
-                  thumbColor={
-                    autocompleteEnabled ? theme.color.text.inverse : theme.color.text.secondary
-                  }
-                />
-              }
-            />
-          </MobileGroupedList>
+          </View>
         </View>
 
         <TerminalShortcutSettings
@@ -374,12 +399,16 @@ export default function TerminalSettingsScreen(): React.JSX.Element {
 
       <PickerModal<RestoreValue>
         visible={pickerHost != null}
-        title={pickerHost ? `${pickerHost.name} 的终端尺寸` : ''}
-        options={AUTO_RESTORE_FIT_OPTIONS}
-        selected={valueFromMs(pickerHost ? hostMs[pickerHost.id] : null)}
-        onSelect={(value) => {
+        title={
+          pickerHost
+            ? t('app.terminalSettings.restoreHost', 'Restore {{name}}', { name: pickerHost.name })
+            : ''
+        }
+        options={autoRestoreFitOptions(t)}
+        selected={valueFromMs(pickerHost ? hostMs[pickerHost.id] : null, t)}
+        onSelect={(v) => {
           if (pickerHost) {
-            void selectValue(pickerHost.id, value)
+            void selectValue(pickerHost.id, v)
           }
         }}
         onClose={() => setPickerHostId(null)}
@@ -387,9 +416,9 @@ export default function TerminalSettingsScreen(): React.JSX.Element {
 
       <PickerModal<TextSizeValue>
         visible={textSizePickerOpen}
-        title="终端文字大小"
-        options={TEXT_SIZE_OPTIONS}
-        selected={textSizeValueFromScale(textScale)}
+        title={t('app.terminalSettings.textSizePickerTitle', 'Terminal text size')}
+        options={textSizeOptions(t)}
+        selected={textSizeValueFromScale(textScale, t)}
         onSelect={selectTextSize}
         onClose={() => setTextSizePickerOpen(false)}
       />

@@ -65,8 +65,7 @@ vi.mock('sonner', () => ({
 }))
 vi.mock('./mobile-pairing-device-polling', () => ({ useMobilePairingDevicePolling: vi.fn() }))
 
-// Stub the child sections so the test targets MobilePane's own connection-mode
-// safety wiring (effective mode, canGenerate gate, persistence) in isolation.
+// Stub sections to isolate MobilePane’s mode safety, generation gate and persistence.
 vi.mock('./MobilePairingSetupSection', () => ({
   MobilePairingSetupSection: (props: {
     canGenerate?: boolean
@@ -78,6 +77,7 @@ vi.mock('./MobilePairingSetupSection', () => ({
     selectedAddressIsCustom: boolean
     onSelectedAddressChange: (address: string) => void
     onCustomAddressSelect: (address: string) => void
+    beforeCustomAddressChange: (address: string) => Promise<boolean>
     onCustomAddressRemove: (address: string) => void
     refreshingNetworkInterfaces: boolean
     onRefreshNetworkInterfaces: () => void
@@ -90,12 +90,24 @@ vi.mock('./MobilePairingSetupSection', () => ({
       <span data-testid="selected-address-is-custom">{String(props.selectedAddressIsCustom)}</span>
       <span data-testid="custom-addresses">{props.customAddresses.join(',')}</span>
       <span data-testid="refreshing-addresses">{String(props.refreshingNetworkInterfaces)}</span>
-      {/* Mirror the real Generate gate (loading/canGenerate) so a stuck
-          loading flag surfaces as a disabled control the tests can catch. */}
-      <button type="button" onClick={props.onGenerateQr} disabled={props.loading}>
+      {props.connectionPathControl}
+      {/* Mirror real generation gating so wedged loading state remains observable. */}
+      <button
+        type="button"
+        onClick={props.onGenerateQr}
+        disabled={props.loading || props.canGenerate === false}
+      >
         Generate
       </button>
-      <button type="button" onClick={() => props.onCustomAddressSelect('100.126.117.25:6768')}>
+      <button
+        type="button"
+        onClick={async () => {
+          const address = '100.126.117.25:6768'
+          if (await props.beforeCustomAddressChange(address)) {
+            props.onCustomAddressSelect(address)
+          }
+        }}
+      >
         choose-custom-address
       </button>
       <button type="button" onClick={() => props.onCustomAddressRemove('100.126.117.25:6768')}>
@@ -135,13 +147,15 @@ vi.mock('./MobilePairedDevicesSection', () => ({
 }))
 vi.mock('./MobileAutoRestoreFitSection', () => ({ MobileAutoRestoreFitSection: () => <div /> }))
 vi.mock('../mobile/WindowsFirewallNotice', () => ({
-  WindowsFirewallNotice: () => <div data-testid="firewall-notice" />
+  WindowsFirewallNotice: (props: { usingRelay?: boolean }) => (
+    <div data-testid="firewall-notice">{String(props.usingRelay)}</div>
+  )
 }))
 
 import { MobilePane } from './MobilePane'
 import { MobileDeviceAccessSettings } from './MobileDeviceAccessSettings'
 
-describe('MobilePane local pairing', () => {
+describe('MobilePane direct pairing', () => {
   const getPairingQR = mocks.getPairingQR
   const updateSettings = mocks.updateSettings
 
@@ -187,15 +201,277 @@ describe('MobilePane local pairing', () => {
     document.body.innerHTML = ''
   })
 
-  it('generates local pairing without a cloud profile login', async () => {
+  it('allows a local profile to create a direct offer without cloud authentication', async () => {
     mocks.holder.state.orcaProfileAuthStatus = { state: 'local' }
     render(<MobilePane />)
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Generate' }))
-    await waitFor(() =>
-      expect(screen.getByTestId('qr')).toHaveTextContent('data:image/png;base64,qr')
+    await userEvent.click(screen.getByRole('button', { name: 'Generate' }))
+    await waitFor(() => expect(getPairingQR).toHaveBeenCalledWith({}))
+    expect(screen.getByTestId('pairing-url')).toHaveTextContent('orca://pair')
+  })
+
+  it('waits for initial discovery before minting the selected address', async () => {
+    let resolveInterfaces: (value: {
+      interfaces: { name: string; address: string }[]
+    }) => void = () => {}
+    mocks.listNetworkInterfaces.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveInterfaces = resolve
+        })
     )
-    expect(getPairingQR).toHaveBeenCalledWith({})
-    expect(mocks.holder.state.fetchOrcaProfileAuthStatus).not.toHaveBeenCalled()
+    render(<MobilePane />)
+    expect(screen.getByRole('button', { name: 'Generate' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Generate' }))
+    expect(getPairingQR).not.toHaveBeenCalled()
+    expect(screen.getByTestId('loading')).toHaveTextContent('false')
+    await act(async () =>
+      resolveInterfaces({ interfaces: [{ name: 'Ethernet', address: '10.0.0.2' }] })
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Generate' }))
+    expect(getPairingQR).toHaveBeenCalledExactlyOnceWith({ address: '10.0.0.2' })
+  })
+
+  it('only applies the latest discovery and keeps its refresh busy', async () => {
+    let resolveOlder: (value: {
+      interfaces: { name: string; address: string }[]
+    }) => void = () => {}
+    let resolveLatest: (value: {
+      interfaces: { name: string; address: string }[]
+    }) => void = () => {}
+    mocks.listNetworkInterfaces
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveOlder = resolve
+          })
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveLatest = resolve
+          })
+      )
+    render(<MobilePane />)
+    await userEvent.click(screen.getByRole('button', { name: 'refresh-addresses' }))
+    await act(async () => resolveOlder({ interfaces: [{ name: 'Old', address: '10.0.0.1' }] }))
+    expect(screen.getByTestId('selected-address')).toHaveTextContent('none')
+    expect(screen.getByTestId('refreshing-addresses')).toHaveTextContent('true')
+    expect(screen.getByRole('button', { name: 'Generate' })).toBeDisabled()
+    await act(async () => resolveLatest({ interfaces: [{ name: 'Latest', address: '10.0.0.2' }] }))
+    expect(screen.getByTestId('selected-address')).toHaveTextContent('10.0.0.2')
+    expect(screen.getByTestId('refreshing-addresses')).toHaveTextContent('false')
+  })
+
+  it('ignores an older discovery after a custom address passes preflight', async () => {
+    let resolveInterfaces: (value: {
+      interfaces: { name: string; address: string }[]
+    }) => void = () => {}
+    mocks.listNetworkInterfaces.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveInterfaces = resolve
+        })
+    )
+    render(<MobilePane />)
+    await userEvent.click(screen.getByRole('button', { name: 'choose-custom-address' }))
+    expect(getPairingQR).toHaveBeenCalledExactlyOnceWith({ address: '100.126.117.25:6768' })
+    await act(async () =>
+      resolveInterfaces({ interfaces: [{ name: 'Stale', address: '10.0.0.1' }] })
+    )
+    expect(screen.getByTestId('selected-address')).toHaveTextContent('100.126.117.25:6768')
+    expect(screen.getByRole('button', { name: 'choose-discovered-address' })).toBeDisabled()
+    expect(screen.getByTestId('refreshing-addresses')).toHaveTextContent('false')
+  })
+
+  it('does not let an older lookup replace a completed newer discovery', async () => {
+    let resolveOlder: (value: {
+      interfaces: { name: string; address: string }[]
+    }) => void = () => {}
+    mocks.listNetworkInterfaces
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveOlder = resolve
+          })
+      )
+      .mockResolvedValueOnce({ interfaces: [{ name: 'Latest', address: '10.0.0.2' }] })
+    render(<MobilePane />)
+    await userEvent.click(screen.getByRole('button', { name: 'refresh-addresses' }))
+    expect(screen.getByTestId('selected-address')).toHaveTextContent('10.0.0.2')
+    await userEvent.click(screen.getByRole('button', { name: 'Generate' }))
+    await act(async () => resolveOlder({ interfaces: [{ name: 'Stale', address: '10.0.0.1' }] }))
+    expect(screen.getByTestId('selected-address')).toHaveTextContent('10.0.0.2')
+    expect(screen.getByTestId('pairing-url')).toHaveTextContent('orca://pair')
+    expect(getPairingQR).toHaveBeenCalledExactlyOnceWith({ address: '10.0.0.2' })
+  })
+
+  it('rejects a pending custom preflight after selecting a discovered address', async () => {
+    mocks.listNetworkInterfaces.mockResolvedValue({
+      interfaces: [{ name: 'Ethernet', address: '10.0.0.2' }]
+    })
+    let resolvePreflight: (result: Record<string, unknown>) => void = () => {}
+    getPairingQR.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolvePreflight = resolve
+        })
+    )
+    render(<MobilePane />)
+    await userEvent.click(screen.getByRole('button', { name: 'choose-custom-address' }))
+    expect(screen.getByRole('button', { name: 'Generate' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'choose-discovered-address' }))
+    await act(async () =>
+      resolvePreflight({
+        available: true,
+        qrDataUrl: 'preflight-qr',
+        pairingUrl: 'orca://preflight'
+      })
+    )
+    expect(updateSettings).not.toHaveBeenCalled()
+    expect(screen.getByTestId('selected-address')).toHaveTextContent('10.0.0.2')
+    expect(screen.getByRole('button', { name: 'Generate' })).toBeEnabled()
+  })
+
+  it.each(['encoding', 'unavailable', 'rejection'])(
+    'does not persist a custom address after %s preflight failure',
+    async (failure) => {
+      render(<MobilePane />)
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Generate' })).toBeEnabled())
+      if (failure === 'rejection') {
+        getPairingQR.mockRejectedValueOnce(new Error('preflight failed'))
+      } else {
+        getPairingQR.mockResolvedValueOnce({
+          available: failure !== 'unavailable',
+          qrDataUrl: null,
+          pairingUrl: 'orca://copy-only'
+        })
+      }
+      await userEvent.click(screen.getByRole('button', { name: 'choose-custom-address' }))
+      expect(getPairingQR).toHaveBeenCalledExactlyOnceWith({ address: '100.126.117.25:6768' })
+      expect(updateSettings).not.toHaveBeenCalled()
+      expect(screen.getByTestId('selected-address')).toHaveTextContent('none')
+      expect(screen.getByTestId('custom-addresses')).toBeEmptyDOMElement()
+      expect(mocks.toastError).toHaveBeenCalledWith('Failed to generate QR code')
+    }
+  )
+
+  it('rotates copy-only credentials on repeat generation and address removal', async () => {
+    mocks.holder.state.settings = {
+      mobileAutoRestoreFitMs: null,
+      mobilePairingCustomAddress: '100.126.117.25:6768',
+      mobilePairingCustomAddresses: ['100.126.117.25:6768']
+    }
+    mocks.listNetworkInterfaces.mockResolvedValue({
+      interfaces: [{ name: 'Ethernet', address: '10.0.0.2' }]
+    })
+    getPairingQR.mockResolvedValue({
+      available: true,
+      qrDataUrl: null,
+      pairingUrl: 'orca://copy-only',
+      endpoint: 'ws://host'
+    })
+    render(<MobilePane />)
+    await userEvent.click(screen.getByRole('button', { name: 'Generate' }))
+    expect(screen.getByTestId('pairing-url')).toHaveTextContent('orca://copy-only')
+    await userEvent.click(screen.getByRole('button', { name: 'Generate' }))
+    expect(getPairingQR).toHaveBeenLastCalledWith({ address: '100.126.117.25:6768', rotate: true })
+    await userEvent.click(screen.getByRole('button', { name: 'remove-custom-address' }))
+    expect(screen.getByTestId('pairing-url')).toHaveTextContent('none')
+    expect(screen.getByTestId('selected-address')).toHaveTextContent('10.0.0.2')
+    await userEvent.click(screen.getByRole('button', { name: 'Generate' }))
+    expect(getPairingQR).toHaveBeenLastCalledWith({ address: '10.0.0.2', rotate: true })
+  })
+
+  it('ignores a pending offer after unmount and preserves a new visit', async () => {
+    let resolveOffer: (result: Record<string, unknown>) => void = () => {}
+    getPairingQR.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveOffer = resolve
+        })
+    )
+    const firstVisit = render(<MobilePane />)
+    await userEvent.click(screen.getByRole('button', { name: 'Generate' }))
+    firstVisit.unmount()
+    const recordFeatureInteraction = mocks.holder.state.recordFeatureInteraction
+    render(<MobilePane />)
+    await userEvent.click(screen.getByRole('button', { name: 'Generate' }))
+    expect(screen.getByTestId('pairing-url')).toHaveTextContent('orca://pair')
+    await act(async () =>
+      resolveOffer({ available: true, qrDataUrl: 'stale', pairingUrl: 'orca://stale' })
+    )
+    expect(screen.getByTestId('pairing-url')).toHaveTextContent('orca://pair')
+    expect(recordFeatureInteraction).toHaveBeenCalledTimes(1)
+  })
+
+  it('retains the offer across Devices visibility changes', async () => {
+    const view = render(<MobilePane active />)
+    await userEvent.click(screen.getByRole('button', { name: 'Generate' }))
+    view.rerender(<MobilePane active={false} />)
+    view.rerender(<MobilePane active />)
+    expect(screen.getByTestId('pairing-url')).toHaveTextContent('orca://pair')
+    expect(getPairingQR).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports an unavailable transport without showing a pairing code', async () => {
+    getPairingQR.mockResolvedValue({ available: false, guidance: 'Host transport is unavailable' })
+    render(<MobilePane />)
+    await userEvent.click(screen.getByRole('button', { name: 'Generate' }))
+    await waitFor(() =>
+      expect(mocks.toastError).toHaveBeenCalledWith('Host transport is unavailable')
+    )
+    expect(screen.getByTestId('pairing-url')).toHaveTextContent('none')
+    expect(screen.getByRole('button', { name: 'Generate' })).toBeEnabled()
+  })
+
+  it('rejects a late offer after the address changes and rotates the next request', async () => {
+    let resolveOffer: (result: Record<string, unknown>) => void = () => {}
+    getPairingQR.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveOffer = resolve
+        })
+    )
+    render(<MobilePane />)
+    await userEvent.click(screen.getByRole('button', { name: 'Generate' }))
+    expect(screen.getByRole('button', { name: 'Generate' })).toBeDisabled()
+    await userEvent.click(screen.getByRole('button', { name: 'choose-custom-address' }))
+    expect(screen.getByRole('button', { name: 'Generate' })).toBeEnabled()
+    await act(async () => {
+      resolveOffer({ available: true, pairingUrl: 'orca://stale', qrDataUrl: 'stale-qr' })
+    })
+    expect(screen.getByTestId('pairing-url')).toHaveTextContent('none')
+    await userEvent.click(screen.getByRole('button', { name: 'Generate' }))
+    expect(getPairingQR).toHaveBeenLastCalledWith({ address: '100.126.117.25:6768', rotate: true })
+    await waitFor(() => expect(screen.getByTestId('pairing-url')).toHaveTextContent('orca://pair'))
+  })
+
+  it('applies a new navigation request while preserving independent cloud and direct owners', () => {
+    const cloud = <div>Cloud connection owner</div>
+    const { rerender } = render(
+      <MobilePane
+        cloudConnection={cloud}
+        requestedConnectionMethod="cloud"
+        navigationRevision={1}
+      />
+    )
+    expect(screen.getByRole('tab', { name: 'HiveCloud account' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    )
+    rerender(
+      <MobilePane
+        cloudConnection={cloud}
+        requestedConnectionMethod="direct"
+        navigationRevision={2}
+      />
+    )
+    expect(screen.getByRole('tab', { name: 'Direct address' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    )
+    expect(getPairingQR).not.toHaveBeenCalled()
+    expect(updateSettings).not.toHaveBeenCalled()
   })
 
   it('keeps the copy fallback when QR encoding fails', async () => {
@@ -434,7 +710,7 @@ async function unmountMobilePaneRoots(): Promise<void> {
   })
 }
 
-describe('Phone access management', () => {
+describe('MobileDeviceAccessSettings', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     _resetPairedMobileDevicesCacheForTests()
@@ -496,8 +772,7 @@ describe('Phone access management', () => {
     await vi.waitFor(() =>
       expect(mocks.latestPairedDevicesProps?.devices.map((d) => d.deviceId)).toEqual(['phone-2'])
     )
-    // Positive control so the unmount test below can't stay green if the
-    // success toast is ever dropped from the revoke path.
+    // Require a successful revoke toast first so the unmount test cannot pass if toasts disappear entirely.
     await vi.waitFor(() => expect(mocks.toastSuccess).toHaveBeenCalledTimes(1))
   })
 
@@ -541,8 +816,7 @@ describe('Phone access management', () => {
       mocks.latestPairedDevicesProps?.onRevokeDevice('phone-1')
     })
 
-    // Refresh rejected, so the fallback republishes the optimistic list without
-    // the revoked device, and success is still reported.
+    // Failed refresh retains optimistic removal and still reports the successful revoke.
     await vi.waitFor(() =>
       expect(mocks.latestPairedDevicesProps?.devices.map((d) => d.deviceId)).toEqual(['phone-2'])
     )

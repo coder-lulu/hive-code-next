@@ -1,113 +1,112 @@
 import { StyleSheet } from 'react-native'
-import type { MobileTheme } from '../theme/mobile-theme'
+import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import { themedStyleSheet } from '../theme/themed-styles'
 
-export function createMobileSourceControlHubStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    segments: {
-      flexDirection: 'row',
-      alignItems: 'stretch',
-      width: '100%',
-      backgroundColor: theme.color.bg.surface,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.color.border.subtle
-    },
-    segment: {
-      flex: 1,
-      minHeight: theme.size.minimumTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: theme.spacing.space4,
-      borderBottomWidth: 2,
-      borderBottomColor: 'transparent'
-    },
-    segmentActive: {
-      borderBottomColor: theme.color.text.primary
-    },
-    segmentPressed: {
-      backgroundColor: theme.color.bg.subtle
-    },
-    segmentText: {
-      ...theme.typography.label,
-      color: theme.color.text.secondary,
-      fontWeight: '600'
-    },
-    segmentTextActive: {
-      color: theme.color.text.primary
-    },
-    chip: {
-      minHeight: theme.size.minimumTouchTarget,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.space8,
-      marginTop: theme.spacing.space12,
-      paddingTop: theme.spacing.space12,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.color.border.subtle
-    },
-    chipPressed: {
-      opacity: 0.72
-    },
-    chipIcon: {
-      width: theme.spacing.space20,
-      alignItems: 'center'
-    },
-    chipNumber: {
-      ...theme.typography.label,
-      color: theme.color.text.primary,
-      fontWeight: '600'
-    },
-    statePill: {
-      paddingHorizontal: theme.spacing.space8,
-      paddingVertical: theme.spacing.space4,
-      borderRadius: theme.radii.small,
-      borderWidth: StyleSheet.hairlineWidth
-    },
-    statePillText: {
-      ...theme.typography.caption,
-      fontWeight: '600'
-    },
-    rollup: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.space4
-    },
-    rollupText: {
-      ...theme.typography.caption,
-      fontWeight: '600'
-    },
-    comment: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.space4
-    },
-    commentText: {
-      ...theme.typography.caption,
-      color: theme.color.text.secondary,
-      fontWeight: '600'
-    },
-    chipSpacer: {
-      flex: 1,
-      minWidth: theme.spacing.space8
-    },
-    chipCreateText: {
-      ...theme.typography.label,
-      color: theme.color.brand.primary,
-      fontWeight: '600'
-    },
-    chipMutedText: {
-      flex: 1,
-      ...theme.typography.caption,
-      color: theme.color.text.tertiary
-    },
-    changesControls: {
-      paddingHorizontal: theme.spacing.space16,
-      marginTop: theme.spacing.space4
-    },
-    tabBody: {
-      flex: 1
-    },
-    tabBodyHidden: {
-      display: 'none'
-    }
-  })
-}
+export const hubStyles = themedStyleSheet(() => ({
+  segments: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    width: '100%',
+    backgroundColor: colors.bgPanel,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.borderSubtle
+  },
+  segment: {
+    flex: 1,
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xs,
+    // Reserve underline height so selection cannot shift layout.
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent'
+  },
+  segmentActive: {
+    borderBottomColor: colors.textPrimary
+  },
+  segmentPressed: {
+    opacity: 0.7
+  },
+  segmentText: {
+    color: colors.textSecondary,
+    fontSize: typography.bodySize,
+    fontWeight: '600'
+  },
+  segmentTextActive: {
+    color: colors.textPrimary
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderSubtle
+  },
+  chipPressed: {
+    opacity: 0.7
+  },
+  chipIcon: {
+    width: 18,
+    alignItems: 'center'
+  },
+  chipNumber: {
+    color: colors.textPrimary,
+    fontSize: typography.bodySize,
+    fontWeight: '700'
+  },
+  statePill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 1,
+    borderRadius: radii.button,
+    borderWidth: StyleSheet.hairlineWidth
+  },
+  statePillText: {
+    fontSize: typography.metaSize,
+    fontWeight: '700'
+  },
+  rollup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4
+  },
+  rollupText: {
+    fontSize: typography.metaSize,
+    fontWeight: '600'
+  },
+  comment: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4
+  },
+  commentText: {
+    color: colors.textSecondary,
+    fontSize: typography.metaSize,
+    fontWeight: '600'
+  },
+  chipSpacer: {
+    flex: 1,
+    minWidth: spacing.sm
+  },
+  chipCreateText: {
+    color: colors.accentBlue,
+    fontSize: typography.bodySize,
+    fontWeight: '600'
+  },
+  chipMutedText: {
+    flex: 1,
+    color: colors.textMuted,
+    fontSize: typography.metaSize
+  },
+  changesControls: {
+    paddingHorizontal: spacing.lg,
+    marginTop: spacing.xs
+  },
+  tabBody: {
+    flex: 1
+  },
+  tabBodyHidden: {
+    display: 'none'
+  }
+}))

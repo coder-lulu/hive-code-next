@@ -8,31 +8,32 @@ import {
 import { ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES } from '../../../shared/electron-remote-runtime-client-capabilities'
 import { resolveAgentLaunchRoute, structuredAgentLaunchSupported } from './agent-launch-routing'
 
-const settings = { experimentalNativeChat: true }
+const settings = { nativeChatProviders: {} }
 
 function route(overrides: Partial<Parameters<typeof resolveAgentLaunchRoute>[0]> = {}) {
   return resolveAgentLaunchRoute({
     agent: 'codex',
     settings,
     executionHostId: 'local',
-    hostCapabilities: [STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY],
+    hostCapabilities: [STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY, STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY],
+    hostStructuredAgents: ['claude', 'codex', 'pi'],
     workspaceKind: 'git-worktree',
     ...overrides
   })
 }
 
 describe('new agent launch routing', () => {
-  it.each(['claude', 'codex'] as const)('opens supported local %s in structured chat', (agent) => {
+  it.each(['claude', 'codex', 'pi'] as const)('opens supported local %s in structured chat', (agent) => {
     expect(route({ agent })).toBe('structured-native-chat')
     expect(route({ agent, launchText: 'draft', promptDelivery: 'draft' })).toBe(
       'structured-native-chat'
     )
   })
 
-  it('uses Chat UI alone even when an old selector is false or absent', () => {
-    const oldSelectorOff = { experimentalNativeChat: true, openAgentTabsInChatByDefault: false }
-    expect(route({ settings: oldSelectorOff })).toBe('structured-native-chat')
-    expect(route({ settings: { experimentalNativeChat: true } })).toBe('structured-native-chat')
+  it('defaults known empty preferences on and scopes explicit false to the chosen agent', () => {
+    expect(route({ settings: { nativeChatProviders: {} } })).toBe('structured-native-chat')
+    expect(route({ agent: 'claude', settings: { nativeChatProviders: { codex: false } } })).toBe('structured-native-chat')
+    expect(route({ settings: undefined })).toBe('terminal-tui')
   })
 
   // Why: a TUI caps a mirrored draft at forty lines; the structured composer has no such limit.
@@ -44,7 +45,7 @@ describe('new agent launch routing', () => {
   })
 
   it('opens the terminal when Chat UI is off', () => {
-    expect(route({ settings: { experimentalNativeChat: false } })).toBe('terminal-tui')
+    expect(route({ settings: { nativeChatProviders: { codex: false } } })).toBe('terminal-tui')
     expect(route({ settings: null })).toBe('terminal-tui')
   })
 
@@ -115,7 +116,8 @@ describe('new agent launch routing', () => {
     ).toBe('structured-native-chat')
     const negotiated = [
       STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY,
-      STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY
+      STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY,
+      STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY
     ]
     expect(
       route({
@@ -127,7 +129,8 @@ describe('new agent launch routing', () => {
     expect(
       route({
         executionHostId: 'runtime:environment-a',
-        hostCapabilities: [STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY],
+        hostCapabilities: [STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY, STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY],
+    hostStructuredAgents: ['claude', 'codex', 'pi'],
         clientCapabilities: negotiated
       })
     ).toBe('terminal-tui')
@@ -151,7 +154,8 @@ describe('explicit structured chat requests', () => {
       agent,
       settings,
       executionHostId: 'local',
-      hostCapabilities: [STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY],
+      hostCapabilities: [STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY, STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY],
+    hostStructuredAgents: ['claude', 'codex', 'pi'],
       workspaceKind: 'folder' as const
     }
     expect(structuredAgentLaunchSupported(input)).toBe(true)
@@ -161,9 +165,10 @@ describe('explicit structured chat requests', () => {
   it('still permits an explicit structured history request while Chat UI is off', () => {
     const input = {
       agent: 'codex' as const,
-      settings: { experimentalNativeChat: false },
+      settings: { nativeChatProviders: { codex: false } },
       executionHostId: 'local',
-      hostCapabilities: [STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY]
+      hostCapabilities: [STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY, STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY],
+      hostStructuredAgents: ['codex']
     }
     expect(resolveAgentLaunchRoute(input)).toBe('terminal-tui')
     expect(structuredAgentLaunchSupported(input)).toBe(true)

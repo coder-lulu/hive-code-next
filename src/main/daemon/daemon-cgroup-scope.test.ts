@@ -27,10 +27,7 @@ describe('daemonScopeUnitName', () => {
   })
 })
 
-// These individual bus cases require a POSIX socket filesystem, not Windows named pipes.
-// Real, connectable AF_UNIX sockets rather than plain files at "bus" — the fix under test
-// distinguishes a genuinely reachable bus from a stale file/directory left at that path, so a
-// fixture that only `existsSync`-passes would not exercise it.
+// Use real AF_UNIX sockets so stale-file and directory fixtures cannot satisfy the bus check.
 const fakeBusServers: Server[] = []
 const fakeBusDirs: string[] = []
 const fakeSystemdBootDirs: string[] = []
@@ -50,8 +47,6 @@ function fakeRuntimeDirWithoutBus(): string {
   return dir
 }
 
-// A directory that reliably exists on every dev host, standing in for the real
-// `/run/systemd/system` boot marker that only exists on a systemd host.
 function fakeSystemdBootPath(): string {
   const dir = mkdtempSync(join(tmpdir(), 'systemd-boot-marker-'))
   fakeSystemdBootDirs.push(dir)
@@ -86,7 +81,7 @@ describe('isDurableDaemonScopeSupported', () => {
     ).toBe(false)
   })
 
-  it.runIf(process.platform !== 'win32')('is false when not booted under systemd, even with a reachable bus and a working binary', () => {
+  it('is false when not booted under systemd, even with a reachable bus and a working binary', () => {
     const perUidDir = fakeRuntimeDirWithBus()
     expect(
       isDurableDaemonScopeSupported({
@@ -116,8 +111,6 @@ describe('isDurableDaemonScopeSupported', () => {
   it('is false when neither the canonical per-UID path nor the env path has a reachable bus', () => {
     const canonical = fakeRuntimeDirWithoutBus()
     const envDir = fakeRuntimeDirWithoutBus()
-    // Neither fixture has a `bus` socket written — the probe must fail closed regardless of
-    // which path it looks at first.
     expect(
       isDurableDaemonScopeSupported({
         env: { XDG_RUNTIME_DIR: envDir },
@@ -130,7 +123,7 @@ describe('isDurableDaemonScopeSupported', () => {
     ).toBe(false)
   })
 
-  it.runIf(process.platform !== 'win32')('is false when systemd-run --version cannot answer: non-zero exit or a timeout kill', () => {
+  it('is false when systemd-run --version cannot answer: non-zero exit or a timeout kill', () => {
     const perUidDir = fakeRuntimeDirWithBus()
     const bootPath = fakeSystemdBootPath()
     expect(
@@ -155,11 +148,8 @@ describe('isDurableDaemonScopeSupported', () => {
     ).toBe(false)
   })
 
-  it.runIf(process.platform !== 'win32')('is true when the process env XDG_RUNTIME_DIR is a hardened unit override, but the real per-UID dir has a reachable bus (mtl-02 regression)', () => {
-    // Simulates orca-serve@factory.service's RuntimeDirectory=factory hardening directive:
-    // the process's own XDG_RUNTIME_DIR points at a private scratch dir that is NOT the user
-    // session bus location, while the real per-UID runtime dir (injected here in place of the
-    // real /run/user/<uid>) has a genuinely reachable bus the whole time.
+  it('is true when the process env XDG_RUNTIME_DIR is a hardened unit override, but the real per-UID dir has a reachable bus (mtl-02 regression)', () => {
+    // Simulate service hardening: the inherited runtime directory has no bus; the per-UID path does.
     const hardenedOverrideDir = fakeRuntimeDirWithoutBus()
     const realPerUidDir = fakeRuntimeDirWithBus()
     expect(
@@ -174,7 +164,7 @@ describe('isDurableDaemonScopeSupported', () => {
     ).toBe(true)
   })
 
-  it.runIf(process.platform !== 'win32')('is true when the caller env XDG_RUNTIME_DIR already points at the correct, reachable per-UID bus', () => {
+  it('is true when the caller env XDG_RUNTIME_DIR already points at the correct, reachable per-UID bus', () => {
     const perUidDir = fakeRuntimeDirWithBus()
     expect(
       isDurableDaemonScopeSupported({
@@ -188,9 +178,7 @@ describe('isDurableDaemonScopeSupported', () => {
     ).toBe(true)
   })
 
-  it.runIf(process.platform !== 'win32')('falls back to the process env XDG_RUNTIME_DIR when the canonical per-UID path has no reachable bus', () => {
-    // Some hosts legitimately have no /run/user/<uid> at all but do have a working bus
-    // wherever their own environment points — the probe must still support that host.
+  it('falls back to the process env XDG_RUNTIME_DIR when the canonical per-UID path has no reachable bus', () => {
     const canonicalWithoutBus = fakeRuntimeDirWithoutBus()
     const envDirWithBus = fakeRuntimeDirWithBus()
     expect(
@@ -231,53 +219,43 @@ describe('buildDurableDaemonScopeCommand', () => {
     ])
   })
 
-  it.runIf(process.platform !== 'win32')(
-    'prefers the canonical per-UID runtime dir over a hardened unit-overridden XDG_RUNTIME_DIR (mtl-02 regression)',
-    () => {
-      const hardenedOverrideDir = fakeRuntimeDirWithoutBus()
-      const realPerUidDir = fakeRuntimeDirWithBus()
-      const result = buildDurableDaemonScopeCommand(
-        '/usr/bin/node',
-        [],
-        'n',
-        { PATH: '/bin', XDG_RUNTIME_DIR: hardenedOverrideDir },
-        realPerUidDir
-      )
-      // Explicitly the real per-UID dir, not inherited from the spread env's overridden value.
-      expect(result.env.XDG_RUNTIME_DIR).toBe(realPerUidDir)
-    }
-  )
+  it('prefers the canonical per-UID runtime dir over a hardened unit-overridden XDG_RUNTIME_DIR (mtl-02 regression)', () => {
+    const hardenedOverrideDir = fakeRuntimeDirWithoutBus()
+    const realPerUidDir = fakeRuntimeDirWithBus()
+    const result = buildDurableDaemonScopeCommand(
+      '/usr/bin/node',
+      [],
+      'n',
+      { PATH: '/bin', XDG_RUNTIME_DIR: hardenedOverrideDir },
+      realPerUidDir
+    )
+    expect(result.env.XDG_RUNTIME_DIR).toBe(realPerUidDir)
+  })
 
-  it.runIf(process.platform !== 'win32')(
-    'falls back to the caller XDG_RUNTIME_DIR when the canonical per-UID path has no reachable bus',
-    () => {
-      const canonicalWithoutBus = fakeRuntimeDirWithoutBus()
-      const envDirWithBus = fakeRuntimeDirWithBus()
-      const result = buildDurableDaemonScopeCommand(
-        '/usr/bin/node',
-        [],
-        'n',
-        { PATH: '/bin', XDG_RUNTIME_DIR: envDirWithBus },
-        canonicalWithoutBus
-      )
-      expect(result.env.XDG_RUNTIME_DIR).toBe(envDirWithBus)
-    }
-  )
+  it('falls back to the caller XDG_RUNTIME_DIR when the canonical per-UID path has no reachable bus', () => {
+    const canonicalWithoutBus = fakeRuntimeDirWithoutBus()
+    const envDirWithBus = fakeRuntimeDirWithBus()
+    const result = buildDurableDaemonScopeCommand(
+      '/usr/bin/node',
+      [],
+      'n',
+      { PATH: '/bin', XDG_RUNTIME_DIR: envDirWithBus },
+      canonicalWithoutBus
+    )
+    expect(result.env.XDG_RUNTIME_DIR).toBe(envDirWithBus)
+  })
 
-  it.runIf(process.platform !== 'win32')(
-    'computes the conventional /run/user/<uid> runtime dir when the caller env omits it',
-    () => {
-      const perUidDir = fakeRuntimeDirWithBus()
-      const result = buildDurableDaemonScopeCommand(
-        '/usr/bin/node',
-        [],
-        'n',
-        { PATH: '/bin' },
-        perUidDir
-      )
-      expect(result.env.XDG_RUNTIME_DIR).toBe(perUidDir)
-    }
-  )
+  it('computes the conventional /run/user/<uid> runtime dir when the caller env omits it', () => {
+    const perUidDir = fakeRuntimeDirWithBus()
+    const result = buildDurableDaemonScopeCommand(
+      '/usr/bin/node',
+      [],
+      'n',
+      { PATH: '/bin' },
+      perUidDir
+    )
+    expect(result.env.XDG_RUNTIME_DIR).toBe(perUidDir)
+  })
 })
 
 describe('detectOwnCgroupScopeUnit', () => {
@@ -382,25 +360,22 @@ describe('legacy daemon scope migration', () => {
     })
   })
 
-  it.runIf(process.platform !== 'win32')(
-    'lets busctl discover the resolved user bus when service hardening disables the inherited address',
-    () => {
-      const runtimeDir = fakeRuntimeDirWithBus()
-      const command = buildLegacyScopeMigrationCommand(
-        'disabled-address',
-        [321],
-        {
-          XDG_RUNTIME_DIR: '/run/orca_serve/factory',
-          DBUS_SESSION_BUS_ADDRESS: 'disabled:'
-        },
-        runtimeDir
-      )
+  it('lets busctl discover the resolved user bus when service hardening disables the inherited address', () => {
+    const runtimeDir = fakeRuntimeDirWithBus()
+    const command = buildLegacyScopeMigrationCommand(
+      'disabled-address',
+      [321],
+      {
+        XDG_RUNTIME_DIR: '/run/orca_serve/factory',
+        DBUS_SESSION_BUS_ADDRESS: 'disabled:'
+      },
+      runtimeDir
+    )
 
-      expect(command.env).toEqual({ XDG_RUNTIME_DIR: runtimeDir })
-    }
-  )
+    expect(command.env).toEqual({ XDG_RUNTIME_DIR: runtimeDir })
+  })
 
-  it.runIf(process.platform !== 'win32')('migrates only a proven legacy scope and fails closed when systemd rejects it', () => {
+  it('migrates only a proven legacy scope and fails closed when systemd rejects it', () => {
     const runtimeDir = fakeRuntimeDirWithBus()
     const runMigration = vi.fn(() => ({ code: 0, timedOut: false }))
     const migrated = migrateLegacyDaemonScope(321, 'new-nonce', {
@@ -431,7 +406,7 @@ describe('legacy daemon scope migration', () => {
 })
 
 describe('durable scope launch environment and lifetime (#25580, #24201)', () => {
-  it.runIf(process.platform !== 'win32')("drops Chromium's disabled: bus marker so systemd-run reaches the user manager", () => {
+  it("drops Chromium's disabled: bus marker so systemd-run reaches the user manager", () => {
     const perUidDir = fakeRuntimeDirWithBus()
     const result = buildDurableDaemonScopeCommand(
       '/usr/bin/node',
@@ -455,7 +430,7 @@ describe('durable scope launch environment and lifetime (#25580, #24201)', () =>
     expect(result.env.DBUS_SESSION_BUS_ADDRESS).toBe('unix:path=/run/user/1000/bus')
   })
 
-  it.runIf(process.platform !== 'win32')('refuses the scope when the user manager would not outlive the caller', () => {
+  it('refuses the scope when the user manager would not outlive the caller', () => {
     const perUidDir = fakeRuntimeDirWithBus()
     const versionProbe = vi.fn(() => ({ code: 0, timedOut: false }))
     expect(
@@ -471,7 +446,7 @@ describe('durable scope launch environment and lifetime (#25580, #24201)', () =>
     expect(versionProbe).not.toHaveBeenCalled()
   })
 
-  it.runIf(process.platform !== 'win32')('never migrates an adopted daemon into a manager that dies at logout', () => {
+  it('never migrates an adopted daemon into a manager that dies at logout', () => {
     const runtimeDir = fakeRuntimeDirWithBus()
     const runMigration = vi.fn(() => ({ code: 0, timedOut: false }))
     expect(

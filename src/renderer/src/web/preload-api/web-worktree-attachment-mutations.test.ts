@@ -4,6 +4,12 @@ import {
   WORKTREE_LINKED_ITEMS_RUNTIME_CAPABILITY
 } from '../../../../shared/workspace-attachment-capabilities'
 import { createWorktreesApi } from './web-worktrees-api'
+const githubLinkBase = {
+  hostId: 'local' as const,
+  instanceId: null,
+  linkedPR: null,
+  suppressedGitHubPR: null
+}
 
 const mocks = vi.hoisted(() => ({ status: vi.fn(), call: vi.fn(), assertEnvironment: vi.fn() }))
 vi.mock('@/i18n/i18n', () => ({ translate: (_key: string, fallback: string) => fallback }))
@@ -30,13 +36,34 @@ beforeEach(() => {
 })
 
 describe('paired web attachment mutation compatibility', () => {
+  it('refuses unlink without an observed base', async () => {
+    await expect(
+      createWorktreesApi().updateMeta({ worktreeId: 'wt', updates: { linkedPR: null } })
+    ).rejects.toThrow('Refresh this workspace')
+    expect(mocks.call).not.toHaveBeenCalled()
+  })
+  it('refuses a base owned by another host', async () => {
+    await expect(
+      createWorktreesApi().updateMeta({
+        worktreeId: 'wt',
+        executionHostId: 'ssh:other',
+        updates: { linkedPR: null },
+        githubLinkBase
+      })
+    ).rejects.toThrow('Refresh this workspace')
+    expect(mocks.call).not.toHaveBeenCalled()
+  })
   it.each([{ linkedPR: null }, { linkedIssue: 9 }, { linkedIssue: null }])(
     'forwards legacy scalar writes without a collection capability: %j',
     async (updates) => {
       mocks.status.mockResolvedValue({ capabilities: [] })
-      await createWorktreesApi().updateMeta({ worktreeId: 'wt', updates })
+      await createWorktreesApi().updateMeta({ worktreeId: 'wt', updates, githubLinkBase })
       expect(mocks.status).not.toHaveBeenCalled()
-      expect(mocks.call).toHaveBeenCalledWith('worktree.set', { worktree: 'id:wt', ...updates })
+      expect(mocks.call).toHaveBeenCalledWith('worktree.set', {
+        worktree: 'id:wt',
+        ...updates,
+        githubLinkBase
+      })
     }
   )
   it.each([true, false])(
@@ -45,10 +72,15 @@ describe('paired web attachment mutation compatibility', () => {
       mocks.status.mockResolvedValue({
         capabilities: supported ? [WORKTREE_LINKED_ITEMS_RUNTIME_CAPABILITY] : []
       })
-      await createWorktreesApi().updateMeta({ worktreeId: 'wt', updates: { linkedGitLabMR: 7 } })
+      await createWorktreesApi().updateMeta({
+        worktreeId: 'wt',
+        updates: { linkedGitLabMR: 7 },
+        githubLinkBase
+      })
       expect(mocks.call).toHaveBeenCalledWith('worktree.set', {
         worktree: 'id:wt',
         linkedGitLabMR: 7,
+        githubLinkBase,
         ...(supported
           ? {}
           : {

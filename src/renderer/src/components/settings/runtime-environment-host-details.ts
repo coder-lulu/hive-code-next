@@ -1,9 +1,9 @@
 import { translate } from '@/i18n/i18n'
 import {
-  describeRuntimeCompatBlock,
   evaluateRuntimeCompat,
   type RuntimeCompatVerdict
 } from '../../../../shared/protocol-compat'
+import { describeRuntimeCompatBlock } from '@/lib/runtime-host-copy'
 import {
   MIN_COMPATIBLE_RUNTIME_SERVER_VERSION,
   PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
@@ -12,39 +12,11 @@ import {
   WORKSPACE_RUN_CONTEXT_RUNTIME_CAPABILITY
 } from '../../../../shared/protocol-version'
 import type { RuntimeStatus } from '../../../../shared/runtime-types'
-import type { PublicKnownRuntimeEnvironment } from '../../../../shared/runtime-environments'
 import {
-  canConnectRuntimeEnvironment,
-  getRuntimeEnvironmentEndpointDisplay,
-  getRuntimeEnvironmentInitialDetails as getRuntimeEnvironmentInitialDetailsFromAccount,
-  getRuntimeEnvironmentRemovalPresentation,
-  resolveRuntimeCloudRenameEnvironment,
-  supportsLocalRuntimeEnvironmentRemoval,
-  type RuntimeEnvironmentRemovalPresentation
-} from './runtime-environment-host-details-account'
-import {
-  getAccountRuntimeConnectionHelp,
-  getRuntimeServerConnectionLabel,
-  getRuntimeServerConnectionState,
-  getRuntimeServerDotClass,
-  isRuntimeServerTransportConnected,
-  type RuntimeServerConnectionState
-} from './runtime-environment-host-details-connection'
-
-export {
-  canConnectRuntimeEnvironment,
-  getAccountRuntimeConnectionHelp,
-  getRuntimeEnvironmentEndpointDisplay,
-  getRuntimeEnvironmentRemovalPresentation,
-  getRuntimeServerConnectionLabel,
-  getRuntimeServerConnectionState,
-  getRuntimeServerDotClass,
-  isRuntimeServerTransportConnected,
-  resolveRuntimeCloudRenameEnvironment,
-  supportsLocalRuntimeEnvironmentRemoval,
-  type RuntimeEnvironmentRemovalPresentation,
-  type RuntimeServerConnectionState
-}
+  isConnectedRuntimeHostState,
+  runtimeHostConnectionState,
+  type RuntimeHostConnectionState
+} from '@/runtime/runtime-host-connection-state'
 
 export type RuntimeHostDetails = {
   status: 'loading' | 'ready' | 'error'
@@ -82,7 +54,7 @@ export function getHostDetailsSummary(details: RuntimeHostDetails | undefined): 
   if (details.runtimeStatus === null && details.compatibility === null) {
     return translate(
       'auto.components.settings.RuntimeEnvironmentsPane.serverRuntimeUnavailable',
-      'HiveCode unavailable'
+      'Orca unavailable'
     )
   }
   if (details.compatibility?.kind === 'blocked') {
@@ -106,7 +78,7 @@ export function getHostDetailsDescription(details: RuntimeHostDetails | undefine
   if (details.runtimeStatus === null && details.compatibility === null) {
     const unavailableDescription = translate(
       'auto.components.settings.RuntimeEnvironmentsPane.serverRuntimeUnavailableDescription',
-      'SSH transport is connected, but the HiveCode runtime did not answer. The host may still be running.'
+      'SSH transport is connected, but the Orca runtime did not answer. The host may still be running.'
     )
     return details.error ? `${unavailableDescription} ${details.error}` : unavailableDescription
   }
@@ -183,12 +155,12 @@ function getHostModelCapabilityLabel(capability: string): string {
 export function getActiveServerModeDescription(allowLocalRuntime: boolean): string {
   return allowLocalRuntime
     ? translate(
-        'auto.components.settings.RuntimeEnvironmentsPane.3f67e8078a',
-        'New projects are created on this computer unless you choose a saved server here. Existing projects, files and terminals stay on their own host.'
+        'auto.components.settings.serverList.defaultHostHelp',
+        'Existing projects stay where they are.'
       )
     : translate(
-        'auto.components.settings.RuntimeEnvironmentsPane.2c85efb3e8',
-        'Selecting a saved server makes this browser use that paired HiveCode runtime as its default Host.'
+        'auto.components.settings.serverList.defaultHostWebHelp',
+        'This browser opens new projects on the chosen server.'
       )
 }
 
@@ -199,15 +171,69 @@ export function isRuntimeEnvironmentRemovalBlocked(
   return activeRuntimeEnvironmentId === environmentId
 }
 
-export function getRuntimeEnvironmentInitialDetails(
-  environment: Pick<PublicKnownRuntimeEnvironment, 'accessSources' | 'accountClaim'>,
-  current?: RuntimeHostDetails,
-  verifiedStatus?: RuntimeStatus
-): RuntimeHostDetails {
-  return getRuntimeEnvironmentInitialDetailsFromAccount(
-    environment,
-    evaluateHostDetails,
-    current,
-    verifiedStatus
-  )
+export type RuntimeServerConnectionState = RuntimeHostConnectionState
+
+export function getRuntimeServerConnectionState(
+  details: RuntimeHostDetails | undefined
+): RuntimeServerConnectionState {
+  if (!details || details.status === 'loading') {
+    return 'checking'
+  }
+  if (details.compatibility?.kind === 'blocked') {
+    return 'disconnected'
+  }
+  // Compatibility verdicts prove runtime availability even when older clients omit full status.
+  if (
+    details.status === 'ready' &&
+    details.runtimeStatus === null &&
+    details.compatibility !== null
+  ) {
+    return 'connected'
+  }
+  return runtimeHostConnectionState({
+    hasStatusEntry: true,
+    status: details.runtimeStatus,
+    remoteControl: details.remoteControl,
+    // Ready details prove only transport; older/failed probes can omit runtime status, and errors need reachability diagnostics.
+    transportStatus: details.status === 'ready' ? 'connected' : 'disconnected'
+  })
+}
+
+export function isRuntimeServerTransportConnected(state: RuntimeServerConnectionState): boolean {
+  return isConnectedRuntimeHostState(state)
+}
+
+export function getRuntimeServerConnectionLabel(state: RuntimeServerConnectionState): string {
+  switch (state) {
+    case 'connected':
+      return translate(
+        'auto.components.settings.RuntimeEnvironmentsPane.serverConnected',
+        'Connected'
+      )
+    case 'runtime-unavailable':
+      return translate(
+        'auto.components.settings.RuntimeEnvironmentsPane.serverRuntimeUnavailable',
+        'Orca unavailable'
+      )
+    case 'workspace-window-closed':
+      return translate(
+        'auto.components.settings.RuntimeEnvironmentsPane.serverWorkspaceWindowClosed',
+        'Workspace window closed'
+      )
+    case 'reconnecting':
+      return translate(
+        'auto.components.settings.RuntimeEnvironmentsPane.serverReconnecting',
+        'Reconnecting'
+      )
+    case 'checking':
+      return translate(
+        'auto.components.settings.RuntimeEnvironmentsPane.serverChecking',
+        'Checking…'
+      )
+    case 'disconnected':
+      return translate(
+        'auto.components.settings.RuntimeEnvironmentsPane.serverDisconnected',
+        'Disconnected'
+      )
+  }
 }

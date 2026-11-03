@@ -3,12 +3,6 @@ import { describe, expect, it } from 'vitest'
 
 const require = createRequire(import.meta.url)
 const electronBuilderConfig = require('../electron-builder.config.cjs')
-const expectedPackagedMetadata = {
-  name: 'hivecode',
-  productName: 'HiveCode',
-  description: 'HiveCode',
-  author: { name: 'HiveCode' }
-}
 
 const MUTABLE_BUILD_ENV = [
   'ORCA_MAC_HOURLY',
@@ -50,21 +44,17 @@ const withDailyEnv = (assert) => withEnv({ ORCA_MAC_DAILY: '1' }, assert)
 const withAdhocEnv = (assert) => withEnv({ ORCA_MAC_ADHOC: '1' }, assert)
 
 describe('electron-builder mac channel config', () => {
-  // Why: every package must retain the configured product identity. Falling back
-  // to an upstream bundle id would cross the fork boundary.
+  // Squirrel.Mac requires release bundle ID and Developer ID signature; local ad-hoc hourly identity cannot update real Orca.
   it('builds hourly artifacts with the release signing identity', () => {
     withHourlyEnv((config) => {
       expect(config.mac.appId).toBeUndefined()
-      expect(config.appId).toBe('com.hivekernel.hivecode.desktop')
+      expect(config.appId).toBe('com.stablyai.orca')
       expect(config.mac.hardenedRuntime).toBe(true)
       expect(config.forceCodeSigning).toBe(true)
     })
   })
 
-  // Why hourly must notarize despite the round trip: TCC anchors a notarized
-  // Developer ID app's grants on identifier + team, not on its cdhash, so they
-  // survive an update. An unnotarized hourly reads as a new client every build
-  // and loses file access under Documents/Desktop/Downloads with no re-prompt.
+  // Notarization anchors TCC to identifier/team across updates; unnotarized hourlies lose folder grants without re-prompt.
   it('notarizes hourly builds like releases, and neither locally', () => {
     withHourlyEnv((config) => {
       expect(config.mac.notarize).toBe(true)
@@ -75,34 +65,34 @@ describe('electron-builder mac channel config', () => {
     expect(electronBuilderConfig.mac.notarize).toBe(false)
   })
 
-  // Why: HiveCode has no approved release repository in the product manifest.
-  // Dev-channel environment variables must not reactivate upstream publishing.
-  it('keeps publishing disabled for unconfigured channels', () => {
+  // Twenty-four hourly releases would evict stable/RC from main repo’s ten-entry feed.
+  it('publishes hourly builds to the separate hourly repo', () => {
     withHourlyEnv((config) => {
-      expect(config.publish).toBeNull()
+      expect(config.publish).toMatchObject({ repo: 'orca-hourly', releaseType: 'prerelease' })
     })
-    expect(electronBuilderConfig.publish).toBeNull()
+    expect(electronBuilderConfig.publish).toMatchObject({
+      repo: 'orca',
+      releaseType: 'draft'
+    })
   })
 
   it('stamps hourly packages with the hourly version', () => {
     withEnv(
       { ORCA_MAC_HOURLY: '1', ORCA_HOURLY_BUILD_VERSION: '1.4.160-hourly.202607281400' },
       (config) => {
-        expect(config.extraMetadata).toEqual({
-          ...expectedPackagedMetadata,
-          version: '1.4.160-hourly.202607281400'
-        })
+        expect(config.extraMetadata).toEqual({ version: '1.4.160-hourly.202607281400' })
       }
     )
   })
 
-  it('builds adhoc artifacts with the HiveCode identity and no upstream repo', () => {
+  // Adhoc uses same updater, signing and TCC identity as hourly; only destination repo differs.
+  it('builds adhoc artifacts with the release identity and its own repo', () => {
     withAdhocEnv((config) => {
-      expect(config.appId).toBe('com.hivekernel.hivecode.desktop')
+      expect(config.appId).toBe('com.stablyai.orca')
       expect(config.mac.hardenedRuntime).toBe(true)
       expect(config.mac.notarize).toBe(true)
       expect(config.forceCodeSigning).toBe(true)
-      expect(config.publish).toBeNull()
+      expect(config.publish).toMatchObject({ repo: 'orca-adhoc', releaseType: 'prerelease' })
     })
   })
 
@@ -110,21 +100,18 @@ describe('electron-builder mac channel config', () => {
     withEnv(
       { ORCA_MAC_ADHOC: '1', ORCA_ADHOC_BUILD_VERSION: '1.4.160-adhoc.20260728140533' },
       (config) => {
-        expect(config.extraMetadata).toEqual({
-          ...expectedPackagedMetadata,
-          version: '1.4.160-adhoc.20260728140533'
-        })
+        expect(config.extraMetadata).toEqual({ version: '1.4.160-adhoc.20260728140533' })
       }
     )
   })
 
-  it('builds daily artifacts with the HiveCode identity and no upstream repo', () => {
+  it('builds daily artifacts with the release identity and its own repo', () => {
     withDailyEnv((config) => {
-      expect(config.appId).toBe('com.hivekernel.hivecode.desktop')
+      expect(config.appId).toBe('com.stablyai.orca')
       expect(config.mac.hardenedRuntime).toBe(true)
       expect(config.mac.notarize).toBe(true)
       expect(config.forceCodeSigning).toBe(true)
-      expect(config.publish).toBeNull()
+      expect(config.publish).toMatchObject({ repo: 'orca-daily', releaseType: 'prerelease' })
     })
   })
 
@@ -132,21 +119,8 @@ describe('electron-builder mac channel config', () => {
     withEnv(
       { ORCA_MAC_DAILY: '1', ORCA_DAILY_BUILD_VERSION: '1.4.160-daily.202607281300' },
       (config) => {
-        expect(config.extraMetadata).toEqual({
-          ...expectedPackagedMetadata,
-          version: '1.4.160-daily.202607281300'
-        })
+        expect(config.extraMetadata).toEqual({ version: '1.4.160-daily.202607281300' })
       }
     )
-  })
-
-  it('keeps every dev channel fail closed without a product repository', () => {
-    withHourlyEnv((hourly) => {
-      withDailyEnv((daily) => {
-        withAdhocEnv((adhoc) => {
-          expect([hourly.publish, daily.publish, adhoc.publish]).toEqual([null, null, null])
-        })
-      })
-    })
   })
 })

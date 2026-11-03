@@ -15,7 +15,7 @@ describe('web settings preload API', () => {
     vi.unstubAllGlobals()
   })
 
-  it('migrates first-work branch auto-rename on for stored legacy web settings once', async () => {
+  it('preserves a stored branch auto-rename opt-out without a marker', async () => {
     const globals = installBrowserGlobals('Linux')
     globals.storage.setItem(
       'orca.web.settings.v1',
@@ -30,13 +30,13 @@ describe('web settings preload API', () => {
       autoRenameBranchFromWorkDefaultedOn?: boolean
     }
 
-    expect(settings.autoRenameBranchFromWork).toBe(true)
-    expect(settings.autoRenameBranchFromWorkDefaultedOn).toBe(true)
-    expect(stored.autoRenameBranchFromWork).toBe(true)
-    expect(stored.autoRenameBranchFromWorkDefaultedOn).toBe(true)
+    expect(settings.autoRenameBranchFromWork).toBe(false)
+    expect(Object.hasOwn(settings, 'autoRenameBranchFromWorkDefaultedOn')).toBe(false)
+    expect(stored.autoRenameBranchFromWork).toBe(false)
+    expect(Object.hasOwn(stored, 'autoRenameBranchFromWorkDefaultedOn')).toBe(false)
   })
 
-  it('migrates inherited terminal bar cursor defaults for stored web settings once', async () => {
+  it('preserves an explicit terminal bar cursor in current web settings', async () => {
     const globals = installBrowserGlobals('Linux')
     globals.storage.setItem('orca.web.settings.v1', JSON.stringify({ terminalCursorStyle: 'bar' }))
     const { installWebPreloadApi } = await import('./web-preload-api')
@@ -48,10 +48,10 @@ describe('web settings preload API', () => {
       terminalCursorStyleDefaultedToBlock?: boolean
     }
 
-    expect(settings.terminalCursorStyle).toBe('block')
-    expect(settings.terminalCursorStyleDefaultedToBlock).toBe(true)
-    expect(stored.terminalCursorStyle).toBe('block')
-    expect(stored.terminalCursorStyleDefaultedToBlock).toBe(true)
+    expect(settings.terminalCursorStyle).toBe('bar')
+    expect(Object.hasOwn(settings, 'terminalCursorStyleDefaultedToBlock')).toBe(false)
+    expect(stored.terminalCursorStyle).toBe('bar')
+    expect(Object.hasOwn(stored, 'terminalCursorStyleDefaultedToBlock')).toBe(false)
   })
 
   it('preserves terminal cursor choices after the web block-default migration', async () => {
@@ -68,7 +68,7 @@ describe('web settings preload API', () => {
 
     const settings = await globals.window.api.settings.get()
     expect(settings.terminalCursorStyle).toBe('bar')
-    expect(settings.terminalCursorStyleDefaultedToBlock).toBe(true)
+    expect(Object.hasOwn(settings, 'terminalCursorStyleDefaultedToBlock')).toBe(false)
   })
 
   it('mirrors the host-owned agent skill sharing capability without granting it', async () => {
@@ -116,9 +116,9 @@ describe('web settings preload API', () => {
       terminalCursorStyleDefaultedToBlock?: boolean
     }
     expect(invalid.terminalCursorStyle).toBe('block')
-    expect(invalid.terminalCursorStyleDefaultedToBlock).toBe(true)
+    expect(Object.hasOwn(invalid, 'terminalCursorStyleDefaultedToBlock')).toBe(false)
     expect(invalidStored.terminalCursorStyle).toBe('block')
-    expect(invalidStored.terminalCursorStyleDefaultedToBlock).toBe(true)
+    expect(Object.hasOwn(invalidStored, 'terminalCursorStyleDefaultedToBlock')).toBe(false)
 
     const valid = await api.settings.set({ terminalCursorStyle: 'bar' })
     expect(valid.terminalCursorStyle).toBe('bar')
@@ -127,9 +127,7 @@ describe('web settings preload API', () => {
     )
   })
 
-  it('migrates OSC 52 clipboard writes on for stored web settings once', async () => {
-    // Why: the web store is a second, independent settings store — the constants-level
-    // default flip only reaches profiles that never persisted the old `false` (#10567).
+  it('preserves stored OSC 52 clipboard denial without a marker', async () => {
     const globals = installBrowserGlobals('Linux')
     globals.storage.setItem(
       'orca.web.settings.v1',
@@ -144,13 +142,13 @@ describe('web settings preload API', () => {
       terminalAllowOsc52ClipboardDefaultedOnForAllUsers?: boolean
     }
 
-    expect(settings.terminalAllowOsc52Clipboard).toBe(true)
-    expect(settings.terminalAllowOsc52ClipboardDefaultedOnForAllUsers).toBe(true)
-    expect(stored.terminalAllowOsc52Clipboard).toBe(true)
-    expect(stored.terminalAllowOsc52ClipboardDefaultedOnForAllUsers).toBe(true)
+    expect(settings.terminalAllowOsc52Clipboard).toBe(false)
+    expect(Object.hasOwn(settings, 'terminalAllowOsc52ClipboardDefaultedOnForAllUsers')).toBe(false)
+    expect(stored.terminalAllowOsc52Clipboard).toBe(false)
+    expect(Object.hasOwn(stored, 'terminalAllowOsc52ClipboardDefaultedOnForAllUsers')).toBe(false)
   })
 
-  it('arms the OSC 52 notice in the web UI store when the flip overrides a persisted off', async () => {
+  it('does not arm an OSC 52 upgrade notice for an explicit opt-out', async () => {
     const globals = installBrowserGlobals('Linux')
     globals.storage.setItem(
       'orca.web.settings.v1',
@@ -164,7 +162,7 @@ describe('web settings preload API', () => {
       osc52ClipboardDefaultOnNoticePending?: boolean
     }
 
-    expect(storedUi.osc52ClipboardDefaultOnNoticePending).toBe(true)
+    expect(storedUi.osc52ClipboardDefaultOnNoticePending).not.toBe(true)
   })
 
   it('does not arm the OSC 52 notice for a web profile with no persisted value', async () => {
@@ -181,12 +179,7 @@ describe('web settings preload API', () => {
     expect(storedUi.osc52ClipboardDefaultOnNoticePending).not.toBe(true)
   })
 
-  it('arms the OSC 52 notice when ui.get is the read that runs the migration', async () => {
-    // Why seed after install: readLocalWebUIState must run the settings migration before it
-    // snapshots the UI blob, and only a ui.get that is itself the first settings read can
-    // show that. Reading first returns a pre-arm state every caller then writes back — and
-    // the stamp means nothing can raise the arm again. Another tab populating localStorage
-    // after this one loaded is the shape that reaches it.
+  it('does not arm a retired notice when ui.get reads newly persisted settings', async () => {
     const globals = installBrowserGlobals('Linux')
     const { installWebPreloadApi } = await import('./web-preload-api')
     installWebPreloadApi()
@@ -197,10 +190,10 @@ describe('web settings preload API', () => {
 
     const ui = await globals.window.api.ui.get()
 
-    expect(ui.osc52ClipboardDefaultOnNoticePending).toBe(true)
+    expect(ui.osc52ClipboardDefaultOnNoticePending).not.toBe(true)
   })
 
-  it('preserves OSC 52 clipboard web opt-outs after migration', async () => {
+  it('preserves OSC 52 clipboard denial and drops a retired marker', async () => {
     const globals = installBrowserGlobals('Linux')
     globals.storage.setItem(
       'orca.web.settings.v1',
@@ -214,10 +207,10 @@ describe('web settings preload API', () => {
 
     const settings = await globals.window.api.settings.get()
     expect(settings.terminalAllowOsc52Clipboard).toBe(false)
-    expect(settings.terminalAllowOsc52ClipboardDefaultedOnForAllUsers).toBe(true)
+    expect(Object.hasOwn(settings, 'terminalAllowOsc52ClipboardDefaultedOnForAllUsers')).toBe(false)
   })
 
-  it('preserves first-work branch auto-rename web opt-outs after migration', async () => {
+  it('preserves branch auto-rename denial and drops a retired marker', async () => {
     const globals = installBrowserGlobals('Linux')
     globals.storage.setItem(
       'orca.web.settings.v1',
@@ -236,24 +229,29 @@ describe('web settings preload API', () => {
     }
 
     expect(settings.autoRenameBranchFromWork).toBe(false)
-    expect(settings.autoRenameBranchFromWorkDefaultedOn).toBe(true)
+    expect(Object.hasOwn(settings, 'autoRenameBranchFromWorkDefaultedOn')).toBe(false)
     expect(stored.autoRenameBranchFromWork).toBe(false)
-    expect(stored.autoRenameBranchFromWorkDefaultedOn).toBe(true)
+    expect(Object.hasOwn(stored, 'autoRenameBranchFromWorkDefaultedOn')).toBe(false)
   })
 
-  it('stamps the first-work branch auto-rename guard for web setting updates', async () => {
+  it('persists branch auto-rename opt-outs without a retired marker', async () => {
     const { api, storage } = await installApi('Linux')
 
-    const settings = await api.settings.set({ autoRenameBranchFromWork: false })
+    const settings = await api.settings.set({
+      autoRenameBranchFromWork: false,
+      terminalAllowOsc52Clipboard: false
+    })
+    expect(settings.terminalAllowOsc52Clipboard).toBe(false)
+    expect((await api.settings.get()).terminalAllowOsc52Clipboard).toBe(false)
     const stored = JSON.parse(storage.getItem('orca.web.settings.v1') ?? '{}') as {
       autoRenameBranchFromWork?: boolean
       autoRenameBranchFromWorkDefaultedOn?: boolean
     }
 
     expect(settings.autoRenameBranchFromWork).toBe(false)
-    expect(settings.autoRenameBranchFromWorkDefaultedOn).toBe(true)
+    expect(Object.hasOwn(settings, 'autoRenameBranchFromWorkDefaultedOn')).toBe(false)
     expect(stored.autoRenameBranchFromWork).toBe(false)
-    expect(stored.autoRenameBranchFromWorkDefaultedOn).toBe(true)
+    expect(Object.hasOwn(stored, 'autoRenameBranchFromWorkDefaultedOn')).toBe(false)
   })
 
   it('hydrates compact worktree cards from paired runtime settings', async () => {
@@ -296,7 +294,7 @@ describe('web settings preload API', () => {
     expect(runtimeCalls).toEqual([{ method: 'settings.get', params: undefined }])
   }, 15_000)
 
-  it('keeps a completed settings merge when the paired host is removed mid-read', async () => {
+  it('rejects settings when the paired host is removed mid-read', async () => {
     let resolveSettings!: (value: RuntimeRpcResponse<unknown>) => void
     const settingsRead = new Promise<RuntimeRpcResponse<unknown>>(
       (resolve) => (resolveSettings = resolve)
@@ -335,12 +333,11 @@ describe('web settings preload API', () => {
       _meta: { runtimeId: 'runtime-1' }
     })
 
-    await expect(read).resolves.toMatchObject({
-      compactWorktreeCards: true,
-      worktreeVisibilityDefaults: { external: 'hide' }
-    })
+    await expect(read).rejects.toThrow('Settings pairing changed')
+    expect(
+      JSON.parse(globals.storage.getItem('orca.web.settings.v1') ?? '{}').compactWorktreeCards
+    ).not.toBe(true)
     expect(JSON.parse(globals.storage.getItem('orca.web.settings.v1') ?? '{}')).toMatchObject({
-      compactWorktreeCards: true,
       worktreeVisibilityDefaults: { external: 'hide' }
     })
   })

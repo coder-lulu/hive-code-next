@@ -2,7 +2,12 @@ import {
   createWsOutboundBackpressureQueue,
   type WsOutboundBackpressureQueue
 } from '../../../src/shared/ws-outbound-backpressure-queue'
+import {
+  classifyPairedE2EEV2AuthReply,
+  pairedE2EEV2TokenAuth
+} from '../../../src/shared/paired-e2ee-client-handshake'
 import type { MobileE2EEV2ClientSession } from './mobile-e2ee-v2-client-session'
+import { WsInboundMessageQueue } from '../../../src/shared/ws-inbound-message-queue'
 
 type ChannelState = 'awaiting-ready' | 'awaiting-authenticated' | 'ready'
 type OutboundItem = { kind: 'text'; plaintext: string } | { kind: 'binary'; plaintext: Uint8Array }
@@ -24,7 +29,7 @@ export class MobileE2EEV2PhysicalChannel {
   private state: ChannelState = 'awaiting-ready'
   private generation = 0
   private disposed = false
-  private inboundChain: Promise<void> = Promise.resolve()
+  private readonly inbound: WsInboundMessageQueue
   private readonly outboundQueue: WsOutboundBackpressureQueue<OutboundItem>
 
   constructor(
@@ -40,6 +45,10 @@ export class MobileE2EEV2PhysicalChannel {
       onError: (error: Error) => void
     }
   ) {
+    this.inbound = new WsInboundMessageQueue(
+      (raw) => this.processMessage(raw, this.generation),
+      (error) => args.onError(error instanceof Error ? error : new Error(String(error)))
+    )
     this.outboundQueue = createWsOutboundBackpressureQueue<OutboundItem>({
       // Why: encryption happens only when an admitted item reaches the wire,
       // so a bounded-queue rejection cannot burn an ordered v2 counter.
@@ -50,14 +59,10 @@ export class MobileE2EEV2PhysicalChannel {
             : args.session.sealBinary(item.plaintext)
         )
       },
-      byteLengthOf: (item) => {
-        const plaintextBytes =
-          item.kind === 'text'
-            ? new TextEncoder().encode(item.plaintext).length
-            : item.plaintext.length
-        const framedBytes = plaintextBytes + 82
-        return item.kind === 'text' ? Math.ceil(framedBytes / 3) * 4 : framedBytes
-      },
+      byteLengthOf: (item) =>
+        item.kind === 'text'
+          ? Math.ceil((new TextEncoder().encode(item.plaintext).length + 82) / 3) * 4
+          : item.plaintext.length + 82,
       getBufferedAmount: () => args.socket.bufferedAmount,
       isWritable: () => args.socket.readyState === args.socket.OPEN,
       onOverflow: () => args.onError(new Error('E2EE v2 outbound buffer overflow'))
@@ -75,23 +80,15 @@ export class MobileE2EEV2PhysicalChannel {
     if (this.disposed) {
       return Promise.resolve()
     }
-    const generation = this.generation
-    this.inboundChain = this.inboundChain
-      .then(() => this.processMessage(raw, generation))
-      .catch((error: unknown) => {
-        if (generation === this.generation) {
-          this.args.onError(error instanceof Error ? error : new Error(String(error)))
-        }
-      })
-    return this.inboundChain
+    return this.inbound.enqueue(raw)
   }
 
   sendText(plaintext: string): boolean {
-    return !this.disposed && this.enqueueReady({ kind: 'text', plaintext })
+    return this.enqueueReady({ kind: 'text', plaintext })
   }
 
   sendBinary(plaintext: Uint8Array): boolean {
-    return !this.disposed && this.enqueueReady({ kind: 'binary', plaintext })
+    return this.enqueueReady({ kind: 'binary', plaintext })
   }
 
   dispose(): void {
@@ -100,11 +97,12 @@ export class MobileE2EEV2PhysicalChannel {
     }
     this.disposed = true
     this.generation++
+    this.inbound.dispose()
     this.outboundQueue.dispose()
   }
 
   private async processMessage(raw: unknown, generation: number): Promise<void> {
-    if (this.disposed || generation !== this.generation) {
+    if (generation !== this.generation) {
       return
     }
     if (this.state === 'awaiting-ready') {
@@ -116,7 +114,7 @@ export class MobileE2EEV2PhysicalChannel {
       typeof raw === 'string'
         ? this.args.session.openText(raw)
         : await this.openBinary(raw, generation)
-    if (this.disposed || generation !== this.generation || plaintext === null) {
+    if (generation !== this.generation || plaintext === null) {
       return
     }
     if (this.state === 'awaiting-authenticated') {
@@ -152,12 +150,9 @@ export class MobileE2EEV2PhysicalChannel {
     this.args.onReadyAccepted?.()
     this.outboundQueue.enqueue({
       kind: 'text',
-      plaintext: JSON.stringify({
-        type: 'e2ee_auth',
-        v: 2,
-        transcriptHashB64: this.args.session.transcriptHashB64,
-        deviceToken: this.args.deviceToken
-      })
+      plaintext: JSON.stringify(
+        pairedE2EEV2TokenAuth(this.args.session.transcriptHashB64, this.args.deviceToken)
+      )
     })
   }
 
@@ -171,17 +166,9 @@ export class MobileE2EEV2PhysicalChannel {
 
   private isAuthenticated(plaintext: string): boolean {
     try {
-      const message: unknown = JSON.parse(plaintext)
       return (
-        typeof message === 'object' &&
-        message !== null &&
-        Object.keys(message).sort().join(',') === 'transcriptHashB64,type,v' &&
-        'type' in message &&
-        message.type === 'e2ee_authenticated' &&
-        'v' in message &&
-        message.v === 2 &&
-        'transcriptHashB64' in message &&
-        message.transcriptHashB64 === this.args.session.transcriptHashB64
+        classifyPairedE2EEV2AuthReply(JSON.parse(plaintext), this.args.session.transcriptHashB64)
+          .kind === 'authenticated'
       )
     } catch {
       return false
@@ -189,7 +176,7 @@ export class MobileE2EEV2PhysicalChannel {
   }
 
   private enqueueReady(item: OutboundItem): boolean {
-    if (this.state !== 'ready') {
+    if (this.disposed || this.state !== 'ready') {
       return false
     }
     this.outboundQueue.enqueue(item)

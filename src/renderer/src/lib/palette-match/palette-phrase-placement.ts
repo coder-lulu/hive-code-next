@@ -1,4 +1,4 @@
-import type { PaletteIndexedField } from './indexed-field'
+import type { PaletteIndexedField } from '../../../../shared/palette-match/indexed-field'
 
 export function phrasePlacement(field: PaletteIndexedField, normalizedQuery: string): number {
   const text = field.text.normalized

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { MobileThemeProvider } from '../theme/mobile-theme-provider'
 import { createElement } from 'react'
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
@@ -5,15 +6,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('react-native', async () => {
   const React = await import('react')
-  const Text = ({ children, ...props }: { children?: unknown }): unknown =>
+  const Text = ({ children, ...props }: { children?: ReactNode }): unknown =>
     React.createElement('Text', props, children)
   return {
     ActivityIndicator: (props: Record<string, unknown>) =>
       React.createElement('ActivityIndicator', props),
-    Pressable: ({ children, ...props }: { children?: unknown }) =>
+    Pressable: ({ children, ...props }: { children?: ReactNode }) =>
       React.createElement('Pressable', props, children),
     Text,
-    View: ({ children, ...props }: { children?: unknown }) =>
+    View: ({ children, ...props }: { children?: ReactNode }) =>
       React.createElement('View', props, children),
     AccessibilityInfo: {
       isReduceMotionEnabled: async () => false,
@@ -29,7 +30,7 @@ vi.mock('../hooks/use-reduced-motion-enabled', () => ({ useReducedMotionEnabled:
 import {
   MobileNativeChatTurnActivity,
   MobileNativeChatTurnStatus
-} from './MobileNativeChatTurnStatus'
+} from './native-chat/transcript/MobileNativeChatTurnStatus'
 
 const labels = (node: ReactTestInstance): string[] =>
   node.findAllByType('Text' as never).map((text) => String(text.children.join('')))

@@ -1,7 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import type { MobileTheme } from '../theme/mobile-theme'
 import { useMobileThemeStyles } from '../theme/mobile-theme-provider'
-import type { SlashCommandSuggestion } from '../../../src/shared/native-chat-slash-commands'
+import type { SlashCommandSuggestion } from '../../../src/shared/native-chat/input/native-chat-slash-commands'
 
 /** One row of the composer autocomplete: an agent slash command (with its
  *  catalog description, desktop parity) or a worktree file path. */

@@ -71,7 +71,7 @@ describe('execution-host agent launch settings', () => {
 
     expect(host.agentCmdOverrides?.claude).toBe('/host/claude-wrapper')
     expect(structuredAgentConfiguredArgs('claude', host)).toEqual(['--host-marker'])
-    expect(resolveTuiAgentLaunchEnv('claude', host.agentDefaultEnv)).toEqual({
+    expect(resolveTuiAgentLaunchEnv('claude', host)).toEqual({
       API_KEY: 'host-secret',
       KEEP: 'host-only',
       MARKER: 'host-marker'
@@ -113,8 +113,8 @@ describe('execution-host agent launch settings', () => {
   it('changes terminal permissions on the host without roundtripping unrelated secrets', async () => {
     const { controller, host } = fixture()
     host.agentDefaultArgs = { claude: '--dangerously-skip-permissions' }
-    await controller.mutateAgentLaunch({ type: 'permissions', mode: 'manual' })
-    expect(host.agentDefaultArgs?.claude).toBe('')
+    await controller.mutateAgentLaunch({ type: 'permissions', mode: 'ask' })
+    expect(host.agentDefaultArgs?.claude).toBe('--dangerously-skip-permissions')
     expect(host.agentDefaultEnv?.claude).toEqual({ API_KEY: 'host-secret', KEEP: 'host-only' })
     expect(JSON.stringify(controller.getAgentLaunch())).not.toContain('host-only')
   })
@@ -223,4 +223,36 @@ describe('execution-host agent launch settings', () => {
     expect(MOBILE_RPC_METHOD_ALLOWLIST.has('settings.getAgentLaunch')).toBe(false)
     expect(MOBILE_RPC_METHOD_ALLOWLIST.has('settings.mutateAgentLaunch')).toBe(false)
   })
+})
+
+
+describe('current typed host permission authority', () => {
+  it.each(['own', 'ask', 'full-access'] as const)('saves %s without changing literal args/env or agent overrides', async mode => {
+    const { controller, host } = fixture()
+    host.agentDefaultArgs = { claude: '--dangerously-skip-permissions --literal', codex: '--sandbox read-only' }
+    host.agentDefaultEnv = { goose: { GOOSE_MODE: 'auto', KEEP: 'literal' } }
+    host.agentPermissionDefault = 'ask'
+    host.agentPermissionOverrides = { claude: 'own', codex: 'ask' }
+    const beforeArgs = structuredClone(host.agentDefaultArgs)
+    const beforeEnv = structuredClone(host.agentDefaultEnv)
+    expect(controller.getAgentLaunch()).toMatchObject({ agentPermissionDefault: 'ask', agentPermissionOverrides: { claude: 'own', codex: 'ask' } })
+    const result = await controller.mutateAgentLaunch(AgentLaunchSettingsMutation.parse({ type: 'permissions', mode }))
+    expect(result).toMatchObject({ agentPermissionDefault: mode, agentPermissionOverrides: { claude: 'own', codex: 'ask' } })
+    expect(host.agentPermissionDefault).toBe(mode)
+    expect(host.agentDefaultArgs).toEqual(beforeArgs)
+    expect(host.agentDefaultEnv).toEqual(beforeEnv)
+    expect(result).not.toHaveProperty('permissionMode')
+  })
+  it.each(['manual', 'yolo', 'mixed'])('rejects retired permission mode %s', mode => {
+    expect(AgentLaunchSettingsMutation.safeParse({ type: 'permissions', mode }).success).toBe(false)
+  })
+})
+
+
+it.each([null, undefined, [], 'unknown'])('refuses unknown launch settings %s', unknown => {
+  expect(() => agentLaunchSettingsMutationUpdates(unknown as never, {type:'permissions',mode:'own'}, 'linux')).toThrow('settings_unavailable')
+})
+it('editing environment does not persist permission-derived environment', () => {
+  const updates = agentLaunchSettingsMutationUpdates({agentPermissionDefault:'full-access',agentDefaultEnv:{goose:{KEEP:'literal'}}}, {type:'environment-set',agent:'goose',name:'NEW',value:'value'}, 'linux')
+  expect(updates.agentDefaultEnv?.goose).toEqual({KEEP:'literal',NEW:'value'})
 })

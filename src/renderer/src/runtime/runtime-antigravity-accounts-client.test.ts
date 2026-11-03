@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { callAntigravityAccounts } from './runtime-antigravity-accounts-client'
 import { assertRuntimeEnvironmentCapability, callRuntimeRpc } from './runtime-rpc-client'
-import { ANTIGRAVITY_ACCOUNTS_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
+import { ANTIGRAVITY_ACCOUNTS_RUNTIME_CAPABILITY } from '../../../shared/account-runtime-capabilities'
 import { APP_DISPLAY_NAME } from '@/product-brand'
 
 vi.mock('./runtime-rpc-client', () => ({

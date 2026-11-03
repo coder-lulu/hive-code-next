@@ -25,7 +25,8 @@ import type { AiVaultSessionDragPayload } from '@/lib/ai-vault-session-drag'
 import { buildAgentResumeStartupPlan } from '@/lib/tui-agent-startup'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
 import { resolveAiVaultResumeStartupShell } from '@/lib/ai-vault-resume-shell'
-import { getAiVaultResumeCodexHome, getAiVaultResumePlatform } from '@/lib/ai-vault-resume-platform'
+import { getAiVaultResumePlatform } from '@/lib/ai-vault-resume-platform'
+import { getAiVaultResumeCodexHome } from '../../../shared/ai-vault-resume-startup'
 
 export type AiVaultResumeCommandSession = Pick<
   AiVaultSession,
@@ -46,17 +47,18 @@ export type AiVaultResumeStartup = {
 }
 
 export type AiVaultResumeWorktreeArgs = {
-  state: Pick<
-    AppState,
-    | 'activeRepoId'
-    | 'activeWorktreeId'
-    | 'folderWorkspaces'
-    | 'projectGroups'
-    | 'projects'
-    | 'repos'
-    | 'settings'
-    | 'worktreesByRepo'
-  >
+  state: Parameters<typeof getAiVaultResumePlatform>[0] &
+    Pick<
+      AppState,
+      | 'activeRepoId'
+      | 'activeWorktreeId'
+      | 'folderWorkspaces'
+      | 'projectGroups'
+      | 'projects'
+      | 'repos'
+      | 'settings'
+      | 'worktreesByRepo'
+    >
   worktreeId?: string | null
   session: AiVaultResumeCommandSession
   commandOverride?: string | null
@@ -176,9 +178,8 @@ function buildAiVaultResumeForWorktree(
       platform,
       shell: liveShell,
       agentArgs:
-        args.agentArgs ??
-        resolveTuiAgentLaunchArgs(args.session.agent, args.state.settings?.agentDefaultArgs),
-      agentEnv: resolveTuiAgentLaunchEnv(args.session.agent, args.state.settings?.agentDefaultEnv),
+        args.agentArgs ?? resolveTuiAgentLaunchArgs(args.session.agent, args.state.settings),
+      agentEnv: resolveTuiAgentLaunchEnv(args.session.agent, args.state.settings),
       resumeInLaunchCwd: true,
       ...(args.session.agent === 'omp' && resumeFilePath
         ? { ompResumeFilePath: resumeFilePath }
@@ -250,6 +251,9 @@ export function resolveAiVaultResumeHost(args: AiVaultResumeWorktreeArgs): {
     !isLocalSession && args.session.executionHostPlatform
       ? args.session.executionHostPlatform
       : getAiVaultResumePlatform(args.state, args.worktreeId)
+  if (!platform) {
+    throw new Error('The resume host platform is unavailable.')
+  }
   // Why: local shell settings do not describe a remote Windows host, whose
   // queued resume command uses the remote default PowerShell syntax.
   const liveShell: AgentStartupShell | undefined =
@@ -258,8 +262,7 @@ export function resolveAiVaultResumeHost(args: AiVaultResumeWorktreeArgs): {
         ? resolveAiVaultResumeStartupShell({
             state: args.state,
             worktreeId: args.worktreeId,
-            platform,
-            isLocalSession
+            platform
           })
         : 'powershell'
       : undefined

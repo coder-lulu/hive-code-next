@@ -1,7 +1,8 @@
 import { DirectRpcClient } from './direct-rpc-client'
-import type { RpcClient, ConnectOptions } from './rpc-client-contract'
+import type { ConnectOptions, RpcClient } from './rpc-client-contract'
 import type { ConnectionState } from './types'
-export type { RpcClient, ConnectOptions, SendRequestOptions } from './rpc-client-contract'
+
+export type { ConnectOptions, RpcClient, SendRequestOptions } from './rpc-client-contract'
 
 export function connect(
   endpoint: string,

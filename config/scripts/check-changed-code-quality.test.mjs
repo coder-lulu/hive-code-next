@@ -1,15 +1,13 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { describe, expect, it, test } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { runProcessSync } from '@orca/process-host'
 import { resolveOxlintInvocation } from './oxlint-cli-invocation.mjs'
 import {
-  chunkFilesForCommand,
-  parseAddedLineRangesByFile,
-  resolveOxlintCommand,
   OXLINT_SCANS,
   collectBaseLineBlocks,
+  collectAddedLineRanges,
   diagnosticTouchesAddedLines,
   isUnloadedPluginDirectiveUnusedWarning,
   isMovedCode,
@@ -18,127 +16,22 @@ import {
   parseAddedLineRanges
 } from './check-changed-code-quality.mjs'
 
-describe('changed-code quality diff parsing', () => {
-  test('collects added-line ranges for every file from one combined diff', () => {
-    const diff = `diff --git a/src/first.ts b/src/first.ts
-index 1111111..2222222 100644
---- a/src/first.ts
-+++ b/src/first.ts
-@@ -2,0 +3,2 @@
-+const first = true
-+const second = true
-diff --git a/src/nested/second.tsx b/src/nested/second.tsx
-index 3333333..4444444 100644
---- a/src/nested/second.tsx
-+++ b/src/nested/second.tsx
-@@ -8,2 +8,0 @@
--old
--lines
-@@ -12 +10,3 @@
--old value
-+new value
-+new value 2
-+new value 3
-`
-
-    expect(parseAddedLineRangesByFile(diff)).toEqual(
-      new Map([
-        ['src/first.ts', [{ start: 3, end: 4 }]],
-        ['src/nested/second.tsx', [{ start: 10, end: 12 }]]
-      ])
-    )
+function scanFixture(label, file) {
+  const root = path.resolve(import.meta.dirname, '..', '..')
+  const scan = OXLINT_SCANS.find((candidate) => candidate.label === label)
+  if (!scan) {
+    throw new Error(`Missing ${label} scan`)
+  }
+  const { command, prefixArgs } = resolveOxlintInvocation(root)
+  const result = runProcessSync({
+    program: command,
+    args: [...prefixArgs, ...scan.args, '--format', 'json', file],
+    cwd: root,
+    timeoutMs: 30_000,
+    maxOutputBytes: 4 * 1024 * 1024
   })
-
-  test('ignores deleted files and normalizes quoted UTF-8 paths', () => {
-    const diff = `diff --git a/src/deleted.ts b/src/deleted.ts
-index 1111111..0000000 100644
---- a/src/deleted.ts
-+++ /dev/null
-@@ -1 +0,0 @@
--old
-diff --git "a/src/\\344\\270\\255\\346\\226\\207.ts" "b/src/\\344\\270\\255\\346\\226\\207.ts"
-index 1111111..2222222 100644
---- "a/src/\\344\\270\\255\\346\\226\\207.ts"
-+++ "b/src/\\344\\270\\255\\346\\226\\207.ts"
-@@ -1 +1 @@
--old
-+new
-`
-
-    expect(parseAddedLineRangesByFile(diff)).toEqual(
-      new Map([['src/中文.ts', [{ start: 1, end: 1 }]]])
-    )
-  })
-})
-
-describe('changed-code quality command batching', () => {
-  test('keeps every file in order while bounding command argument length', () => {
-    const files = ['src/first-file.ts', 'src/second-file.ts', 'src/third-file.ts']
-
-    expect(chunkFilesForCommand(files, 37)).toEqual([
-      ['src/first-file.ts', 'src/second-file.ts'],
-      ['src/third-file.ts']
-    ])
-  })
-
-  test('runs the repository-local Oxlint launcher with the active Node executable', () => {
-    expect(resolveOxlintCommand('C:/repo', 'C:/node/node.exe')).toEqual({
-      command: 'C:/node/node.exe',
-      args: [path.join('C:/repo', 'node_modules', 'oxlint', 'bin', 'oxlint')]
-    })
-  })
-})
-
-describe('moved-code exemption', () => {
-  test('treats a verbatim contiguous block from the base as moved', () => {
-    const base = [['const a = 1', 'items.map((item, index) => (', 'key={index}', '))']]
-    expect(isMovedCode(['items.map((item, index) => (', 'key={index}', '))'], base)).toBe(true)
-  })
-
-  test('ignores indentation and whitespace changes from the move', () => {
-    const base = [['    items.map((item, index) => (', '      key={index}']]
-    expect(isMovedCode(['items.map((item, index) => (', 'key={index}'], base)).toBe(true)
-  })
-
-  test('does not exempt a genuinely new violation', () => {
-    const base = [['const a = 1', 'const b = 2']]
-    expect(isMovedCode(['rows.map((row, i) => <td key={i} />)'], base)).toBe(false)
-  })
-
-  test('does not exempt a block that is only partly present in the base', () => {
-    const base = [['doThing()', 'unrelated()']]
-    expect(isMovedCode(['doThing()', 'newlyAddedSideEffect()'], base)).toBe(false)
-  })
-
-  test('tolerates a few lines appended inside the moved block', () => {
-    // A split commonly grows a hook dependency array when closure variables
-    // become props; the moved body around it is still moved.
-    const body = Array.from({ length: 20 }, (_, i) => `line${i}()`)
-    const base = [body]
-    const moved = [...body.slice(0, 19), 'newDep,', body[19]]
-    expect(isMovedCode(moved, base)).toBe(true)
-  })
-
-  test('does not exempt when the anchor line is absent from the base', () => {
-    const base = [['doThing()', 'filler()', 'other()']]
-    expect(isMovedCode(['brandNewCall()', 'doThing()', 'other()'], base)).toBe(false)
-  })
-
-  test('does not exempt when most of the block is absent from the base', () => {
-    const base = [['keep0()', 'keep1()', 'unrelated()']]
-    const mostlyNew = ['keep0()', ...Array.from({ length: 18 }, (_, i) => `fresh${i}()`)]
-    expect(isMovedCode(mostlyNew, base)).toBe(false)
-  })
-
-  test('ignores blank lines when matching', () => {
-    const base = [['a()', 'b()']]
-    expect(isMovedCode(['a()', '', 'b()'], base)).toBe(true)
-  })
-
-  test('never exempts an empty highlight', () => {
-    expect(isMovedCode(['', '   '], [['a()']])).toBe(false)
-  })
-})
+  return JSON.parse(result.stdout).diagnostics
+}
 
 describe('changed-code quality line matching', () => {
   it('parses added and replaced hunk ranges while ignoring deletions', () => {
@@ -177,28 +70,148 @@ describe('changed-code quality line matching', () => {
     ).toBe(true)
   })
 
-  // Why: pinning --config disables nested-config discovery, so root rules that
-  // mobile/.oxlintrc.json turns off would fail the gate on mobile files.
-  it('lets the untyped scan discover nested configs instead of pinning the root config', () => {
-    const scan = OXLINT_SCANS.find((candidate) => candidate.label === 'code quality')
+  it.each(['edit', 'rename'])('treats bracketed filenames literally after %s', (change) => {
+    const repo = mkdtempSync(path.join(tmpdir(), 'changed-code-quality-literal-'))
+    try {
+      const hooks = `core.hooksPath=${path.join(repo, '.git', 'no-hooks')}`
+      const git = (...args) => {
+        const result = runProcessSync({
+          program: 'git',
+          args: ['-c', 'commit.gpgsign=false', '-c', hooks, ...args],
+          cwd: repo
+        })
+        expect(result.code, result.stderr).toBe(0)
+        return result.stdout.trim()
+      }
+      git('init', '--quiet')
+      const file = '[cd].ts'
+      const source = change === 'rename' ? '[ab].ts' : file
+      const content = 'export const first = 1\n\nexport const legacy = 3\n'
+      writeFileSync(path.join(repo, source), content)
+      writeFileSync(path.join(repo, 'c.ts'), content)
+      git('add', '.')
+      git('-c', 'user.name=t', '-c', 'user.email=t@example.invalid', 'commit', '-qm', 'base')
+      const base = git('rev-parse', 'HEAD')
+      if (change === 'rename') {
+        git('mv', source, file)
+      }
+      writeFileSync(path.join(repo, file), content.replace('first = 1', 'first = 2'))
+      writeFileSync(path.join(repo, 'c.ts'), content.replace('legacy = 3', 'legacy = 4'))
 
-    expect(scan.args).not.toContain('--config')
-    expect(scan.args).not.toContain('--disable-nested-config')
+      const { rangesByFile } = collectAddedLineRanges(repo, base)
+      expect(rangesByFile.get(file)).toEqual([{ start: 1, end: 1 }])
+      expect(rangesByFile.get('c.ts')).toEqual([{ start: 3, end: 3 }])
+    } finally {
+      rmSync(repo, { recursive: true, force: true })
+    }
   })
 
-  // Why: import/no-duplicates was reachable only through the repo-wide CI audit, so it first
-  // surfaced after push. The cycle rule stays out because CI's audit runs before the mobile install.
-  it('runs the focused plugin config the repo-wide audit enforces, minus the cycle rule', () => {
-    const scan = OXLINT_SCANS.find((candidate) => candidate.label === 'focused plugins')
+  it('discovers nested rule overrides while retaining root diagnostics', () => {
+    const root = path.resolve(import.meta.dirname, '..', '..')
+    const directory = mkdtempSync(path.join(root, 'config', 'changed-code-quality-nested-'))
+    try {
+      const nested = path.join(directory, 'nested')
+      mkdirSync(nested)
+      const source = 'export const answer: any = 42\n'
+      const parentFile = path.join(directory, 'parent.ts')
+      const nestedFile = path.join(nested, 'child.ts')
+      writeFileSync(parentFile, source)
+      writeFileSync(nestedFile, source)
+      writeFileSync(
+        path.join(nested, '.oxlintrc.json'),
+        JSON.stringify({ rules: { 'typescript/no-explicit-any': 'off' } })
+      )
+      const explicitAny = (file) =>
+        scanFixture('code quality', file).filter(
+          (diagnostic) => diagnostic.code === 'typescript(no-explicit-any)'
+        )
+      expect(explicitAny(parentFile)).toHaveLength(1)
+      expect(explicitAny(nestedFile)).toEqual([])
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
 
-    expect(scan.args).toContain('config/oxlint-code-quality-native-plugins.json')
-    expect(scan.args).toContain('import/no-cycle')
-    expect(scan.args[scan.args.indexOf('import/no-cycle') - 1]).toBe('--allow')
+  it('reports duplicate imports through the actual focused scan', () => {
+    const root = path.resolve(import.meta.dirname, '..', '..')
+    const directory = mkdtempSync(path.join(root, 'config', 'changed-code-quality-import-'))
+    try {
+      const file = path.join(directory, 'consumer.ts')
+      writeFileSync(path.join(directory, 'dependency.ts'), 'export const a = 1, b = 2\n')
+      writeFileSync(
+        file,
+        "import { a } from './dependency'\nimport { b } from './dependency'\nexport { a, b }\n"
+      )
+      expect(
+        scanFixture('focused plugins', file).filter(
+          (diagnostic) => diagnostic.code === 'import(no-duplicates)'
+        )
+      ).toHaveLength(1)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
   })
 
   it('leaves Cloud source to the independent Cloud quality checks', () => {
     expect(isRootCodeQualityPath('cloud/apps/relay/src/index.ts')).toBe(false)
     expect(isRootCodeQualityPath('src/main/index.ts')).toBe(true)
+  })
+
+  it.each(['src/renderer/src', 'mobile/src'])(
+    'checks nested components natively and keeps the selective index-key check in %s',
+    (sourceRoot) => {
+      const root = path.resolve(import.meta.dirname, '../..')
+      const directory = mkdtempSync(path.join(root, sourceRoot, 'native-react-lint-'))
+      try {
+        const file = path.join(directory, 'List.tsx')
+        writeFileSync(
+          file,
+          `export function List({ rows }) {
+            function Row() { return <input /> }
+            return <>{rows.map((row, index) => <Row key={index} />)}</>
+          }`
+        )
+        const codes = scanFixture('code quality', file).map((diagnostic) => diagnostic.code)
+        expect(codes).toContain('react(no-unstable-nested-components)')
+        expect(scanFixture('React Doctor', file).map((diagnostic) => diagnostic.code)).toEqual([
+          'react-doctor(no-array-index-as-key)'
+        ])
+      } finally {
+        rmSync(directory, { recursive: true, force: true })
+      }
+    }
+  )
+
+  it.each([
+    ['Counter.tsx', []],
+    ['Counter.txt', [{ start: 1, end: 2 }]],
+    ['cloud/Counter.tsx', [{ start: 1, end: 2 }]]
+  ])('retains rename subtraction only within the included scope: %s', (source, expected) => {
+    const repo = mkdtempSync(path.join(tmpdir(), 'changed-code-quality-entry-'))
+    try {
+      const git = (...args) => {
+        const result = runProcessSync({ program: 'git', args, cwd: repo })
+        expect(result.code, result.stderr).toBe(0)
+        return result.stdout.trim()
+      }
+      git('init', '--quiet')
+      const hooks = path.join(repo, '.git', 'test-hooks')
+      mkdirSync(hooks)
+      git('config', 'core.hooksPath', hooks)
+      git('config', 'commit.gpgsign', 'false')
+      mkdirSync(path.dirname(path.join(repo, source)), { recursive: true })
+      writeFileSync(path.join(repo, source), 'const counter = 1\nexport { counter }\n')
+      git('add', source)
+      git('-c', 'user.name=t', '-c', 'user.email=t@example.invalid', 'commit', '-qm', 'base')
+      const base = git('rev-parse', 'HEAD')
+      git('mv', source, 'MovedCounter.tsx')
+
+      expect(collectAddedLineRanges(repo, base).rangesByFile.get('MovedCounter.tsx') ?? []).toEqual(
+        expected
+      )
+    } finally {
+      rmSync(repo, { recursive: true, force: true })
+    }
   })
 })
 
@@ -276,6 +289,78 @@ describe('moved-code exemption', () => {
       rmSync(repo, { recursive: true, force: true })
     }
   })
+
+  it('keeps source boundaries across batches, missing files, and multibyte contents', () => {
+    const repo = mkdtempSync(path.join(tmpdir(), 'changed-code-quality-batch-'))
+    try {
+      const git = (...args) => {
+        const result = runProcessSync({ program: 'git', args, cwd: repo })
+        expect(result.code, result.stderr).toBe(0)
+        return result.stdout.trim()
+      }
+      git('init', '--quiet')
+      const files = Array.from({ length: 40 }, (_, index) => `file ${index} é.ts`)
+      const sources = files.map((_, index) =>
+        index === 0 ? '' : `  const café${index} = '🐳'\r\n\r\n// missing\nlastLine()`
+      )
+      files.forEach((file, index) => writeFileSync(path.join(repo, file), sources[index]))
+      git('add', '--all')
+      git(
+        '-c',
+        'commit.gpgsign=false',
+        '-c',
+        'user.name=t',
+        '-c',
+        'user.email=t@example.invalid',
+        'commit',
+        '-qm',
+        'base'
+      )
+      const base = git('rev-parse', 'HEAD')
+      const expected = sources.map((_, index) =>
+        index === 0 ? [] : [`const café${index} = '🐳'`, '// missing', 'lastLine()']
+      )
+      expect(
+        collectBaseLineBlocks(repo, base, ['missing.ts', ...files, 'also-missing.ts'])
+      ).toEqual(expected)
+      expect(collectBaseLineBlocks(repo, base, [])).toEqual([])
+      expect(collectBaseLineBlocks(repo, base, ['missing.ts'])).toEqual([])
+      expect(collectBaseLineBlocks(path.join(repo, 'absent'), base, files)).toEqual([])
+    } finally {
+      rmSync(repo, { recursive: true, force: true })
+    }
+  })
+
+  it.skipIf(process.platform === 'win32')('reads filenames containing newlines', () => {
+    const repo = mkdtempSync(path.join(tmpdir(), 'changed-code-quality-newline-'))
+    try {
+      const git = (...args) => {
+        const result = runProcessSync({ program: 'git', args, cwd: repo })
+        expect(result.code, result.stderr).toBe(0)
+        return result.stdout.trim()
+      }
+      git('init', '--quiet')
+      const file = 'line\nbreak.ts'
+      writeFileSync(path.join(repo, file), 'const kept = true\n')
+      git('add', '--all')
+      git(
+        '-c',
+        'commit.gpgsign=false',
+        '-c',
+        'user.name=t',
+        '-c',
+        'user.email=t@example.invalid',
+        'commit',
+        '-qm',
+        'base'
+      )
+      expect(collectBaseLineBlocks(repo, git('rev-parse', 'HEAD'), [file])).toEqual([
+        ['const kept = true']
+      ])
+    } finally {
+      rmSync(repo, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('unloaded plugin directive unused warning', () => {
@@ -302,6 +387,9 @@ describe('unloaded plugin directive unused warning', () => {
     withFixture(directive('anti-slop/no-module-mocking'), (diagnostic) => {
       expect(isUnloadedPluginDirectiveUnusedWarning(diagnostic, root, 'code quality')).toBe(true)
     })
+    withFixture(directive('ime-enter-guard/require-ime-guard'), (diagnostic) => {
+      expect(isUnloadedPluginDirectiveUnusedWarning(diagnostic, root, 'code quality')).toBe(true)
+    })
   })
 
   it('still reports an unused directive for a rule the root scan does load', () => {
@@ -321,22 +409,6 @@ describe('unloaded plugin directive unused warning', () => {
       ).toBe(false)
     })
   })
-
-  function scanFixture(label, file) {
-    const scan = OXLINT_SCANS.find((candidate) => candidate.label === label)
-    if (!scan) {
-      throw new Error(`Missing ${label} scan`)
-    }
-    const { command, prefixArgs } = resolveOxlintInvocation(root)
-    const result = runProcessSync({
-      program: command,
-      args: [...prefixArgs, ...scan.args, '--format', 'json', file],
-      cwd: root,
-      timeoutMs: 30_000,
-      maxOutputBytes: 4 * 1024 * 1024
-    })
-    return JSON.parse(result.stdout).diagnostics
-  }
 
   it.each([
     "import './web-session-tabs-sync-test-harness'",
@@ -395,6 +467,22 @@ describe('unloaded plugin directive unused warning', () => {
       expect(isUnloadedPluginDirectiveUnusedWarning(diagnostics[0], root, 'React Doctor')).toBe(
         false
       )
+    })
+  })
+
+  it('keeps mount-time state copies covered after disabling the overlapping rule', () => {
+    const source = `
+      import { useEffect, useState } from 'react'
+      export function Title({ title }) {
+        const [value, setValue] = useState('')
+        useEffect(() => { setValue(title) }, [])
+        return value
+      }
+    `
+    withFixture(source, ({ filename }) => {
+      expect(scanFixture('React Doctor', filename).map((diagnostic) => diagnostic.code)).toEqual([
+        'react-doctor(no-derived-state-effect)'
+      ])
     })
   })
 

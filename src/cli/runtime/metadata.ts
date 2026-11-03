@@ -1,4 +1,5 @@
 import { homedir } from 'node:os'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { join } from 'node:path'
 import { readFileSync } from 'node:fs'
 import {
@@ -6,7 +7,6 @@ import {
   getRuntimeMetadataPath,
   type RuntimeMetadata
 } from '../../shared/runtime-bootstrap'
-import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { RuntimeClientError } from './types'
 
 export function readMetadata(userDataPath: string): RuntimeMetadata {
@@ -16,7 +16,7 @@ export function readMetadata(userDataPath: string): RuntimeMetadata {
     if (!metadata || !findTransport(metadata, 'unix', 'named-pipe') || !metadata.authToken) {
       throw new RuntimeClientError(
         'runtime_unavailable',
-        `${APP_DISPLAY_NAME} runtime metadata is incomplete at ${metadataPath}`
+        `Orca runtime metadata is incomplete at ${metadataPath}`
       )
     }
     return metadata
@@ -26,7 +26,7 @@ export function readMetadata(userDataPath: string): RuntimeMetadata {
     }
     throw new RuntimeClientError(
       'runtime_unavailable',
-      `Could not read ${APP_DISPLAY_NAME} runtime metadata at ${metadataPath}. Start the ${APP_DISPLAY_NAME} app first.`
+      `Could not read Orca runtime metadata at ${metadataPath}. Start the Orca app first.`
     )
   }
 }
@@ -45,10 +45,6 @@ export function getDefaultUserDataPath(
   homeDir = homedir(),
   appName: string = APP_DISPLAY_NAME
 ): string {
-  // Why: in dev mode (and for parallel HiveCode instances), the Electron app writes
-  // runtime metadata to a separate userData directory (e.g. hivecode-dev) to avoid
-  // clobbering the production app's metadata. The CLI needs to find the same
-  // metadata file, so this env var lets the CLI target a specific instance.
   if (process.env.ORCA_USER_DATA_PATH) {
     return process.env.ORCA_USER_DATA_PATH
   }
@@ -74,8 +70,6 @@ export function getPlatformUserDataPath(
     }
     return join(appData, appName)
   }
-  // Why: the CLI must find the same metadata file Electron writes in packaged
-  // runs, so this mirrors Electron's default userData base instead of inventing
-  // a CLI-specific config path.
+  // Match Electron’s packaged userData path.
   return join(process.env.XDG_CONFIG_HOME || join(homeDir, '.config'), appName)
 }

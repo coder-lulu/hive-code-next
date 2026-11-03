@@ -1,7 +1,7 @@
 import { expect } from 'vitest'
 import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import { openTestAgentSessionRecordStore } from './agent-session-record-store-test-harness'
-import { applyAgentSessionRestartAdjudication } from './agent-session-restart-lease-transitions'
+import { applyAgentSessionRestartAdjudication } from './agent-session/ownership/agent-session-restart-lease-transitions'
 import type { AgentSessionRecordStore } from './agent-session-record-store'
 import type {
   AgentSessionExecutionLocation,

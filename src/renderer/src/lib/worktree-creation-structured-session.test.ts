@@ -38,7 +38,7 @@ vi.mock('@/store', () => ({
   })
 }))
 
-vi.mock('@/lib/structured-agent-session-provisional-tab', () => ({
+vi.mock('@/lib/agent-session/structured-agent-session-provisional-tab', () => ({
   beginStructuredAgentSessionProvisionalLaunch: mocks.beginStructuredAgentSessionProvisionalLaunch
 }))
 
@@ -83,39 +83,6 @@ describe('launchStructuredWorktreeSession', () => {
     })
   })
 
-  it('reveals the created workspace before opening its final-id chat tab', async () => {
-    const order: string[] = []
-    mocks.activateAndRevealWorktree.mockImplementation(() => {
-      order.push('reveal')
-      return { primaryTabId: null }
-    })
-    mocks.beginStructuredAgentSessionProvisionalLaunch.mockImplementation((args) => {
-      order.push('begin')
-      args.beforeOpen?.('session-1')
-      order.push('open')
-      return { sessionId: 'session-1', tab: { id: 'agent-session:session-1' } }
-    })
-
-    await expect(launchStructuredWorktreeSession(baseArgs)).resolves.toEqual({
-      accepted: true,
-      cancelled: false,
-      activation: { primaryTabId: null },
-      primaryTabId: 'agent-session:session-1'
-    })
-    expect(order).toEqual(['begin', 'reveal', 'open'])
-    expect(mocks.beginStructuredAgentSessionProvisionalLaunch).toHaveBeenCalledWith(
-      expect.objectContaining({
-        target: { worktreeId: 'worktree-1' },
-        activate: true,
-        plan: expect.objectContaining({
-          route: 'structured-native-chat',
-          agent: 'codex',
-          prompt: 'Fix the route'
-        })
-      })
-    )
-  })
-
   it('does not launch after the pending creation was cancelled', async () => {
     mocks.state.pendingWorktreeCreations = {}
 
@@ -127,18 +94,24 @@ describe('launchStructuredWorktreeSession', () => {
     expect(mocks.beginStructuredAgentSessionProvisionalLaunch).not.toHaveBeenCalled()
   })
 
-  it('keeps deferred activation from selecting the provisional tab', async () => {
-    await expect(
-      launchStructuredWorktreeSession({
-        ...baseArgs,
-        shouldActivateOnCompletion: false,
-        primaryTabId: 'existing-tab'
-      })
-    ).resolves.toMatchObject({ primaryTabId: 'agent-session:session-1' })
-    expect(mocks.activateAndRevealWorktree).not.toHaveBeenCalled()
-    expect(mocks.beginStructuredAgentSessionProvisionalLaunch).toHaveBeenCalledWith(
-      expect.objectContaining({ activate: false })
-    )
+  it('carries an explicit permission choice into the actual structured admission plan', async () => {
+    await launchStructuredWorktreeSession({
+      ...baseArgs,
+      request: {
+        ...request,
+        startupPlan: {
+          agent: 'codex',
+          agentPermissionMode: 'manual',
+          launchCommand: 'codex -a on-request',
+          expectedProcess: 'codex',
+          followupPrompt: null,
+          launchConfig: { agentCommand: 'codex', agentArgs: '-a on-request', agentEnv: {} }
+        }
+      }
+    })
+    expect(mocks.beginStructuredAgentSessionProvisionalLaunch.mock.calls[0]?.[0]).toMatchObject({
+      plan: { launchOptions: { permissionMode: 'ask' } }
+    })
   })
 
   it('does not open a tab when cancellation races the reveal callback', async () => {

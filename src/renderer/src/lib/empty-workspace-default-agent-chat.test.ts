@@ -33,7 +33,7 @@ function seedSettings(settings: Partial<GlobalSettings>): void {
     detectedAgentIds: ['claude', 'codex'],
     settings: {
       ...getDefaultSettings('/tmp'),
-      experimentalNativeChat: true,
+      nativeChatProviders: {},
       defaultTuiAgent: 'codex',
       disabledTuiAgents: [],
       ...settings
@@ -56,6 +56,26 @@ afterEach(() => {
 })
 
 describe('openDefaultAgentChatInEmptyWorkspace', () => {
+  it('does not decide a default before settings are known', () => {
+    seedSettings({})
+    useAppStore.setState({ settings: null })
+    expect(emptyWorkspaceDefaultChatAwaitsDetection('wt-1')).toBe(false)
+    expect(openDefaultAgentChatInEmptyWorkspace('wt-1', mocks.seedShell)).toBeNull()
+    expect(mocks.launchAgentInNewTab).not.toHaveBeenCalled()
+  })
+
+  it('checks the detected fallback agent preference before planning or launching', () => {
+    seedSettings({ nativeChatProviders: { claude: false } })
+    useAppStore.setState({ detectedAgentIds: ['claude'] })
+    expect(openDefaultAgentChatInEmptyWorkspace('wt-1', mocks.seedShell)).toBeNull()
+    expect(mocks.planAgentSessionLaunch).not.toHaveBeenCalled()
+    expect(mocks.launchAgentInNewTab).not.toHaveBeenCalled()
+  })
+
+  it('keeps another agent preference from disabling the selected default', () => {
+    seedSettings({ nativeChatProviders: { claude: false } })
+    expect(openDefaultAgentChatInEmptyWorkspace('wt-1', mocks.seedShell)).not.toBeNull()
+  })
   it('launches the default agent as a chat', () => {
     seedSettings({})
 
@@ -81,7 +101,7 @@ describe('openDefaultAgentChatInEmptyWorkspace', () => {
   })
 
   it('does nothing unless new agent tabs open as chat', () => {
-    seedSettings({ experimentalNativeChat: false })
+    seedSettings({ nativeChatProviders: { codex: false } })
 
     expect(openDefaultAgentChatInEmptyWorkspace('wt-1', mocks.seedShell)).toBeNull()
     expect(mocks.launchAgentInNewTab).not.toHaveBeenCalled()
@@ -134,7 +154,7 @@ describe('agent detection for the default chat', () => {
     useAppStore.setState({ remoteDetectedAgentIds: { 'conn-1': [] } })
     expect(emptyWorkspaceDefaultChatAwaitsDetection('wt-1')).toBe(false)
 
-    seedSettings({ experimentalNativeChat: false })
+    seedSettings({ nativeChatProviders: { codex: false } })
     useAppStore.setState({ remoteDetectedAgentIds: {} })
     expect(emptyWorkspaceDefaultChatAwaitsDetection('wt-1')).toBe(false)
   })

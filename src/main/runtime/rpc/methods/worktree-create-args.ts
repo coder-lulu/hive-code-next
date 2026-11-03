@@ -1,7 +1,10 @@
+import { terminalImageViewerSupported } from '../../terminal-image-viewer-env'
+import { hostQualifiedRepoSelector, type RuntimeRepoSelector } from '../../runtime-repo-selector'
 import type { z } from 'zod'
 import { resolveRuntimeNavigationTarget } from '../../../../shared/runtime-navigation'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { WorktreeCreate } from '../../../../shared/rpc-contract/worktree-create-params'
+import { agentPermissionChoiceForLaunchMode } from '../../../../shared/tui-agent-permission-choice'
 
 type WorktreeCreateParams = z.infer<typeof WorktreeCreate>
 type ManagedWorktreeCreateArgs = Parameters<OrcaRuntimeService['createManagedWorktree']>[0]
@@ -10,21 +13,35 @@ type CreateProvenance = Pick<
   'automationProvenance' | 'cliProvenance' | 'creatorProvenance'
 >
 
+export function worktreeCreateRepoSelector(
+  params: Pick<WorktreeCreateParams, 'repo' | 'repoHostId'>
+): RuntimeRepoSelector {
+  return hostQualifiedRepoSelector(params.repo, params.repoHostId)
+}
+
 /** Wire params → runtime create args. Kept out of the method table so the mapping can grow with
  *  the schema without the table becoming unreadable. */
 export function buildManagedWorktreeCreateArgs(
   params: WorktreeCreateParams,
   provenance: CreateProvenance,
-  origin: { clientKind?: 'mobile' | 'runtime' } = {}
+  origin?: Parameters<typeof terminalImageViewerSupported>[0]
 ): ManagedWorktreeCreateArgs {
+  const viewerSupported = origin && terminalImageViewerSupported(origin)
+  const hostAutomationCreate =
+    provenance.automationProvenance !== undefined &&
+    provenance.automationProvenance.origin !== 'client'
+  const permissionChoice = agentPermissionChoiceForLaunchMode(params.startupPermissionMode)
   return {
-    repoSelector: params.repo,
+    repoSelector: worktreeCreateRepoSelector(params),
+    creationId: params.creationId ?? params.clientMutationId,
+    ...(viewerSupported !== undefined ? { terminalImageViewerSupported: viewerSupported } : {}),
     name: params.name ?? '',
     // Absent means the user typed the name, which must never be retired.
     ...(params.nameWasGenerated === true ? { nameWasGenerated: true } : {}),
     baseBranch: params.baseBranch,
     compareBaseRef: params.compareBaseRef,
     branchNameOverride: params.branchNameOverride,
+    ...(params.branchIntent ? { branchIntent: params.branchIntent } : {}),
     linkedIssue: params.linkedIssue,
     linkedPR: params.linkedPR,
     linkedLinearIssue: params.linkedLinearIssue,
@@ -44,6 +61,13 @@ export function buildManagedWorktreeCreateArgs(
     telemetrySource: params.telemetrySource,
     workspaceStatus: params.workspaceStatus,
     manualOrder: params.manualOrder,
+    ...(params.nestWorkspaces !== undefined ? { nestWorkspaces: params.nestWorkspaces } : {}),
+    ...(params.refreshLocalBaseRefOnWorktreeCreate !== undefined
+      ? { refreshLocalBaseRefOnWorktreeCreate: params.refreshLocalBaseRefOnWorktreeCreate }
+      : {}),
+    ...(params.localBaseRefSuggestionDismissed !== undefined
+      ? { localBaseRefSuggestionDismissed: params.localBaseRefSuggestionDismissed }
+      : {}),
     sparseCheckout: params.sparseCheckout,
     pushTarget: params.pushTarget,
     runHooks: params.runHooks === true,
@@ -59,7 +83,7 @@ export function buildManagedWorktreeCreateArgs(
                 : params.navigation
           }
         : {}),
-      ...(origin.clientKind === 'runtime' && params.cliProvenanceRequest === undefined
+      ...(origin?.clientKind === 'runtime' && params.cliProvenanceRequest === undefined
         ? { clientKind: origin.clientKind }
         : {}),
       defaultTarget: 'host'
@@ -70,9 +94,10 @@ export function buildManagedWorktreeCreateArgs(
     ...provenance,
     // Why: a person initiated this create (the phone, CLI text and agent.launch don't surface the
     // fallback yet); an automation run has no one watching, so it keeps the network error.
-    ...(provenance.automationProvenance ? {} : { allowLocalBaseFallback: true }),
+    ...(hostAutomationCreate ? {} : { allowLocalBaseFallback: true }),
+    ...(hostAutomationCreate ? {} : { wslUserAct: true as const }),
     startup:
-      params.startupCommand && !params.startupPermissionMode
+      params.startupCommand && !permissionChoice && !params.startupLaunchPreferences
         ? {
             command: params.startupCommand,
             ...(params.startupEnv ? { env: params.startupEnv } : {}),
@@ -84,13 +109,15 @@ export function buildManagedWorktreeCreateArgs(
           }
         : undefined,
     ...(params.startupAgent ? { startupAgent: params.startupAgent } : {}),
-    ...(params.startupLaunchPreferences
-      ? { startupLaunchPreferences: params.startupLaunchPreferences }
+    ...(params.startupLaunchPreferences || permissionChoice
+      ? {
+          startupLaunchPreferences: {
+            ...params.startupLaunchPreferences,
+            ...(permissionChoice ? { mode: permissionChoice } : {})
+          }
+        }
       : {}),
-    ...(params.startupPermissionMode
-      ? { startupPermissionMode: params.startupPermissionMode }
-      : {}),
-    ...(params.startupLaunchToken && params.startupPermissionMode
+    ...(params.startupLaunchToken && (params.startupAgent || params.startupDraft)
       ? { startupLaunchToken: params.startupLaunchToken }
       : {}),
     ...(params.startupPrompt !== undefined ? { startupPrompt: params.startupPrompt } : {}),

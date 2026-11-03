@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { encodePairingOffer } from './pairing'
 import {
   addEnvironmentFromPairingCode,
@@ -11,14 +11,7 @@ import {
 
 describe('Cloud identity from the saved runtime pairing', () => {
   const directories: string[] = []
-  const platform = Object.getOwnPropertyDescriptor(process, 'platform')
-  beforeEach(() =>
-    Object.defineProperty(process, 'platform', { configurable: true, value: 'linux' })
-  )
   afterEach(() => {
-    if (platform) {
-      Object.defineProperty(process, 'platform', platform)
-    }
     for (const directory of directories.splice(0)) {
       rmSync(directory, { recursive: true, force: true })
     }

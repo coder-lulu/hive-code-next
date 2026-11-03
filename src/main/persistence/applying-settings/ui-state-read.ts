@@ -32,8 +32,8 @@ import {
   normalizeSortBy
 } from './ui-selection-normalization'
 import { stripMainOwnedTelemetryMarkerFromUI } from './ui-interaction-merge'
+import { normalizeSessionListMetadata } from '../../../shared/session-list-metadata'
 
-/** Returns normalized UI state with the authoritative active view and without the main-owned telemetry marker. */
 export function getPersistedUI(
   state: PersistedState,
   activeView: PersistedState['ui']['activeView']
@@ -42,6 +42,7 @@ export function getPersistedUI(
   return {
     ...getDefaultUIState(),
     ...uiState,
+    sessionListMetadata: normalizeSessionListMetadata(uiState.sessionListMetadata),
     groupBy: normalizeGroupBy(state.ui?.groupBy),
     sortBy: normalizeSortBy(state.ui?.sortBy),
     projectOrderBy: normalizeProjectOrderBy(state.ui?.projectOrderBy),
@@ -51,6 +52,7 @@ export function getPersistedUI(
       state.ui?.rightSidebarTab
     ),
     worktreeCardProperties: normalizeWorktreeCardProperties(state.ui?.worktreeCardProperties),
+    showAgentModels: state.ui?.showAgentModels !== false,
     agentActivityDisplayMode: normalizeAgentActivityDisplayMode(state.ui?.agentActivityDisplayMode),
     workspaceStatuses: normalizeWorkspaceStatuses(state.ui?.workspaceStatuses),
     workspaceBoardOpacity: clampWorkspaceBoardOpacity(state.ui?.workspaceBoardOpacity),
@@ -60,7 +62,6 @@ export function getPersistedUI(
     statusBarUsageMode: normalizeStatusBarUsageMode(state.ui?.statusBarUsageMode),
     statusBarCompactChangeNoticeDismissed:
       state.ui?.statusBarCompactChangeNoticeDismissed !== false,
-    // Why: strict boolean coercion so a missing/legacy value reads as false (first-run notice still fires).
     trayMinimizeNoticeShown: state.ui?.trayMinimizeNoticeShown === true,
     osc52ClipboardDefaultOnNoticePending: state.ui?.osc52ClipboardDefaultOnNoticePending === true,
     markdownTocPanelWidth: clampMarkdownTocPanelWidth(state.ui?.markdownTocPanelWidth),

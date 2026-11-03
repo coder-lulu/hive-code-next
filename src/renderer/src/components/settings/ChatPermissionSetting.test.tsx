@@ -11,28 +11,19 @@ vi.mock('../../store', () => ({
 }))
 afterEach(cleanup)
 
-// A web client unpaired from its host holds no value, so it shows no control.
-it.each([undefined, 'ask', 'full-access'] as const)(
-  'offers the new-chat default only for a host value %s',
-  (mode) => {
-    const { container } = render(
-      <TooltipProvider>
-        <ChatPermissionSetting
-          settings={{ ...getDefaultSettings('/tmp'), nativeChatPermissionMode: mode }}
-          updateSettings={vi.fn()}
-          forceVisible
-        />
-      </TooltipProvider>
-    )
-    if (mode === undefined) {
-      expect(container.querySelector('#chat-permissions')).toBeNull()
-      expect(screen.queryByRole('button')).toBeNull()
-    } else {
-      expect(
-        screen.getByRole('button', {
-          name: `Permissions ${mode === 'ask' ? 'Ask for approval' : 'Full access'}`
-        })
-      ).toBeTruthy()
-    }
+it.each([undefined, 'own', 'ask', 'full-access'] as const)(
+  'offers the current profile default %s', mode => {
+    render(<TooltipProvider><ChatPermissionSetting settings={{...getDefaultSettings('/tmp'),agentPermissionDefault:mode}} updateSettings={vi.fn()} forceVisible /></TooltipProvider>)
+    const label = mode === 'ask' ? 'Ask for approval' : mode === 'full-access' ? 'Full access' : 'Own settings'
+    expect(screen.getByRole('button',{name:`Permissions ${label}`})).toBeTruthy()
   }
 )
+it('changes the profile default while preserving per-agent choices and literal configuration', () => {
+  const updateSettings = vi.fn()
+  const settings = {...getDefaultSettings('/tmp'),agentPermissionDefault:'ask' as const,agentPermissionOverrides:{claude:'own' as const,codex:'ask' as const},agentDefaultArgs:{claude:'--literal'},agentDefaultEnv:{goose:{GOOSE_MODE:'auto'}}}
+  const element = ChatPermissionSetting({settings,updateSettings,forceVisible:true})!
+  element.props.children.props.control.props.onSelect('full-access')
+  expect(updateSettings).toHaveBeenCalledWith({agentPermissionDefault:'full-access',agentPermissionOverrides:{claude:'own',codex:'ask'}})
+  element.props.children.props.control.props.onSelect('own')
+  expect(updateSettings).toHaveBeenLastCalledWith({agentPermissionDefault:'own',agentPermissionOverrides:{claude:'own',codex:'ask'}})
+})

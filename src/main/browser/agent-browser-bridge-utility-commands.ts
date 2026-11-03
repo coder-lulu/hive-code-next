@@ -1,12 +1,17 @@
+import { mkdir } from 'node:fs/promises'
+import path from 'node:path'
 import { BrowserError } from './cdp-bridge'
 import { assertClipboardTextWriteWithinLimitWithYield } from '../../shared/clipboard-text'
-import { AGENT_BROWSER_CLIPBOARD_WRITE_MAX_BYTES } from './agent-browser-bridge-types'
+import { withTimeout } from '../../shared/promise-timeout-fallback'
+import {
+  AGENT_BROWSER_CLIPBOARD_WRITE_MAX_BYTES,
+  AGENT_DOWNLOAD_REPLY_DEADLINE_MS,
+  AGENT_DOWNLOAD_START_TIMEOUT_MS
+} from './agent-browser-bridge-types'
 import type { BrowserBackResult, BrowserReloadResult } from '../../shared/runtime-types'
 import { AgentBrowserBridgeMouseCommands } from './agent-browser-bridge-mouse-commands'
 
 export abstract class AgentBrowserBridgeUtilityCommands extends AgentBrowserBridgeMouseCommands {
-  // ── Clipboard commands ──
-
   async clipboardRead(worktreeId?: string, browserPageId?: string): Promise<unknown> {
     return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
       return await this.execAgentBrowser(sessionName, ['clipboard', 'read'])
@@ -26,8 +31,6 @@ export abstract class AgentBrowserBridgeUtilityCommands extends AgentBrowserBrid
     })
   }
 
-  // ── Dialog commands ──
-
   async dialogAccept(text?: string, worktreeId?: string, browserPageId?: string): Promise<unknown> {
     return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
       const args = ['dialog', 'accept']
@@ -43,8 +46,6 @@ export abstract class AgentBrowserBridgeUtilityCommands extends AgentBrowserBrid
       return await this.execAgentBrowser(sessionName, ['dialog', 'dismiss'])
     })
   }
-
-  // ── Storage commands ──
 
   async storageLocalGet(
     key: string,
@@ -100,20 +101,52 @@ export abstract class AgentBrowserBridgeUtilityCommands extends AgentBrowserBrid
     })
   }
 
-  // ── Download command ──
-
+  // Orca's will-download handler picks every save path, so agent-browser's own download
+  // (CDP download behavior + rename) never sees the file; claim the download here instead.
   async download(
     selector: string,
-    path: string,
+    savePath: string,
     worktreeId?: string,
     browserPageId?: string
-  ): Promise<unknown> {
-    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
-      return await this.execAgentBrowser(sessionName, ['download', selector, path])
+  ): Promise<{ path: string }> {
+    if (!path.isAbsolute(savePath)) {
+      throw new BrowserError('invalid_argument', `--path must be an absolute path: ${savePath}`)
+    }
+    const replyDeadline = Date.now() + AGENT_DOWNLOAD_REPLY_DEADLINE_MS
+    return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName, target) => {
+      await mkdir(path.dirname(savePath), { recursive: true })
+      const claim = this.browserManager.claimNextDownload(target.webContentsId, savePath)
+      try {
+        await this.execAgentBrowser(sessionName, ['click', selector])
+        if (!(await withTimeout(claim.started, AGENT_DOWNLOAD_START_TIMEOUT_MS, false))) {
+          throw new BrowserError(
+            'browser_download_not_started',
+            `Clicking ${selector} did not start a download within ${AGENT_DOWNLOAD_START_TIMEOUT_MS / 1000}s.`
+          )
+        }
+        const finished = await withTimeout(
+          claim.finished,
+          Math.max(0, replyDeadline - Date.now()),
+          null
+        )
+        if (!finished) {
+          throw new BrowserError(
+            'browser_download_in_progress',
+            `The download is still in progress and will be saved to ${savePath}.`
+          )
+        }
+        if (finished.status !== 'completed') {
+          throw new BrowserError(
+            'browser_download_failed',
+            finished.error ?? `The download was ${finished.status}.`
+          )
+        }
+        return { path: savePath }
+      } finally {
+        claim.release()
+      }
     })
   }
-
-  // ── Highlight command ──
 
   async highlight(selector: string, worktreeId?: string, browserPageId?: string): Promise<unknown> {
     return this.enqueueTargetedCommand(worktreeId, browserPageId, async (sessionName) => {
@@ -134,7 +167,7 @@ export abstract class AgentBrowserBridgeUtilityCommands extends AgentBrowserBrid
   }
 
   async reload(worktreeId?: string, browserPageId?: string): Promise<BrowserReloadResult> {
-    // Why: reload can trigger an Electron process swap that destroys the session mid-command — reload via webContents directly instead.
+    // Reload directly because a process swap can destroy the helper session mid-command.
     return this.enqueueTargetedCommand(worktreeId, browserPageId, async (_sessionName, target) => {
       const wc = this.getWebContents(target.webContentsId)
       if (!wc) {
@@ -163,7 +196,7 @@ export abstract class AgentBrowserBridgeUtilityCommands extends AgentBrowserBrid
 
         wc.on('did-finish-load', onFinish)
         wc.on('did-fail-load', onFail)
-        // Why: clear the fallback timer on load; otherwise each reload leaks the webContents + listeners until the 10s timeout.
+        // Clear this timer on load to release WebContents and listeners promptly.
         fallbackTimer = setTimeout(finish, 10_000)
         if (typeof fallbackTimer.unref === 'function') {
           fallbackTimer.unref()

@@ -21,6 +21,7 @@ import type {
 } from '../../../../shared/structured-agent-session-create'
 import { structuredAgentSessionOptionOverridesRefusal } from '../../../native-chat/agent-session-wire/structured-agent-session-options-read'
 import type { OrcaRuntimeService } from '../../orca-runtime'
+import { assertAgentPromptRequestActive } from '../../orca-runtime-core'
 import type { StructuredAgentId } from '../../../../shared/agent-session-provider-handle'
 import {
   resolveUncommittedStructuredCreate,
@@ -45,6 +46,7 @@ export function structuredAgentSessionCreateIntentFingerprint(params: {
   resumeFrom?: StructuredAgentSessionResumeSource
   tabId?: string
   firstMessage?: StructuredAgentSessionFirstMessage
+  optionsMode?: 'replace-model-selection'
   options?: Readonly<Record<string, string>>
 }): string {
   return computeAgentSessionPayloadFingerprint({
@@ -56,6 +58,7 @@ export function structuredAgentSessionCreateIntentFingerprint(params: {
       resumeFrom: params.resumeFrom,
       tabId: params.tabId,
       firstMessage: params.firstMessage,
+      optionsMode: params.optionsMode,
       options: params.options
     }
   })
@@ -73,6 +76,7 @@ export async function prepareStructuredAgentSessionCreateForWorktree(args: {
   caller: StructuredAgentSessionCaller
   resumeFrom?: StructuredAgentSessionResumeSource
   /** Explicit picks override seed keys at rest; acquired in-process launches replace the seed. */
+  optionsMode?: 'replace-model-selection'
   options?: Readonly<Record<string, string>>
   /** The tab id the caller reserved for this chat, taken when its tab is published; absent, the tab
    *  gets the id clients derive. Beside `options`, after the fingerprint, likewise. */
@@ -108,7 +112,13 @@ export async function prepareStructuredAgentSessionCreateForWorktree(args: {
     args.atRest !== undefined &&
     (priorOperation?.fingerprint === args.envelope.payloadFingerprint ||
       (args.atRest === true && !legacyReplay))
-  const hostFingerprint = atRest ? args.envelope.payloadFingerprint : attachFingerprint
+  // Host-minted attach envelopes from agent.launch carry an intentionally empty client
+  // fingerprint. Persist the computed attach digest so the operation row remains readable and
+  // replay-safe; explicit at-rest fingerprints still win for client retries.
+  const hostFingerprint =
+    atRest && args.envelope.payloadFingerprint
+      ? args.envelope.payloadFingerprint
+      : attachFingerprint
   if (atRest && args.options) {
     const refusal = structuredAgentSessionOptionOverridesRefusal(
       host.deps.agents,
@@ -125,6 +135,9 @@ export async function prepareStructuredAgentSessionCreateForWorktree(args: {
     hostLaunchDirectory,
     ...resolvedAttach
   } = resolved
+  const overlays = atRest
+    ? args.optionsMode !== 'replace-model-selection'
+    : Object.keys(args.options ?? {}).every((id) => id === AGENT_CHAT_PERMISSION_MODE_OPTION_ID)
   return {
     host,
     ...(hostLaunchDirectory ? { hostLaunchDirectory } : {}),
@@ -134,7 +147,7 @@ export async function prepareStructuredAgentSessionCreateForWorktree(args: {
       // Explicit picks replace the saved selection; the permission default is the chat's own.
       ...(args.options
         ? {
-            options: atRest
+            options: overlays
               ? { ...resolved.options, ...args.options }
               : { ...seededPermissionMode(resolved.options), ...args.options }
           }
@@ -228,19 +241,31 @@ export async function createStructuredAgentSessionForWorktree(args: {
   worktree: string
   agent: StructuredAgentId
   activate: boolean
+  /** Create without starting the agent; its first message starts it. */
+  atRest?: true
+  firstMessage?: StructuredAgentSessionFirstMessage
+  optionsMode?: 'replace-model-selection'
   options?: Readonly<Record<string, string>>
   tabId?: string
+  signal?: AbortSignal
   /** Private launch tracker; never called after attach starts. */
   onPrepareRefused?: (refusal: AgentSessionWireRefusal, cause: unknown) => never
 }): Promise<AgentSessionMutationResult<AgentSessionAttachResult>> {
+  assertAgentPromptRequestActive(args.signal)
+  const envelope = args.atRest
+    ? { ...args.envelope, payloadFingerprint: structuredAgentSessionCreateIntentFingerprint(args) }
+    : args.envelope
   let preparationFailure: unknown
   const prepared: PreparedStructuredAgentSessionCreate | StructuredCreateRefused =
     await resolveUncommittedStructuredCreate(() =>
-      prepareStructuredAgentSessionCreateForWorktree(args).catch((error: unknown) => {
-        preparationFailure = error
-        throw error
-      })
+      prepareStructuredAgentSessionCreateForWorktree({ ...args, envelope }).catch(
+        (error: unknown) => {
+          preparationFailure = error
+          throw error
+        }
+      )
     )
+  assertAgentPromptRequestActive(args.signal)
   if ('refusal' in prepared) {
     args.onPrepareRefused?.(prepared.refusal, preparationFailure)
     return { ok: false, refusal: prepared.refusal }

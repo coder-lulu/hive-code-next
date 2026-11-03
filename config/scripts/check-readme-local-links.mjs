@@ -1,16 +1,24 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 
-// GitHub renders tracked public files; private translated READMEs belong to the submodule.
+// Docs-only CI skips some media owners; check index paths because GitHub cannot render uncommitted docs-site/feature-wall assets.
+const TRANSLATED_README_DIR = path.join('docs', 'readme')
 const EXTERNAL_TARGET = /^(?:[a-z][a-z0-9+.-]*:|#|\/\/)/i
-const HTML_ATTRIBUTE = /\b(?:src|srcset|href)\s*=\s*(?:"([^"]*)"|'([^']*)')/g
+const HTML_ATTRIBUTE = /\b(src|srcset|href)\s*=\s*(?:"([^"]*)"|'([^']*)')/g
 const MARKDOWN_LINK = /!?\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g
 
-// Why only the referenced paths: a full `git ls-files` of this repo overflows the
-// default child buffer; asking about a few dozen pathspecs stays bounded.
+function readmeFiles(root) {
+  const translated = readdirSync(path.join(root, TRANSLATED_README_DIR))
+    .filter((name) => name.endsWith('.md'))
+    .sort()
+    .map((name) => path.posix.join('docs', 'readme', name))
+  return ['README.md', ...translated]
+}
+
+// Bound ls-files to referenced pathspecs; full-tree output overflows the child buffer.
 function trackedFiles(root, candidates) {
   if (candidates.length === 0) {
     return new Set()
@@ -24,10 +32,14 @@ function trackedFiles(root, candidates) {
 }
 
 function* localTargets(markdown) {
-  for (const match of markdown.matchAll(HTML_ATTRIBUTE)) {
-    // Why: srcset is a candidate list ("a.gif 1x, b.gif 2x"); each entry starts with a URL.
-    for (const candidate of (match[1] ?? match[2]).split(',')) {
-      const target = candidate.trim().split(/\s+/)[0]
+  for (const [, attribute, doubleQuoted, singleQuoted] of markdown.matchAll(HTML_ATTRIBUTE)) {
+    const value = doubleQuoted ?? singleQuoted
+    // Only srcset lists candidates; each begins with its URL. src/href hold one whole URL.
+    const targets =
+      attribute === 'srcset'
+        ? value.split(',').map((candidate) => candidate.trim().split(/\s+/)[0])
+        : [value.trim()]
+    for (const target of targets) {
       if (target) {
         yield target
       }
@@ -51,7 +63,7 @@ function resolveTarget(readme, target) {
 
 function collectLinks(root) {
   const links = []
-  for (const readme of ['README.md']) {
+  for (const readme of readmeFiles(root)) {
     const markdown = readFileSync(path.join(root, readme), 'utf8')
     for (const target of new Set(localTargets(markdown))) {
       if (EXTERNAL_TARGET.test(target)) {

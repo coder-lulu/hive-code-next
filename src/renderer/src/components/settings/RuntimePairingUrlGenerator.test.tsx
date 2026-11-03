@@ -206,9 +206,7 @@ describe('RuntimePairingUrlGenerator', () => {
     expect(screen.getByTestId('current-grant')).toHaveTextContent('runtime-2')
   })
 
-  // Why: the main process gates the one-way network widen on the declared reach, so dropping it (as the
-  // component used to) leaves main guessing from the address string — "This computer only" then widened,
-  // and a Custom loopback tunnel front-end would not.
+  // Declared reach gates network widening; address strings alone confuse local-only intent with custom loopback tunnels.
   it.each([
     ['local' as const, '127.0.0.1', 'this-computer'],
     ['another' as const, '100.76.32.125', 'network'],

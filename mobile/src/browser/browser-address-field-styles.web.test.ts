@@ -1,79 +1,109 @@
-import { describe, expect, it, vi } from 'vitest'
+import { createElement } from 'react'
+import { act, create, type ReactTestRenderer } from 'react-test-renderer'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { StyleSheet, Text, TextInput } from 'react-native'
+import { MobileBrowserAddressField } from './MobileBrowserAddressField'
+import { mobileBrowserPaneStyles } from './mobile-browser-pane-styles'
+import { TextField } from '../components/composer-input/TextField'
+import { COMPOSER_TEXT_SIZE } from '../components/composer-input/composer-input-styles'
+import { applyMobileColorScheme, paletteForScheme } from '../theme/mobile-theme'
+import { TEXT_INPUT_FONT_SIZE } from '../platform/text-input-font-size'
 
-// StyleSheet.create is identity in React Native and on RN Web alike, and every other export of the
-// module reaches the native runtime this test does not have.
+const platform = vi.hoisted(() => ({ OS: 'web' }))
 vi.mock('react-native', () => ({
-  StyleSheet: { create: (styles: unknown) => styles }
+  Platform: platform,
+  StyleSheet: {
+    hairlineWidth: 1,
+    absoluteFillObject: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+    create: <T>(styles: T) => styles,
+    flatten: (styles: unknown) => Object.assign({}, ...[styles].flat())
+  },
+  Text: 'Text',
+  TextInput: 'TextInput',
+  View: 'View'
 }))
-
-// The seam as the page bundle resolves it. Without this the `.web.ts` styles below would read the
-// native seam and the test would pass on a size that no browser ever renders.
+vi.mock('./MobileBrowserLoadProgress', () => ({ MobileBrowserLoadProgress: () => null }))
 vi.mock(
   '../platform/text-input-font-size',
   async () => await import('../platform/text-input-font-size.web')
 )
 
-import { TEXT_INPUT_FONT_SIZE } from '../platform/text-input-font-size'
-import { lightTheme, typography } from '../theme/mobile-theme'
-import { browserAddressFieldBase } from './browser-address-field-base-styles'
-import { browserAddressFieldStyles } from './browser-address-field-styles'
-import { browserAddressFieldStyles as browserAddressFieldStylesOnWeb } from './browser-address-field-styles.web'
-import { createMobileBrowserPaneStyles } from './mobile-browser-pane-styles'
-
-/** Below this an iOS browser zooms the page when an input takes focus, and does not zoom back. */
-const IOS_FOCUS_ZOOM_FLOOR = 16
-
-describe('the browser pane text inputs on the web', () => {
-  it('raises the address field to the seam, above the focus-zoom floor', () => {
-    expect(browserAddressFieldStylesOnWeb.input.fontSize).toBe(TEXT_INPUT_FONT_SIZE)
-    expect(browserAddressFieldStylesOnWeb.input.fontSize).toBeGreaterThanOrEqual(
-      IOS_FOCUS_ZOOM_FLOOR
-    )
-    // A raise rather than the same number twice: the native seam is the app's body size.
-    expect(TEXT_INPUT_FONT_SIZE).toBeGreaterThan(typography.bodySize)
-  })
-
-  it('raises the key row input to the same seam', () => {
-    const styles = createMobileBrowserPaneStyles(lightTheme)
-    expect(styles.keyboardInput.fontSize).toBe(TEXT_INPUT_FONT_SIZE)
-    expect(styles.keyboardInput.fontSize).toBeGreaterThanOrEqual(IOS_FOCUS_ZOOM_FLOOR)
-  })
-
-  it('keeps the overlaid label on the input size, so focus does not resize the address', () => {
-    expect(browserAddressFieldStylesOnWeb.fileLabel.fontSize).toBe(
-      browserAddressFieldStylesOnWeb.input.fontSize
-    )
-    expect(browserAddressFieldStylesOnWeb.fileLabel.lineHeight).toBe(
-      browserAddressFieldStylesOnWeb.input.lineHeight
+const renderers: ReactTestRenderer[] = []
+function address(os: string, focused: boolean) {
+  platform.OS = os
+  let mounted: ReactTestRenderer | undefined
+  act(() => {
+    mounted = create(
+      createElement(MobileBrowserAddressField, {
+        disabled: false,
+        focused,
+        loading: false,
+        loadFailed: false,
+        value: 'file:///home/user/project/README.md',
+        onBlur: vi.fn(),
+        onChangeText: vi.fn(),
+        onFocus: vi.fn(),
+        onSubmit: vi.fn()
+      })
     )
   })
-
-  it('gives the raised size a line box it fits in', () => {
-    expect(browserAddressFieldStylesOnWeb.input.lineHeight).toBeGreaterThanOrEqual(
-      browserAddressFieldStylesOnWeb.input.fontSize
-    )
+  if (!mounted) {
+    throw new Error('Address field did not mount')
+  }
+  renderers.push(mounted)
+  return mounted
+}
+afterEach(() => {
+  act(() => {
+    for (const renderer of renderers.splice(0)) {
+      renderer.unmount()
+    }
   })
+  applyMobileColorScheme('dark')
+  platform.OS = 'web'
 })
 
-describe('the browser address field natively', () => {
-  it('renders at exactly the size it did before the split', () => {
-    expect(browserAddressFieldStyles.input.fontSize).toBe(typography.metaSize)
-    expect(browserAddressFieldStyles.input.fontSize).toBe(12)
-    expect(browserAddressFieldStyles.input.lineHeight).toBe(16)
-    expect(browserAddressFieldStyles.fileLabel.fontSize).toBe(12)
-    expect(browserAddressFieldStyles.fileLabel.lineHeight).toBe(16)
+describe('actual browser address and keyboard input styles', () => {
+  it.each(['web', 'ios', 'android'])(
+    'keeps %s address text at the shared focus-safe size',
+    (os) => {
+      const mounted = address(os, true)
+      const input = mounted.root.findByType(TextInput)
+      const style = StyleSheet.flatten(input.props.style)
+      expect(style.fontSize).toBe(COMPOSER_TEXT_SIZE)
+      expect(style.fontSize).toBeGreaterThanOrEqual(16)
+      expect(StyleSheet.flatten(mounted.root.findByType(TextField).props.style)).toMatchObject({
+        height: 28,
+        minHeight: 28
+      })
+    }
+  )
+
+  it('keeps the browser keyboard row above the web focus-zoom floor', () => {
+    expect(mobileBrowserPaneStyles.keyboardInput.fontSize).toBe(TEXT_INPUT_FONT_SIZE)
+    expect(mobileBrowserPaneStyles.keyboardInput.fontSize).toBeGreaterThanOrEqual(16)
   })
 
-  // The split is one value, not a second style: everything the siblings do not differ on comes from
-  // the same object, so a padding or a colour cannot drift between the platforms.
-  it('differs from the web style in nothing but the size', () => {
-    expect(browserAddressFieldBase.input).not.toHaveProperty('fontSize')
-    expect(browserAddressFieldBase.input).not.toHaveProperty('lineHeight')
-    expect(browserAddressFieldStyles.input).toMatchObject(browserAddressFieldBase.input)
-    expect(browserAddressFieldStylesOnWeb.input).toMatchObject(browserAddressFieldBase.input)
-    expect(browserAddressFieldStyles.fileLabel).toMatchObject(browserAddressFieldBase.fileLabel)
-    expect(browserAddressFieldStylesOnWeb.fileLabel).toMatchObject(
-      browserAddressFieldBase.fileLabel
+  it.each(['light', 'dark'] as const)(
+    'keeps the %s file label aligned with the actual input',
+    (scheme) => {
+      applyMobileColorScheme(scheme)
+      const mounted = address('web', false)
+      const inputStyle = StyleSheet.flatten(mounted.root.findByType(TextInput).props.style)
+      const labelStyle = StyleSheet.flatten(mounted.root.findByType(Text).props.style)
+      expect(labelStyle.fontSize).toBe(inputStyle.fontSize)
+      expect(labelStyle.color).toBe(paletteForScheme(scheme).textPrimary)
+      expect(inputStyle.color).toBe(labelStyle.color)
+      expect(labelStyle.flex).toBe(1)
+      expect(mounted.root.findByType(Text).props.numberOfLines).toBe(1)
+    }
+  )
+
+  it('keeps platform differences in keyboard hints, with identical input geometry', () => {
+    const styles = ['web', 'ios', 'android'].map((os) =>
+      StyleSheet.flatten(address(os, true).root.findByType(TextInput).props.style)
     )
+    expect(styles[1]).toEqual(styles[0])
+    expect(styles[2]).toEqual(styles[0])
   })
 })

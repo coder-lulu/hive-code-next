@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { useWallAppUpdate } from '../app-update/use-wall-app-update'
 import { APP_DISPLAY_NAME, PRODUCT_PUBLIC_LINKS } from '@/product-brand'
 import { ShieldAlert } from 'lucide-react-native'
@@ -69,6 +70,8 @@ function blockBody(verdict: BlockedVerdict, remedy: BlockRemedy, storeName: stri
 }
 
 export function ProtocolBlockScreen({ verdict }: Props) {
+  const t = useMobileTranslation()
+
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createStyles)
   const router = useRouteHandoff()
@@ -77,12 +80,18 @@ export function ProtocolBlockScreen({ verdict }: Props) {
   const mobileUpdateTarget =
     Platform.OS === 'ios'
       ? {
-          label: 'Open iOS download',
+          label: t(
+            'auto.mobile.src.components.ProtocolBlockScreen.04d7965947',
+            'Open iOS download'
+          ),
           url: PRODUCT_PUBLIC_LINKS.iosDownload,
           storeName: 'the official iOS distribution channel'
         }
       : {
-          label: 'Open Android download',
+          label: t(
+            'auto.mobile.src.components.ProtocolBlockScreen.f6aab9204d',
+            'Open Android download'
+          ),
           url: PRODUCT_PUBLIC_LINKS.androidDownload,
           storeName: 'the official Android distribution channel'
         }
@@ -94,7 +103,11 @@ export function ProtocolBlockScreen({ verdict }: Props) {
         ? mobileUpdate
           ? {
               kind: 'install',
-              label: `获取 ${APP_DISPLAY_NAME} ${mobileUpdate.version}`,
+              label: t(
+                'auto.mobile.src.components.ProtocolBlockScreen.36b9bb59ff',
+                'Get {{value0}} {{value1}}',
+                { value0: APP_DISPLAY_NAME, value1: mobileUpdate.version }
+              ),
               onPress: () => {
                 void mobileUpdate.install()
               },
@@ -106,7 +119,10 @@ export function ProtocolBlockScreen({ verdict }: Props) {
         : PRODUCT_PUBLIC_LINKS.desktopDownload
           ? {
               kind: 'link',
-              label: 'Open desktop download',
+              label: t(
+                'auto.mobile.src.components.ProtocolBlockScreen.4174fec926',
+                'Open desktop download'
+              ),
               url: PRODUCT_PUBLIC_LINKS.desktopDownload
             }
           : null
@@ -166,7 +182,7 @@ export function ProtocolBlockScreen({ verdict }: Props) {
             </Pressable>
           ) : null}
           <Pressable
-            accessibilityLabel="Back to hosts"
+            accessibilityLabel={t('hostScreen.hostScreenHeader.backToHosts', 'Back to hosts')}
             accessibilityRole="button"
             style={({ pressed }) => [
               styles.button,
@@ -179,7 +195,7 @@ export function ProtocolBlockScreen({ verdict }: Props) {
             }}
           >
             <Text maxFontSizeMultiplier={1.3} style={styles.secondaryButtonText}>
-              Back to hosts
+              {t('hostScreen.hostScreenHeader.backToHosts', 'Back to hosts')}
             </Text>
           </Pressable>
           {mobileUpdate?.message ? (

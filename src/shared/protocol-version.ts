@@ -1,22 +1,67 @@
-import { JIRA_AGENT_ACCESS_RUNTIME_CAPABILITY } from './jira-agent-capability'
-import { JIRA_STATUS_FILTER_RUNTIME_CAPABILITY } from './jira-quick-filters'
-import { JIRA_SAVED_FILTER_RUNTIME_CAPABILITY } from './jira-saved-filter-capability'
-import * as jiraDetailCapabilities from './jira-detail-capabilities'
-import { SESSION_TABS_RUNTIME_CAPABILITIES } from './session-tabs-runtime-capabilities'
-export {
-  JIRA_ISSUE_SUMMARY_RUNTIME_CAPABILITY,
-  JIRA_TRANSITION_FIELDS_RUNTIME_CAPABILITY,
-  JIRA_CURRENT_SPRINT_RUNTIME_CAPABILITY
-} from './jira-detail-capabilities'
-export * from './agent-session-stop-capabilities'
-import * as capabilities from './runtime-capability-identifiers'
-export * from './runtime-capability-identifiers'
-import { WORKSPACE_ATTACHMENT_RUNTIME_CAPABILITIES } from './workspace-attachment-capabilities'
-import { SSH_TARGET_MANAGEMENT_RUNTIME_CAPABILITY } from './ssh-target-management'
+import { AGENT_SESSION_LAUNCH_PERMISSION_RUNTIME_CAPABILITY } from './runtime-capability-identifiers'
+export { AGENT_SESSION_LAUNCH_PERMISSION_RUNTIME_CAPABILITY } from './runtime-capability-identifiers'
+import { ACCOUNT_RUNTIME_CAPABILITIES } from './account-runtime-capabilities'
+import * as agentLaunchCapabilities from './agent-launch-runtime-capability'
+import {
+  AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
+  AGENT_SESSION_RUNTIME_CAPABILITIES
+} from './agent-session-runtime-capabilities'
+import { AI_VAULT_RUNTIME_CAPABILITIES } from './ai-vault-runtime-capabilities'
 import {
   AUTOMATION_RUNTIME_CAPABILITIES,
   AUTOMATION_RUNTIME_CLIENT_CAPABILITIES
 } from './automation-runtime-capabilities'
+import { BROWSER_RUNTIME_CAPABILITIES } from './browser-runtime-capabilities'
+import { DEVICE_KEY_RUNTIME_CAPABILITIES } from './device-key-capability'
+import { FILES_RUNTIME_CAPABILITIES } from './files-runtime-capabilities'
+import { HOST_RUNTIME_CAPABILITIES } from './host-runtime-capabilities'
+import { MOBILE_RUNTIME_CAPABILITIES } from './mobile-runtime-capabilities'
+import { ORCAD_RUNTIME_CAPABILITIES } from './orcad-runtime-capabilities'
+import { ORCHESTRATION_RUNTIME_CAPABILITIES } from './orchestration-runtime-capabilities'
+import { PREFLIGHT_RUNTIME_CAPABILITIES } from './preflight-runtime-capabilities'
+import {
+  SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
+  SESSION_TABS_RUNTIME_CAPABILITIES
+} from './session-tabs-runtime-capabilities'
+import { SKILL_RUNTIME_CAPABILITIES } from './skill-install-capability'
+import { SOURCE_CONTROL_RUNTIME_CAPABILITIES } from './source-control-runtime-capabilities'
+import { TASK_SOURCE_RUNTIME_CAPABILITIES } from './task-source-runtime-capabilities'
+import { TERMINAL_RUNTIME_CAPABILITIES } from './terminal-runtime-capabilities'
+import { WORKSPACE_PORTS_RUNTIME_CAPABILITIES } from './workspace-ports-runtime-capabilities'
+import {
+  REPO_SEARCH_QUALIFIED_REFS_RUNTIME_CAPABILITY,
+  WORKTREE_GITHUB_PR_SUPPRESSION_RUNTIME_CAPABILITY,
+  WORKTREE_RUNTIME_CAPABILITIES,
+  WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
+  WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY
+} from './worktree-runtime-capabilities'
+
+// Runtime protocol ranges permit app-version drift across desktop/server/CLI/mobile. Bump for removed methods/required params,
+// changed field meaning (units/nullability), framing or auth; optional fields, new methods and ignorable events are additive.
+// Raise minimum client/server versions to refuse unsupported peers; never require equal app versions.
+
+export const RUNTIME_PROTOCOL_VERSION = 3
+export const MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION = 2
+export const MIN_COMPATIBLE_RUNTIME_SERVER_VERSION = 2
+
+// Why stars: importers keep reading every capability from here while each area owns its module.
+export * from './agent-session-runtime-capabilities'
+export * from './agent-session-resume-runtime-capabilities'
+export * from './agent-session-stop-capabilities'
+export * from './ai-vault-runtime-capabilities'
+export * from './browser-runtime-capabilities'
+export * from './files-runtime-capabilities'
+export * from './host-runtime-capabilities'
+
+export * from './mobile-runtime-capabilities'
+export * from './preflight-runtime-capabilities'
+export * from './source-control-runtime-capabilities'
+export * from './task-source-runtime-capabilities'
+export * from './terminal-runtime-capabilities'
+export * from './workspace-ports-runtime-capabilities'
+export * from './worktree-runtime-capabilities'
+export { REMOTE_SERVER_UPDATE_CAPABILITY } from './remote-server-update'
+export { TERMINAL_QUICK_COMMANDS_RUNTIME_CAPABILITY } from './terminal-quick-command-capabilities'
 export {
   AUTOMATION_LIST_HOST_SCOPE_RUNTIME_CAPABILITY,
   AUTOMATION_LIST_HOST_SCOPE_UPDATE_REQUIRED_MESSAGE,
@@ -25,21 +70,23 @@ export {
   AUTOMATION_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY,
   AUTOMATION_EXTRA_AGENT_ARGS_RUNTIME_CAPABILITY
 } from './automation-runtime-capabilities'
-import { STRUCTURED_AGENT_SESSION_SURFACE_RUNTIME_CAPABILITIES } from './structured-agent-session-surface-capabilities'
 export {
   STRUCTURED_AGENT_SESSION_HOLD_RUNTIME_CAPABILITY,
   STRUCTURED_AGENT_SESSION_REVEAL_RUNTIME_CAPABILITY,
+  STRUCTURED_AGENT_SESSION_REGENERATE_NAME_RUNTIME_CAPABILITY,
+  STRUCTURED_AGENT_SESSION_RENAME_RUNTIME_CAPABILITY,
   STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY,
   PI_STRUCTURED_DIALOGS_RUNTIME_CAPABILITY,
-  STRUCTURED_AGENT_SESSION_RESUME_HISTORY_RUNTIME_CAPABILITY
+  STRUCTURED_AGENT_SESSION_RESUME_HISTORY_RUNTIME_CAPABILITY,
+  STRUCTURED_AGENT_SESSION_RESUME_LINKED_CWD_RUNTIME_CAPABILITY,
+  STRUCTURED_AGENT_SESSION_CLI_SOURCE_RUNTIME_CAPABILITY,
+  STRUCTURED_AGENT_SESSION_AVAILABILITY_RUNTIME_CAPABILITY
 } from './structured-agent-session-surface-capabilities'
-import { AGENT_SESSION_ATTENTION_RUNTIME_CAPABILITIES } from './agent-session-attention-capabilities'
 export {
   AGENT_SESSION_STATUS_FEED_RUNTIME_CAPABILITY,
   AGENT_SESSION_TURN_COMPLETION_RUNTIME_CAPABILITY,
   AGENT_SESSION_ATTENTION_ACK_RUNTIME_CAPABILITY
 } from './agent-session-attention-capabilities'
-import { ORCHESTRATION_RUNTIME_CAPABILITIES } from './orchestration-runtime-capabilities'
 export {
   ORCHESTRATION_FEDERATION_RUNTIME_CAPABILITY,
   ORCHESTRATION_FEDERATION_CONTROL_MAIL_RUNTIME_CAPABILITY,
@@ -54,182 +101,54 @@ export {
   ORCHESTRATION_CONTRACT_VERSION,
   ORCHESTRATION_CONTRACT_RUNTIME_CAPABILITY
 } from './orchestration-runtime-capabilities'
-import { AGENT_SESSION_RESUME_RUNTIME_CAPABILITIES } from './agent-session-resume-runtime-capabilities'
-import { QODER_OWNED_TERMINAL_CREATE_CAPABILITY } from './qoder-terminal-create-capability'
-import { AGENT_SESSION_CONTINUE_INTERRUPTED_RUNTIME_CAPABILITY } from './agent-session-continue-interrupted-capability'
-import { ORCAD_RUNTIME_CAPABILITIES } from './orcad-runtime-capabilities'
-import { DEVICE_KEY_RUNTIME_CAPABILITIES } from './device-key-capability'
-// Why a star: every resume capability is part of the runtime contract this module re-exports.
-export * from './agent-session-resume-runtime-capabilities'
-import { AGENT_SESSION_BACKGROUND_TASK_CHILD_VIEWS_CAPABILITY } from './agent-session-background-task-child-views-capability'
-import { AGENT_SESSION_STOP_RUNTIME_CAPABILITIES } from './agent-session-stop-capabilities'
-import { AGENT_SESSION_CREATE_RUNTIME_CAPABILITIES } from './agent-session-create-capabilities'
-import { REMOTE_SERVER_UPDATE_CAPABILITY } from './remote-server-update'
-import {
-  SKILL_INSTALL_CAPABILITY,
-  SKILL_BUNDLE_INSTALL_CAPABILITY,
-  SKILL_INSTALL_CANCEL_CAPABILITY,
-  SKILL_INSTALL_PROGRESS_CAPABILITY,
-  SKILL_INSTALL_RESULT_V2_CAPABILITY,
-  SKILL_UPLOAD_CAPABILITY,
-  SKILL_MANAGEMENT_CAPABILITY,
-  SKILL_INSTALL_PROVIDERS_CAPABILITY,
-  SKILL_DELETE_CAPABILITY
-} from './skill-install-capability'
-import {
-  AGENT_LAUNCH_RUNTIME_CAPABILITIES,
-  AGENT_LAUNCH_RUNTIME_CAPABILITY
-} from './agent-launch-runtime-capability'
+export {
+  AGENT_STATUS_RESTORED_UNCONFIRMED_RUNTIME_CAPABILITY,
+  SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
+  SESSION_TABS_AUTHORITATIVE_INVENTORY_RUNTIME_CAPABILITY,
+  SESSION_TABS_RETIREMENT_PROOF_DELTA_RUNTIME_CAPABILITY,
+  SESSION_TABS_SPLIT_GROUP_PLACEMENT_RUNTIME_CAPABILITY,
+  SESSION_TABS_TAB_DELTA_RUNTIME_CAPABILITY
+} from './session-tabs-runtime-capabilities'
 
-// Why: declares the Orca runtime RPC compatibility contract. Desktop,
-// headless server, CLI, and mobile builds may drift in app version, but
-// they must agree on this protocol range before runtime RPCs are allowed.
-//
-// Bump RUNTIME_PROTOCOL_VERSION when:
-//   - You remove an RPC method or required parameter that clients use.
-//   - You change the meaning (units, nullability) of an existing field
-//     clients read.
-//   - You change encrypted framing, terminal stream framing, or auth.
-// Do NOT bump for:
-//   - Adding new RPC methods.
-//   - Adding new optional fields on existing methods.
-//   - Adding new ignorable event types.
-//
-// Bump MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION when a runtime server must
-// refuse older clients. Bump MIN_COMPATIBLE_RUNTIME_SERVER_VERSION when
-// this client build requires a newer server. Exact app-version equality is
-// never required; these numbers define the supported compatibility window.
-
-export const RUNTIME_PROTOCOL_VERSION = 3
-export const MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION = 2
-export const MIN_COMPATIBLE_RUNTIME_SERVER_VERSION = 2
-
-// Generic native clients include the CLI and must not claim Electron-only page
-// placement support.
+// Native clients include the CLI, which cannot place Electron browser pages.
 export const NATIVE_REMOTE_RUNTIME_CLIENT_CAPABILITIES = [
-  capabilities.SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
-  capabilities.AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
-  capabilities.WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
-  capabilities.WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY,
-  capabilities.WORKTREE_GITHUB_PR_SUPPRESSION_RUNTIME_CAPABILITY,
-  capabilities.REPO_SEARCH_QUALIFIED_REFS_RUNTIME_CAPABILITY,
+  SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
+  AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
+  WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
+  WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY,
+  WORKTREE_GITHUB_PR_SUPPRESSION_RUNTIME_CAPABILITY,
+  REPO_SEARCH_QUALIFIED_REFS_RUNTIME_CAPABILITY,
   ...AUTOMATION_RUNTIME_CLIENT_CAPABILITIES,
-  AGENT_LAUNCH_RUNTIME_CAPABILITY
+  agentLaunchCapabilities.AGENT_LAUNCH_RUNTIME_CAPABILITY
 ] as const
 
-export const ANTIGRAVITY_CONFIGURED_MODEL_RUNTIME_CAPABILITY =
-  'git.antigravity-configured-model.v1' as const
+// Each area lists what it publishes in its own module; a new capability edits only that module.
+export const SAVED_RESUME_ORIGIN_RUNTIME_CAPABILITY =
+  'agent-session.saved-resume-origin.v1' as const
 
 export const RUNTIME_CAPABILITIES = [
-  jiraDetailCapabilities.JIRA_TRANSITION_FIELDS_RUNTIME_CAPABILITY,
-  JIRA_AGENT_ACCESS_RUNTIME_CAPABILITY,
-  jiraDetailCapabilities.JIRA_CURRENT_SPRINT_RUNTIME_CAPABILITY,
-  ...ORCAD_RUNTIME_CAPABILITIES,
+  AGENT_SESSION_LAUNCH_PERMISSION_RUNTIME_CAPABILITY,
+  SAVED_RESUME_ORIGIN_RUNTIME_CAPABILITY,
+  ...HOST_RUNTIME_CAPABILITIES,
   ...DEVICE_KEY_RUNTIME_CAPABILITIES,
-  QODER_OWNED_TERMINAL_CREATE_CAPABILITY,
-  ...AGENT_SESSION_STOP_RUNTIME_CAPABILITIES,
-  ...AGENT_SESSION_CREATE_RUNTIME_CAPABILITIES,
-  ANTIGRAVITY_CONFIGURED_MODEL_RUNTIME_CAPABILITY,
-  'files.pathsExist',
-  'files.resolve-terminal-path.cross-workspace.v1',
-  'runtime.status.compat.v1',
-  'runtime.environments.v1',
-  capabilities.REMOTE_RUNTIME_SHARED_CONTROL_CAPABILITY,
+  ...MOBILE_RUNTIME_CAPABILITIES,
+  ...ORCAD_RUNTIME_CAPABILITIES,
   ...ORCHESTRATION_RUNTIME_CAPABILITIES,
-  capabilities.BROWSER_SCREENCAST_RUNTIME_CAPABILITY,
-  capabilities.BROWSER_TAB_CREATE_KNOWN_ID_RUNTIME_CAPABILITY,
-  capabilities.BROWSER_CLIENT_HOST_RUNTIME_CAPABILITY,
-  capabilities.BROWSER_CLIENT_PAGE_METADATA_RUNTIME_CAPABILITY,
-  capabilities.BROWSER_CLIENT_AUTOMATION_RUNTIME_CAPABILITY,
-  capabilities.BROWSER_CLIENT_FILE_CHANNEL_RUNTIME_CAPABILITY,
-  capabilities.BROWSER_NETWORK_TUNNEL_RUNTIME_CAPABILITY,
-  capabilities.BROWSER_NETWORK_EXECUTION_HOSTS_RUNTIME_CAPABILITY,
-  'terminal.binary-stream.v1',
-  'terminal.multiplex.v1',
-  'workspace-ports.v1',
-  'mobile.tasks.v1',
-  capabilities.PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
-  capabilities.TASK_SOURCE_CONTEXT_RUNTIME_CAPABILITY,
-  capabilities.WORKSPACE_RUN_CONTEXT_RUNTIME_CAPABILITY,
-  capabilities.WORKTREE_PROVISIONED_ROOT_RUNTIME_CAPABILITY,
-  capabilities.WORKTREE_LINKED_WORK_ITEM_CONTEXT_RUNTIME_CAPABILITY,
-  ...WORKSPACE_ATTACHMENT_RUNTIME_CAPABILITIES,
-  capabilities.WORKTREE_GITHUB_PR_SUPPRESSION_RUNTIME_CAPABILITY,
-  capabilities.REPO_SEARCH_QUALIFIED_REFS_RUNTIME_CAPABILITY,
-  capabilities.FOLDER_WORKSPACE_PATH_STATUS_RUNTIME_CAPABILITY,
-  capabilities.LINEAR_ISSUE_ATTRIBUTE_FILTER_RUNTIME_CAPABILITY,
-  ...jiraDetailCapabilities.JIRA_DETAIL_RUNTIME_CAPABILITIES,
-  JIRA_SAVED_FILTER_RUNTIME_CAPABILITY,
-  JIRA_STATUS_FILTER_RUNTIME_CAPABILITY,
-  capabilities.AI_VAULT_RUNTIME_CAPABILITY,
-  capabilities.AI_VAULT_SESSION_TITLES_RUNTIME_CAPABILITY,
-  capabilities.TERMINAL_QUERY_REPLY_INPUT_RUNTIME_CAPABILITY,
-  capabilities.TERMINAL_PROMPT_DELIVERY_RUNTIME_CAPABILITY,
-  capabilities.TERMINAL_PAIRED_PARKING_RUNTIME_CAPABILITY,
-  capabilities.TERMINAL_SPAWN_INTENT_RUNTIME_CAPABILITY,
-  capabilities.RUNTIME_AUTOMATIC_WORK_RUNTIME_CAPABILITY,
-  capabilities.TERMINAL_QUICK_COMMANDS_RUNTIME_CAPABILITY,
-  capabilities.WORKTREE_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY,
-  capabilities.WORKTREE_ARCHIVE_FAILURE_BLOCKING_RUNTIME_CAPABILITY,
-  capabilities.TERMINAL_CREATE_IDEMPOTENCY_RUNTIME_CAPABILITY,
-  capabilities.TERMINAL_CREATE_SHELL_SELECTION_RUNTIME_CAPABILITY,
-  capabilities.SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
-  capabilities.SESSION_TABS_AUTHORITATIVE_INVENTORY_RUNTIME_CAPABILITY,
-  ...SESSION_TABS_RUNTIME_CAPABILITIES,
-  capabilities.AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
-  REMOTE_SERVER_UPDATE_CAPABILITY,
-  capabilities.AGENT_SESSION_HOST_AUTHORITY_RUNTIME_CAPABILITY,
-  capabilities.AGENT_SESSION_LAUNCH_PERMISSION_RUNTIME_CAPABILITY,
-  capabilities.AGENT_SESSION_OMP_RESUME_PATH_RUNTIME_CAPABILITY,
-  capabilities.AGENT_SESSION_KEYBOARD_RUNTIME_CAPABILITY,
-  capabilities.STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY,
-  capabilities.STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY,
-  capabilities.AGENT_SESSION_PENDING_SEND_RESULT_RUNTIME_CAPABILITY,
-  // The host side: it accepts a send before any agent has it, and a Stop with no writer before a
-  // turn starts, so a client may gate on either.
-  capabilities.AGENT_SESSION_ACCEPTED_SEND_RUNTIME_CAPABILITY,
-  capabilities.AGENT_SESSION_SEND_ANSWERS_PROOF_RUNTIME_CAPABILITY,
-  capabilities.AGENT_SESSION_QUEUED_COMMANDS_RUNTIME_CAPABILITY,
-  capabilities.AGENT_SESSION_QUEUED_MESSAGE_EDIT_RUNTIME_CAPABILITY,
-  AGENT_SESSION_CONTINUE_INTERRUPTED_RUNTIME_CAPABILITY,
-  ...STRUCTURED_AGENT_SESSION_SURFACE_RUNTIME_CAPABILITIES,
-  ...AGENT_SESSION_ATTENTION_RUNTIME_CAPABILITIES,
-  capabilities.AGENT_SESSION_REWIND_RUNTIME_CAPABILITY,
-  capabilities.AGENT_SESSION_REWIND_RECOVERY_CAPABILITY,
-  capabilities.AGENT_SESSION_CONVERSATION_OUTLINE_RUNTIME_CAPABILITY,
-  capabilities.AGENT_SESSION_BACKGROUND_TASK_STOP_CAPABILITY,
-  capabilities.AGENT_SESSION_QUESTION_ANSWERS_RUNTIME_CAPABILITY,
-  capabilities.AGENT_SESSION_ATTACHMENTS_RUNTIME_CAPABILITY,
-  capabilities.AGENT_SESSION_TURN_ITEM_CAPABILITY,
-  capabilities.AGENT_SESSION_BACKGROUND_TASK_ROW_STOP_CAPABILITY,
-  AGENT_SESSION_BACKGROUND_TASK_CHILD_VIEWS_CAPABILITY,
-  ...AGENT_SESSION_RESUME_RUNTIME_CAPABILITIES,
-  capabilities.FILE_MUTATION_OWNERSHIP_RUNTIME_CAPABILITY,
-  capabilities.GITHUB_MARK_PR_READY_RUNTIME_CAPABILITY,
-  capabilities.GITLAB_READY_FOR_REVIEW_RUNTIME_CAPABILITY,
-  capabilities.WORKTREE_VISIBILITY_DEFAULTS_RUNTIME_CAPABILITY,
-  capabilities.WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY,
-  capabilities.ACCOUNT_IMPORT_RUNTIME_CAPABILITY,
-  capabilities.CLAUDE_SIGN_IN_RUNTIME_CAPABILITY,
-  capabilities.ANTIGRAVITY_ACCOUNTS_RUNTIME_CAPABILITY,
-  capabilities.DATA_ACCOUNT_RUNTIME_CAPABILITY,
-  capabilities.CODEX_RESET_CREDIT_RUNTIME_CAPABILITY,
-  SKILL_INSTALL_CAPABILITY,
-  SKILL_BUNDLE_INSTALL_CAPABILITY,
-  SKILL_INSTALL_CANCEL_CAPABILITY,
-  SKILL_INSTALL_PROGRESS_CAPABILITY,
-  SKILL_INSTALL_RESULT_V2_CAPABILITY,
-  SKILL_UPLOAD_CAPABILITY,
-  SKILL_MANAGEMENT_CAPABILITY,
-  SKILL_INSTALL_PROVIDERS_CAPABILITY,
-  SKILL_DELETE_CAPABILITY,
+  ...agentLaunchCapabilities.AGENT_LAUNCH_RUNTIME_CAPABILITIES,
+  ...AGENT_SESSION_RUNTIME_CAPABILITIES,
+  ...ACCOUNT_RUNTIME_CAPABILITIES,
+  ...SKILL_RUNTIME_CAPABILITIES,
   ...AUTOMATION_RUNTIME_CAPABILITIES,
-  capabilities.PREFLIGHT_WORKSPACE_SCOPED_RUNTIME_CAPABILITY,
-  capabilities.PREFLIGHT_OTHER_RUNTIME_REFUSAL_RUNTIME_CAPABILITY,
-  capabilities.WORKSPACE_PORTS_HOST_SCOPED_RUNTIME_CAPABILITY,
-  capabilities.RUNTIME_SOURCE_FENCE_RUNTIME_CAPABILITY,
-  SSH_TARGET_MANAGEMENT_RUNTIME_CAPABILITY,
-  ...AGENT_LAUNCH_RUNTIME_CAPABILITIES
+  ...WORKTREE_RUNTIME_CAPABILITIES,
+  ...PREFLIGHT_RUNTIME_CAPABILITIES,
+  ...WORKSPACE_PORTS_RUNTIME_CAPABILITIES,
+  ...SESSION_TABS_RUNTIME_CAPABILITIES,
+  ...TERMINAL_RUNTIME_CAPABILITIES,
+  ...FILES_RUNTIME_CAPABILITIES,
+  ...BROWSER_RUNTIME_CAPABILITIES,
+  ...SOURCE_CONTROL_RUNTIME_CAPABILITIES,
+  ...TASK_SOURCE_RUNTIME_CAPABILITIES,
+  ...AI_VAULT_RUNTIME_CAPABILITIES
 ] as const
 
 export type RuntimeCapability = (typeof RUNTIME_CAPABILITIES)[number] | (string & {})

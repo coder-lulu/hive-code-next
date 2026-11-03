@@ -88,12 +88,14 @@ export function createAcknowledgedTabRetirementFixture(bound = false) {
   setRuntimeDesktopSurface({
     showNotification: () => false,
     findWindowById: () => {
-      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the exercised close path only checks window and WebContents destruction.
-      return { isDestroyed: () => false, webContents: { isDestroyed: () => false } } as never
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the exercised close path only checks destruction and, for a paired client's close, throttling.
+      return {
+        isDestroyed: () => false,
+        webContents: { isDestroyed: () => false, setBackgroundThrottling: () => {} }
+      } as never
     },
     onIpc: () => {},
-    removeIpcListener: () => {},
-    waitForBrowserTabRegistration: async () => {}
+    removeIpcListener: () => {}
   })
   const runtime = new OrcaRuntimeService(store)
   runtime.attachWindow(1)
@@ -176,7 +178,6 @@ export function createAcknowledgedTabRetirementFixture(bound = false) {
     splitTerminal: () => {},
     renameTerminal: () => {},
     focusTerminal: () => {},
-    sleepWorktree: () => {},
     terminalFitOverrideChanged: () => {},
     terminalDriverChanged: () => {}
   })

@@ -1,19 +1,19 @@
 import { Pressable, Text, View } from 'react-native'
 import { ChevronLeft, ExternalLink, RefreshCw, X } from 'lucide-react-native'
-import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
-import { createMobileSourceControlStyles } from './mobile-source-control-styles'
+import { colors } from '../theme/mobile-theme'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
+import { styles } from './mobile-source-control-styles'
 
 type Props = {
   embedded: boolean
   worktreeLabel: string
   ioBusy: boolean
-  /** Pops the route; the embedded dock has a separate close action. */
   onBack: () => void
-  /** Dismisses the dock beside the terminal. */
+  // Dock dismissal does not pop a route; keep it separate from Back.
   onClose: () => void
   onRefresh: () => void
-  // When set (PR segment ready with a host URL), show open-on-web flush-right of
-  // the title so the control stays visible while the PR body scrolls.
+  // Keep open-on-web in the header while the PR body scrolls.
   onOpenPrWeb?: () => void
   prNumber?: number | null
 }
@@ -28,19 +28,20 @@ export function MobileSourceControlHeader({
   onOpenPrWeb,
   prNumber = null
 }: Props) {
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createMobileSourceControlStyles)
+  useMobileColorScheme()
+  const t = useMobileTranslation()
   return (
     <View style={styles.topBar}>
+      {/* Dock dismissal and route Back have distinct semantics. */}
       {embedded ? (
         <Pressable
           style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
           onPress={onClose}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel="关闭源码控制"
+          accessibilityLabel={t('sourceControl.header.close', 'Close source control')}
         >
-          <X size={20} color={theme.color.text.secondary} strokeWidth={2} />
+          <X size={22} color={colors.textSecondary} strokeWidth={2.2} />
         </Pressable>
       ) : (
         <Pressable
@@ -48,14 +49,14 @@ export function MobileSourceControlHeader({
           onPress={onBack}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel="返回会话"
+          accessibilityLabel={t('sourceControl.header.backToSession', 'Back to session')}
         >
-          <ChevronLeft size={20} color={theme.color.text.secondary} strokeWidth={2} />
+          <ChevronLeft size={22} color={colors.textSecondary} strokeWidth={2.2} />
         </Pressable>
       )}
       <View style={styles.titleBlock}>
         <Text style={styles.title} numberOfLines={1}>
-          源码控制
+          {t('sourceControl.header.title', 'Source Control')}
         </Text>
         <Text style={styles.meta} numberOfLines={1}>
           {worktreeLabel}
@@ -68,10 +69,18 @@ export function MobileSourceControlHeader({
           hitSlop={8}
           accessibilityRole="link"
           accessibilityLabel={
-            prNumber != null ? `在网页中打开拉取请求 #${prNumber}` : '在网页中打开拉取请求'
+            prNumber != null
+              ? t(
+                  'sourceControl.header.openNumberedPrWeb',
+                  'Open pull request #{{number}} on the web',
+                  {
+                    number: prNumber
+                  }
+                )
+              : t('sourceControl.header.openPrWeb', 'Open pull request on the web')
           }
         >
-          <ExternalLink size={20} color={theme.color.text.secondary} strokeWidth={2} />
+          <ExternalLink size={18} color={colors.textSecondary} strokeWidth={2.1} />
         </Pressable>
       ) : null}
       <Pressable
@@ -84,9 +93,9 @@ export function MobileSourceControlHeader({
         disabled={ioBusy}
         hitSlop={8}
         accessibilityRole="button"
-        accessibilityLabel="刷新源码控制"
+        accessibilityLabel={t('sourceControl.header.refresh', 'Refresh source control')}
       >
-        <RefreshCw size={20} color={theme.color.text.secondary} strokeWidth={2} />
+        <RefreshCw size={18} color={colors.textSecondary} strokeWidth={2.1} />
       </Pressable>
     </View>
   )

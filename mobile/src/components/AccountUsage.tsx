@@ -1,10 +1,9 @@
-import { useMemo } from 'react'
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, Text, ActivityIndicator } from 'react-native'
 import { colors, spacing, typography } from '../theme/mobile-theme'
-import type { MobileTheme } from '../theme/mobile-theme'
+import { themedStyleSheet } from '../theme/themed-styles'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 
-// Pure types and selectors live in account-usage-state.ts (no RN imports) so
-// they are unit-testable; re-exported here so existing import sites are stable.
+// Re-export pure account-usage-state selectors/types to keep imports stable and tests free of RN.
 export type {
   RateLimitWindow,
   ProviderRateLimits,
@@ -25,36 +24,32 @@ export {
   hasRenderableUsage
 } from './account-usage-state'
 
-// Why: matches desktop StatusBar — bars show percent used (consumption), same
-// as Claude/Codex harness meters. Fresh account is empty/green; depleted is
-// full/red.
+// Match desktop/harness consumption meters: fresh empty/green, depleted full/red.
 export function UsageBar({
   label,
   usedPercent,
   unavailable,
   loading,
-  resetText,
-  theme
+  resetText
 }: {
   label: string
   usedPercent: number | null
   unavailable: boolean
   loading?: boolean
   resetText?: string | null
-  theme?: MobileTheme
 }) {
-  const styles = useMemo(() => createStyles(theme), [theme])
+  useMobileColorScheme()
   // Why: round then clamp so bar width, color, and label share one value (desktop parity).
   const used = usedPercent == null ? null : Math.max(0, Math.min(100, Math.round(usedPercent)))
   // Why: same consumption bands as desktop barColor (green <60, amber <80, red ≥80).
   const barColor =
     used == null
-      ? (theme?.color.text.tertiary ?? colors.textMuted)
+      ? colors.textMuted
       : used >= 80
-        ? (theme?.color.status.danger ?? colors.statusRed)
+        ? colors.statusRed
         : used >= 60
-          ? (theme?.color.status.warning ?? colors.statusAmber)
-          : (theme?.color.status.success ?? colors.statusGreen)
+          ? colors.statusAmber
+          : colors.statusGreen
   return (
     <View style={styles.usageBarColumn}>
       <View style={styles.usageBar}>
@@ -65,9 +60,7 @@ export function UsageBar({
               styles.usageFill,
               {
                 width: `${used ?? 0}%`,
-                backgroundColor: unavailable
-                  ? (theme?.color.text.tertiary ?? colors.textMuted)
-                  : barColor
+                backgroundColor: unavailable ? colors.textMuted : barColor
               }
             ]}
           />
@@ -75,7 +68,7 @@ export function UsageBar({
         {loading ? (
           <ActivityIndicator
             size="small"
-            color={theme?.color.text.secondary ?? colors.textSecondary}
+            color={colors.textSecondary}
             style={styles.usageSpinner}
           />
         ) : (
@@ -91,37 +84,45 @@ export function UsageBar({
   )
 }
 
-function createStyles(theme?: MobileTheme) {
-  const labelStyle = theme?.typography.caption ?? { fontSize: typography.metaSize }
-  const gap = theme?.spacing.space4 ?? spacing.xs
-  return StyleSheet.create({
-    usageBarColumn: { flex: 1, gap },
-    usageBar: { flexDirection: 'row', alignItems: 'center', gap },
-    usageLabel: {
-      ...labelStyle,
-      width: 22,
-      color: theme?.color.text.tertiary ?? colors.textMuted
-    },
-    usageTrack: {
-      flex: 1,
-      height: 6,
-      overflow: 'hidden',
-      borderRadius: theme?.radii.small ?? 4,
-      backgroundColor: theme?.color.bg.subtle ?? colors.bgRaised
-    },
-    usageFill: { height: '100%', borderRadius: theme?.radii.small ?? 4 },
-    usageValue: {
-      ...labelStyle,
-      width: 36,
-      color: theme?.color.text.secondary ?? colors.textSecondary,
-      textAlign: 'right'
-    },
-    usageSpinner: { width: 36 },
-    // Why: indented past the window label so the countdown aligns with the track above it.
-    usageResetText: {
-      ...labelStyle,
-      marginLeft: 22 + gap,
-      color: theme?.color.text.tertiary ?? colors.textMuted
-    }
-  })
-}
+const styles = themedStyleSheet(() => ({
+  usageBarColumn: {
+    flex: 1,
+    gap: 2
+  },
+  usageBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs
+  },
+  usageLabel: {
+    fontSize: typography.metaSize,
+    color: colors.textMuted,
+    width: 22
+  },
+  usageTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.bgRaised,
+    overflow: 'hidden'
+  },
+  usageFill: {
+    height: '100%',
+    borderRadius: 3
+  },
+  usageValue: {
+    fontSize: typography.metaSize,
+    color: colors.textSecondary,
+    width: 36,
+    textAlign: 'right'
+  },
+  usageSpinner: {
+    width: 36
+  },
+  // Indent countdown past window label to align with track.
+  usageResetText: {
+    fontSize: typography.metaSize,
+    color: colors.textMuted,
+    marginLeft: 22 + spacing.xs
+  }
+}))

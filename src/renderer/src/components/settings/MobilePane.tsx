@@ -14,6 +14,7 @@ import { MobilePairingSetupSection } from './MobilePairingSetupSection'
 import { WindowsFirewallNotice } from '../mobile/WindowsFirewallNotice'
 import { translate } from '@/i18n/i18n'
 import { useMobilePairingAddressPreference } from '../mobile/use-mobile-pairing-address-preference'
+import type { MobilePairingAddressChange } from '../mobile/use-mobile-pairing-address-preference'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 export { getMobilePaneSearchEntries } from './mobile-pane-search'
 
@@ -39,6 +40,8 @@ export function MobilePane({
   const [qrEnlarged, setQrEnlarged] = useState(false)
   const [networkInterfaces, setNetworkInterfaces] = useState<MobileNetworkInterface[]>([])
   const [refreshingNetworkInterfaces, setRefreshingNetworkInterfaces] = useState(false)
+  const [addressDiscoverySettled, setAddressDiscoverySettled] = useState(false)
+  const [validatingCustomAddress, setValidatingCustomAddress] = useState(false)
   const [codeCopied, setCodeCopied] = useState(false)
   const [deviceCountAtQr, setDeviceCountAtQr] = useState<number | null>(null)
   const [rotateNextQr, setRotateNextQr] = useState(false)
@@ -57,16 +60,27 @@ export function MobilePane({
   }
   const connectionMethod = methodSelection.value
   const setConnectionMethod = (value: string): void => {
-    setMethodSelection((current) => ({ ...current, value: value as 'cloud' | 'direct' }))
+    if (value === 'cloud' || value === 'direct') {
+      setMethodSelection((current) => ({ ...current, value }))
+    }
   }
   const codeCopiedResetTimerRef = useRef<number | null>(null)
   // Address changes invalidate pending QR responses.
   const pairingRequestIdRef = useRef(0)
+  const networkInterfacesRequestIdRef = useRef(0)
+  const customAddressRequestIdRef = useRef(0)
   // Ref mirrors of QR-visible / loading so invalidatePairing stays stable and
   // cannot make loadNetworkInterfaces re-fetch on every generate.
-  const qrDisplayedRef = useRef(false)
+  const credentialAvailableRef = useRef(false)
   const loadingRef = useRef(false)
   const mountedRef = useMountedRef()
+  const cancelAddressRequests = useCallback((): void => {
+    customAddressRequestIdRef.current += 1
+    networkInterfacesRequestIdRef.current += 1
+    setValidatingCustomAddress(false)
+    setRefreshingNetworkInterfaces(false)
+    setAddressDiscoverySettled(true)
+  }, [])
   const {
     devices,
     loaded: devicesLoaded,
@@ -74,8 +88,8 @@ export function MobilePane({
   } = usePairedMobileDevices({ refreshOnMount: false })
 
   useEffect(() => {
-    qrDisplayedRef.current = qrDataUrl != null
-  }, [qrDataUrl])
+    credentialAvailableRef.current = pairingUrl != null
+  }, [pairingUrl])
 
   useEffect(() => {
     loadingRef.current = loading
@@ -87,7 +101,7 @@ export function MobilePane({
   // issues a fresh credential rather than the discarded pending one.
   const invalidatePairing = useCallback((): void => {
     pairingRequestIdRef.current += 1
-    const hadPending = qrDisplayedRef.current || loadingRef.current
+    const hadPending = credentialAvailableRef.current || loadingRef.current
     setQrDataUrl(null)
     setQrSize(null)
     setPairingUrl(null)
@@ -102,13 +116,24 @@ export function MobilePane({
       setRotateNextQr(true)
     }
   }, [])
-  const invalidatePairingAddress = useCallback(() => invalidatePairing(), [invalidatePairing])
+  const invalidatePairingAddress = useCallback(
+    (change: MobilePairingAddressChange) => {
+      if (change.source !== 'refresh') {
+        cancelAddressRequests()
+      } else {
+        customAddressRequestIdRef.current += 1
+        setValidatingCustomAddress(false)
+      }
+      invalidatePairing()
+    },
+    [cancelAddressRequests, invalidatePairing]
+  )
   const {
     selectedAddress,
     selectedAddressIsCustom,
     customAddresses,
     selectAddress: handleSelectedAddressChange,
-    selectCustomAddress: handleCustomAddressSelect,
+    selectCustomAddress,
     removeCustomAddress: handleCustomAddressRemove,
     selectAddressAfterRefresh
   } = useMobilePairingAddressPreference({
@@ -123,6 +148,48 @@ export function MobilePane({
     }
   }, [])
 
+  const beforeCustomAddressChange = useCallback(
+    async (address: string): Promise<boolean> => {
+      if (address === selectedAddress) {
+        return true
+      }
+      const requestId = ++customAddressRequestIdRef.current
+      setValidatingCustomAddress(true)
+      try {
+        const result = await window.api.mobile.getPairingQR({ address })
+        if (!mountedRef.current || requestId !== customAddressRequestIdRef.current) {
+          return false
+        }
+        if (!result.available || result.qrDataUrl === null) {
+          toast.error(
+            translate(
+              'auto.components.settings.MobilePane.e3c427e020',
+              'Failed to generate QR code'
+            )
+          )
+          return false
+        }
+        setRotateNextQr(true)
+        return true
+      } catch {
+        if (mountedRef.current && requestId === customAddressRequestIdRef.current) {
+          toast.error(
+            translate(
+              'auto.components.settings.MobilePane.e3c427e020',
+              'Failed to generate QR code'
+            )
+          )
+        }
+        return false
+      } finally {
+        if (mountedRef.current && requestId === customAddressRequestIdRef.current) {
+          setValidatingCustomAddress(false)
+        }
+      }
+    },
+    [mountedRef, selectedAddress]
+  )
+
   const loadDevices = useCallback(async () => {
     try {
       await refreshDevices()
@@ -133,15 +200,20 @@ export function MobilePane({
 
   const loadNetworkInterfaces = useCallback(
     async (opts: { notifyOnError?: boolean } = {}) => {
+      const requestId = ++networkInterfacesRequestIdRef.current
       setRefreshingNetworkInterfaces(true)
       try {
         const result = await window.api.mobile.listNetworkInterfaces()
-        if (mountedRef.current) {
+        if (mountedRef.current && requestId === networkInterfacesRequestIdRef.current) {
           setNetworkInterfaces(result.interfaces)
           selectAddressAfterRefresh(result.interfaces)
         }
       } catch {
-        if (opts.notifyOnError && mountedRef.current) {
+        if (
+          opts.notifyOnError &&
+          mountedRef.current &&
+          requestId === networkInterfacesRequestIdRef.current
+        ) {
           toast.error(
             translate(
               'auto.components.settings.MobilePane.d714614dbf',
@@ -150,7 +222,8 @@ export function MobilePane({
           )
         }
       } finally {
-        if (mountedRef.current) {
+        if (mountedRef.current && requestId === networkInterfacesRequestIdRef.current) {
+          setAddressDiscoverySettled(true)
           setRefreshingNetworkInterfaces(false)
         }
       }
@@ -164,7 +237,11 @@ export function MobilePane({
         rotate?: boolean
       } = {}
     ) => {
+      if (!addressDiscoverySettled || refreshingNetworkInterfaces || validatingCustomAddress) {
+        return
+      }
       const requestId = ++pairingRequestIdRef.current
+      loadingRef.current = true
       setLoading(true)
       setQrError(false)
       try {
@@ -175,7 +252,7 @@ export function MobilePane({
         // Why: an address change bumps the epoch.
         // A response for a superseded request must not paint a QR that no
         // longer matches the current selection.
-        if (requestId !== pairingRequestIdRef.current) {
+        if (!mountedRef.current || requestId !== pairingRequestIdRef.current) {
           return
         }
         if (result.available) {
@@ -217,11 +294,30 @@ export function MobilePane({
         }
       } finally {
         if (mountedRef.current && requestId === pairingRequestIdRef.current) {
+          loadingRef.current = false
           setLoading(false)
         }
       }
     },
-    [clearCodeCopiedResetTimer, loadDevices, mountedRef, rotateNextQr, selectedAddress]
+    [
+      addressDiscoverySettled,
+      refreshingNetworkInterfaces,
+      validatingCustomAddress,
+      clearCodeCopiedResetTimer,
+      loadDevices,
+      mountedRef,
+      rotateNextQr,
+      selectedAddress
+    ]
+  )
+
+  useEffect(
+    () => () => {
+      pairingRequestIdRef.current += 1
+      networkInterfacesRequestIdRef.current += 1
+      customAddressRequestIdRef.current += 1
+    },
+    []
   )
 
   useEffect(() => {
@@ -274,14 +370,21 @@ export function MobilePane({
             customAddresses={customAddresses}
             selectedAddress={selectedAddress}
             selectedAddressIsCustom={selectedAddressIsCustom}
-            onSelectedAddressChange={handleSelectedAddressChange}
-            onCustomAddressSelect={handleCustomAddressSelect}
+            onSelectedAddressChange={(address) => {
+              cancelAddressRequests()
+              handleSelectedAddressChange(address)
+            }}
+            onCustomAddressSelect={selectCustomAddress}
+            beforeCustomAddressChange={beforeCustomAddressChange}
             onCustomAddressRemove={handleCustomAddressRemove}
             refreshingNetworkInterfaces={refreshingNetworkInterfaces}
             onRefreshNetworkInterfaces={() => void loadNetworkInterfaces({ notifyOnError: true })}
             loading={loading}
-            hasQrCode={qrDataUrl != null}
-            onGenerateQr={() => void generateQR({ rotate: qrDataUrl != null })}
+            canGenerate={
+              addressDiscoverySettled && !refreshingNetworkInterfaces && !validatingCustomAddress
+            }
+            hasQrCode={pairingUrl != null}
+            onGenerateQr={() => void generateQR({ rotate: pairingUrl != null })}
           />
 
           <span className="sr-only" role="status" aria-live="polite">

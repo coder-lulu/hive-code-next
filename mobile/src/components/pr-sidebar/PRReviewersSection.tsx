@@ -1,15 +1,18 @@
 import { useMemo, useState } from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { UserPlus, X } from 'lucide-react-native'
-import { useMobileTheme, useMobileThemeStyles } from '../../theme/mobile-theme-provider'
+import { colors } from '../../theme/mobile-theme'
+import { useMobileColorScheme } from '../../theme/use-mobile-color-scheme'
+import type { Translate } from '../../i18n/mobile-i18n'
+import { useMobileTranslation } from '../../i18n/use-mobile-translation'
 import type { GitHubWorkItemDetails } from '../../../../src/shared/github/work-item-types'
 import type { RpcClient } from '../../transport/rpc-client'
 import type { MobilePrActions } from '../../session/use-mobile-pr-actions'
 import { isPrSidebarDetailsPlaceholder } from '../../session/mobile-pr-sidebar-state'
-import { getPRReviewerRows } from './pr-checks-presentation'
+import { getGitHubPRReviewerRows } from '../../../../src/shared/github/pr-reviewer-display'
 import { ReviewerPickerDrawer } from './ReviewerPickerDrawer'
 import { PRSection } from './PRSection'
-import { createMobilePrSidebarStyles } from './mobile-pr-sidebar-styles'
+import { mobilePrSidebarStyles as styles } from './mobile-pr-sidebar-styles'
 
 type Props = {
   details: GitHubWorkItemDetails | null
@@ -18,28 +21,56 @@ type Props = {
   worktreeId: string
 }
 
-// Requested reviewers + their latest review status, with a picker to request /
-// remove (optimistic add/remove via the actions hook).
+function reviewerStateLabel(
+  item: GitHubWorkItemDetails['item'],
+  login: string,
+  t: Translate
+): string {
+  const normalizedLogin = login.toLowerCase()
+  if (item.reviewRequests?.some((user) => user.login.trim().toLowerCase() === normalizedLogin)) {
+    return t('pullRequest.reviewersSection.requested', 'Requested')
+  }
+  const review = item.latestReviews?.find(
+    (entry) => entry.login.trim().toLowerCase() === normalizedLogin
+  )
+  switch (review?.state) {
+    case 'APPROVED':
+      return t('pullRequest.reviewersSection.approved', 'Approved')
+    case 'CHANGES_REQUESTED':
+      return t('pullRequest.reviewersSection.changesRequested', 'Changes requested')
+    case 'COMMENTED':
+      return t('pullRequest.reviewersSection.commented', 'Commented')
+    case 'DISMISSED':
+      return t('pullRequest.reviewersSection.dismissed', 'Dismissed')
+    case 'PENDING':
+      return t('pullRequest.reviewersSection.pending', 'Pending')
+    case undefined:
+    case null:
+    default:
+      return t('pullRequest.reviewersSection.reviewed', 'Reviewed')
+  }
+}
+
+// Requested reviewers/latest verdicts with optimistic request/remove picker.
 export function PRReviewersSection({ details, actions, client, worktreeId }: Props) {
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createMobilePrSidebarStyles)
-  // details === null means phase 2 (work-item payload) is still in flight — same
-  // signal Comments uses. Do not treat that as "no reviewers" or the section goes
-  // blank while checks (phase 1) already paint. A synthetic placeholder means
-  // phase 2 failed (no body/comments/reviews landed).
+  useMobileColorScheme()
+  const t = useMobileTranslation()
+  // Null details means heavy phase 2 still loading; synthetic placeholder means failure, neither means no reviewers.
   const loadingDetails = details === null
   const detailsFailed = details != null && isPrSidebarDetailsPlaceholder(details)
   const authoritativeRows = useMemo(
     () =>
       details?.item && !isPrSidebarDetailsPlaceholder(details)
-        ? getPRReviewerRows(details.item)
+        ? getGitHubPRReviewerRows(details.item).map((row) => ({
+            ...row,
+            stateLabel: reviewerStateLabel(details.item, row.login, t)
+          }))
         : [],
-    [details]
+    [details, t]
   )
   const [pickerOpen, setPickerOpen] = useState(false)
 
-  // The authoritative requested-set drives optimistic resolution; an optimistic
-  // add can surface a login not yet in authoritativeRows.
+  // Resolve optimism against authoritative request set; newly added login may have no fetched row yet.
   const authoritativeRequested = useMemo(
     () => new Set(authoritativeRows.map((r) => r.login.toLowerCase())),
     [authoritativeRows]
@@ -47,9 +78,7 @@ export function PRReviewersSection({ details, actions, client, worktreeId }: Pro
   const isRequested = (login: string): boolean =>
     actions.resolveReviewerRequested(login, authoritativeRequested.has(login.toLowerCase()))
 
-  // Render rows = authoritative rows whose optimistic membership is still true.
-  // An optimistic add of a brand-new login surfaces in the row list only after
-  // refetch supplies it authoritatively; until then the picker's check reflects it.
+  // Filter authoritative rows by optimistic membership; new login appears after refetch, while picker check updates immediately.
   const rows = authoritativeRows.filter((r) => isRequested(r.login))
 
   const seededLogins = useMemo(() => {
@@ -63,23 +92,32 @@ export function PRReviewersSection({ details, actions, client, worktreeId }: Pro
       style={styles.iconButton}
       onPress={() => setPickerOpen(true)}
       accessibilityRole="button"
-      accessibilityLabel="添加或移除审阅者"
+      accessibilityLabel={t('pullRequest.reviewersSection.addOrRemove', 'Add or remove reviewers')}
     >
-      <UserPlus size={16} color={theme.color.text.secondary} strokeWidth={2.2} />
+      <UserPlus size={16} color={colors.textSecondary} strokeWidth={2.2} />
     </Pressable>
   )
 
   return (
-    <PRSection title="审阅者" trailing={addButton}>
+    <PRSection title={t('pullRequest.reviewersSection.title', 'Reviewers')} trailing={addButton}>
       {loadingDetails ? (
         <View style={styles.reviewersStatus}>
-          <ActivityIndicator color={theme.color.text.secondary} />
-          <Text style={styles.emptyText}>正在加载审阅者…</Text>
+          <ActivityIndicator color={colors.textSecondary} />
+          <Text style={styles.emptyText}>
+            {t('pullRequest.reviewersSection.loading', 'Loading reviewers…')}
+          </Text>
         </View>
       ) : detailsFailed ? (
-        <Text style={styles.emptyText}>无法加载审阅者。请刷新后重试。</Text>
+        <Text style={styles.emptyText}>
+          {t(
+            'pullRequest.reviewersSection.loadFailed',
+            'Could not load reviewers. Tap refresh to try again.'
+          )}
+        </Text>
       ) : rows.length === 0 ? (
-        <Text style={styles.emptyText}>尚未请求审阅</Text>
+        <Text style={styles.emptyText}>
+          {t('pullRequest.reviewersSection.noReviewers', 'No reviewers requested')}
+        </Text>
       ) : (
         rows.map((row) => {
           const busy = actions.isBusy({ kind: 'reviewer', login: row.login })
@@ -90,9 +128,8 @@ export function PRReviewersSection({ details, actions, client, worktreeId }: Pro
                   {row.name ? `${row.name} (${row.login})` : row.login}
                 </Text>
               </View>
-              {/* Neutral gray like the desktop PR page (the label text carries the
-                  state); keeps the sidebar mostly monochrome. */}
-              <Text style={[styles.rowStatus, { color: theme.color.text.secondary }]}>
+              {/* Use neutral desktop tone; label text carries review state. */}
+              <Text style={[styles.rowStatus, { color: colors.textSecondary }]}>
                 {row.stateLabel}
               </Text>
               <Pressable
@@ -100,12 +137,16 @@ export function PRReviewersSection({ details, actions, client, worktreeId }: Pro
                 onPress={() => actions.removeReviewer(row.login)}
                 disabled={busy}
                 accessibilityRole="button"
-                accessibilityLabel={`移除 ${row.login}`}
+                accessibilityLabel={t(
+                  'pullRequest.reviewersSection.removeReviewer',
+                  'Remove {{login}}',
+                  { login: row.login }
+                )}
               >
                 {busy ? (
-                  <ActivityIndicator color={theme.color.text.secondary} />
+                  <ActivityIndicator color={colors.textSecondary} />
                 ) : (
-                  <X size={14} color={theme.color.text.secondary} strokeWidth={2.2} />
+                  <X size={14} color={colors.textSecondary} strokeWidth={2.2} />
                 )}
               </Pressable>
             </View>

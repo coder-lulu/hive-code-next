@@ -1,9 +1,4 @@
-/**
- * How the AppImage extraction cache keys its copies, shared with the CLI: a service run from a copy
- * has no $APPIMAGE and must find, from the cache layout alone, which AppImage file it came from.
- * Layout: `<cache>/<namespace>/<generation>/`, namespace keyed on the AppImage path and generation
- * on that file's identity.
- */
+/** Find copies without APPIMAGE via cache/namespace/generation: namespace identifies the source path, generation its file identity. Share this layout with the CLI. */
 import { createHash } from 'node:crypto'
 import { readFileSync, statSync } from 'node:fs'
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
@@ -11,9 +6,7 @@ import { APPIMAGE_NODE_RUNTIME_SEGMENTS } from './appimage-node-runtime'
 
 const CACHE_KEY_PATTERN = /^[0-9a-f]{24}$/u
 export const APPIMAGE_LINUX_GUI_EXECUTABLE_NAME = 'hivecode'
-// Why a versioned key: builds before generation leases prune every generation in
-// digest(appImagePath) except their own, including one a newer build still runs from. They never
-// scan this namespace. Rolling back to such a build reopens that window for its own namespace only.
+// Version the namespace so older pruners cannot delete generations a newer build still runs; rollback reopens only the old namespace's risk.
 const NAMESPACE_KEY_VERSION = 'generation-lease-v1'
 /** Beside a namespace's generations; not a cache key, so pruning skips it. */
 export const APPIMAGE_SOURCE_RECORD_NAME = 'source-appimage'
@@ -30,15 +23,7 @@ export function appImageNamespaceKey(appImagePath: string): string {
   return appImageCacheDigest(`${NAMESPACE_KEY_VERSION}\0${appImagePath}`)
 }
 
-/**
- * Identity of the AppImage's *content*, used to key its extracted generation.
- *
- * Deliberately excludes ctime: it changes on any inode metadata write — `chmod +x` (which every
- * AppImage user is told to run), `chown`, an ACL or SELinux relabel, a backup restore — none of
- * which alter a byte of the payload. Including it re-keyed the cache on those, costing a full
- * ~519 MB re-extraction and a multi-second stall for nothing. An in-place content change moves
- * mtime and almost always size; a replacement moves the inode.
- */
+/** Exclude ctime: chmod/chown/ACL/relabel/restore changes metadata without changing payload and would force ~519MB re-extraction. Content changes move mtime/usually size; replacement changes inode. */
 export function resolveAppImageCacheKey(appImagePath: string): string | null {
   try {
     const stats = statSync(appImagePath)
@@ -55,13 +40,10 @@ export type AppImageGenerationLocation = {
   rootPath: string
 }
 
-/** The generation root of the packaged GUI, a legacy Orca GUI, or the exact bundled daemon Node. */
+/** The generation root an executable runs from: its `orca-ide`, or its bundled Node (the daemon). */
 function generationRootOfExecutable(execPath: string): string | null {
   const resolved = resolve(execPath)
-  if (
-    basename(resolved) === APPIMAGE_LINUX_GUI_EXECUTABLE_NAME ||
-    basename(resolved) === 'orca-ide'
-  ) {
+  if (basename(resolved) === APPIMAGE_LINUX_GUI_EXECUTABLE_NAME || basename(resolved) === 'orca-ide') {
     return dirname(resolved)
   }
   const nodeSuffix = join('resources', ...APPIMAGE_NODE_RUNTIME_SEGMENTS)

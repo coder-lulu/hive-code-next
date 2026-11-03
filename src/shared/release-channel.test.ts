@@ -3,12 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const updateSourceState = vi.hoisted(() => ({
   value: {
     channel: 'stable',
-    feedUrl: 'https://github.com/stablyai/orca/releases/latest/download',
+    feedUrl: 'https://github.com/example/hive-releases/releases/latest/download',
     github: {
-      repo: 'stablyai/orca',
-      atomFeedUrl: 'https://github.com/stablyai/orca/releases.atom',
-      releasesDownloadBase: 'https://github.com/stablyai/orca/releases/download',
-      releasesApiUrl: 'https://api.github.com/repos/stablyai/orca/releases'
+      repo: 'example/hive-releases',
+      atomFeedUrl: 'https://github.com/example/hive-releases/releases.atom',
+      releasesDownloadBase: 'https://github.com/example/hive-releases/releases/download',
+      releasesApiUrl: 'https://api.github.com/repos/example/hive-releases/releases'
     }
   } as unknown
 }))
@@ -44,12 +44,12 @@ describe('release channel', () => {
   beforeEach(() => {
     updateSourceState.value = {
       channel: 'stable',
-      feedUrl: 'https://github.com/stablyai/orca/releases/latest/download',
+      feedUrl: 'https://github.com/example/hive-releases/releases/latest/download',
       github: {
-        repo: 'stablyai/orca',
-        atomFeedUrl: 'https://github.com/stablyai/orca/releases.atom',
-        releasesDownloadBase: 'https://github.com/stablyai/orca/releases/download',
-        releasesApiUrl: 'https://api.github.com/repos/stablyai/orca/releases'
+        repo: 'example/hive-releases',
+        atomFeedUrl: 'https://github.com/example/hive-releases/releases.atom',
+        releasesDownloadBase: 'https://github.com/example/hive-releases/releases/download',
+        releasesApiUrl: 'https://api.github.com/repos/example/hive-releases/releases'
       }
     }
   })
@@ -67,6 +67,7 @@ describe('release channel', () => {
     expect(getVersionChannel('v1.4.160')).toBe('stable')
     expect(getVersionChannel('1.4.160-rc.3')).toBe('rc')
     expect(getVersionChannel('1.5.0-beta.1')).toBe('beta')
+    expect(getVersionChannel('1.5.0-internal.1')).toBe('internal')
     expect(getVersionChannel('1.4.160-hourly.202607281400')).toBe('hourly')
     expect(getVersionChannel('1.4.160-daily.202607281300')).toBe('daily')
     expect(getVersionChannel('1.4.160-adhoc.20260728140533')).toBe('adhoc')
@@ -80,8 +81,8 @@ describe('release channel', () => {
     expect(getReleaseRepoForChannel('hourly')).toBeNull()
     expect(getReleaseRepoForChannel('daily')).toBeNull()
     expect(getReleaseRepoForChannel('adhoc')).toBeNull()
-    expect(getReleaseRepoForChannel('stable')).toBe('stablyai/orca')
-    expect(getReleaseRepoForChannel('rc')).toBe('stablyai/orca')
+    expect(getReleaseRepoForChannel('stable')).toBe('example/hive-releases')
+    expect(getReleaseRepoForChannel('rc')).toBe('example/hive-releases')
   })
 
   it('marks exactly the dev channels as having their own repo', () => {
@@ -96,13 +97,15 @@ describe('release channel', () => {
     expect(getReleaseNotesUrlForVersion('1.4.160-hourly.202607281400')).toBeNull()
     expect(getReleaseNotesUrlForVersion('1.4.160-daily.202607281300')).toBeNull()
     expect(getReleaseNotesUrlForVersion('1.4.160')).toBe(
-      'https://github.com/stablyai/orca/releases/tag/v1.4.160'
+      'https://github.com/example/hive-releases/releases/tag/v1.4.160'
     )
     expect(getReleaseNotesUrlForVersion('v1.4.160-rc.3')).toBe(
-      'https://github.com/stablyai/orca/releases/tag/v1.4.160-rc.3'
+      'https://github.com/example/hive-releases/releases/tag/v1.4.160-rc.3'
     )
     expect(getReleaseNotesUrlForVersion('1.4.160-adhoc.20260728140533')).toBeNull()
-    expect(getReleaseNotesUrlForVersion(null)).toBe('https://github.com/stablyai/orca/releases')
+    expect(getReleaseNotesUrlForVersion(null)).toBe(
+      'https://github.com/example/hive-releases/releases'
+    )
   })
 
   it('round-trips an hourly version stamp as UTC', () => {
@@ -281,7 +284,7 @@ describe('release channel', () => {
       channel: 'hourly',
       name: null,
       publishedAt: null,
-      releaseUrl: `https://github.com/stablyai/orca-hourly/releases/tag/v${version}`,
+      releaseUrl: `https://github.com/example/hive-releases-hourly/releases/tag/v${version}`,
       installerUrl: null
     })
     const sorted = sortReleaseBuildsNewestFirst([
@@ -327,7 +330,7 @@ describe('release channel', () => {
       channel: 'adhoc',
       name: null,
       publishedAt: null,
-      releaseUrl: `https://github.com/stablyai/orca-adhoc/releases/tag/v${version}`,
+      releaseUrl: `https://github.com/example/hive-releases-adhoc/releases/tag/v${version}`,
       installerUrl: null
     })
     const sorted = sortReleaseBuildsNewestFirst([
@@ -349,7 +352,7 @@ describe('release channel', () => {
       channel: 'adhoc',
       name: null,
       publishedAt: null,
-      releaseUrl: `https://github.com/stablyai/orca-adhoc/releases/tag/v${version}`,
+      releaseUrl: `https://github.com/example/hive-releases-adhoc/releases/tag/v${version}`,
       installerUrl: null
     })
     const sorted = sortReleaseBuildsNewestFirst([

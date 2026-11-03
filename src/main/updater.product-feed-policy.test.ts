@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HiveCloudUpdateDecision } from './product/hivecloud-update-check'
 import type { ProductUpdateSource } from './updater-test-harness'
+import { updaterMainWindow } from './updater-test-main-window'
+vi.mock('./updater/updater-wsl-move-install-hold', () => ({ wslMoveInstallHold: () => null }))
+vi.mock('./serve-update-handoff', () => ({
+  hasServeUpdateSupervisor: () => false,
+  getServeUpdateHandoffFailure: () => null,
+  failServeUpdateHandoff: vi.fn(),
+  requestServeUpdateHandoff: () => false
+}))
 
 const {
   appMock,
@@ -59,7 +67,7 @@ describe('updater product feed policy', () => {
     productUpdateSourceState.value = configuredProductSource('rc')
     fetchNewerReleaseTagsMock.mockResolvedValue(['v1.0.52-rc.1'])
     const { setupAutoUpdater, checkForUpdatesFromMenu } = await import('./updater')
-    setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+    setupAutoUpdater(updaterMainWindow(vi.fn()), {
       getLastUpdateCheckAt: () => Date.now()
     })
 
@@ -83,7 +91,7 @@ describe('updater product feed policy', () => {
     }
     const { setupAutoUpdater } = await import('./updater')
 
-    setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+    setupAutoUpdater(updaterMainWindow(vi.fn()), {
       getLastUpdateCheckAt: () => Date.now()
     })
 
@@ -117,7 +125,7 @@ describe('updater product feed policy', () => {
       return Promise.resolve(undefined)
     })
     const { checkForUpdatesFromMenu, setupAutoUpdater } = await import('./updater')
-    setupAutoUpdater({ webContents: { send } } as never, {
+    setupAutoUpdater(updaterMainWindow(send), {
       getLastUpdateCheckAt: () => Date.now()
     })
 
@@ -147,7 +155,7 @@ describe('updater product feed policy', () => {
       return Promise.resolve(undefined)
     })
     const { setupAutoUpdater, checkForUpdatesFromMenu } = await import('./updater')
-    setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+    setupAutoUpdater(updaterMainWindow(vi.fn()), {
       getLastUpdateCheckAt: () => Date.now(),
       getReleaseChannelOverride: () => channel
     })
@@ -170,7 +178,7 @@ describe('updater product feed policy', () => {
     fetchNewerReleaseTagsMock.mockResolvedValue([])
     const send = vi.fn()
     const { setupAutoUpdater, checkForUpdatesFromMenu } = await import('./updater')
-    setupAutoUpdater({ webContents: { send } } as never, {
+    setupAutoUpdater(updaterMainWindow(send), {
       getLastUpdateCheckAt: () => Date.now()
     })
     const feedCallsBeforeCheck = autoUpdaterMock.setFeedURL.mock.calls.length
@@ -196,7 +204,7 @@ describe('updater product feed policy', () => {
     })
     const send = vi.fn()
     const { setupAutoUpdater, checkForUpdatesFromMenu } = await import('./updater')
-    setupAutoUpdater({ webContents: { send } } as never, {
+    setupAutoUpdater(updaterMainWindow(send), {
       getLastUpdateCheckAt: () => Date.now()
     })
     const feedCallsBeforeCheck = autoUpdaterMock.setFeedURL.mock.calls.length
@@ -207,6 +215,7 @@ describe('updater product feed policy', () => {
       expect(send).toHaveBeenCalledWith('updater:status', {
         state: 'error',
         message: "Couldn't reach the update server. Try again in a few minutes.",
+        messageCode: 'updateServerUnreachable',
         userInitiated: true
       })
     })
@@ -225,7 +234,7 @@ describe('updater product feed policy', () => {
     )
     autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined)
     const { setupAutoUpdater, checkForUpdatesFromMenu } = await import('./updater')
-    setupAutoUpdater({ webContents: { send: vi.fn() } } as never, {
+    setupAutoUpdater(updaterMainWindow(vi.fn()), {
       getLastUpdateCheckAt: () => null
     })
     await vi.waitFor(() => expect(fetchNewerReleaseTagsMock).toHaveBeenCalledTimes(1))
@@ -250,7 +259,7 @@ describe('updater product feed policy', () => {
     appMock.getVersion.mockReturnValue('1.5.0-beta.24')
     const send = vi.fn()
     const { setupAutoUpdater, checkForUpdatesFromMenu } = await import('./updater')
-    setupAutoUpdater({ webContents: { send } } as never, {
+    setupAutoUpdater(updaterMainWindow(send), {
       getLastUpdateCheckAt: () => Date.now()
     })
     const feedCallsBeforeCheck = autoUpdaterMock.setFeedURL.mock.calls.length
@@ -369,7 +378,7 @@ describe('updater product feed policy', () => {
         const onBeforeQuit = vi.fn().mockResolvedValue(undefined)
         const send = vi.fn()
         const updater = await import('./updater')
-        updater.setupAutoUpdater({ webContents: { send } } as never, {
+        updater.setupAutoUpdater(updaterMainWindow(send), {
           getLastUpdateCheckAt: () => Date.now(),
           onBeforeQuit,
           onBeforeQuitFailure: 'abort'

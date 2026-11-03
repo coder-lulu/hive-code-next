@@ -8,26 +8,24 @@ import {
   normalizeFilePath
 } from './markdown-file-path-detection'
 import { routeMarkdownHref } from './markdown-href-routing'
-import type { MobileMarkdownStyles } from './mobile-markdown-styles'
+import { styles, type MarkdownTone } from './mobile-markdown-styles'
 import { MarkdownText } from './mobile-markdown-text'
 import { plainText } from './mobile-markdown-tree'
 
 export type MarkdownInlineContext = {
-  styles: MobileMarkdownStyles
-  /** When provided, detected file paths and file-target hrefs render as tappable and invoke
-   *  this with the path text; without it, paths render as plain text. */
+  // File targets call this when viewer exists; omit to keep paths plain.
   onOpenFile?: (pathText: string) => void
+  tone: MarkdownTone
+  textScale: number
 }
 
 type SpanStyle = TextProps['style']
 
-// Web/mail hrefs open the system handler; file-target hrefs (file: URIs and
-// scheme-less paths — the entire desktop file-link contract) go to onOpenFile.
+// Send web/mail links to system handler; desktop-compatible file:/scheme-less targets go to onOpenFile.
 export function openMarkdownHref(href: string, onOpenFile?: (pathText: string) => void): void {
   const route = routeMarkdownHref(href)
   if (route.kind === 'web') {
-    // The seam, not react-native's `Linking`: this module is in the tasks page closure, and inside
-    // the shell's WebView `openURL` resolves without opening anything.
+    // Use link-opening seam: RN Linking inside shell page resolves without opening anything.
     openExternalLink(route.url)
     return
   }
@@ -40,9 +38,8 @@ export function openMarkdownHref(href: string, onOpenFile?: (pathText: string) =
 function renderTextRun(
   text: string,
   key: string,
-  onOpenFile: ((pathText: string) => void) | undefined,
-  outer: SpanStyle,
-  styles: MobileMarkdownStyles
+  { onOpenFile, tone }: MarkdownInlineContext,
+  outer: SpanStyle
 ): ReactNode {
   if (!onOpenFile) {
     return text
@@ -55,7 +52,7 @@ function renderTextRun(
     segment.type === 'file' ? (
       <MarkdownText
         key={`${key}:${segmentIndex}`}
-        style={[outer, styles.link]}
+        style={[outer, styles.link, tone.link]}
         onPress={() => onOpenFile(segment.path)}
       >
         {segment.value}
@@ -73,11 +70,10 @@ function renderLink(
   ctx: MarkdownInlineContext,
   outer: SpanStyle
 ): ReactNode {
-  const { styles } = ctx
   return (
     <MarkdownText
       key={key}
-      style={[outer, styles.link]}
+      style={[outer, styles.link, ctx.tone.link]}
       onPress={() => openMarkdownHref(url, ctx.onOpenFile)}
     >
       {label}
@@ -91,14 +87,9 @@ function renderPhrasing(
   ctx: MarkdownInlineContext,
   outer: SpanStyle
 ): ReactNode {
-  const { styles } = ctx
   switch (node.type) {
     case 'text':
-      return (
-        <Fragment key={key}>
-          {renderTextRun(node.value, key, ctx.onOpenFile, outer, ctx.styles)}
-        </Fragment>
-      )
+      return <Fragment key={key}>{renderTextRun(node.value, key, ctx, outer)}</Fragment>
     case 'break':
       return <Fragment key={key}>{'\n'}</Fragment>
     case 'emphasis':
@@ -106,7 +97,7 @@ function renderPhrasing(
     case 'delete': {
       const emphasis =
         node.type === 'strong'
-          ? styles.bold
+          ? [styles.bold, ctx.tone.text]
           : node.type === 'emphasis'
             ? styles.italic
             : styles.strike
@@ -117,27 +108,38 @@ function renderPhrasing(
         </MarkdownText>
       )
     }
-    case 'inlineCode':
+    case 'inlineCode': {
+      // A span keeps its line's leading; only its own smaller size scales.
+      const size =
+        ctx.textScale !== 1 ? { fontSize: styles.inlineCode.fontSize * ctx.textScale } : null
       return ctx.onOpenFile && isFilePathCodeSpan(node.value) ? (
         <MarkdownText
           key={key}
-          style={[outer, styles.inlineCode, styles.inlineCodeLink]}
+          style={[
+            outer,
+            styles.inlineCode,
+            size,
+            ctx.tone.inlineCode,
+            styles.inlineCodeLink,
+            ctx.tone.link
+          ]}
           onPress={() => ctx.onOpenFile?.(normalizeFilePath(node.value.trim()))}
         >
           {node.value}
         </MarkdownText>
       ) : (
-        <MarkdownText key={key} style={[outer, styles.inlineCode]}>
+        <MarkdownText key={key} style={[outer, styles.inlineCode, size, ctx.tone.inlineCode]}>
           {node.value}
         </MarkdownText>
       )
+    }
     case 'link':
       return renderLink(key, plainText(node), node.url, ctx, outer)
     case 'image':
       return renderLink(key, node.alt || 'image', node.url, ctx, outer)
     case 'footnoteReference':
       return (
-        <MarkdownText key={key} style={[outer, styles.footnoteReference]}>
+        <MarkdownText key={key} style={[outer, styles.footnoteReference, ctx.tone.secondary]}>
           {`[${node.label ?? node.identifier}]`}
         </MarkdownText>
       )

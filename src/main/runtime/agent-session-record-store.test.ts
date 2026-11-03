@@ -2,7 +2,6 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { AgentSessionOwnerProbe } from '../../shared/agent-session-lease-adjudication'
 import type {
   AgentSessionExecutionLocation,
@@ -19,12 +18,9 @@ import {
   readPersistedTestAgentSessionStore,
   seedTestAgentSessionStoreFromNewerBuild
 } from './agent-session-record-store-test-harness'
-import { AGENT_SESSION_CLAIM_KEY_RETENTION_MS } from './agent-session-claim-key-retention'
-import {
-  closeTestJournalHostDatabase,
-  openTestJournalHostDatabase
-} from '../native-chat/agent-session-journal/journal-host-database-test-support'
-import type { AgentSessionReserveRequest } from './agent-session-reservation-admission'
+import { AGENT_SESSION_CLAIM_KEY_RETENTION_MS } from './agent-session/ownership/agent-session-claim-key-retention'
+import { openTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
+import type { AgentSessionReserveRequest } from './agent-session/ownership/agent-session-reservation-admission'
 import {
   claudeProviderHandle,
   codexProviderHandle
@@ -109,12 +105,6 @@ async function open(hostId = 'local'): Promise<AgentSessionRecordStore> {
   return openTestAgentSessionRecordStore(directory, { hostId })
 }
 
-async function restart(): Promise<AgentSessionRecordStore> {
-  closeTestJournalHostDatabase(directory)
-  return open()
-}
-
-/** Reserve, observe the spawn, prove the handle — the full path to an admitted writer. */
 async function establishOwner(
   store: AgentSessionRecordStore,
   overrides: Partial<AgentSessionReserveRequest> = {}
@@ -136,8 +126,7 @@ async function establishOwner(
   })
 }
 
-/** The shape the removed conflict marker wrote, as it decodes. No shipped build called it; a record
- *  may carry it. */
+/** Seed the retired unshipped conflict-marker shape for compatibility. */
 async function markLegacyConflicted(
   store: AgentSessionRecordStore,
   lease: Partial<AgentSessionLease> = {}
@@ -161,7 +150,6 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
-  closeTestJournalHostDatabase(directory)
   await rm(directory, { recursive: true, force: true })
 })
 
@@ -178,7 +166,6 @@ describe('acquisition path', () => {
       reservedSpawnToken: 'spawn-a'
     })
 
-    // Proving before the spawn is observed is refused.
     await expect(
       store.proveOwner({ sessionId: 'session-alpha', fence: 1, link: handleLink(), now: NOW })
     ).rejects.toThrow('agent_session_ownership_unknown')
@@ -314,7 +301,7 @@ describe('acquisition path', () => {
 })
 
 describe('concurrent claims', () => {
-  it('lets exactly one of two concurrent reservations win and never spawns the loser', async () => {
+  it('grants exactly one of two concurrent reservations at the next fence', async () => {
     const store = await open()
     await establishOwner(store)
     const request = () =>
@@ -389,7 +376,7 @@ describe('concurrent claims', () => {
     await establishOwner(store)
     const before = store.getRecord('session-alpha')
     const persistedBefore = await readPersistedTestAgentSessionStore(directory)
-    // The row write fails inside the commit, as a full disk or an I/O error would.
+    // Fail the record update inside commit, like full-disk/I/O failure.
     openTestJournalHostDatabase(directory).db.exec(
       "CREATE TRIGGER fail_record_write BEFORE UPDATE ON agent_session_records BEGIN SELECT RAISE(ABORT, 'disk I/O error'); END"
     )
@@ -424,7 +411,6 @@ describe('expiry is not eviction', () => {
     }
     expect(store.getRecord('session-alpha')?.lease.runtimeFence).toBe(1)
 
-    // Only proof of death moves it.
     const evicted = await store.evictProvenDeadOwner({
       sessionId: 'session-alpha',
       expectedFence: 1,
@@ -474,7 +460,7 @@ describe('restart reconciliation', () => {
     const first = await open()
     await establishOwner(first)
 
-    const reopened = await restart()
+    const reopened = await open()
     const loaded = reopened.getRecord('session-alpha')
     expect(loaded?.lease.unreconciled).toBe(true)
     expect(loaded?.providerHandleChain).toHaveLength(1)
@@ -482,7 +468,6 @@ describe('restart reconciliation', () => {
       variable: 'CLAUDE_CONFIG_DIR',
       path: '/home/dev/.claude-work'
     })
-    // Every mutating path is closed while unreconciled.
     await expect(
       reopened.renewLease({ sessionId: 'session-alpha', fence: 1, childProbe: MATCHED, now: NOW })
     ).rejects.toThrow('execution_owner_reconciling')
@@ -500,7 +485,7 @@ describe('restart reconciliation', () => {
   it('re-adopts a live owner without moving the fence', async () => {
     const first = await open()
     await establishOwner(first)
-    const reopened = await restart()
+    const reopened = await open()
     await reopened.reconcileOnRestart({ probe: async () => MATCHED, now: NOW + 1_000 })
     const record = reopened.getRecord('session-alpha')
     expect(record?.lease).toMatchObject({
@@ -513,7 +498,7 @@ describe('restart reconciliation', () => {
 
   it('never applies a stale restart probe to a lease another reconcile already settled', async () => {
     await establishOwner(await open())
-    const store = await restart()
+    const store = await open()
     let releaseProbe!: (probe: AgentSessionOwnerProbe) => void
     let markProbeStarted!: () => void
     const probeStarted = new Promise<void>((resolve) => (markProbeStarted = resolve))
@@ -551,7 +536,7 @@ describe('restart reconciliation', () => {
       now: NOW
     })
 
-    const second = await restart()
+    const second = await open()
     await second.reconcileOnRestart({ probe: async () => UNUSED, now: NOW + 1_000 })
     const afterRestart = second.getRecord('session-alpha')?.lease.runtimeFence ?? 0
     expect(afterRestart).toBeGreaterThanOrEqual(2)
@@ -571,14 +556,14 @@ describe('restart reconciliation', () => {
     )
     expect(reacquired.record.lease.runtimeFence).toBe(afterRestart + 1)
 
-    const third = await restart()
+    const third = await open()
     expect(third.getRecord('session-alpha')?.lease.runtimeFence).toBe(afterRestart + 1)
   })
 
   it('sends an unverifiable owner to recovery rather than releasing it', async () => {
     const first = await open()
     await establishOwner(first)
-    const reopened = await restart()
+    const reopened = await open()
     await reopened.reconcileOnRestart({ probe: async () => INDETERMINATE, now: NOW + 1_000 })
     const lease = reopened.getRecord('session-alpha')?.lease
     expect(lease).toMatchObject({ handoffStage: 'recovering', runtimeFence: 1 })
@@ -604,7 +589,7 @@ describe('restart reconciliation', () => {
     await establishOwner(first)
     await markLegacyConflicted(first)
 
-    const reopened = await restart()
+    const reopened = await open()
     await reopened.reconcileOnRestart({
       probe: async () => ({ outcome: 'indeterminate', reason: 'no answer' }),
       now: NOW
@@ -616,30 +601,29 @@ describe('restart reconciliation', () => {
     })
   })
 
-  it('retains an ownerless conflict until a scan proves no process started', async () => {
+  it('releases a claim an older record marked conflicted that names no process', async () => {
     const first = await open()
     await markLegacyConflicted(first, { ownerProcess: null })
 
-    const reopened = await restart()
+    const reopened = await open()
     await reopened.reconcileOnRestart({
       probe: async () => ({ outcome: 'indeterminate', reason: 'no answer' }),
       now: NOW
     })
     expect(reopened.getRecord('session-alpha')?.lease).toMatchObject({
-      claimStatus: 'conflicted',
-      handoffStage: 'recovering',
+      claimStatus: 'released',
+      handoffStage: null,
       deathEvidence: null
     })
   })
 
   it('releases a conflict whose named owner is proven gone at restart', async () => {
-    // A conflict with no exit is a session the user can never open again; present-time proof that
-    // the process the conflict names has exited leaves no claimant left to protect.
+    // Present-time exit proof releases old conflict records; without it users could never reopen these sessions.
     const first = await open()
     await establishOwner(first)
     await markLegacyConflicted(first)
 
-    const reopened = await restart()
+    const reopened = await open()
     await reopened.reconcileOnRestart({ probe: async () => ({ outcome: 'pid-absent' }), now: NOW })
 
     const lease = reopened.getRecord('session-alpha')?.lease
@@ -661,7 +645,7 @@ describe('restart reconciliation', () => {
   it('frees a reservation that provably never spawned', async () => {
     const first = await open()
     await first.reserveOwner(reserveRequest())
-    const reopened = await restart()
+    const reopened = await open()
     await reopened.reconcileOnRestart({ probe: async () => UNUSED, now: NOW + 1_000 })
     expect(reopened.getRecord('session-alpha')?.lease).toMatchObject({
       claimStatus: 'released',
@@ -680,7 +664,7 @@ describe('restart reconciliation', () => {
       outcome: { status: 'succeeded', sessionId: 'session-alpha' }
     })
 
-    const reopened = await restart()
+    const reopened = await open()
     expect(reopened.listOperationRows()).toHaveLength(1)
     const replayed = await reopened.reserveOwner(reserveRequest({ operation }))
     expect(replayed.disposition).toBe('replayed')
@@ -730,12 +714,78 @@ describe('host and workspace isolation', () => {
   it('preserves the workspace kind so a folder workspace is never read back as a worktree', async () => {
     const first = await open()
     await establishOwner(first, { sessionId: 'session-folder', location: FOLDER })
-    const reopened = await restart()
+    const reopened = await open()
     expect(reopened.getRecord('session-folder')?.location).toEqual(FOLDER)
   })
 })
 
 describe('claim keys and unreadable rows', () => {
+  it.each(['bad', {}, null, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
+    'preserves a damaged next-fence floor %j through refusal and unrelated writes',
+    async (minimumNextFence) => {
+      const first = await open()
+      await first.reserveOwner(reserveRequest())
+      await first.setSessionTabVisibility('session-alpha', true, 'tab-alpha')
+      let damaged: PersistedAgentSessionRecord | undefined
+      await editPersistedTestAgentSessionStore(directory, (persisted) => {
+        damaged = persisted.records['session-alpha']
+        Object.assign(damaged.lease, { minimumNextFence })
+      })
+      const reopened = await open()
+      expect(reopened.isSessionUnreadable('session-alpha')).toBe(true)
+      expect(reopened.getRecord('session-alpha')).toBeNull()
+      expect(reopened.getConversation('session-alpha')).toMatchObject({
+        currentFence: 1,
+        neverStarted: false,
+        ownerObservation: { unreconciled: true }
+      })
+      expect(reopened.getConversation('session-alpha')).not.toHaveProperty('lease')
+      expect(reopened.getVisibleSessionTabIndex().sessionIds).toEqual(['session-alpha'])
+      await expect(reopened.setConversationName('session-alpha', 'new')).rejects.toMatchObject({
+        refusal: { details: { reason: 'recordUnreadable' } }
+      })
+      await expect(
+        reopened.renewLease({ sessionId: 'session-alpha', fence: 1, childProbe: UNUSED, now: NOW })
+      ).rejects.toThrow('execution_owner_reconciling')
+      await expect(reopened.reserveOwner(reserveRequest())).rejects.toMatchObject({
+        refusal: { details: { reason: 'recordUnreadable' } }
+      })
+      await expect(reopened.founding.commit(reserveRequest())).rejects.toMatchObject({
+        refusal: { details: { reason: 'recordUnreadable' } }
+      })
+      await establishOwner(reopened, { sessionId: 'session-beta', claimKeyId: 'key-2' })
+      expect((await open()).isSessionUnreadable('session-alpha')).toBe(true)
+      const persisted = await readPersistedTestAgentSessionStore(directory)
+      expect(persisted.records['session-alpha']).toEqual(damaged)
+      expect(persisted.sessionTabs).toContainEqual({
+        tabId: 'tab-alpha',
+        sessionId: 'session-alpha'
+      })
+    }
+  )
+
+  it('uses a legacy floor for the next reservation after restarting a released chat', async () => {
+    const first = await open()
+    await first.reserveOwner(reserveRequest())
+    await editPersistedTestAgentSessionStore(directory, (persisted) => {
+      Object.assign(persisted.records['session-alpha'].lease, {
+        claimStatus: 'released',
+        reservedSpawnToken: null,
+        minimumNextFence: 9
+      })
+    })
+    const reopened = await open()
+    await reopened.reconcileOnRestart({ probe: async () => UNUSED, now: NOW + 1_000 })
+    const reserved = await reopened.reserveOwner(
+      reserveRequest({ expectedFence: 1, probe: UNUSED })
+    )
+    expect(reserved.record.lease.runtimeFence).toBe(9)
+    expect((await open()).getRecord('session-alpha')?.lease).toMatchObject({
+      runtimeFence: 9,
+      minimumNextFence: 9
+    })
+  })
+
   it('keeps a retired claim key verifiable for the retention window', async () => {
     const store = await open()
     await store.retireClaimKey('key-1', NOW)
@@ -748,25 +798,35 @@ describe('claim keys and unreadable rows', () => {
     expect(store.isClaimKeyVerifiable('key-unknown', NOW)).toBe(true)
   })
 
-  it.each([
-    [
-      'invalid checkpoint',
-      (record: PersistedAgentSessionRecord) =>
-        Object.assign(record.lease, { journalCheckpoint: { epoch: 'bad', sequence: 1 } })
-    ],
-    [
-      'missing live proof',
-      (record: PersistedAgentSessionRecord) =>
-        Object.assign(record.lease, { provenHandleLinkId: null })
-    ]
-  ])('quarantines a record with %s', async (_name, corrupt) => {
+  // Pending provider proof can be valid; a live proof naming no link is corrupt.
+  it('quarantines a record with a live proof naming no handle', async () => {
     const first = await open()
     await establishOwner(first)
     await editPersistedTestAgentSessionStore(directory, (persisted) => {
-      corrupt(persisted.records['session-alpha'])
+      Object.assign(persisted.records['session-alpha'].lease, {
+        provenHandleLinkId: 'link-never-minted'
+      })
     })
     expect((await open()).isSessionUnreadable('session-alpha')).toBe(true)
   })
+
+  // Retired checkpoints no longer affect record readability.
+  it.each([null, { epoch: 3, sequence: 0 }, { epoch: 'bad', sequence: 1 }])(
+    "loads a record carrying an older build's journal checkpoint %o, and drops it on the next write",
+    async (journalCheckpoint) => {
+      const first = await open()
+      await establishOwner(first)
+      await editPersistedTestAgentSessionStore(directory, (persisted) => {
+        Object.assign(persisted.records['session-alpha'].lease, { journalCheckpoint })
+      })
+      const reopened = await open()
+      expect(reopened.isSessionUnreadable('session-alpha')).toBe(false)
+      await reopened.setConversationName('session-alpha', 'renamed')
+      const stored = (await readPersistedTestAgentSessionStore(directory)).records['session-alpha']
+      expect(stored.conversationName).toBe('renamed')
+      expect(stored.lease).not.toHaveProperty('journalCheckpoint')
+    }
+  )
 
   it('sets aside a row whose handle is in both stored forms and never rewrites it', async () => {
     const first = await open()
@@ -783,7 +843,7 @@ describe('claim keys and unreadable rows', () => {
     })
     const reopened = await open()
     expect(reopened.isSessionUnreadable('session-alpha')).toBe(true)
-    // Another chat's write must carry the set-aside row through untouched.
+    // Unrelated writes must leave unreadable rows intact.
     await establishOwner(reopened, { sessionId: 'session-beta', claimKeyId: 'key-2' })
     expect((await open()).isSessionUnreadable('session-alpha')).toBe(true)
     expect((await readPersistedTestAgentSessionStore(directory)).records['session-alpha']).toEqual(
@@ -791,15 +851,13 @@ describe('claim keys and unreadable rows', () => {
     )
   })
 
-  it('refuses to write a store a newer build wrote, with the refusal clients print as "update"', async () => {
+  it('refuses to write a store a newer Orca wrote, with the refusal clients print as "update"', async () => {
     await seedTestAgentSessionStoreFromNewerBuild(directory)
     const store = await open()
     expect(store.readOnly).toBe(true)
     await expect(store.reserveOwner(reserveRequest())).rejects.toMatchObject({
-      message: 'agent_session_journal_unreadable',
       refusal: {
         code: 'agent_session_journal_unreadable',
-        message: `Chats were saved by a newer ${APP_DISPLAY_NAME}. Update ${APP_DISPLAY_NAME} to keep using them.`,
         details: { reason: 'journalWrittenByNewerOrca' }
       }
     })

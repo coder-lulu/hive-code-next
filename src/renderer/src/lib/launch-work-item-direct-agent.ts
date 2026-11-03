@@ -11,25 +11,26 @@ import type { LaunchSource } from '../../../shared/telemetry-events'
 import type { StartupCommandDelivery } from '../../../shared/codex-startup-delivery'
 import type { TuiAgent } from '../../../shared/tui-agent'
 import {
-  resolveTuiAgentLaunchArgs,
-  resolveTuiAgentLaunchEnv
-} from '../../../shared/tui-agent-launch-defaults'
+  resolveAgentStartupPlanInputs,
+  type AgentStartupSettings
+} from '../../../shared/agent-startup-plan-inputs'
+import { terminalSessionOptionInputs } from '../../../shared/tui-agent-launch-command'
+import {
+  resolveStartupShell,
+  type AgentStartupShell
+} from '../../../shared/tui-agent-startup-shell'
 import { translate } from '@/i18n/i18n'
 
 export function buildDirectWorkItemAgentStartupPlan(args: {
   agent: TuiAgent | null
   agentArgs?: string | null
+  sessionOptions?: Readonly<Record<string, string>>
+  sessionOptionsYieldToAgentArgs?: true
   draftContent: string
   promptDelivery: 'draft' | 'submit-after-ready'
-  settings:
-    | {
-        agentCmdOverrides?: Partial<Record<TuiAgent, string>>
-        agentDefaultArgs?: Partial<Record<TuiAgent, string>>
-        agentDefaultEnv?: Partial<Record<TuiAgent, Record<string, string>>>
-      }
-    | null
-    | undefined
+  settings: AgentStartupSettings | null | undefined
   launchPlatform: NodeJS.Platform
+  shell?: AgentStartupShell
   /** Why: SSH remotes deploy the CLI shim as plain `orca`, so the Linux-only
    * `orca-ide` rename must not be applied for remote launches. */
   isRemote?: boolean
@@ -42,22 +43,31 @@ export function buildDirectWorkItemAgentStartupPlan(args: {
     return { startupPlan: null, draftLaunchedNatively: false, startupPlanFailed: false }
   }
 
-  const effectiveAgentArgs =
-    args.agentArgs === undefined
-      ? resolveTuiAgentLaunchArgs(args.agent, args.settings?.agentDefaultArgs)
-      : args.agentArgs
-  const effectiveAgentEnv = resolveTuiAgentLaunchEnv(args.agent, args.settings?.agentDefaultEnv)
+  const inputs = resolveAgentStartupPlanInputs({
+    agent: args.agent,
+    settings: args.settings ?? {},
+    sessionOptions: args.sessionOptions,
+    agentArgs: args.agentArgs,
+    platform: args.launchPlatform,
+    isRemote: args.isRemote === true,
+    shell: args.shell
+  })
+  const planInputs = {
+    ...inputs,
+    ...terminalSessionOptionInputs({
+      agent: args.agent,
+      sessionOptions: args.sessionOptions,
+      yieldToAgentArgs: args.sessionOptionsYieldToAgentArgs,
+      agentArgs: inputs.agentArgs,
+      shell: resolveStartupShell(inputs.platform, inputs.shell)
+    })
+  }
   const draftLaunchPlan =
     args.promptDelivery === 'submit-after-ready'
       ? null
       : buildAgentDraftLaunchPlan({
-          agent: args.agent,
-          draft: args.draftContent,
-          cmdOverrides: args.settings?.agentCmdOverrides ?? {},
-          platform: args.launchPlatform,
-          isRemote: args.isRemote,
-          agentArgs: effectiveAgentArgs,
-          agentEnv: effectiveAgentEnv
+          ...planInputs,
+          draft: args.draftContent
         })
 
   if (draftLaunchPlan) {
@@ -68,6 +78,7 @@ export function buildDirectWorkItemAgentStartupPlan(args: {
         expectedProcess: draftLaunchPlan.expectedProcess,
         followupPrompt: null,
         launchConfig: draftLaunchPlan.launchConfig,
+        ...(planInputs.sessionOptions ? { sessionOptions: planInputs.sessionOptions } : {}),
         ...(draftLaunchPlan.startupCommandDelivery
           ? { startupCommandDelivery: draftLaunchPlan.startupCommandDelivery }
           : {}),
@@ -79,13 +90,8 @@ export function buildDirectWorkItemAgentStartupPlan(args: {
   }
 
   const startupPlan = buildAgentStartupPlan({
-    agent: args.agent,
+    ...planInputs,
     prompt: '',
-    cmdOverrides: args.settings?.agentCmdOverrides ?? {},
-    platform: args.launchPlatform,
-    isRemote: args.isRemote,
-    agentArgs: effectiveAgentArgs,
-    agentEnv: effectiveAgentEnv,
     allowEmptyPromptLaunch: true
   })
   if (startupPlan && args.promptDelivery === 'draft') {

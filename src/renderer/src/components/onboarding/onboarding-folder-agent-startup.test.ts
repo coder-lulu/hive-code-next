@@ -15,15 +15,14 @@ describe('buildOnboardingFolderAgentStartup', () => {
     })
 
     expect(startup).toEqual({
-      command: "codex '--dangerously-bypass-approvals-and-sandbox'",
+      command: "codex '-c' 'disable_paste_burst=true'",
       env: {},
       launchAgent: 'codex',
       launchConfig: {
-        agentCommand: "codex '--dangerously-bypass-approvals-and-sandbox'",
-        agentArgs: '--dangerously-bypass-approvals-and-sandbox',
+        agentCommand: 'codex',
+        agentArgs: '',
         agentEnv: {}
       },
-      sessionOptions: undefined,
       telemetry: {
         agent_kind: 'codex',
         launch_source: 'onboarding',
@@ -43,11 +42,10 @@ describe('buildOnboardingFolderAgentStartup', () => {
 
   it.each([false, true])(
     'keeps Chat UI model preferences out of the terminal folder launch (Chat UI %s)',
-    (experimentalNativeChat) => {
+    (_experimentalNativeChat) => {
       const startup = buildOnboardingFolderAgentStartup({
         ...getDefaultSettings('/tmp/orca-workspaces'),
         defaultTuiAgent: 'codex',
-        experimentalNativeChat,
         nativeChatSessionOptions: {
           codex: {
             model: 'gpt-5.2-codex',
@@ -120,15 +118,14 @@ describe('buildOnboardingFolderAgentStartup', () => {
         false
       )
     ).toEqual({
-      command: "echo onboarding-folder-agent '--dangerously-bypass-approvals-and-sandbox'",
+      command: 'echo onboarding-folder-agent',
       env: {},
       launchAgent: 'codex',
       launchConfig: {
-        agentCommand: "echo onboarding-folder-agent '--dangerously-bypass-approvals-and-sandbox'",
-        agentArgs: '--dangerously-bypass-approvals-and-sandbox',
+        agentCommand: 'echo onboarding-folder-agent',
+        agentArgs: '',
         agentEnv: {}
       },
-      sessionOptions: undefined,
       telemetry: {
         agent_kind: 'codex',
         launch_source: 'onboarding',

@@ -21,7 +21,6 @@ import {
 import { useProjectTree } from './project-tree-context'
 import { getLocalizedExecutionHostLabel } from '@/lib/localized-execution-host-label'
 
-// Why: pinned repo icon and compact inline badge share this chip shell so both repo cues read as the same affordance.
 function RepoIdentityChip({
   repo,
   children
@@ -33,14 +32,21 @@ function RepoIdentityChip({
     <Tooltip>
       <TooltipTrigger asChild>
         <span
-          className="inline-flex size-4 shrink-0 items-center justify-center rounded-[4px] border border-worktree-sidebar-border bg-worktree-sidebar-accent/55"
+          className="inline-flex h-4 max-w-24 shrink-0 items-center justify-center gap-0.5 rounded-[4px] border border-worktree-sidebar-border bg-worktree-sidebar-accent/55 px-0.5"
           aria-label={translate(
             'auto.components.sidebar.WorktreeCard.35ccfe2475',
             'Project {{value0}}',
             { value0: repo.displayName }
           )}
         >
-          {children}
+          {/* Why: emoji glyphs scale with font size (0.9em), so pin it to fit the 12px icon box. */}
+          <span className="inline-flex size-3 shrink-0 items-center justify-center text-2xs">
+            {children}
+          </span>
+          {/* Why: the default folder icon is the same for every project, so the name tells them apart. */}
+          <span className="min-w-0 truncate text-3xs leading-none text-muted-foreground lowercase">
+            {repo.displayName}
+          </span>
         </span>
       </TooltipTrigger>
       <TooltipContent side="right" sideOffset={8}>
@@ -141,9 +147,7 @@ export function WorktreeCardHeader({
             <TooltipTrigger asChild>
               <span className="shrink-0 inline-flex items-center">
                 {isRuntimeDisconnected ? (
-                  // Passive by design: runtime ("Orca server") hosts have no
-                  // renderer-reachable connect API, unlike the SSH glyph above which is
-                  // now a control. Don't "fix" the inconsistency by wiring one up.
+                  // This surface shows runtime disconnection passively; reconnect controls belong to host management.
                   <ServerOff className="size-3 text-destructive" />
                 ) : (
                   <Server className="size-3 text-muted-foreground" />
@@ -187,7 +191,6 @@ export function WorktreeCardHeader({
           </RepoIdentityChip>
         )}
 
-        {/* Why: unread alert lives in the left status lane; title-row contrast comes from weight and dimmed read titles. */}
         <WorktreeTitleInlineRename
           displayName={visibleCardTitle}
           disabled={isDeleting || affiliateListMode}
@@ -208,7 +211,7 @@ export function WorktreeCardHeader({
         {typeof worktree.firstAgentMessageRenameError === 'string' &&
         worktree.firstAgentMessageRenameError.length > 0 &&
         !titleRenaming ? (
-          // Why: the error can be raw agent CLI output, so the badge opens a dialog rather than a tooltip.
+          // Errors can contain raw agent output; open a dialog rather than a tooltip.
           <Tooltip>
             <TooltipTrigger asChild>
               <Button

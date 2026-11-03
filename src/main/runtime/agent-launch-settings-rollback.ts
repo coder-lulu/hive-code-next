@@ -13,6 +13,8 @@ export function agentLaunchSettingsRollbackUpdates(
       Object.is(current.newWorkspaceSetupOnly, applied.newWorkspaceSetupOnly))
   // A newer full-field write supersedes this mutation and must survive its rollback.
   return {
+    ...(Object.hasOwn(updates, 'agentPermissionDefault') && Object.is(current.agentPermissionDefault, applied.agentPermissionDefault) ? { agentPermissionDefault: before.agentPermissionDefault ?? 'own' } : {}),
+    ...(Object.hasOwn(updates, 'agentPermissionOverrides') && Object.is(current.agentPermissionOverrides, applied.agentPermissionOverrides) ? { agentPermissionOverrides: before.agentPermissionOverrides ?? {} } : {}),
     ...(Object.hasOwn(updates, 'defaultTuiAgent') && defaultUnchanged
       ? { defaultTuiAgent: before.defaultTuiAgent ?? null }
       : {}),

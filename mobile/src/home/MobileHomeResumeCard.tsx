@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { ChevronRight, GitBranch, Monitor } from 'lucide-react-native'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { MobileRepoIcon } from '../components/MobileRepoIcon'
@@ -12,6 +13,8 @@ export function MobileHomeResumeCard(props: {
   readonly runtimeName: string | null
   readonly runtimeOnline: boolean
 }) {
+  const t = useMobileTranslation()
+
   const theme = useMobileTheme()
   const styles = createStyles(theme)
   const status = homeResumeStatus(props.card)
@@ -67,7 +70,11 @@ export function MobileHomeResumeCard(props: {
             ]}
           />
           <Text maxFontSizeMultiplier={1.3} numberOfLines={1} style={styles.runtimeText}>
-            {props.runtimeName ?? 'Runtime'} {props.runtimeOnline ? '在线' : '不可验证'}
+            {props.runtimeName ??
+              t('auto.mobile.src.home.MobileHomeResumeCard.62207aa32c', 'Runtime')}{' '}
+            {props.runtimeOnline
+              ? t('auto.mobile.src.home.MobileHomeResumeCard.a66df76fb8', 'Online')
+              : t('auto.mobile.src.home.MobileHomeResumeCard.0e18f68879', 'Unverifiable')}
           </Text>
         </View>
       </View>

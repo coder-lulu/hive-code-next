@@ -1,14 +1,15 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import { useAppStore } from '@/store'
+import { isActiveSidebarWorkspace } from '../../../../shared/sidebar-list/active-workspace'
+import {
+  isWorktreeHostIdentity,
+  getWorktreeIdFromHostIdentity,
+  getExecutionHostIdFromWorktreeHostIdentity
+} from '../../../../shared/worktree/host-qualified-identity'
 
-/**
- * Expand/collapse state for a WorktreeCard's inline agent list:
- *  - `collapsedLineageParents`: agent-lineage parent paneKeys the user folded.
- *  - `compactRootListExpanded`: whether the "N agents" compact summary is open.
- */
 export type WorktreeAgentExpansionState = {
   collapsedLineageParents: ReadonlySet<string>
   compactRootListExpanded: boolean
-  rootListTouched?: boolean
 }
 
 const EMPTY_COLLAPSED_PARENTS: ReadonlySet<string> = new Set()
@@ -18,17 +19,10 @@ const DEFAULT_EXPANSION_STATE: WorktreeAgentExpansionState = {
   compactRootListExpanded: false
 }
 
-// Why: the inline agent list's expand/collapse must outlive the WorktreeCard
-// remount that fires (a) when the sidebar virtualizer recycles the row on
-// scroll and (b) when the sibling child-worktrees section toggles — that toggle
-// flips the card between an `item` and a `lineage-group` render row, changing
-// its virtual-row key and forcing a fresh mount. Holding this in plain local
-// useState reset it on every such remount, so folding one section visibly
-// re-expanded the other. Renderer-only and LRU-bounded: it resets on reload,
-// matching the ephemeral live-agent lineage it tracks, and never grows without
-// bound in a long-lived renderer.
+// Retain disclosures across virtualizer/lineage remounts in a bounded renderer-session cache; reload resets them.
 export const MAX_PERSISTED_WORKTREE_AGENT_EXPANSIONS = 512
-const expansionByWorktreeId = new Map<string, WorktreeAgentExpansionState>()
+type PersistedExpansionState = WorktreeAgentExpansionState & { compactRootListTouched?: true }
+const expansionByWorktreeId = new Map<string, PersistedExpansionState>()
 
 function trimPersistedExpansions(): void {
   while (expansionByWorktreeId.size > MAX_PERSISTED_WORKTREE_AGENT_EXPANSIONS) {
@@ -40,24 +34,21 @@ function trimPersistedExpansions(): void {
   }
 }
 
-function readExpansionState(
-  worktreeId: string,
-  initiallyExpanded = false
-): WorktreeAgentExpansionState {
-  return (
-    expansionByWorktreeId.get(worktreeId) ??
-    (initiallyExpanded
-      ? { ...DEFAULT_EXPANSION_STATE, compactRootListExpanded: true }
-      : DEFAULT_EXPANSION_STATE)
-  )
+function readExpansionState(worktreeId: string, active = false): PersistedExpansionState {
+  const saved = expansionByWorktreeId.get(worktreeId)
+  return {
+    ...(saved ?? DEFAULT_EXPANSION_STATE),
+    compactRootListExpanded: saved?.compactRootListTouched
+      ? saved.compactRootListExpanded
+      : active || (saved?.compactRootListExpanded ?? false)
+  }
 }
 
-function persistExpansionState(worktreeId: string, state: WorktreeAgentExpansionState): void {
-  // Re-insert to refresh LRU order; drop entries that carry no non-default
-  // state so idle worktrees never occupy a slot.
+function persistExpansionState(worktreeId: string, state: PersistedExpansionState): void {
+  // Refresh LRU order; an explicit collapse must survive an active-workspace default.
   expansionByWorktreeId.delete(worktreeId)
   if (
-    state.rootListTouched ||
+    state.compactRootListTouched ||
     state.compactRootListExpanded ||
     state.collapsedLineageParents.size > 0
   ) {
@@ -69,45 +60,39 @@ function persistExpansionState(worktreeId: string, state: WorktreeAgentExpansion
 export type WorktreeAgentExpansionControls = {
   collapsedLineageParents: ReadonlySet<string>
   compactRootListExpanded: boolean
-  /** Fold/unfold a single agent-lineage parent by its paneKey. */
   toggleLineageParent: (paneKey: string) => void
-  /** Open/close the compact multi-agent summary panel. */
   toggleCompactRootList: () => void
 }
 
-/**
- * Remount-durable expand/collapse state for one worktree card's inline agent
- * list. Reads seed from a module-level, session-scoped cache so a virtualizer
- * recycle or a sibling child-worktrees toggle no longer wipes the user's
- * disclosure choices. Independent per worktree id.
- */
-export function useWorktreeAgentExpansionState(
-  worktreeId: string,
-  initiallyExpanded = false
-): WorktreeAgentExpansionControls {
-  const [rendered, setRendered] = useState<{
-    worktreeId: string
-    state: WorktreeAgentExpansionState
-  }>(() => ({ worktreeId, state: readExpansionState(worktreeId, initiallyExpanded) }))
-
-  // Why: a memoized body can be handed a new worktreeId without remounting;
-  // fall back to the cache so we never show a stale card's disclosure.
-  const current =
-    rendered.worktreeId === worktreeId
-      ? rendered.state
-      : readExpansionState(worktreeId, initiallyExpanded)
+/** Restore each worktree’s disclosures across virtualizer and sibling-lineage remounts. */
+export function useWorktreeAgentExpansionState(worktreeId: string): WorktreeAgentExpansionControls {
+  const active = useAppStore(
+    (state) =>
+      state.activeView === 'terminal' &&
+      isActiveSidebarWorkspace(
+        isWorktreeHostIdentity(worktreeId)
+          ? {
+              id: getWorktreeIdFromHostIdentity(worktreeId),
+              hostId: getExecutionHostIdFromWorktreeHostIdentity(worktreeId)
+            }
+          : { id: worktreeId },
+        { worktreeId: state.activeWorktreeId, hostId: state.activeWorkspaceExecutionHostId ?? null }
+      )
+  )
+  const [, rerender] = useState(0)
+  const current = readExpansionState(worktreeId, active)
 
   const commit = useCallback(
-    (next: WorktreeAgentExpansionState) => {
+    (next: PersistedExpansionState) => {
       persistExpansionState(worktreeId, next)
-      setRendered({ worktreeId, state: next })
+      rerender((revision) => revision + 1)
     },
     [worktreeId]
   )
 
   const toggleLineageParent = useCallback(
     (paneKey: string) => {
-      const base = expansionByWorktreeId.get(worktreeId) ?? current
+      const base = readExpansionState(worktreeId, active)
       const nextParents = new Set(base.collapsedLineageParents)
       if (nextParents.has(paneKey)) {
         nextParents.delete(paneKey)
@@ -116,24 +101,32 @@ export function useWorktreeAgentExpansionState(
       }
       commit({ ...base, collapsedLineageParents: nextParents })
     },
-    [commit, worktreeId, current]
+    [active, commit, worktreeId]
   )
 
   const toggleCompactRootList = useCallback(() => {
-    const base = expansionByWorktreeId.get(worktreeId) ?? current
+    const base = readExpansionState(worktreeId, active)
     commit({
       ...base,
       compactRootListExpanded: !base.compactRootListExpanded,
-      rootListTouched: true
+      compactRootListTouched: true
     })
-  }, [commit, worktreeId, current])
+  }, [active, commit, worktreeId])
 
-  return {
-    collapsedLineageParents: current.collapsedLineageParents,
-    compactRootListExpanded: current.compactRootListExpanded,
-    toggleLineageParent,
-    toggleCompactRootList
-  }
+  return useMemo(
+    () => ({
+      collapsedLineageParents: current.collapsedLineageParents,
+      compactRootListExpanded: current.compactRootListExpanded,
+      toggleLineageParent,
+      toggleCompactRootList
+    }),
+    [
+      current.collapsedLineageParents,
+      current.compactRootListExpanded,
+      toggleLineageParent,
+      toggleCompactRootList
+    ]
+  )
 }
 
 export function clearWorktreeAgentExpansionStateForTests(): void {

@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import nacl from 'tweetnacl'
+import { createHash } from 'node:crypto'
+import { setFlagsFromString } from 'node:v8'
+import { runInNewContext } from 'node:vm'
 import {
   encodeMobileE2EEV2Transcript,
   validateMobileE2EEV2Handshake,
@@ -29,8 +32,7 @@ const client = nacl.box.keyPair.fromSecretKey(new Uint8Array(32).fill(2))
 function setup(decodeBinary: (raw: unknown) => Promise<Uint8Array | null>) {
   const session = MobileE2EEV2ClientSession.create({
     desktopPublicKeyB64: Buffer.from(desktop.publicKey).toString('base64'),
-    transport: 'relay',
-    relayHostId: 'AbCdEf0123_-xyZ9',
+    transport: 'direct',
     clientNonce: new Uint8Array(32).fill(3),
     clientKeyPair: client
   })
@@ -116,10 +118,62 @@ describe('mobile E2EE v2 physical channel', () => {
     const ctx = setup(async () => null)
     await authenticate(ctx)
 
-    expect(JSON.parse(ctx.sent[0] as string)).toEqual(ctx.session.hello)
-    expect(typeof ctx.sent[1]).toBe('string')
+    const hello = ctx.sent[0]
+    const auth = ctx.sent[1]
+    if (typeof hello !== 'string' || typeof auth !== 'string') {
+      throw new Error('Expected hello and encrypted auth text frames')
+    }
+    expect(JSON.parse(hello)).toEqual(ctx.session.hello)
+    const plaintext = openMobileE2EEV2Frame({
+      frame: Buffer.from(auth, 'base64'),
+      key: ctx.schedule.mobileToDesktopKey,
+      sessionId: ctx.schedule.sessionId,
+      direction: 'mobile-to-desktop',
+      payloadKind: 'text',
+      expectedCounter: 0n
+    })
+    if (!plaintext) {
+      throw new Error('Auth frame failed desktop decryption')
+    }
+    expect(JSON.parse(new TextDecoder().decode(plaintext))).toEqual({
+      type: 'e2ee_auth',
+      v: 2,
+      transcriptHashB64: createHash('sha256')
+        .update(
+          encodeMobileE2EEV2Transcript(validateMobileE2EEV2Handshake(ctx.session.hello, ctx.ready)!)
+        )
+        .digest('base64'),
+      deviceToken: 'valid-token'
+    })
     expect(ctx.onAuthenticated).toHaveBeenCalledOnce()
     expect(ctx.onError).not.toHaveBeenCalled()
+
+    const wrongTranscript = setup(async () => null)
+    await wrongTranscript.channel.handleMessage(JSON.stringify(wrongTranscript.ready))
+    const response = serverFrame(
+      new TextEncoder().encode(
+        JSON.stringify({
+          type: 'e2ee_authenticated',
+          v: 2,
+          transcriptHashB64: createHash('sha256')
+            .update(
+              encodeMobileE2EEV2Transcript(
+                validateMobileE2EEV2Handshake(ctx.session.hello, ctx.ready)!
+              )
+            )
+            .digest('base64')
+            .repeat(44)
+        })
+      ),
+      'text',
+      0n,
+      wrongTranscript.schedule
+    )
+    await wrongTranscript.channel.handleMessage(Buffer.from(response).toString('base64'))
+    expect(wrongTranscript.onAuthenticated).not.toHaveBeenCalled()
+    expect(wrongTranscript.onError).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ message: 'Invalid E2EE v2 authenticated response' })
+    )
   })
 
   it('classifies the encrypted desktop device-token rejection as global auth failure', async () => {
@@ -194,16 +248,56 @@ describe('mobile E2EE v2 physical channel', () => {
     ).toEqual(new Uint8Array([2]))
   })
 
+  it('ignores queued and newly arriving frames after disposal', async () => {
+    let releaseBinary!: (bytes: Uint8Array) => void
+    const pendingBinary = new Promise<Uint8Array>((resolve) => (releaseBinary = resolve))
+    const ctx = setup(async () => pendingBinary)
+    await authenticate(ctx)
+    ctx.events.length = 0
+
+    const binary = serverFrame(new Uint8Array([7]), 'binary', 1n, ctx.schedule)
+    const text = serverFrame(new TextEncoder().encode('retired'), 'text', 2n, ctx.schedule)
+    const first = ctx.channel.handleMessage({ delayedBlob: true })
+    const second = ctx.channel.handleMessage(Buffer.from(text).toString('base64'))
+    await Promise.resolve()
+    ctx.channel.dispose()
+
+    const successor = setup(async () => null)
+    await authenticate(successor)
+    successor.events.length = 0
+    const live = serverFrame(new TextEncoder().encode('successor'), 'text', 1n, successor.schedule)
+    await successor.channel.handleMessage(Buffer.from(live).toString('base64'))
+    expect(successor.events).toEqual(['text:successor'])
+    expect(successor.onError).not.toHaveBeenCalled()
+
+    releaseBinary(binary)
+    await Promise.all([first, second])
+    expect(ctx.events).toEqual([])
+
+    const late = serverFrame(new TextEncoder().encode('late'), 'text', 1n, ctx.schedule)
+    await ctx.channel.handleMessage(Buffer.from(late).toString('base64'))
+    expect(ctx.events).toEqual([])
+    expect(ctx.onError).not.toHaveBeenCalled()
+  })
+
   it('bounds the unified outbound queue and reports a wedged link', async () => {
     const ctx = setup(async () => null)
     await authenticate(ctx)
     ctx.socket.bufferedAmount = 9 * 1024 * 1024
     const megabyte = new Uint8Array(1024 * 1024)
-    for (let index = 0; index < 65; index++) {
+    for (let index = 0; index < 63; index++) {
       expect(ctx.channel.sendBinary(megabyte)).toBe(true)
     }
-    expect(ctx.onError).toHaveBeenCalledOnce()
-    expect(ctx.onError.mock.calls[0]![0].message).toBe('E2EE v2 outbound buffer overflow')
+    expect(ctx.onError).not.toHaveBeenCalled()
+    expect(ctx.sent).toHaveLength(2)
+    expect(ctx.channel.sendBinary(megabyte)).toBe(true)
+    expect(ctx.onError).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ message: 'E2EE v2 outbound buffer overflow' })
+    )
+    ctx.socket.bufferedAmount = 0
+    vi.runOnlyPendingTimers()
+    expect(ctx.sent).toHaveLength(2)
+    expect(vi.getTimerCount()).toBe(0)
   })
 
   it('accounts for base64 expansion when bounding queued text frames', async () => {
@@ -239,5 +333,57 @@ describe('mobile E2EE v2 physical channel', () => {
     expect(ctx.sent).toHaveLength(2)
     expect(ctx.events).toEqual([])
     expect(ctx.onError).not.toHaveBeenCalled()
+  })
+})
+
+function nextInboundTurn(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve))
+}
+
+// Why: enabling the flag at runtime lets these retention checks run in every Node pool without --expose-gc.
+setFlagsFromString('--expose-gc')
+const collectGarbage: unknown = runInNewContext('gc')
+
+async function collectInboundPayloads(): Promise<void> {
+  if (typeof collectGarbage !== 'function') {
+    throw new Error('Retention tests require V8 gc')
+  }
+  for (let round = 0; round < 3; round += 1) {
+    await nextInboundTurn()
+    collectGarbage()
+  }
+}
+
+function receiveRetainedPayload(channel: MobileE2EEV2PhysicalChannel): WeakRef<Uint8Array> {
+  const payload = new Uint8Array(1024 * 1024)
+  void channel.handleMessage(payload)
+  return new WeakRef(payload)
+}
+
+describe('authenticated direct inbound payload disposal', () => {
+  it('releases queued payloads on disposal while binary conversion remains blocked', async () => {
+    let release: (bytes: ArrayBuffer) => void = () => {
+      throw new Error('Expected pending binary conversion')
+    }
+    const blocked = new Promise<ArrayBuffer>((resolve) => {
+      release = resolve
+    })
+    const ctx = setup(async () => new Uint8Array(await blocked))
+    await authenticate(ctx)
+    const inbound = ctx.channel.handleMessage({ arrayBuffer: () => blocked })
+    await nextInboundTurn()
+    const refs = Array.from({ length: 8 }, () => receiveRetainedPayload(ctx.channel))
+    try {
+      await collectInboundPayloads()
+      expect(refs.filter((ref) => ref.deref() !== undefined)).toHaveLength(8)
+      ctx.channel.dispose()
+      await collectInboundPayloads()
+      expect(refs.filter((ref) => ref.deref() !== undefined)).toHaveLength(0)
+      expect(ctx.onError).not.toHaveBeenCalled()
+    } finally {
+      release(new ArrayBuffer(0))
+      await inbound
+      ctx.channel.dispose()
+    }
   })
 })

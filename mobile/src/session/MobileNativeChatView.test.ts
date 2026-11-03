@@ -1,3 +1,4 @@
+import { isHostType } from '../test-support/react-test-renderer-host-nodes'
 import type { createElement } from 'react'
 import type { NativeChatMessage } from '../../../src/shared/native-chat-types'
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
@@ -56,7 +57,7 @@ describe('MobileNativeChatView', () => {
       }
     })
     const stop = renderer!.root.find(
-      (node) => node.type === 'Pressable' && node.props.accessibilityLabel === '正在停止…'
+      (node) => isHostType(node, 'Pressable') && node.props.accessibilityLabel === '正在停止…'
     )
     expect(stop.props.disabled).toBe(true)
   })
@@ -73,7 +74,7 @@ describe('MobileNativeChatView', () => {
         canStop: true,
         turnIndicator: { thinking: false, activityText: null, stopping: true, afterStop }
       })
-      const composer = renderer!.root.find((node) => node.type === 'Composer')
+      const composer = renderer!.root.find((node) => isHostType(node, 'Composer'))
       expect(composer.props.placeholder).toBe(placeholder)
     }
   )
@@ -87,7 +88,7 @@ describe('MobileNativeChatView', () => {
       turnIndicator: { thinking: false, activityText: null, stopping: true }
     })
     const stop = renderer!.root.find(
-      (node) => node.type === 'Pressable' && node.props.accessibilityLabel === '停止 Agent'
+      (node) => isHostType(node, 'Pressable') && node.props.accessibilityLabel === '停止 Agent'
     )
     expect(stop.props.disabled).toBe(false)
   })
@@ -110,7 +111,7 @@ describe('MobileNativeChatView', () => {
   }
 
   function list(): ReactTestInstance {
-    return renderer!.root.find((node) => node.type === 'FlatList')
+    return renderer!.root.find((node) => isHostType(node, 'FlatList'))
   }
 
   function renderedRow(id: string): ReturnType<typeof createElement> {
@@ -125,22 +126,20 @@ describe('MobileNativeChatView', () => {
   }
 
   function composer(): ReactTestInstance {
-    return renderer!.root.find((node) => node.type === 'Composer')
+    return renderer!.root.find((node) => isHostType(node, 'Composer'))
   }
 
   function bannerText(): string {
     const [alert, ...rest] = banners()
     expect(rest).toHaveLength(0)
     return alert
-      .findAll((node) => node.type === 'Text')
+      .findAll((node) => isHostType(node, 'Text'))
       .map((node) => node.props.children)
       .join('')
   }
 
   async function pressSend(): Promise<void> {
-    const composer = renderer!.root.find((node) => node.type === 'Composer') as {
-      props: { onPress: () => Promise<boolean> }
-    }
+    const composer = renderer!.root.find((node) => isHostType(node, 'Composer'))
     await act(async () => {
       await composer.props.onPress()
     })
@@ -165,9 +164,9 @@ describe('MobileNativeChatView', () => {
     const loaded = [assistantTurn('m1', 'earlier reply')]
     const words = 'This chat was saved by a newer Orca. Update Orca to open it.'
     const shown = (text: string) =>
-      renderer!.root.findAll((node) => node.type === 'Text' && node.props.children === text)
-    const composers = () => renderer!.root.findAll((node) => node.type === 'Composer')
-    const lists = () => renderer!.root.findAll((node) => node.type === 'FlatList')
+      renderer!.root.findAll((node) => isHostType(node, 'Text') && node.props.children === text)
+    const composers = () => renderer!.root.findAll((node) => isHostType(node, 'Composer'))
+    const lists = () => renderer!.root.findAll((node) => isHostType(node, 'FlatList'))
     const failure = {
       messages: loaded,
       folded: loaded,

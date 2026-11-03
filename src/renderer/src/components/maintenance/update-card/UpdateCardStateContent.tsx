@@ -78,12 +78,12 @@ export function UpdateCardStateContent({
             ? undefined
             : (getReleaseNotesUrlForVersion(linuxPackageRecovery.recovery.version) ?? undefined)
         }
-        onClose={onCollapse}
+        onClose={onCollapse ?? (() => {})}
       />
     )
   }
   if (errorCard) {
-    return <UpdateErrorCardContent {...errorCard} onClose={onCollapse} />
+    return <UpdateErrorCardContent {...errorCard} onClose={onCollapse ?? (() => {})} />
   }
   if (status.state === 'downloaded') {
     if (status.installing) {
@@ -114,7 +114,7 @@ export function UpdateCardStateContent({
       <UpdateReadyToInstallContent
         version={status.version}
         onRestart={onInstallRetry}
-        onClose={onCollapse}
+        onClose={onCollapse ?? (() => {})}
       />
     )
   }
@@ -129,7 +129,7 @@ export function UpdateCardStateContent({
         mediaLoaded={mediaLoaded}
         onMediaError={onMediaError}
         onMediaLoad={onMediaLoad}
-        onCollapse={onCollapse}
+        onCollapse={onCollapse ?? (() => {})}
         showReleaseNotes={!isLocalBuild}
       />
     )

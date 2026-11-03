@@ -5,22 +5,14 @@ import { isUnreadableError, writeSecureFile } from '../../shared/secure-file'
 import {
   PLUGIN_STORAGE_KEY_LIMIT,
   PLUGIN_STORAGE_TOTAL_MAX_BYTES
-} from '../../shared/plugins/plugin-host-api'
-import { ElectronSecretStore } from '../host/electron-secret-store'
+} from '../../shared/plugins/workers/plugin-host-api'
 import { pluginDataDir } from './plugin-storage-store'
 
-/**
- * Per-plugin secret vault, following the repo's safeStorage-backed
- * credential-file pattern (versioned envelope + base64 ciphertext via the
- * atomic secure-file writer). No plaintext fallback: when OS encryption is
- * unavailable, writes fail loudly instead of silently downgrading — plugin
- * secrets are API-token grade.
- */
+// SafeStorage vault writes fail without OS encryption; never fall back to plaintext.
 
 type PersistedSecretsFile = {
   version: 1
   format: 'electron-safe-storage-v1'
-  /** key → base64 ciphertext of the secret value. */
   ciphertexts: Record<string, string>
 }
 
@@ -35,7 +27,7 @@ export class PluginSecretsStore {
     this.filePath = join(pluginDataDir(pluginsDataDir, qualifiedKey), 'secrets.json.enc')
   }
 
-  /** `null` means the vault exists and this process may not read it — which is never "empty". */
+  /** Null means unreadable, never empty. */
   private read(): PersistedSecretsFile | null {
     const empty: PersistedSecretsFile = {
       version: 1,
@@ -61,9 +53,7 @@ export class PluginSecretsStore {
         return parsed
       }
     } catch (error) {
-      // Being denied the read is not evidence the vault is corrupt. Returning `empty` here would
-      // make the next set() write a vault containing only that one key, silently dropping every
-      // secret the file still holds — and the write would succeed.
+      // Read denial cannot prove emptiness; replacing the vault would silently drop every other secret.
       if (isUnreadableError(error)) {
         return null
       }
@@ -92,14 +82,8 @@ export class PluginSecretsStore {
   }
 
   set(key: string, value: string): PluginSecretsResult<true> {
-    let protectionGap: string | null
-    try {
-      protectionGap = new ElectronSecretStore().describeProtectionGap()
-    } catch {
-      protectionGap = 'OS-backed encryption could not be verified.'
-    }
-    if (protectionGap !== null) {
-      return { ok: false, error: `Secret not stored securely. ${protectionGap}` }
+    if (!safeStorage.isEncryptionAvailable()) {
+      return { ok: false, error: 'OS-backed encryption is unavailable; secret not stored' }
     }
     const file = this.read()
     if (!file) {

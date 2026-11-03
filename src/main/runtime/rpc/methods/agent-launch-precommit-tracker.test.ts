@@ -31,9 +31,11 @@ function fixture() {
     resolveStructuredAgentSessionCreateIntent: resolve
   } as unknown as OrcaRuntimeService
   const tracker = trackTerminalSpawnDispatch()
-  const refused = vi.fn((refusal, cause) =>
+  const refused = vi.fn((refusal, cause: unknown) =>
     tracker.rethrow(
-      new AgentLaunchStructuredSessionRefusedError(refusal.code, refusal.message, { cause })
+      Object.assign(new AgentLaunchStructuredSessionRefusedError(refusal.code, refusal.message), {
+        cause
+      })
     )
   )
   const create = () =>

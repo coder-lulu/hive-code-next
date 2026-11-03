@@ -1,13 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { decodeAccountsSnapshot } from '../components/AccountUsage'
 import { subscribeToDesktopNotifications } from '../notifications/mobile-notifications'
-import { usePrimeHosts, useRpcClientContext } from '../transport/client-context'
+import { usePrimeHosts } from '../transport/host-client-hooks'
 import { createHostConnectRefetchGate } from '../transport/host-connect-refetch-gate'
-import {
-  advanceHomeAutoConnectProgress,
-  EMPTY_HOME_AUTO_CONNECT_PROGRESS,
-  selectHomeAutoConnectHostIds
-} from '../transport/home-host-auto-connect'
+import { selectHomeAutoConnectHostIds } from '../transport/home-host-auto-connect'
 import type { RpcClient } from '../transport/rpc-client'
 import type { ConnectionState, HostCatalogEntry, HostProfile } from '../transport/types'
 import { useAllHostClients } from '../transport/use-all-host-clients'
@@ -100,33 +96,12 @@ export function useMobileHomeHostConnections(
   const [hostStates, setHostStates] = useState<Record<string, ConnectionState>>({})
   const [hostAttempts, setHostAttempts] = useState<Record<string, number>>({})
   const [hostLastConnected, setHostLastConnected] = useState<Record<string, number | null>>({})
-  // Track the whole visible catalog so a connection acquired by a project or
-  // session screen remains visible on Home even if a stale cloud presence
-  // update temporarily removes that Runtime's connectable profile.
-  // Check each connectable Runtime while limiting simultaneous first attempts.
-  const hostIds = useMemo(() => hostCatalog.map((host) => host.id), [hostCatalog])
+  const hostIds = useMemo(() => hosts.map((host) => host.id), [hosts])
   const autoConnectHostIds = useMemo(() => selectHomeAutoConnectHostIds(hosts), [hosts])
-  const [autoConnectProgress, setAutoConnectProgress] = useState(() =>
-    advanceHomeAutoConnectProgress(autoConnectHostIds, EMPTY_HOME_AUTO_CONNECT_PROGRESS, () => null)
-  )
-  const autoConnectHostIdSet = useMemo(() => new Set(autoConnectHostIds), [autoConnectHostIds])
-  const failedHostIdSet = useMemo(() => new Set(autoConnectProgress.failed), [autoConnectProgress])
-  const acquiredHostIds = useMemo(
-    () =>
-      autoConnectProgress.started.filter(
-        (id) => autoConnectHostIdSet.has(id) && !failedHostIdSet.has(id)
-      ),
-    [autoConnectHostIdSet, autoConnectProgress, failedHostIdSet]
-  )
-  const pendingHostIds = useMemo(
-    () => autoConnectProgress.pending.filter((id) => autoConnectHostIdSet.has(id)),
-    [autoConnectHostIdSet, autoConnectProgress]
-  )
   const allClients = useAllHostClients(hostIds, {
-    autoConnectHostIds: acquiredHostIds,
+    autoConnectHostIds,
     closeUnusedOnRelease: true
   })
-  const clientContext = useRpcClientContext()
   const primeHosts = usePrimeHosts()
   const subscriptionsRef = useRef(new Map<string, { client: RpcClient; cleanup: () => void }>())
   const { setAccounts, setStats, setTaskProviders, setWorktreeInfo } = setters
@@ -136,12 +111,6 @@ export function useMobileHomeHostConnections(
       primeHosts(hosts)
     }
   }, [hosts, primeHosts])
-
-  useEffect(() => {
-    setAutoConnectProgress((previous) =>
-      advanceHomeAutoConnectProgress(autoConnectHostIds, previous, clientContext.getKnownState)
-    )
-  }, [allClients, autoConnectHostIds, autoConnectProgress, clientContext])
 
   useEffect(() => {
     setHostAttempts((previous) => readMobileHomeReconnectAttempts(previous, allClients))
@@ -180,7 +149,7 @@ export function useMobileHomeHostConnections(
 
   return {
     allClients,
-    autoConnectHostIds: pendingHostIds,
+    autoConnectHostIds,
     hostAttempts,
     hostLastConnected,
     hostStates

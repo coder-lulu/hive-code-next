@@ -1,48 +1,57 @@
-import { Platform, StyleSheet, Switch, Text, TextInput, View } from 'react-native'
-import { TEXT_INPUT_FONT_SIZE } from '../platform/text-input-font-size'
+import { useRef } from 'react'
+import { Text, View, type TextInput } from 'react-native'
 import type { MobileComposerSource } from '../tasks/use-mobile-composer-source'
-import type { MobileTheme } from '../theme/mobile-theme'
-import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { colors, spacing, typography } from '../theme/mobile-theme'
+import { themedStyleSheet } from '../theme/themed-styles'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
+import { MobileSegmentedControl } from './MobileSegmentedControl'
+import { TextField } from './composer-input/TextField'
 
 type Props = {
   composer: MobileComposerSource
   selectedRepoIsGit: boolean
 }
 
-// The Advanced-section source controls: the editable Name appears once a source
-// pill is shown (the field itself is no longer the name input); the branch-name
-// override and reuse toggle mirror the desktop composer's advanced branch fields.
+// Show editable Name after source pill; branch override/reuse follow desktop’s advanced composer fields.
 export function SmartWorkspaceAdvancedFields({ composer, selectedRepoIsGit }: Props) {
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createStyles)
+  useMobileColorScheme()
+  const t = useMobileTranslation()
+  const branchNameInputRef = useRef<TextInput>(null)
   const selection = composer.smartNameSelection
   const showBranchOverride = selectedRepoIsGit && (!selection || selection.kind === 'branch')
   return (
     <>
       {selection ? (
         <View style={styles.field}>
-          <Text style={styles.label}>Name</Text>
-          <TextInput
-            style={styles.input}
+          <Text style={styles.label}>
+            {t('components.smartWorkspaceAdvancedFields.name', 'Name')}
+          </Text>
+          <TextField
             value={composer.name}
             onChangeText={composer.setName}
-            placeholder="Workspace name"
-            placeholderTextColor={theme.color.text.tertiary}
+            placeholder={t(
+              'components.smartWorkspaceAdvancedFields.workspaceName',
+              'Workspace name'
+            )}
             autoCapitalize="none"
             autoCorrect={false}
           />
         </View>
       ) : null}
 
-      {showBranchOverride ? (
+      {showBranchOverride && !composer.reuseEligibleBranch ? (
         <View style={styles.field}>
-          <Text style={styles.label}>Branch name</Text>
-          <TextInput
-            style={styles.input}
+          <Text style={styles.label}>
+            {t('components.smartWorkspaceAdvancedFields.branchName', 'Branch name')}
+          </Text>
+          <TextField
             value={composer.branchNameOverride ?? ''}
             onChangeText={composer.handleBranchNameOverrideChange}
-            placeholder="Derived from name"
-            placeholderTextColor={theme.color.text.tertiary}
+            placeholder={t(
+              'components.smartWorkspaceAdvancedFields.derivedFromName',
+              'Derived from name'
+            )}
             autoCapitalize="none"
             autoCorrect={false}
           />
@@ -51,64 +60,77 @@ export function SmartWorkspaceAdvancedFields({ composer, selectedRepoIsGit }: Pr
 
       {composer.reuseEligibleBranch ? (
         <View style={styles.field}>
-          <View style={styles.reuseRow}>
-            <Text style={styles.reuseLabel} numberOfLines={1}>
-              Reuse branch “{composer.reuseEligibleBranch}”
-            </Text>
-            <Switch
-              value={composer.reuseSelectedBranch}
-              onValueChange={composer.setReuseSelectedBranch}
-              trackColor={{
-                false: theme.color.border.default,
-                true: theme.color.text.secondary
-              }}
-              thumbColor={theme.color.bg.surface}
-              style={styles.reuseSwitch}
-            />
-          </View>
+          <Text style={styles.label}>
+            {t('workspace.branchChoice.title', 'Branch for this worktree')}
+          </Text>
+          <MobileSegmentedControl
+            segments={[
+              { value: 'existing', label: t('workspace.branchChoice.existing', 'Existing branch') },
+              { value: 'new', label: t('workspace.branchChoice.new', 'New branch') }
+            ]}
+            selected={composer.reuseSelectedBranch ? 'existing' : 'new'}
+            onSelect={(value) => {
+              composer.setReuseSelectedBranch(value === 'existing')
+              if (value === 'new') {
+                branchNameInputRef.current?.focus()
+              }
+            }}
+            fill
+          />
+          {composer.reuseSelectedBranch ? (
+            <View style={styles.branchDetail}>
+              <Text style={styles.branchName}>{composer.reuseEligibleBranch}</Text>
+              <Text style={styles.description}>
+                {t('workspace.branchChoice.existingHint', 'New commits go on this branch.')}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.branchDetail}>
+              <Text style={styles.description}>
+                {t('workspace.branchChoice.newHint', 'Create a new local branch')}
+              </Text>
+              <Text style={styles.label}>
+                {t('workspace.branchChoice.newName', 'New branch name')}
+              </Text>
+              <TextField
+                inputRef={branchNameInputRef}
+                accessibilityLabel={t('workspace.branchChoice.newName', 'New branch name')}
+                autoFocus
+                value={composer.branchNameOverride ?? ''}
+                onChangeText={composer.handleBranchNameOverrideChange}
+                placeholder={t('workspace.branchChoice.automaticName', 'Automatic name')}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+          )}
         </View>
       ) : null}
     </>
   )
 }
 
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    field: {
-      marginBottom: theme.spacing.space16
-    },
-    label: {
-      ...theme.typography.meta,
-      fontWeight: '500',
-      color: theme.color.text.secondary,
-      marginBottom: theme.spacing.space8
-    },
-    input: {
-      minHeight: theme.size.minimumTouchTarget,
-      backgroundColor: theme.color.bg.surface,
-      color: theme.color.text.primary,
-      borderRadius: theme.radii.control,
-      paddingHorizontal: theme.spacing.space12,
-      paddingVertical: Platform.OS === 'ios' ? theme.spacing.space12 : theme.spacing.space8,
-      ...theme.typography.body,
-      fontSize: TEXT_INPUT_FONT_SIZE,
-      borderWidth: 1,
-      borderColor: theme.color.border.default
-    },
-    reuseRow: {
-      minHeight: theme.size.minimumTouchTarget,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: theme.spacing.space12
-    },
-    reuseLabel: {
-      flex: 1,
-      ...theme.typography.meta,
-      color: theme.color.text.secondary
-    },
-    reuseSwitch: {
-      transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }]
-    }
-  })
-}
+const styles = themedStyleSheet(() => ({
+  field: {
+    marginBottom: spacing.md
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.textSecondary,
+    marginBottom: spacing.xs
+  },
+  branchDetail: {
+    marginTop: spacing.sm,
+    gap: spacing.xs
+  },
+  branchName: {
+    fontFamily: typography.monoFamily,
+    fontSize: typography.metaSize,
+    color: colors.textPrimary
+  },
+  description: {
+    fontSize: typography.metaSize,
+    color: colors.textSecondary
+  }
+}))

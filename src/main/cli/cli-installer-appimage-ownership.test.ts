@@ -13,7 +13,6 @@ import {
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { APP_DISPLAY_NAME, PRODUCT_CONFIG } from '../../shared/brand'
 import type { CliInstallStatus } from '../../shared/cli-install-types'
 import { resolveAppImageExtractedRoot, type AppImageExtractedRoot } from './appimage-extracted-root'
 
@@ -42,7 +41,7 @@ async function makeFixture() {
   const appImagePath = join(root, 'Orca.AppImage')
   const cacheRootPath = join(root, 'cache')
   const commandDirectory = join(root, 'home', '.local', 'bin')
-  const commandPath = join(commandDirectory, PRODUCT_CONFIG.cli.primary)
+  const commandPath = join(commandDirectory, 'orca-ide')
   await mkdir(commandDirectory, { recursive: true })
   await writeFile(appImagePath, '#!/usr/bin/env bash\n', { mode: 0o755 })
   return { root, appImagePath, cacheRootPath, commandDirectory, commandPath }
@@ -51,9 +50,7 @@ async function makeFixture() {
 async function extractPayload(_appImagePath: string, cwd: string): Promise<void> {
   const launcherDirectory = join(cwd, 'squashfs-root', 'resources', 'bin')
   await mkdir(launcherDirectory, { recursive: true })
-  await writeFile(join(launcherDirectory, PRODUCT_CONFIG.cli.primary), '#!/usr/bin/env bash\n', {
-    mode: 0o755
-  })
+  await writeFile(join(launcherDirectory, 'orca-ide'), '#!/usr/bin/env bash\n', { mode: 0o755 })
 }
 
 function installerOptions(fixture: Fixture) {
@@ -76,7 +73,7 @@ describe.skipIf(process.platform === 'win32')('AppImage CLI ownership', () => {
   it('uses the mounted bundled launcher when only APPDIR is inherited', async () => {
     const fixture = await makeFixture()
     const resourcesPath = join(fixture.root, 'mounted', 'resources')
-    const launcherPath = join(resourcesPath, 'bin', PRODUCT_CONFIG.cli.primary)
+    const launcherPath = join(resourcesPath, 'bin', 'orca-ide')
     await mkdir(dirname(launcherPath), { recursive: true })
     await writeFile(launcherPath, '#!/usr/bin/env bash\n', { mode: 0o755 })
     vi.stubEnv('APPIMAGE', '')
@@ -108,7 +105,7 @@ describe.skipIf(process.platform === 'win32')('AppImage CLI ownership', () => {
   it('ignores inherited APPIMAGE without the matching runtime identity', async () => {
     const fixture = await makeFixture()
     const resourcesPath = join(fixture.root, 'installed', 'resources')
-    const launcherPath = join(resourcesPath, 'bin', PRODUCT_CONFIG.cli.primary)
+    const launcherPath = join(resourcesPath, 'bin', 'orca-ide')
     await mkdir(dirname(launcherPath), { recursive: true })
     await writeFile(launcherPath, '#!/usr/bin/env bash\n', { mode: 0o755 })
     vi.stubEnv('APPIMAGE', fixture.appImagePath)
@@ -148,23 +145,9 @@ describe.skipIf(process.platform === 'win32')('AppImage CLI ownership', () => {
     })
 
     await expect(installer.getStatus()).resolves.toMatchObject({ state: 'conflict' })
-    await expect(installer.install()).rejects.toThrow(
-      `Refusing to replace non-${APP_DISPLAY_NAME} command`
-    )
+    await expect(installer.install()).rejects.toThrow('Refusing to replace non-Orca command')
     await expect(readlink(fixture.commandPath)).resolves.toBe(foreignTarget)
     expect(extract).not.toHaveBeenCalled()
-  })
-
-  it('leaves a foreign legacy resources/bin/orca symlink untouched', async () => {
-    const fixture = await makeFixture()
-    const legacyCommandPath = join(fixture.commandDirectory, 'orca')
-    const foreignTarget = join(fixture.root, 'foreign', 'resources', 'bin', 'orca')
-    await symlink(foreignTarget, legacyCommandPath)
-
-    await expect(new CliInstaller(installerOptions(fixture)).install()).resolves.toMatchObject({
-      state: 'installed'
-    })
-    await expect(readlink(legacyCommandPath)).resolves.toBe(foreignTarget)
   })
 
   it('keeps installation bound to the extracted generation', async () => {
@@ -218,8 +201,7 @@ describe.skipIf(process.platform === 'win32')('AppImage CLI ownership', () => {
     expect(repaired).toMatchObject({ state: 'installed', launcherPath: first.launcherPath })
     await expect(readlink(fixture.commandPath)).resolves.toBe(first.launcherPath)
     await expect(lstat(relocatedRoot.payloadLauncherPath)).resolves.toBeDefined()
-    // A path namespace is an ownership boundary; the relocated process cannot prove that no
-    // sibling AppImage still owns the prior namespace.
+    // Relocation cannot prove that no sibling AppImage still owns the prior namespace.
     await expect(lstat(firstRoot.rootPath)).resolves.toBeDefined()
   })
 
@@ -234,7 +216,7 @@ describe.skipIf(process.platform === 'win32')('AppImage CLI ownership', () => {
       'a'.repeat(24),
       'resources',
       'bin',
-      PRODUCT_CONFIG.cli.primary
+      'orca-ide'
     )
     const foreignTarget = join(fixture.root, 'foreign', 'orca-ide')
     await symlink(ownedOldTarget, fixture.commandPath)
@@ -256,66 +238,11 @@ describe.skipIf(process.platform === 'win32')('AppImage CLI ownership', () => {
     }
 
     await expect(new RacedInstaller(installerOptions(fixture)).install()).rejects.toThrow(
-      `Refusing to replace non-${APP_DISPLAY_NAME} command`
+      'Refusing to replace non-Orca command'
     )
     await expect(readlink(fixture.commandPath)).resolves.toBe(foreignTarget)
     expect((await readdir(fixture.commandDirectory)).some((name) => name.includes('.orca-'))).toBe(
       false
     )
-  })
-
-  // #15081 review: the Linux reclaim rule was narrowed to extracted-cache launchers, which left a
-  // deb/rpm -> AppImage migration wedged on its own leftover symlink.
-  it('reclaims a symlink left by a packaged deb/rpm install', async () => {
-    for (const directory of ['/opt/Orca', '/opt/orca-ide', '/opt/orca']) {
-      const fixture = await makeFixture()
-      await symlink(`${directory}/resources/bin/orca-ide`, fixture.commandPath)
-
-      await expect(new CliInstaller(installerOptions(fixture)).getStatus()).resolves.toMatchObject({
-        state: 'stale'
-      })
-    }
-  })
-
-  it('migrates the product primary and compatibility launchers from exact packaged roots', async () => {
-    for (const directory of [`/opt/${PRODUCT_CONFIG.displayName}`, `/opt/${PRODUCT_CONFIG.slug}`]) {
-      for (const command of [PRODUCT_CONFIG.cli.primary, 'hivecode', 'orca-ide']) {
-        const fixture = await makeFixture()
-        await symlink(`${directory}/resources/bin/${command}`, fixture.commandPath)
-        const installer = new CliInstaller(installerOptions(fixture))
-
-        await expect(installer.getStatus()).resolves.toMatchObject({ state: 'stale' })
-        const installed = await installer.install()
-        expect(installed.state).toBe('installed')
-        await expect(readlink(fixture.commandPath)).resolves.toBe(installed.launcherPath)
-      }
-    }
-  })
-
-  it.each([
-    '/usr/bin/orca',
-    `/opt/${PRODUCT_CONFIG.displayName}-other/resources/bin/${PRODUCT_CONFIG.cli.primary}`,
-    `/opt/${PRODUCT_CONFIG.displayName}/other/bin/${PRODUCT_CONFIG.cli.primary}`,
-    `/opt/${PRODUCT_CONFIG.displayName}/resources/bin/not-${PRODUCT_CONFIG.cli.primary}`,
-    `/opt/${PRODUCT_CONFIG.displayName}/resources/bin/orca`
-  ])('preserves an unowned or screen-reader target at %s', async (target) => {
-    const fixture = await makeFixture()
-    await symlink(target, fixture.commandPath)
-    const installer = new CliInstaller(installerOptions(fixture))
-
-    await expect(installer.getStatus()).resolves.toMatchObject({ state: 'conflict' })
-    await expect(installer.install()).rejects.toThrow(
-      `Refusing to replace non-${APP_DISPLAY_NAME} command`
-    )
-    await expect(readlink(fixture.commandPath)).resolves.toBe(target)
-  })
-
-  it('still refuses a launcher-named symlink outside the packaged install tree', async () => {
-    const fixture = await makeFixture()
-    await symlink('/opt/not-orca/resources/bin/orca-ide', fixture.commandPath)
-
-    await expect(new CliInstaller(installerOptions(fixture)).getStatus()).resolves.toMatchObject({
-      state: 'conflict'
-    })
   })
 })

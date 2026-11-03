@@ -1,3 +1,4 @@
+import { pairedRuntimeConnectionFromOffer } from '../../shared/paired-runtime-connection'
 
 import '../daemon/mock-descendant-sweep'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -6,7 +7,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../shared/constants'
 import { parsePairingCode } from '../../shared/pairing'
-import { RemoteRuntimeRequestConnection } from '../../shared/remote-runtime-request-connection'
+import { RemoteRuntimeRequestConnection } from '../../shared/remote-runtime/requests/remote-runtime-request-connection'
 import type {
   RuntimeEnsureAgentSessionResult,
   RuntimeEnsureAgentSessionRequest
@@ -149,13 +150,13 @@ describe('remote agent-session host authority integration', () => {
       cleanups.push(() => server.stop())
 
       const firstClient = new RemoteRuntimeRequestConnection(
-        requirePairing(server, 'client-one')
+        pairedRuntimeConnectionFromOffer(requirePairing(server, 'client-one'))
       )
       const secondClient = new RemoteRuntimeRequestConnection(
-        requirePairing(server, 'client-two')
+        pairedRuntimeConnectionFromOffer(requirePairing(server, 'client-two'))
       )
       const retryClient = new RemoteRuntimeRequestConnection(
-        requirePairing(server, 'retry-client')
+        pairedRuntimeConnectionFromOffer(requirePairing(server, 'retry-client'))
       )
       cleanups.push(() => firstClient.close())
       cleanups.push(() => secondClient.close())
@@ -199,8 +200,7 @@ describe('remote agent-session host authority integration', () => {
       expect(spawnSubprocess).toHaveBeenCalledOnce()
       expect(host.listSessions()).toHaveLength(1)
 
-      // Why: a retry cannot prove whether its previous response arrived, so
-      // the provider identity—not a new client operation—must recover the owner.
+      // A lost reply cannot prove delivery; retries must recover ownership through provider identity.
       const retry = await retryClient.request<RuntimeEnsureAgentSessionResult>(
         'terminal.ensureAgentSession',
         request,

@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { useMemo } from 'react'
 import { useRouter } from 'expo-router'
 import { ChevronRight, QrCode, UserRound } from 'lucide-react-native'
@@ -31,6 +32,8 @@ export function MobileHomeEmptyState(props: {
   connectionStates: RuntimeSelectorConnectionStates
   selectedId: string | null
 }) {
+  const t = useMobileTranslation()
+
   const router = useRouter()
   const { hydrated, session } = useMobileAuthSession()
   const { state, refresh } = useAccountRuntimeDirectory()
@@ -88,14 +91,20 @@ export function MobileHomeEmptyState(props: {
       ]}
     >
       <MobileSegmentedControl
-        accessibilityLabel="选择连接方式"
+        accessibilityLabel={t(
+          'auto.mobile.src.home.MobileHomeEmptyState.f45014dc2a',
+          'Choose connection method'
+        )}
         selectionStyle="surface"
         value={props.method}
         onValueChange={props.onMethodChange}
         options={[
           {
             value: 'scan',
-            label: '扫码连接',
+            label: t(
+              'auto.mobile.src.home.MobileHomeEmptyState.1092170b90',
+              'Connect with QR code'
+            ),
             renderIcon: (selected) => (
               <QrCode
                 size={20}
@@ -106,7 +115,7 @@ export function MobileHomeEmptyState(props: {
           },
           {
             value: 'account',
-            label: '账号连接',
+            label: t('auto.mobile.src.home.MobileHomeEmptyState.8afa2b3b33', 'Account connection'),
             renderIcon: (selected) => (
               <UserRound
                 size={20}
@@ -127,7 +136,10 @@ export function MobileHomeEmptyState(props: {
           </Text>
           <Text maxFontSizeMultiplier={1.3} style={styles.hint}>
             {isAccount && session
-              ? '选择账号下已认领的电脑，连接后继续工作。'
+              ? t(
+                  'auto.mobile.src.home.MobileHomeEmptyState.42ddcc1e45',
+                  'Choose a computer claimed by your account, connect, and keep working.'
+                )
               : content.description}
           </Text>
         </View>
@@ -154,7 +166,7 @@ export function MobileHomeEmptyState(props: {
         </Pressable>
         {isAccount && !hydrated ? (
           <Text accessibilityLiveRegion="polite" maxFontSizeMultiplier={1.3} style={styles.hint}>
-            正在读取账号…
+            {t('auto.mobile.src.home.MobileHomeEmptyState.bb655d7c99', 'Reading account…')}
           </Text>
         ) : null}
         {isAccount && session ? (
@@ -171,7 +183,7 @@ export function MobileHomeEmptyState(props: {
       </View>
       <View style={styles.stepsSection}>
         <Text accessibilityRole="header" maxFontSizeMultiplier={1.3} style={styles.hint}>
-          连接步骤
+          {t('auto.mobile.src.home.MobileHomeEmptyState.8b8c2e064c', 'Connection steps')}
         </Text>
         {content.steps.map((step, index) => (
           <View key={step.title} style={styles.stepRow}>

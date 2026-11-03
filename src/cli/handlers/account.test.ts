@@ -1,4 +1,3 @@
-import { applyProductBranding } from '../../shared/brand'
 import type * as NodeCliCommandResolutionModule from '../../shared/node-cli-command-resolution'
 import { EventEmitter } from 'node:events'
 import { existsSync } from 'node:fs'
@@ -26,23 +25,12 @@ const {
   writeKeychainMock: vi.fn()
 }))
 
-// Why: keep real temp-dir cleanup by default so leak assertions stay honest,
-// while allowing deterministic Windows EBUSY coverage.
+// Use real cleanup by default so leaks remain visible; override it only for Windows EBUSY cases.
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof NodeFs>()
   rmSyncMock.mockImplementation(actual.rmSync)
   return { ...actual, rmSync: rmSyncMock }
 })
-
-vi.mock('@orca/process-host', () => ({
-  spawnProcess: spawnMock,
-  runProcess: vi.fn(() => {
-    throw new Error('Unexpected process execution in account unit test')
-  }),
-  runProcessSync: vi.fn(() => {
-    throw new Error('Unexpected synchronous process execution in account unit test')
-  })
-}))
 
 vi.mock('node:child_process', () => ({
   execFile: vi.fn(),
@@ -54,8 +42,7 @@ vi.mock('../../main/claude-accounts/keychain', () => ({
   readActiveClaudeKeychainCredentialsStrict: readKeychainMock,
   writeActiveClaudeKeychainCredentials: writeKeychainMock
 }))
-// Why importOriginal: withCliRuntimeOnPath is a pure filesystem-probing helper,
-// and the PATH assertions below are only meaningful against the real one.
+// PATH assertions must exercise the real withCliRuntimeOnPath filesystem probes.
 vi.mock('../../shared/node-cli-command-resolution', async (importOriginal) => ({
   ...(await importOriginal<typeof NodeCliCommandResolutionModule>()),
   getVersionManagerBinPaths: getVersionManagerBinPathsMock,
@@ -84,9 +71,7 @@ function successfulChild(): EventEmitter {
   return child
 }
 
-// Why: identify the handler under test by set difference, not by position —
-// `.at(-1)` picks up any listener a later registration appends (vitest installs
-// its own once-wrapped SIGINT teardown), which made assertions flake.
+// Diff listener sets: Vitest may append its own wrapped SIGINT listener after ours.
 function newSignalListener(
   signal: NodeJS.Signals,
   before: readonly unknown[]
@@ -157,8 +142,7 @@ describe('account CLI handlers', () => {
     )
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     process.env.ELECTRON_RUN_AS_NODE = '1'
-    // Why: a test run inside a real distro carries WSL_DISTRO_NAME, which would
-    // leak WSL attribution into every faked-win32 add below.
+    // Clear real WSL attribution before simulating win32.
     delete process.env.WSL_DISTRO_NAME
     delete process.env.ORCA_CLI_WSL_DISTRO
   })
@@ -192,14 +176,14 @@ describe('account CLI handlers', () => {
     await ACCOUNT_HANDLERS['account add'](context('codex', true))
 
     expect(spawnMock).toHaveBeenCalledWith(
+      'codex',
+      ['login', '--device-auth'],
       expect.objectContaining({
-        program: 'codex',
-        args: ['login', '--device-auth'],
         stdio: ['inherit', process.stderr, 'inherit'],
         env: expect.objectContaining({ CODEX_HOME: expect.any(String) })
       })
     )
-    const spawnOptions = spawnMock.mock.calls[0]?.[0]
+    const spawnOptions = spawnMock.mock.calls[0]?.[2]
     expect(spawnOptions.env.ELECTRON_RUN_AS_NODE).toBeUndefined()
     expect(existsSync(spawnOptions.env.CODEX_HOME)).toBe(false)
     expect(callMock).toHaveBeenCalledWith('accounts.addCodexFromHome', {
@@ -218,11 +202,9 @@ describe('account CLI handlers', () => {
     await ACCOUNT_HANDLERS['account add'](context('codex'))
 
     expect(spawnMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        program: 'codex',
-        args: ['login', '--device-auth'],
-        stdio: [11, 'inherit', 'inherit']
-      })
+      'codex',
+      ['login', '--device-auth'],
+      expect.objectContaining({ stdio: [11, 'inherit', 'inherit'] })
     )
     expect(dispose).toHaveBeenCalledTimes(1)
   })
@@ -253,11 +235,9 @@ describe('account CLI handlers', () => {
     await ACCOUNT_HANDLERS['account add'](context('codex', true))
 
     expect(spawnMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        program: 'codex',
-        args: ['login', '--device-auth'],
-        stdio: [11, process.stderr, 'inherit']
-      })
+      'codex',
+      ['login', '--device-auth'],
+      expect.objectContaining({ stdio: [11, process.stderr, 'inherit'] })
     )
   })
 
@@ -268,11 +248,9 @@ describe('account CLI handlers', () => {
     await ACCOUNT_HANDLERS['account add'](context('codex'))
 
     expect(spawnMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        program: getCmdExePath(),
-        args: ['/d', '/c', 'C:\\tools\\codex.cmd', 'login', '--device-auth'],
-        stdio: ['inherit', 'inherit', 'inherit']
-      })
+      getCmdExePath(),
+      ['/d', '/c', '@', 'C:\\tools\\codex.cmd', 'login', '--device-auth'],
+      expect.objectContaining({ stdio: ['inherit', 'inherit', 'inherit'] })
     )
   })
 
@@ -284,10 +262,9 @@ describe('account CLI handlers', () => {
     await ACCOUNT_HANDLERS['account add'](context('codex'))
 
     expect(spawnMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        program: getCmdExePath(),
-        args: ['/d', '/c', shim, 'login', '--device-auth']
-      })
+      getCmdExePath(),
+      ['/d', '/c', '@', shim, 'login', '--device-auth'],
+      expect.anything()
     )
   })
 
@@ -312,7 +289,7 @@ describe('account CLI handlers', () => {
 
     await ACCOUNT_HANDLERS['account add'](context('codex'))
 
-    const path = spawnMock.mock.calls[0]?.[0].env.PATH as string
+    const path = spawnMock.mock.calls[0]?.[2].env.PATH as string
     expect(path.split(delimiter)[0]).toBe(nodeBin)
   })
 
@@ -325,16 +302,19 @@ describe('account CLI handlers', () => {
 
     await ACCOUNT_HANDLERS['account add'](context('codex'))
 
-    const env = spawnMock.mock.calls[0]?.[0].env as NodeJS.ProcessEnv
+    const env = spawnMock.mock.calls[0]?.[2].env as NodeJS.ProcessEnv
     const pathValues = Object.entries(env)
       .filter(([key]) => key.toLowerCase() === 'path')
       .map(([, value]) => value)
     expect(pathValues).toContain(`${nodeBin}${delimiter}${effectivePathBefore}`)
   })
 
-  it('runs login in the final profile and never reads, writes or cleans up Keychain credentials', async () => {
+  it('runs login in the final profile without accessing a locked Keychain', async () => {
+    readKeychainMock.mockRejectedValue(new Error('locked'))
+    deleteKeychainMock.mockRejectedValue(new Error('locked'))
+    writeKeychainMock.mockRejectedValue(new Error('locked'))
     await ACCOUNT_HANDLERS['account add'](context('claude'))
-    expect(spawnMock.mock.calls[0]?.[0].env.CLAUDE_CONFIG_DIR).toBe('/fake/final-profile')
+    expect(spawnMock.mock.calls[0]?.[2].env.CLAUDE_CONFIG_DIR).toBe('/fake/final-profile')
     expect(callMock).toHaveBeenCalledWith(
       'accounts.finishClaudeSignIn',
       { accountId: 'draft', runtime: 'host', wslDistro: undefined },
@@ -352,7 +332,7 @@ describe('account CLI handlers', () => {
       context('codex', false, String.raw`\\wsl$\Ubuntu\home\user`)
     )
 
-    const sourceHome = spawnMock.mock.calls[0]?.[0].env.CODEX_HOME
+    const sourceHome = spawnMock.mock.calls[0]?.[2].env.CODEX_HOME
     expect(callMock).toHaveBeenCalledWith('accounts.addCodexFromHome', {
       sourceHome,
       runtime: 'wsl',
@@ -397,33 +377,32 @@ describe('account CLI handlers', () => {
     Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' })
     process.env.WSL_DISTRO_NAME = 'stale-Windows-value'
     await ACCOUNT_HANDLERS['account add'](context('codex', false, String.raw`C:\work`))
-    const sourceHome = spawnMock.mock.calls[0]?.[0].env.CODEX_HOME
+    const sourceHome = spawnMock.mock.calls[0]?.[2].env.CODEX_HOME
     expect(callMock).toHaveBeenCalledWith('accounts.addCodexFromHome', { sourceHome })
   })
 
   it.each(['linux', 'darwin'])(
     'keeps host attribution when the CLI runs on %s',
     async (platform) => {
-      // Why: a Linux CLI talks to a Linux runtime whose accounts are host-lane;
-      // WSL_DISTRO_NAME there names the CLI's own environment, not a target lane.
+      // Linux runtimes use host-lane accounts even when the CLI itself runs in WSL.
       Object.defineProperty(process, 'platform', { configurable: true, value: platform })
       process.env.WSL_DISTRO_NAME = 'Ubuntu-22.04'
       process.env.ORCA_CLI_WSL_DISTRO = 'Ubuntu-22.04'
 
       await ACCOUNT_HANDLERS['account add'](context('codex'))
 
-      const sourceHome = spawnMock.mock.calls[0]?.[0].env.CODEX_HOME
+      const sourceHome = spawnMock.mock.calls[0]?.[2].env.CODEX_HOME
       expect(callMock).toHaveBeenCalledWith('accounts.addCodexFromHome', { sourceHome })
     }
   )
 
   it('waits for physical child close before removing interrupted login credentials', async () => {
-    // Why: deleting first lets the still-live login recreate credentials afterward.
+    // A live login can recreate credentials after cleanup; wait for close before deleting them.
     Object.defineProperty(process, 'platform', { configurable: true, value: 'linux' })
     const kill = vi.fn()
     const child = Object.assign(new EventEmitter(), { kill })
     let codexHome = ''
-    spawnMock.mockImplementation((options: { env: Record<string, string> }) => {
+    spawnMock.mockImplementation((_command, _args, options: { env: Record<string, string> }) => {
       codexHome = options.env.CODEX_HOME
       return child
     })
@@ -451,12 +430,11 @@ describe('account CLI handlers', () => {
   })
 
   it('cleans up when an SSH hangup ends the login', async () => {
-    // Why: this flow targets headless/SSH hosts, where a dropped connection
-    // delivers SIGHUP — Node's default terminates without running cleanup.
+    // Node's default SIGHUP exit would bypass cleanup when an SSH connection drops.
     Object.defineProperty(process, 'platform', { configurable: true, value: 'linux' })
     const child = Object.assign(new EventEmitter(), { kill: vi.fn() })
     let codexHome = ''
-    spawnMock.mockImplementation((options: { env: Record<string, string> }) => {
+    spawnMock.mockImplementation((_command, _args, options: { env: Record<string, string> }) => {
       codexHome = options.env.CODEX_HOME
       return child
     })
@@ -482,14 +460,17 @@ describe('account CLI handlers', () => {
   })
 
   it('warns that the account may already be registered when interrupted mid-RPC', async () => {
-    // Why: the runtime finishes the add independently of this process, so an
-    // interrupt after sign-in cannot honestly be reported as "not added".
+    // Registration continues at the runtime after the CLI is interrupted.
     const child = Object.assign(new EventEmitter(), { kill: vi.fn() })
     spawnMock.mockImplementation(() => {
       queueMicrotask(() => child.emit('exit', 0))
       return child
     })
-    // Why: only the registration RPC hangs — the preflight must still resolve.
+    let rejectRegistration: ((error: Error) => void) | undefined
+    const registration = new Promise<never>((_resolve, reject) => {
+      rejectRegistration = reject
+    })
+    // Only registration waits; preflight must still resolve.
     callMock.mockImplementation((method: string) =>
       method === 'status.get'
         ? Promise.resolve({
@@ -507,27 +488,34 @@ describe('account CLI handlers', () => {
               result: { claude: accountState('c@e.com'), codex: accountState('x@e.com') },
               _meta: { runtimeId: 'test-runtime' }
             })
-          : new Promise(() => {})
+          : registration
     )
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
     const listenersBefore = process.listeners('SIGINT')
 
-    void ACCOUNT_HANDLERS['account add'](context('codex')).catch(() => {})
-    await vi.waitFor(() =>
-      expect(callMock).toHaveBeenCalledWith('accounts.addCodexFromHome', expect.anything())
-    )
+    const pending = ACCOUNT_HANDLERS['account add'](context('codex')).catch(() => {})
+    try {
+      await vi.waitFor(() =>
+        expect(callMock).toHaveBeenCalledWith('accounts.addCodexFromHome', expect.anything())
+      )
 
-    newSignalListener('SIGINT', listenersBefore)('SIGINT')
+      newSignalListener('SIGINT', listenersBefore)('SIGINT')
 
-    await vi.waitFor(() => expect(exitSpy).toHaveBeenCalledWith(130))
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('may still have been registered'))
-    warnSpy.mockRestore()
-    exitSpy.mockRestore()
+      await vi.waitFor(() => expect(exitSpy).toHaveBeenCalledWith(130))
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('may still have been registered')
+      )
+    } finally {
+      rejectRegistration?.(new Error('finish interrupted registration'))
+      await pending
+      warnSpy.mockRestore()
+      exitSpy.mockRestore()
+    }
+    expect(process.listeners('SIGINT')).toEqual(listenersBefore)
   })
 
   it('fails before the login when the runtime is unreachable', async () => {
-    // Why: discovering a dead runtime after sign-in wastes a full OAuth round trip.
     callMock.mockRejectedValue(new Error('runtime not running'))
 
     await expect(ACCOUNT_HANDLERS['account add'](context('codex'))).rejects.toThrow(
@@ -537,19 +525,19 @@ describe('account CLI handlers', () => {
     expect(spawnMock).not.toHaveBeenCalled()
   })
 
-  it('still adds Codex through an older host that advertises only the retired import capability', async () => {
-    callMock.mockResolvedValue({
+  it('adds Codex through an older host that advertises only the retired import capability', async () => {
+    callMock.mockResolvedValueOnce({
       id: 'test',
       ok: true,
       result: { capabilities: [ACCOUNT_IMPORT_RUNTIME_CAPABILITY] },
       _meta: { runtimeId: 'test-runtime' }
     })
-    spawnMock.mockImplementation(() => {
-      throw new Error('stop after the capability gate')
-    })
 
-    await expect(ACCOUNT_HANDLERS['account add'](context('codex'))).rejects.toThrow()
-    expect(spawnMock).toHaveBeenCalled()
+    await ACCOUNT_HANDLERS['account add'](context('codex'))
+
+    const sourceHome = spawnMock.mock.calls[0]?.[2].env.CODEX_HOME
+    expect(callMock).toHaveBeenCalledWith('accounts.addCodexFromHome', { sourceHome })
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('codex@example.com'))
   })
 
   it.each(['claude', 'codex'] as const)(
@@ -563,7 +551,7 @@ describe('account CLI handlers', () => {
       })
 
       await expect(ACCOUNT_HANDLERS['account add'](context(agent))).rejects.toThrow(
-        applyProductBranding('The running Orca runtime is too old to add accounts from the CLI.')
+        'The running Orca runtime is too old to add accounts from the CLI.'
       )
       expect(callMock).toHaveBeenCalledOnce()
       expect(callMock).toHaveBeenCalledWith('status.get')
@@ -574,8 +562,6 @@ describe('account CLI handlers', () => {
   it.each(['environment', 'pairing-code'])(
     'rejects --%s instead of silently ignoring it',
     async (flag) => {
-      // Why: account commands are pinned to the local runtime, so honoring these
-      // silently would register the account on the wrong host.
       await expect(
         ACCOUNT_HANDLERS['account add']({
           ...context('codex'),
@@ -592,8 +578,6 @@ describe('account CLI handlers', () => {
   it.each(['environment', 'pairing-code'])(
     'rejects --%s on `account list` instead of listing the local host',
     async (flag) => {
-      // Why: listing is read-only, but answering with the LOCAL machine's accounts
-      // when the user named a remote host is the specific wrong answer they'd act on.
       await expect(
         ACCOUNT_HANDLERS['account list']({
           ...context('claude'),
@@ -605,8 +589,6 @@ describe('account CLI handlers', () => {
   )
 
   it('keeps the original add error when cleanup also fails', async () => {
-    // Why: cleanup runs in a `finally`, so an unguarded rejection there replaces
-    // the error that actually explains why the add failed.
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     rmSyncMock.mockImplementationOnce(() => {
       throw new Error('EBUSY: resource busy or locked')
@@ -650,19 +632,7 @@ describe('account CLI handlers', () => {
     expect(logSpy).not.toHaveBeenCalled()
   })
 
-  it('does not touch a locked Keychain while the CLI signs in', async () => {
-    readKeychainMock.mockRejectedValue(new Error('locked'))
-    deleteKeychainMock.mockRejectedValue(new Error('locked'))
-    writeKeychainMock.mockRejectedValue(new Error('locked'))
-    await ACCOUNT_HANDLERS['account add'](context('claude'))
-    expect(readKeychainMock).not.toHaveBeenCalled()
-    expect(deleteKeychainMock).not.toHaveBeenCalled()
-    expect(writeKeychainMock).not.toHaveBeenCalled()
-  })
-
   it('rejects `--agent` with no value instead of defaulting to Claude', async () => {
-    // Why: the parser turns a valueless flag into boolean true, so a silent
-    // default would run a full OAuth login for the wrong provider.
     await expect(
       ACCOUNT_HANDLERS['account add']({ ...context('claude'), flags: new Map([['agent', true]]) })
     ).rejects.toThrow(
@@ -712,14 +682,12 @@ describe('account CLI handlers', () => {
 
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining(
-        '  old@example.com (active) (sign in again in HiveCode Settings > AI Provider Accounts)\n  ok@example.com\n'
+        '  old@example.com (active) (sign in again in Orca Settings > AI Provider Accounts)\n  ok@example.com\n'
       )
     )
   })
 
   it('lists accounts without forcing a provider usage refresh', async () => {
-    // Why: the forced lane bypasses the poll throttle and costs one serial
-    // round-trip per managed account, and this output shows no usage numbers.
     callMock.mockResolvedValue({
       id: 'test',
       ok: true,

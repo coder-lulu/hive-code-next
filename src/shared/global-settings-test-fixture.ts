@@ -15,7 +15,6 @@ export function createGlobalSettingsFixture(
       appFontFamily: 'Geist',
       editorAutoSaveDelayMs: 1000,
       primarySelectionMiddleClickPaste: false,
-      primarySelectionDefaultedForLinux: false,
       terminalFontFamily: 'JetBrains Mono',
       terminalInactivePaneOpacity: 0.5,
       terminalRightClickToPaste: false,

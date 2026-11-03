@@ -24,6 +24,8 @@ describe('resolveAgentStartupPlanInputs with extra agent args', () => {
       extraAgentArgs: '--model opus --add-dir "my docs"'
     })
     const plan = buildAgentStartupPlan({ ...inputs, prompt: 'go' })
+    expect(plan?.launchCommand).toContain('my docs')
+    expect(plan?.launchCommand).toContain('--add-dir')
     expect(plan?.launchCommand).toContain('opus')
     expect(plan?.launchCommand).not.toContain('sonnet')
     expect(plan?.launchCommand).toContain('--dangerously-skip-permissions')
@@ -40,7 +42,7 @@ describe('resolveAgentStartupPlanInputs with extra agent args', () => {
     })
     const desktopArgs = mergeExtraAgentArgs({
       agent: 'claude',
-      defaultArgs: resolveTuiAgentLaunchArgs('claude', SETTINGS.agentDefaultArgs),
+      defaultArgs: resolveTuiAgentLaunchArgs('claude', SETTINGS),
       extraAgentArgs: '--effort high',
       shell: 'posix'
     })

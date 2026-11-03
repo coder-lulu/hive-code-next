@@ -11,6 +11,7 @@ import { isRuntimeSelectorNotFoundError } from '../listing/runtime-worktree-rpc-
 import { parseWorkspaceKey } from '../../../../../../shared/workspace-scope'
 import { parseExecutionHostId, type ExecutionHostId } from '../../../../../../shared/execution-host'
 import { getIndexedWorktreesById } from '../../../worktree-repo-index'
+import { captureWorktreeGitHubLinkBase } from '../../../../../../shared/worktree/github-link-base'
 
 function getKnownOwnerHostIds(
   state: ReturnType<WorktreeSliceGet>,
@@ -54,6 +55,7 @@ export function createUpdateWorktreesMeta(
       }
     }
 
+    const beforeMutation = get()
     set((s) => {
       let nextWorktrees = s.worktreesByRepo
       let nextDetectedWorktrees = s.detectedWorktreesByRepo
@@ -90,7 +92,7 @@ export function createUpdateWorktreesMeta(
       ),
       ...gitWorktreeUpdates.map(async ({ worktreeId, updates, executionHostId }) => {
         try {
-          const state = get()
+          const state = beforeMutation
           const ownerHostIds = executionHostId
             ? [executionHostId]
             : getKnownOwnerHostIds(state, worktreeId)
@@ -110,7 +112,8 @@ export function createUpdateWorktreesMeta(
                     worktreeId,
                     updates,
                     hostId,
-                    worktree?.identity?.key
+                    worktree?.identity?.key,
+                    captureWorktreeGitHubLinkBase(worktree)
                   )
                 })
               ))

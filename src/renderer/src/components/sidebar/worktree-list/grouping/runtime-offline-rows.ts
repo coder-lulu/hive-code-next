@@ -2,36 +2,45 @@ import {
   getRepoExecutionHostId,
   getWorktreeExecutionHostId
 } from '../../../../../../shared/execution-host'
-import { Folder } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import {
   getProjectSetupRuntimeOwnerEnvironmentId,
   isOfflineRuntimeOwner
 } from '@/lib/runtime-offline-directory'
-import { buildRows } from './build-rows'
+import {
+  planSidebarRows,
+  type SidebarRowPlanInputs
+} from '../../../../../../shared/sidebar-list/sidebar-row-plan'
 import { getProjectGroupIdentity, getRenderableFolderWorkspaces } from './folder-workspace-lanes'
 import {
   getFolderWorkspaceExecutionHostIdForRows,
   getProjectGroupExecutionHostIdForRows
-} from '../listing/host-filtering'
-import type { Row } from './row-types'
-import type { HostSectionRow } from '../../host-section-rows'
+} from '../../../../../../shared/sidebar-list/host-filtering'
+import type { Row } from '../../../../../../shared/sidebar-list/row-types'
+import type { HostSectionRow } from '../../../../../../shared/sidebar-list/host-section-rows'
 import { OFFLINE_RUNTIME_GROUP_KEY } from './group-keys'
 
 /** Split source membership first so collapsed groups, pinned lanes and counts remain correct. */
 export function buildRuntimeOfflineRows(
-  args: Parameters<typeof buildRows>,
-  offlineEnvironmentIds: ReadonlySet<string>
+  args: SidebarRowPlanInputs,
+  offlineEnvironmentIds: ReadonlySet<string>,
+  collapsedGroups = new Set<string>()
 ): { onlineRows: Row[]; offlineRows: Row[]; offlineCount: number } {
   if (offlineEnvironmentIds.size === 0) {
-    return { onlineRows: buildRows(...args), offlineRows: [], offlineCount: 0 }
+    return {
+      onlineRows: planSidebarRows(args).render(collapsedGroups),
+      offlineRows: [],
+      offlineCount: 0
+    }
   }
-  const worktrees = args[1]
-  const repoMap = args[2]
-  const projectGroups = args[12] ?? []
-  const folders = getRenderableFolderWorkspaces(args[18] ?? [], projectGroups)
-  const defaultHostId = args[20] ?? 'local'
-  const setupByRepoId = new Map(args[17]?.projectHostSetups.map((setup) => [setup.repoId, setup]))
+  const worktrees = args.worktrees
+  const repoMap = args.repoMap
+  const projectGroups = args.projectGroups ?? []
+  const folders = getRenderableFolderWorkspaces(args.folderWorkspaces ?? [], projectGroups)
+  const defaultHostId = args.defaultHostId ?? 'local'
+  const setupByRepoId = new Map(
+    args.projectGrouping?.projectHostSetups.map((setup) => [setup.repoId, setup])
+  )
   const repoRuntimeOwner = (repoId: string) =>
     getProjectSetupRuntimeOwnerEnvironmentId(setupByRepoId.get(repoId))
   const repoIsOffline = (repoId: string) => {
@@ -43,17 +52,21 @@ export function buildRuntimeOfflineRows(
     )
   }
   const partition = (offline: boolean) => {
-    const scoped: Parameters<typeof buildRows> = [...args]
-    scoped[1] = worktrees.filter(
+    const scoped: SidebarRowPlanInputs = { ...args }
+    scoped.worktrees = worktrees.filter(
       (worktree) =>
         isOfflineRuntimeOwner(
-          getWorktreeExecutionHostId(worktree, repoMap.get(worktree.repoId), defaultHostId),
+          getWorktreeExecutionHostId(
+            worktree,
+            args.repoOfWorktree?.(worktree) ?? repoMap.get(worktree.repoId),
+            defaultHostId
+          ),
           offlineEnvironmentIds,
           worktree.runtimeOwnerEnvironmentId ?? repoRuntimeOwner(worktree.repoId)
         ) === offline
     )
-    const worktreeRepoIds = new Set(scoped[1].map((worktree) => worktree.repoId))
-    scoped[2] = new Map(
+    const worktreeRepoIds = new Set(scoped.worktrees.map((worktree) => worktree.repoId))
+    scoped.repoMap = new Map(
       [...repoMap].filter(([id]) => repoIsOffline(id) === offline || worktreeRepoIds.has(id))
     )
     const scopedFolders = folders.filter(
@@ -74,7 +87,7 @@ export function buildRuntimeOfflineRows(
         )
         .map((group) => getProjectGroupIdentity(group)),
       ...scopedFolders.map((pair) => getProjectGroupIdentity(pair.projectGroup)),
-      ...[...scoped[2].values()].flatMap((repo) =>
+      ...[...scoped.repoMap.values()].flatMap((repo) =>
         repo.projectGroupId ? [getProjectGroupIdentity(repo, repo.projectGroupId)] : []
       )
     ])
@@ -93,30 +106,55 @@ export function buildRuntimeOfflineRows(
         }
       }
     }
-    scoped[12] = projectGroups.filter((group) => includedGroups.has(getProjectGroupIdentity(group)))
-    scoped[13] = new Set([...(args[13] ?? [])].filter((id) => repoIsOffline(id) === offline))
-    scoped[14] = new Map([...(args[14] ?? [])].filter(([id]) => repoIsOffline(id) === offline))
-    scoped[15] = new Map([...(args[15] ?? [])].filter(([id]) => repoIsOffline(id) === offline))
-    scoped[16] = args[16]?.filter((creation) => repoIsOffline(creation.repoId) === offline)
-    scoped[18] = scopedFolders.map((pair) => pair.folderWorkspace)
+    scoped.projectGroups = projectGroups.filter((group) =>
+      includedGroups.has(getProjectGroupIdentity(group))
+    )
+    scoped.placeholderRepoIds = new Set(
+      [...(args.placeholderRepoIds ?? [])].filter((id) => repoIsOffline(id) === offline)
+    )
+    scoped.importedWorktreesByRepo = new Map(
+      [...(args.importedWorktreesByRepo ?? [])].filter(([id]) => repoIsOffline(id) === offline)
+    )
+    scoped.newExternalWorktreesInboxByRepo = new Map(
+      [...(args.newExternalWorktreesInboxByRepo ?? [])].filter(
+        ([id]) => repoIsOffline(id) === offline
+      )
+    )
+    scoped.pendingCreations = args.pendingCreations?.filter(
+      (creation) => repoIsOffline(creation.repoId) === offline
+    )
+    scoped.folderWorkspaces = scopedFolders.map((pair) => pair.folderWorkspace)
     return scoped
   }
   const onlineArgs = partition(false)
   const offlineArgs = partition(true)
-  const offlineRows = buildRows(...offlineArgs).map((row): Row =>
-    row.type === 'header' ? { ...row, renderKey: `${OFFLINE_RUNTIME_GROUP_KEY}:${row.key}` } : row
-  )
-  const occupiedRepoIds = new Set(offlineArgs[1].map((worktree) => worktree.repoId))
+  const offlineRows = planSidebarRows(offlineArgs)
+    .render(collapsedGroups)
+    .map((row): Row =>
+      row.type === 'header'
+        ? {
+            ...row,
+            key: `${OFFLINE_RUNTIME_GROUP_KEY}:${row.key}`,
+            collapseKey: row.collapseKey ?? row.key
+          }
+        : row
+    )
+  const occupiedRepoIds = new Set(offlineArgs.worktrees.map((worktree) => worktree.repoId))
   const offlineCount =
     offlineRows.length === 0
       ? 0
       : Math.max(
           1,
-          offlineArgs[1].length +
-            (offlineArgs[18]?.length ?? 0) +
-            [...(offlineArgs[13] ?? [])].filter((id) => !occupiedRepoIds.has(id)).length
+          offlineArgs.worktrees.length +
+            (offlineArgs.folderWorkspaces?.length ?? 0) +
+            [...(offlineArgs.placeholderRepoIds ?? [])].filter((id) => !occupiedRepoIds.has(id))
+              .length
         )
-  return { onlineRows: buildRows(...onlineArgs), offlineRows, offlineCount }
+  return {
+    onlineRows: planSidebarRows(onlineArgs).render(collapsedGroups),
+    offlineRows,
+    offlineCount
+  }
 }
 
 export function appendRuntimeOfflineDirectory(
@@ -133,8 +171,7 @@ export function appendRuntimeOfflineDirectory(
     key: OFFLINE_RUNTIME_GROUP_KEY,
     label: translate('components.sessions.offline', 'Offline'),
     count: offlineCount,
-    tone: 'text-muted-foreground',
-    icon: Folder
+    icon: { kind: 'project' }
   }
   const children = collapsedGroups.has(OFFLINE_RUNTIME_GROUP_KEY)
     ? []

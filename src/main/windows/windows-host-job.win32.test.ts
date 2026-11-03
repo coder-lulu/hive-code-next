@@ -5,18 +5,7 @@ import { spawn } from 'node:child_process'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { removeTreeSync } from '../../shared/windows-transient-lock-removal'
 
-/**
- * The second half of the two-job design.
- *
- * A per-PTY job cannot carry KILL_ON_JOB_CLOSE — its handle is released when
- * the shell exits, which would reap whatever the user had backgrounded. So the
- * host process takes a second job that IS kill-on-close, and children inherit
- * membership. This asserts the property that buys: a host that dies without
- * unwinding strands nothing.
- *
- * It needs a real second process, because the assertion is about what happens
- * when that process is killed. Runs only on win32; skipped elsewhere.
- */
+/** Per-PTY jobs preserve background children on clean shell exit; a separate kill-on-close host job must reap them on host death. Real Windows processes prove inherited ownership. */
 const describeOnWindows = process.platform === 'win32' ? describe : describe.skip
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
@@ -57,8 +46,7 @@ describeOnWindows('host job reaps the tree when the host dies', () => {
   it('kills a pty and its detached grandchild when the host is force-killed', async () => {
     const nodePtyDir = join(process.cwd(), 'node_modules', 'node-pty')
     const hostScript = join(dir, 'host.js')
-    // The host assigns itself, then opens a pty whose shell spawns a DETACHED
-    // grandchild — the process a parent-pid walk cannot see.
+    // A detached grandchild escapes parent-PID walks but must inherit the host job.
     writeFileSync(
       hostScript,
       [
@@ -76,62 +64,34 @@ describeOnWindows('host job reaps the tree when the host dies', () => {
 
     const host = spawn(process.execPath, [hostScript], { stdio: ['ignore', 'pipe', 'pipe'] })
     let output = ''
-    let stderr = ''
     host.stdout.on('data', (chunk) => {
       output += String(chunk)
-    })
-    host.stderr.on('data', (chunk) => {
-      stderr += String(chunk)
     })
     host.stdout.on('error', () => {})
     host.stderr?.on('error', () => {})
 
-    let shellPid = Number.NaN
-    let grandchildPid = Number.NaN
+    for (let attempt = 0; attempt < 60 && !/SHELL=/.test(output); attempt += 1) {
+      await sleep(250)
+    }
+
+    expect(output).toContain('ASSIGNED=true')
+    const shellPid = Number(/SHELL=(\d+)/.exec(output)?.[1])
+    const grandchildPid = Number(/GRANDCHILD=(\d+)/.exec(output)?.[1])
+    expect(Number.isInteger(shellPid)).toBe(true)
+    expect(Number.isInteger(grandchildPid)).toBe(true)
+    expect(isAlive(grandchildPid)).toBe(true)
+
+    // Kill only the host to reproduce daemon death without cleanup.
+    process.kill(host.pid!, 'SIGKILL')
     try {
-      for (
-        let attempt = 0;
-        attempt < 60 && host.exitCode === null && !/SHELL=/.test(output);
-        attempt += 1
-      ) {
-        await sleep(250)
-      }
-
-      expect(
-        output,
-        JSON.stringify({ hostPid: host.pid, exitCode: host.exitCode, stderr })
-      ).toContain('ASSIGNED=true')
-      shellPid = Number(/SHELL=(\d+)/.exec(output)?.[1])
-      grandchildPid = Number(/GRANDCHILD=(\d+)/.exec(output)?.[1])
-      expect(Number.isInteger(shellPid)).toBe(true)
-      expect(Number.isInteger(grandchildPid)).toBe(true)
-      expect(isAlive(grandchildPid)).toBe(true)
-
-      // Force-kill only the host: no tree kill, nothing given a chance to unwind.
-      // This is the daemon-crash shape.
-      process.kill(host.pid!, 'SIGKILL')
       const [shellExited, grandchildExited] = await Promise.all([
         waitForProcessExit(shellPid, 15_000),
         waitForProcessExit(grandchildPid, 15_000)
       ])
-      process.stdout.write(
-        `${JSON.stringify({
-          phase: 'host-exit-proof',
-          hostPid: host.pid,
-          shellPid,
-          grandchildPid,
-          shellExited,
-          grandchildExited
-        })}\n`
-      )
       expect(shellExited).toBe(true)
       expect(grandchildExited).toBe(true)
     } finally {
-      host.kill('SIGKILL')
       for (const pid of [shellPid, grandchildPid]) {
-        if (!Number.isInteger(pid)) {
-          continue
-        }
         try {
           process.kill(pid)
         } catch {

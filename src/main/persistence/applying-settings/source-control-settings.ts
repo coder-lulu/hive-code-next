@@ -5,7 +5,7 @@ import {
   SOURCE_CONTROL_TEXT_ACTION_IDS
 } from '../../../shared/source-control-ai-actions'
 
-export function retireLegacyInstructionsForClearedTextActionRecipes(
+export function clearInstructionsForResetTextActionRecipes(
   sourceControlAi: GlobalSettings['sourceControlAi'],
   previousSettings: GlobalSettings
 ): GlobalSettings['sourceControlAi'] {
@@ -13,10 +13,7 @@ export function retireLegacyInstructionsForClearedTextActionRecipes(
     return sourceControlAi
   }
 
-  const previousSourceControlAi = normalizeSourceControlAiSettings(
-    previousSettings.sourceControlAi,
-    previousSettings.commitMessageAi
-  )
+  const previousSourceControlAi = normalizeSourceControlAiSettings(previousSettings.sourceControlAi)
   let instructionsByOperation = sourceControlAi.instructionsByOperation
   let changed = false
   for (const actionId of SOURCE_CONTROL_TEXT_ACTION_IDS) {
@@ -37,7 +34,7 @@ export function retireLegacyInstructionsForClearedTextActionRecipes(
     if (instructionsByOperation?.[actionId] === '') {
       continue
     }
-    // Why: {basePrompt} is the explicit clear state; an empty instruction shadows rollback commitMessageAi.customPrompt on normalize/project.
+    // An explicit template reset also clears its previous operation instruction.
     instructionsByOperation = { ...instructionsByOperation, [actionId]: '' }
     changed = true
   }

@@ -56,6 +56,8 @@ function api(next: OrcadDeltaMovePreview, result: OrcadDeltaMoveResult): Managed
     update: unused,
     rollback: unused,
     recover: unused,
+    restart: unused,
+    reclaimStaleLock: unused,
     stop: unused,
     cancelStop: unused,
     forget: unused,
@@ -65,7 +67,8 @@ function api(next: OrcadDeltaMovePreview, result: OrcadDeltaMoveResult): Managed
     listPendingMigrations: unused,
     previewDeltaMove: vi.fn(async () => next),
     moveDelta: vi.fn(async () => result),
-    keepServerVersion: unused
+    keepServerVersion: unused,
+    allowMoveLeavingBehind: unused
   }
 }
 

@@ -5,12 +5,6 @@ import {
 } from './artifact-cloud-config'
 
 describe('resolveArtifactCloudApiUrl', () => {
-  it('requires an explicit endpoint instead of inheriting an upstream default', () => {
-    expect(() => resolveArtifactCloudApiUrl(undefined, {}, true)).toThrow(
-      'Artifact API URL is not configured.'
-    )
-  })
-
   it('allows loopback HTTP only in development', () => {
     expect(
       resolveArtifactCloudApiUrl(

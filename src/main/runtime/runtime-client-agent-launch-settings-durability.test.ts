@@ -1,3 +1,4 @@
+import { AgentLaunchSettingsMutation } from '../../shared/rpc-contract/agent-launch-settings-params'
 import { describe, expect, it, vi } from 'vitest'
 import {
   deferred,
@@ -257,5 +258,36 @@ describe('durable execution-host launch settings', () => {
     expect(store.getSettings().agentDefaultArgs?.claude).toBe('--newer-write')
     await store.flushPendingOrThrowAsync()
     expect(readState().settings.agentDefaultArgs.claude).toBe('--newer-write')
+  })
+})
+
+
+describe('durable current permission authority', () => {
+  it.each(['own', 'ask', 'full-access'] as const)('parses, persists and projects %s without rewriting configuration', async mode => {
+    const {store,readState} = await fixture()
+    const args = {claude:'--dangerously-skip-permissions --literal'}
+    const env = {goose:{GOOSE_MODE:'auto',KEEP:'literal'}}
+    store.updateSettings({agentPermissionDefault:'ask',agentPermissionOverrides:{claude:'own',codex:'ask'},agentDefaultArgs:args,agentDefaultEnv:env})
+    await store.flushPendingOrThrowAsync()
+    const controller = new RuntimeClientSettingsController(store)
+    expect(controller.getAgentLaunch().agentPermissionOverrides).toEqual({claude:'own',codex:'ask'})
+    const result = await controller.mutateAgentLaunch(AgentLaunchSettingsMutation.parse({type:'permissions',mode}))
+    expect(result).toMatchObject({agentPermissionDefault:mode,agentPermissionOverrides:{claude:'own',codex:'ask'}})
+    expect(readState().settings).toMatchObject({agentPermissionDefault:mode,agentPermissionOverrides:{claude:'own',codex:'ask'},agentDefaultArgs:args,agentDefaultEnv:env})
+    expect(controller.getAgentLaunch()).toEqual(result)
+  })
+  it('rolls back current permission choice after failed durable write', async () => {
+    const {store,authority,readState} = await fixture()
+    store.updateSettings({agentPermissionDefault:'ask',agentPermissionOverrides:{codex:'own'}})
+    await store.flushPendingOrThrowAsync()
+    const controller = new RuntimeClientSettingsController(store)
+    authority.failNextWrite()
+    try {
+      await expect(controller.mutateAgentLaunch(AgentLaunchSettingsMutation.parse({type:'permissions',mode:'auto'}))).rejects.toThrow('profile_state_write_failed')
+    } finally {
+      await store.flushPendingOrThrowAsync().catch(() => {})
+    }
+    expect(controller.getAgentLaunch()).toMatchObject({agentPermissionDefault:'ask',agentPermissionOverrides:{codex:'own'}})
+    expect(readState().settings.agentPermissionDefault).toBe('ask')
   })
 })

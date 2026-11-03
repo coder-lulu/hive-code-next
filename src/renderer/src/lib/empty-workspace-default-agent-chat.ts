@@ -1,5 +1,5 @@
-import { isNativeChatEnabled } from '../../../shared/structured-native-chat-launch-route'
-import { pickTuiAgent } from '../../../shared/tui-agent-selection'
+import { isNativeChatDefaultFor } from '../../../shared/structured-native-chat-launch-route'
+import { pickTuiAgent, TUI_AGENT_AUTO_PICK_ORDER } from '../../../shared/tui-agent-selection'
 import { withTimeout } from '../../../shared/promise-timeout-fallback'
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store/types'
@@ -29,11 +29,29 @@ function defaultChatDetectionTarget(
   worktreeId: string
 ): AgentDetectionTarget | undefined {
   // Why: a 'blank' default means the user wants workspaces to open without an agent.
-  if (!isNativeChatEnabled(state.settings) || state.settings?.defaultTuiAgent === 'blank') {
+  const settings = state.settings
+  if (!settings || settings.defaultTuiAgent === 'blank') {
     return undefined
   }
   // Why: an unresolved owner is an unknown host, not the local machine.
-  return parseAgentDetectionTargetKey(getAgentDetectionTargetKeyForWorktree(state, worktreeId))
+  const target = parseAgentDetectionTargetKey(
+    getAgentDetectionTargetKeyForWorktree(state, worktreeId)
+  )
+  if (!target) return undefined
+  const detected = readDetectedAgentsForTarget(state, target)
+  const agent =
+    detected === null
+      ? settings.defaultTuiAgent
+      : pickTuiAgent(settings.defaultTuiAgent, detected, settings.disabledTuiAgents)
+  const couldDefaultToChat = agent
+    ? isNativeChatDefaultFor(settings, agent)
+    : detected === null &&
+      TUI_AGENT_AUTO_PICK_ORDER.some(
+        (candidate) =>
+          !settings.disabledTuiAgents?.includes(candidate) &&
+          isNativeChatDefaultFor(settings, candidate)
+      )
+  return couldDefaultToChat ? target : undefined
 }
 
 /** True when the default chat could open here but the workspace host's agent list has not loaded. */
@@ -76,7 +94,7 @@ export function openDefaultAgentChatInEmptyWorkspace(
     readDetectedAgentsForTarget(state, target) ?? [],
     state.settings?.disabledTuiAgents
   )
-  if (!agent) {
+  if (!agent || !state.settings || !isNativeChatDefaultFor(state.settings, agent)) {
     return null
   }
   // No user gesture: opening this empty workspace is the one action this chat serves.

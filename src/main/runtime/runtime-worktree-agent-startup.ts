@@ -19,11 +19,19 @@ import {
 import { detectAgentsOnHost } from '../preflight/workspace-agent-detection'
 import type { RuntimeStore } from './runtime-store-contract'
 import type { RuntimeManagedWorktreeCreateArgs } from './runtime-managed-worktree-create-types'
+import type { SessionOptionValue } from '../../shared/native-chat/input/native-chat-session-options'
 
 export type WorktreeStartupDraftPaste = { agent: TuiAgent; content: string }
-export type WorktreeStartupFollowup = { expectedProcess: string; prompt: string }
+export type WorktreeStartupFollowup = { agent: TuiAgent; prompt: string }
+export type WorktreeStartupInputs = {
+  agentArgs?: string | null
+  extraAgentArgs?: string
+  suppressStartupUpdatePrompt?: boolean
+  launchSource?: string
+  onPromptCarry?: (carried: boolean) => void
+}
 
-/** A fresh agent the host builds always carries its `agent_started` record; dropping it fails to compile. */
+/** Require agent_started attribution on every host-built fresh launch. */
 type AttributedWorktreeStartupLaunch = WorktreeStartupLaunch & {
   telemetry: NonNullable<WorktreeStartupLaunch['telemetry']>
 }
@@ -31,25 +39,25 @@ type AttributedWorktreeStartupLaunch = WorktreeStartupLaunch & {
 type StartupEnvironment = {
   repo: Repo
   settings: ReturnType<RuntimeStore['getSettings']>
-  /** Where the agent runs: what its command is quoted for, and the fact the create spawns with, or
-   *  the repair error its startup fails with. */
+  /** Resolve the execution host's quoting/spawn fact, or the repair error that refuses startup. */
   getLaunchRuntime: (agent: TuiAgent) => ReturnType<typeof resolveStartupAgentLaunchRuntime>
   /** Replaces the configured arguments for this launch; `null` means none. */
   agentArgs?: string | null
   /** An automation's saved extras, merged over the launch's arguments. */
   extraAgentArgs?: string
+  /** Orca, not a user, types into this agent once it starts. */
+  suppressStartupUpdatePrompt?: boolean
   /** Caller-supplied telemetry attribution, validated leniently at the host boundary. */
   launchSource?: string
 }
 
-/** The agent a linked draft starts: the requested one, else the default, else one detected on the
- *  host that runs it. `null` means the draft starts no agent. */
+/** Choose requested, default or execution-host-detected agent; null means no agent. */
 export async function resolveWorktreeStartupDraftAgent(
   environment: Pick<StartupEnvironment, 'repo' | 'settings'> & { requestedAgent?: TuiAgent }
 ): Promise<TuiAgent | null> {
   const { repo, settings } = environment
   const preferredAgent = environment.requestedAgent ?? settings.defaultTuiAgent
-  // Why: `blank` is an explicit shell-only preference, so linked drafts must not auto-pick an agent.
+  // Blank explicitly requests a shell; linked drafts must not auto-pick an agent.
   if (preferredAgent === 'blank') {
     return null
   }
@@ -57,13 +65,14 @@ export async function resolveWorktreeStartupDraftAgent(
     return preferredAgent
   }
   let detected: string[] = []
-  // Why: detection has to run on the machine that will run the agent, and SSH ownership has two
-  // spellings — the raw field probes this client for an `executionHostId: 'ssh:*'`-only repo.
+  // Detect on the execution host; raw connectionId misses executionHostId-only SSH repos.
   const sshConnectionId = getRepoSshConnectionId(repo)
   try {
-    // Why: startup-draft fallback can run from sparse runtime launch envs too.
+    // Sparse launch environments may lack host detection dependencies.
+    // Disabled agents cannot be picked here, so background detection never probes them (#34635).
     detected = await detectAgentsOnHost(
-      sshConnectionId ? { kind: 'ssh', connectionId: sshConnectionId } : { kind: 'local' }
+      sshConnectionId ? { kind: 'ssh', connectionId: sshConnectionId } : { kind: 'local' },
+      { disabledTuiAgents: settings.disabledTuiAgents }
     )
   } catch {
     detected = []
@@ -72,7 +81,11 @@ export async function resolveWorktreeStartupDraftAgent(
 }
 
 export async function buildWorktreeStartupForDraft(
-  environment: StartupEnvironment & { draft: string; requestedAgent?: TuiAgent }
+  environment: StartupEnvironment & {
+    draft: string
+    requestedAgent?: TuiAgent
+    sessionOptions?: Record<string, SessionOptionValue>
+  }
 ): Promise<{
   agent: TuiAgent
   startup: AttributedWorktreeStartupLaunch
@@ -96,7 +109,10 @@ export async function buildWorktreeStartupForDraft(
     platform,
     shell,
     isRemote: repoIsRemote(repo),
-    ...(environment.agentArgs !== undefined ? { agentArgs: environment.agentArgs } : {})
+    ...(environment.agentArgs !== undefined ? { agentArgs: environment.agentArgs } : {}),
+    ...(environment.extraAgentArgs ? { extraAgentArgs: environment.extraAgentArgs } : {}),
+    ...(environment.suppressStartupUpdatePrompt ? { suppressStartupUpdatePrompt: true } : {}),
+    sessionOptions: environment.sessionOptions
   })
   const telemetry = agentStartedTelemetry(agent, environment.launchSource)
   const draftPlan = buildAgentDraftLaunchPlan({ ...launchArgs, draft: content })
@@ -121,6 +137,9 @@ export async function buildWorktreeStartupForDraft(
     allowEmptyPromptLaunch: true
   })
   if (!startupPlan) {
+    if (environment.sessionOptions && Object.keys(environment.sessionOptions).length > 0) {
+      throw new Error(`Could not build launch command for ${agent}.`)
+    }
     return null
   }
   return {
@@ -147,8 +166,7 @@ export function buildWorktreeStartupForAgent(
     toSessionOptions: (
       preferences?: AgentLaunchPreferences
     ) => Parameters<typeof buildAgentStartupPlan>[0]['sessionOptions'] | undefined
-    /** Set by a caller that delivers an uncarried prompt itself: the prompt then rides only a typed
-     *  line that can carry it, and this reports whether it did. Absent keeps the CLI's fold. */
+    /** Caller delivers any uncarried prompt; report typed-line carry. Absent preserves CLI behavior. */
     onPromptCarry?: (carried: boolean) => void
   }
 ): {
@@ -170,6 +188,7 @@ export function buildWorktreeStartupForAgent(
     isRemote: repoIsRemote(repo),
     ...(environment.agentArgs !== undefined ? { agentArgs: environment.agentArgs } : {}),
     ...(environment.extraAgentArgs ? { extraAgentArgs: environment.extraAgentArgs } : {}),
+    ...(environment.suppressStartupUpdatePrompt ? { suppressStartupUpdatePrompt: true } : {}),
     sessionOptions: environment.toSessionOptions(environment.launchPreferences)
   })
   const prompt = environment.prompt ?? ''
@@ -211,10 +230,7 @@ export function buildWorktreeStartupForAgent(
     launchRuntime,
     ...(startupPlan.followupPrompt
       ? {
-          followup: {
-            expectedProcess: startupPlan.expectedProcess,
-            prompt: startupPlan.followupPrompt
-          }
+          followup: { agent, prompt: startupPlan.followupPrompt }
         }
       : {})
   }
@@ -226,12 +242,7 @@ export function resolveWorktreeCreateAgentStartup(
     agent: TuiAgent,
     prompt: string | undefined,
     preferences: AgentLaunchPreferences | undefined,
-    inputs: {
-      agentArgs?: string | null
-      extraAgentArgs?: string
-      launchSource?: string
-      onPromptCarry?: (carried: boolean) => void
-    }
+    inputs: WorktreeStartupInputs
   ) => {
     agent: TuiAgent
     startup: WorktreeStartupLaunch
@@ -242,16 +253,22 @@ export function resolveWorktreeCreateAgentStartup(
   if (args.startup || !args.startupAgent) {
     return null
   }
-  const built = build(args.startupAgent, args.startupPrompt, args.startupLaunchPreferences, {
+  return build(
+    args.startupAgent,
+    args.startupPrompt,
+    args.startupLaunchPreferences,
+    worktreeStartupInputs(args)
+  )
+}
+
+export function worktreeStartupInputs(
+  args: RuntimeManagedWorktreeCreateArgs
+): WorktreeStartupInputs {
+  return {
     ...(args.startupAgentArgs !== undefined ? { agentArgs: args.startupAgentArgs } : {}),
     ...(args.startupExtraAgentArgs ? { extraAgentArgs: args.startupExtraAgentArgs } : {}),
+    ...(args.startupSuppressUpdatePrompt ? { suppressStartupUpdatePrompt: true } : {}),
     ...(args.startupLaunchSource ? { launchSource: args.startupLaunchSource } : {}),
     ...(args.onStartupPromptCarry ? { onPromptCarry: args.onStartupPromptCarry } : {})
-  })
-  return args.startupAccountEnv
-    ? {
-        ...built,
-        startup: { ...built.startup, env: { ...built.startup.env, ...args.startupAccountEnv } }
-      }
-    : built
+  }
 }

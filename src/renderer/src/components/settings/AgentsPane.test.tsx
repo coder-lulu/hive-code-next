@@ -504,22 +504,14 @@ describe('AgentsPane', () => {
     expect(matchesSettingsSearch('manual', getAgentsPaneSearchEntries())).toBe(true)
   })
 
-  it('applies the selected agent permission mode from settings without a mixed segment', () => {
+  it('offers the actual typed permission default including Own', () => {
     const onChange = vi.fn()
-    const element = AgentPermissionsSetting({ mode: 'mixed', onChange })
-    const props = element.props.children.props.action.props as {
-      value: 'yolo'
-      onChange: (value: 'yolo' | 'manual' | 'mixed') => void
-      options: { value: string }[]
-    }
-
-    expect(props.value).toBe('yolo')
-    expect(props.options.map((option) => option.value)).toEqual(['yolo', 'manual'])
-    props.onChange('mixed')
-    expect(onChange).not.toHaveBeenCalled()
-
-    props.onChange('manual')
-    expect(onChange).toHaveBeenCalledWith('manual')
+    const element = AgentPermissionsSetting({ mode: 'own', onChange })
+    const props = element.props.children.props.action.props
+    expect(props.current).toBe('own')
+    expect(props.modes).toEqual(['own', 'ask', 'accept-edits', 'auto', 'full-access'])
+    props.onSelect('ask')
+    expect(onChange).toHaveBeenCalledWith('ask')
   })
 
   it('keeps catalog agent ids, labels, and commands discoverable in settings search', () => {

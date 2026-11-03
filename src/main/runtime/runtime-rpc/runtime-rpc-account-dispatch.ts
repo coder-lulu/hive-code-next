@@ -11,7 +11,7 @@ import {
   REMOTE_RUNTIME_MAX_OUTBOUND_JSON_BYTES,
   REMOTE_RUNTIME_MAX_PROCESS_PENDING_REQUESTS,
   REMOTE_RUNTIME_MAX_PROCESS_PENDING_RPC_BYTES
-} from '../../../shared/remote-runtime-memory-limits'
+} from '../../../shared/remote-runtime/remote-runtime-memory-limits'
 
 export type RuntimeRpcAccountConnection = {
   ws: WebSocket
@@ -91,7 +91,6 @@ export class RuntimeRpcAccountDispatch extends RuntimeRpcCloudDispatch {
         this.binaryMessageRouter.dispatch(connection.connectionId, bytes)
       }
     })
-    this.runtime.activateRecentPtyPathCandidateTracking?.()
     return () => {
       if (closed) {
         return
@@ -102,11 +101,7 @@ export class RuntimeRpcAccountDispatch extends RuntimeRpcCloudDispatch {
       try {
         this.runtime.cleanupSubscriptionsForConnection(connection.connectionId)
       } finally {
-        try {
-          this.runtime.cancelMobileDictationForConnection(connection.connectionId)
-        } finally {
-          this.binaryMessageRouter.deleteConnection(connection.connectionId)
-        }
+        this.binaryMessageRouter.deleteConnection(connection.connectionId)
       }
     }
   }
@@ -208,6 +203,7 @@ export class RuntimeRpcAccountDispatch extends RuntimeRpcCloudDispatch {
     const abort = this.registerWebSocketDispatchAbort(socket.ws)
     try {
       await this.dispatcher.dispatchStreaming(request, reply, {
+        mobileRelayHosts: this.mobileRelayHostCatalog ?? undefined,
         authorizeRequest: (method) =>
           current() && !LOCAL_ONLY_RPC_METHODS.has(method) && !method.startsWith('pairing.'),
         authenticatedCallerFingerprint: fingerprintAuthenticatedPairingCredential(clientId),

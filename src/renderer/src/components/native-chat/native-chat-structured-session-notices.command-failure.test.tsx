@@ -1,7 +1,6 @@
 // @vitest-environment happy-dom
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, expect, it } from 'vitest'
-import { APP_DISPLAY_NAME } from '@/product-brand'
 import { sayAgentSessionFailureEnglish } from '../../../../shared/agent-session-failure-copy'
 import { agentSessionFailureSentence } from '../../../../shared/agent-session-failure-words'
 import { agentSessionRefusalFailure } from '../../../../shared/agent-session-write-failure'
@@ -27,7 +26,7 @@ it('names the Command setting when it is not a program Orca can run', () => {
   )
   expect(
     screen.getByText(
-      `Chat could not be started. Claude's Command in Settings → Agents must be a program path or name ${APP_DISPLAY_NAME} can find, with no arguments or variables. Change it or reset it.`
+      "Chat could not be started. Claude's Command in Settings → Agents must start with a program Orca can find. Variables, pipes and other shell syntax aren't supported; use the Environment setting for variables. Change it or reset it."
     )
   ).toBeTruthy()
   expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
@@ -42,6 +41,6 @@ it('reads naturally where no agent name is known', () => {
       sayAgentSessionFailureEnglish
     )
   ).toBe(
-    `The agent's Command in Settings → Agents must be a program path or name ${APP_DISPLAY_NAME} can find, with no arguments or variables. Change it or reset it.`
+    "The agent's Command in Settings → Agents must start with a program Orca can find. Variables, pipes and other shell syntax aren't supported; use the Environment setting for variables. Change it or reset it."
   )
 })

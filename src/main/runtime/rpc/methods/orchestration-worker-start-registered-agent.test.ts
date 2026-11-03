@@ -11,7 +11,7 @@ import {
 } from './orchestration-worker-start-mode'
 
 const STRUCTURED_PREFERENCE = {
-  experimentalNativeChat: true
+  nativeChatProviders: {}
 } as const
 
 const REGISTERED_AGENTS = STRUCTURED_AGENT_RUNTIME_REGISTRATIONS.map(
@@ -64,7 +64,7 @@ describe('a worker for a registered native-chat agent', () => {
       expect(
         decideWorkerStartMode({
           params: { agent },
-          settings: { experimentalNativeChat: false }
+          settings: { nativeChatProviders: { claude: false, codex: false, opencode: false } }
         })
       ).toMatchObject({ mode: 'terminal', preferred: 'terminal', reason: 'user_default' })
     }

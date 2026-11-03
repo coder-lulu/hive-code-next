@@ -30,9 +30,7 @@ const SidebarHeader = React.memo(function SidebarHeader({
   const updateSettings = useAppStore((s) => s.updateSettings)
   const agentsViewActive = sidebarBody === 'agents'
   const agentsSidebarIntroShown = useAppStore((s) => s.settings?.agentsSidebarIntroShown === true)
-  const migratedFromExperimental = useAppStore(
-    (s) => s.settings?.agentsSidebarMigratedFromExperimental === true
-  )
+  const migratedFromExperimental = false
   const introTitleId = useId()
   const introDescriptionId = useId()
   // Existing users who opted into the former Experimental Agents view get one explanation.

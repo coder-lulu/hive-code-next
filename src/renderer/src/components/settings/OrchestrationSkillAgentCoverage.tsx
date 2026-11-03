@@ -1,30 +1,36 @@
-import { useState } from 'react'
+import type { BundledSkillObserved, BundledSkillPlan } from '../../../../shared/bundled-skill-plan'
 import type { DiscoveredSkill, SkillDiscoverySource } from '../../../../shared/skills'
 import type { OrchestrationSkillAgentStatus } from '@/lib/orchestration-skill-coverage'
-import { AgentIcon } from '@/lib/agent-catalog'
+import { AgentIcon, getAgentLabel } from '@/lib/agent-catalog'
 import { useDetectedAgents, type AgentDetectionTarget } from '@/hooks/useDetectedAgents'
-import { getOrchestrationSkillAgentStatuses } from '@/lib/orchestration-skill-coverage'
+import {
+  getOrchestrationSkillAgentStatuses,
+  sortOrchestrationAgents
+} from '@/lib/orchestration-skill-coverage'
+import { ORCHESTRATION_SKILL_NAME } from '@/lib/agent-feature-skill-names'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
-import { Button } from '../ui/button'
-import { ChevronRight } from 'lucide-react'
+
+type AgentCoverageStatus = OrchestrationSkillAgentStatus & { needsAttention?: boolean }
+
+function skillReadFailed(observed: BundledSkillObserved | undefined): boolean {
+  return (
+    observed?.kind === 'unreadable' ||
+    (observed?.kind === 'folder' &&
+      observed.entries.includes('SKILL.md:file') &&
+      observed.skillDigest === null)
+  )
+}
 
 function getAgentCoverageSummary(props: {
   loading: boolean
-  detectionFailed: boolean
   totalCount: number
   installedCount: number
   fullCoverage: boolean
   noCoverage: boolean
 }): string {
-  const { loading, detectionFailed, totalCount, installedCount, fullCoverage, noCoverage } = props
+  const { loading, totalCount, installedCount, fullCoverage, noCoverage } = props
 
-  if (detectionFailed) {
-    return translate(
-      'auto.components.settings.AgentsPane.remoteDetectionFailed',
-      'Couldn’t detect installed agents. Check the host connection and try again.'
-    )
-  }
   if (loading) {
     return translate(
       'auto.components.settings.OrchestrationSkillAgentCoverage.checking',
@@ -38,16 +44,15 @@ function getAgentCoverageSummary(props: {
     )
   }
   if (fullCoverage) {
-    return totalCount === 1
-      ? translate(
-          'auto.components.settings.OrchestrationSkillAgentCoverage.fullCoverage_one',
-          'All 1 detected agent has the skill.'
-        )
-      : translate(
-          'auto.components.settings.OrchestrationSkillAgentCoverage.fullCoverage_other',
-          'All {{value0}} detected agents have the skill.',
-          { value0: totalCount }
-        )
+    return translate(
+      'auto.components.settings.OrchestrationSkillAgentCoverage.fullCoverage',
+      'All {{value0}} detected agents have the skill.',
+      {
+        value0: totalCount,
+        count: totalCount,
+        defaultValue_one: 'All 1 detected agent has the skill.'
+      }
+    )
   }
   if (noCoverage) {
     return translate(
@@ -62,11 +67,7 @@ function getAgentCoverageSummary(props: {
   )
 }
 
-function AgentCoverageChip({
-  status
-}: {
-  status: OrchestrationSkillAgentStatus
-}): React.JSX.Element {
+function AgentCoverageChip({ status }: { status: AgentCoverageStatus }): React.JSX.Element {
   return (
     <span
       className={cn(
@@ -84,169 +85,88 @@ function AgentCoverageChip({
           status.installed ? 'text-status-success' : 'text-muted-foreground'
         )}
       >
-        {status.installed
-          ? translate(
-              'auto.components.settings.OrchestrationSkillAgentCoverage.1e8f8d8fae',
-              'Ready'
-            )
-          : translate(
-              'auto.components.settings.OrchestrationSkillAgentCoverage.ffe13e36fb',
-              'Missing'
-            )}
+        {status.needsAttention
+          ? translate('auto.components.skills.skillPlanOpCopy.needsAttention', 'Needs attention')
+          : status.installed
+            ? translate(
+                'auto.components.settings.OrchestrationSkillAgentCoverage.1e8f8d8fae',
+                'Ready'
+              )
+            : translate(
+                'auto.components.settings.OrchestrationSkillAgentCoverage.ffe13e36fb',
+                'Missing'
+              )}
       </span>
     </span>
   )
 }
 
 export function OrchestrationSkillAgentCoverage(props: {
+  plan?: BundledSkillPlan
+  discoveryError?: string | null
+  onSkillRecheck?: () => Promise<boolean>
+  comparable?: boolean
+  detectionTarget?: AgentDetectionTarget
+  collapsible?: boolean
   skills: readonly DiscoveredSkill[]
   sources: readonly SkillDiscoverySource[]
   loading: boolean
-  discoveryError?: string | null
-  onSkillRecheck?: () => Promise<boolean>
   embedded?: boolean
   className?: string
-  collapsible?: boolean
-  comparable?: boolean
-  detectionTarget?: AgentDetectionTarget
 }): React.JSX.Element {
-  const {
-    skills,
-    sources,
-    loading: skillsLoading,
-    discoveryError,
-    onSkillRecheck,
-    embedded = false,
-    className,
-    collapsible = false,
-    comparable = true,
-    detectionTarget = { kind: 'local' }
-  } = props
-  const [detailsOpen, setDetailsOpen] = useState(false)
-  const {
-    detectedIds,
-    isLoading: agentsLoading,
-    detectionFailed,
-    isRefreshing,
-    refresh
-  } = useDetectedAgents(comparable ? detectionTarget : undefined)
-  const loading = skillsLoading || agentsLoading || (detectedIds === null && !detectionFailed)
-  const agentStatuses = getOrchestrationSkillAgentStatuses(skills, detectedIds ?? [], sources)
+  const { skills, sources, loading: skillsLoading, embedded = false, className } = props
+  const { detectedIds, isLoading: agentsLoading } = useDetectedAgents(
+    props.plan ? undefined : (props.detectionTarget ?? { kind: 'local' })
+  )
+  const loading = !props.plan && (skillsLoading || agentsLoading || detectedIds === null)
+  const ops = props.plan?.skills.find((skill) => skill.name === ORCHESTRATION_SKILL_NAME)?.ops ?? []
+  const plannedAgents = sortOrchestrationAgents([...new Set(ops.flatMap((op) => op.agents))])
+  const shared = ops.find((op) => op.role === 'shared')?.observed
+  const readableShared = shared?.kind === 'folder' && shared.skillDigest !== null
+  const agentStatuses: AgentCoverageStatus[] = props.plan
+    ? plannedAgents.map((agent) => {
+        const agentOps = ops.filter((op) => op.agents.some((provider) => provider === agent))
+        const installed = agentOps.some(
+          (op) =>
+            op.kind === 'keep' ||
+            (op.observed.kind === 'folder' && op.observed.skillDigest !== null) ||
+            (op.observed.kind === 'link' && op.reason === 'shared-not-current' && readableShared)
+        )
+        return {
+          agent,
+          label: getAgentLabel(agent),
+          installed,
+          needsAttention:
+            !installed &&
+            agentOps.some(
+              (op) =>
+                skillReadFailed(op.observed) ||
+                (op.observed.kind === 'link' &&
+                  op.reason === 'shared-not-current' &&
+                  skillReadFailed(shared))
+            )
+        }
+      })
+    : getOrchestrationSkillAgentStatuses(skills, detectedIds ?? [], sources)
   const installedCount = agentStatuses.filter((status) => status.installed).length
   const totalCount = agentStatuses.length
-  const fullCoverage =
-    !loading && !detectionFailed && totalCount > 0 && installedCount === totalCount
+  const fullCoverage = !loading && totalCount > 0 && installedCount === totalCount
   const noCoverage = !loading && totalCount > 0 && installedCount === 0
-  const showAgentChips = !loading && totalCount > 0 && !fullCoverage
+  const showAgentChips =
+    !loading &&
+    totalCount > 0 &&
+    !fullCoverage &&
+    props.comparable !== false &&
+    !props.discoveryError
   const summary = getAgentCoverageSummary({
     loading,
-    detectionFailed,
     totalCount,
     installedCount,
     fullCoverage,
     noCoverage
   })
 
-  if (!comparable) {
-    return (
-      <p className="text-xs text-muted-foreground">
-        {translate(
-          'agentCapabilities.coverageScopeUnavailable',
-          'Agent detection and skill discovery are in different runtime scopes; coverage cannot be compared here.'
-        )}
-      </p>
-    )
-  }
-
-  if (discoveryError && !skillsLoading) {
-    return (
-      <div className={cn('flex flex-wrap items-center gap-2', className)} role="alert">
-        <p className="text-xs text-destructive">
-          {translate(
-            'agentCapabilities.coverageSkillCheckFailed',
-            'Could not check skill paths; agent coverage is unavailable.'
-          )}
-        </p>
-        {onSkillRecheck ? (
-          <Button type="button" variant="ghost" size="xs" onClick={() => void onSkillRecheck()}>
-            {translate('auto.components.settings.AgentSkillSetupPanel.c689392435', 'Re-check')}
-          </Button>
-        ) : null}
-      </div>
-    )
-  }
-
-  if (collapsible) {
-    const compactSummary =
-      loading || detectionFailed || totalCount === 0
-        ? summary
-        : translate(
-            'agentCapabilities.coverageCount',
-            '{{value0}} of {{value1}} detected agents found the orchestration skill.',
-            { value0: installedCount, value1: totalCount }
-          )
-    return (
-      <div className={className}>
-        <button
-          type="button"
-          aria-expanded={detailsOpen}
-          onClick={() => setDetailsOpen((open) => !open)}
-          className="flex w-full items-center justify-between gap-4 text-left"
-        >
-          <span
-            role={detectionFailed ? 'alert' : undefined}
-            className={cn(
-              'min-w-0 text-xs',
-              detectionFailed ? 'text-destructive' : 'text-muted-foreground'
-            )}
-          >
-            {compactSummary}
-          </span>
-          <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-foreground">
-            {translate('agentCapabilities.viewCoverageDetails', 'View details')}
-            <ChevronRight
-              className={cn('size-4 transition-transform', detailsOpen && 'rotate-90')}
-            />
-          </span>
-        </button>
-        {detectionFailed ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="xs"
-            disabled={agentsLoading || isRefreshing}
-            onClick={() => void refresh()}
-          >
-            {translate('agentsSettings.retry', 'Retry')}
-          </Button>
-        ) : null}
-        {detailsOpen ? (
-          <div className="mt-3 divide-y divide-border/60 border-t border-border/60">
-            {agentStatuses.map((status) => (
-              <div
-                key={status.agent}
-                className="flex items-center justify-between gap-3 py-2 text-xs"
-              >
-                <span className="flex items-center gap-2 font-medium text-foreground">
-                  <AgentIcon agent={status.agent} size={16} />
-                  {status.label}
-                </span>
-                <span
-                  className={status.installed ? 'text-status-success' : 'text-muted-foreground'}
-                >
-                  {status.installed
-                    ? translate('agentCapabilities.skillFound', 'Skill found')
-                    : translate('agentCapabilities.skillMissing', 'Not found')}
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : null}
-      </div>
-    )
-  }
-
-  return (
+  const content = (
     <div
       className={cn(
         embedded ? 'space-y-2.5' : 'space-y-4 border-t border-border/60 pt-6',
@@ -260,25 +180,27 @@ export function OrchestrationSkillAgentCoverage(props: {
             'Agent coverage'
           )}
         </h3>
-        <p
-          role={detectionFailed ? 'alert' : undefined}
-          className={cn(
-            'text-xs leading-relaxed',
-            detectionFailed ? 'text-destructive' : 'text-muted-foreground'
-          )}
-        >
-          {summary}
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          {props.discoveryError ??
+            (props.comparable === false
+              ? translate(
+                  'auto.components.settings.OrchestrationSkillAgentCoverage.unavailable',
+                  'Agent coverage is unavailable for this runtime.'
+                )
+              : summary)}
         </p>
-        {detectionFailed ? (
-          <Button
+        {props.onSkillRecheck ? (
+          <button
             type="button"
-            variant="ghost"
-            size="xs"
-            disabled={agentsLoading || isRefreshing}
-            onClick={() => void refresh()}
+            disabled={loading}
+            className="text-xs underline"
+            onClick={() => void props.onSkillRecheck?.()}
           >
-            {translate('agentsSettings.retry', 'Retry')}
-          </Button>
+            {translate(
+              'auto.components.settings.OrchestrationSkillAgentCoverage.recheck',
+              'Re-check'
+            )}
+          </button>
         ) : null}
       </div>
 
@@ -290,5 +212,18 @@ export function OrchestrationSkillAgentCoverage(props: {
         </div>
       ) : null}
     </div>
+  )
+  return props.collapsible ? (
+    <details>
+      <summary className="cursor-pointer text-xs">
+        {translate(
+          'auto.components.settings.OrchestrationSkillAgentCoverage.6dec5ce2d2',
+          'Agent coverage'
+        )}
+      </summary>
+      {content}
+    </details>
+  ) : (
+    content
   )
 }

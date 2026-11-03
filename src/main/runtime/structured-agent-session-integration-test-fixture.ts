@@ -1,9 +1,9 @@
-import type * as ProcessIdentityProbe from './agent-session-process-identity-probe'
+import type * as ProcessIdentityProbe from './agent-session/ownership/agent-session-process-identity-probe'
+import type { openCodexAppServerConnection } from '../codex/codex-app-server-connection'
 import type {
   CodexAppServerConnection,
-  CodexAppServerConnectionHandlers,
-  openCodexAppServerConnection
-} from '../codex/codex-app-server-connection'
+  CodexAppServerConnectionHandlers
+} from '../codex/app-server/codex-app-server-connection-types'
 
 export function scriptedOwnerProbes(
   actual: typeof ProcessIdentityProbe,
@@ -48,7 +48,7 @@ type FakeConnection = Omit<CodexAppServerConnection, 'closed'> & {
 
 export function fakeCodex(threadId: string, turnId: string): CodexScript {
   const connections: FakeConnection[] = []
-  const openConnection = (async (launch, handlers = {}) => {
+  const openConnection: typeof openCodexAppServerConnection = async (launch, handlers = {}) => {
     const connection: FakeConnection = {
       launch,
       handlers,
@@ -99,7 +99,7 @@ export function fakeCodex(threadId: string, turnId: string): CodexScript {
     }
     connections.push(connection)
     return connection
-  }) as typeof openCodexAppServerConnection
+  }
   const live = (): FakeConnection => {
     const connection = connections.at(-1)
     if (!connection) {

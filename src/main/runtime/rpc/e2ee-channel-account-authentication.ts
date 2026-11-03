@@ -1,4 +1,4 @@
-import { parseRemoteRuntimeJsonText } from '../../../shared/remote-runtime-request-frames'
+import { parseRemoteRuntimeJsonText } from '../../../shared/remote-runtime/requests/remote-runtime-request-frames'
 import type { RuntimeCapability } from '../../../shared/protocol-version'
 import { parseRuntimeClientCapabilities } from './runtime-client-capabilities'
 

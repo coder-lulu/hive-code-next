@@ -4,16 +4,16 @@
     {
       "name": "computer-use",
       "sourcePath": "skills/computer-use",
-      "packageDigest": "962dcc2cbc612f9601d81cdc2a2d171d352b48647f94681d3f663527017c7dfb",
+      "packageDigest": "8a7a029709d4b91928b750c74cf9911cddf4cd77455ae1197f0ae133af532098",
       "files": [
         {
           "path": "SKILL.md",
-          "size": 2814,
+          "size": 2999,
           "executable": false,
           "classification": "text",
-          "exactSha256": "9f9a1851fa428430244929e59be8dccb897f20735f8fd4c2c3e9177cdc8df423",
-          "textNormalizedSha256": "9f9a1851fa428430244929e59be8dccb897f20735f8fd4c2c3e9177cdc8df423",
-          "identitySha256": "9f9a1851fa428430244929e59be8dccb897f20735f8fd4c2c3e9177cdc8df423"
+          "exactSha256": "386c5a2ce644e143adc8b4c5fc6c07a1f246c9e2f351e8c12995e880872049c8",
+          "textNormalizedSha256": "386c5a2ce644e143adc8b4c5fc6c07a1f246c9e2f351e8c12995e880872049c8",
+          "identitySha256": "386c5a2ce644e143adc8b4c5fc6c07a1f246c9e2f351e8c12995e880872049c8"
         }
       ]
     },
@@ -68,16 +68,16 @@
     {
       "name": "orca-cli",
       "sourcePath": "skills/orca-cli",
-      "packageDigest": "1cd8b47818e1cddba58db625938c1f5655072eb09c547e6393f4295be47dce5d",
+      "packageDigest": "5d9a9ca2986fa4a3f33ccd37e7c5f9896a896d41b678caf4da2b5774bb5cd756",
       "files": [
         {
           "path": "SKILL.md",
-          "size": 3191,
+          "size": 3105,
           "executable": false,
           "classification": "text",
-          "exactSha256": "66745b96c9117b11ebc3d774865273c0185b2ab3dd6386b448edd602e2983aa4",
-          "textNormalizedSha256": "66745b96c9117b11ebc3d774865273c0185b2ab3dd6386b448edd602e2983aa4",
-          "identitySha256": "66745b96c9117b11ebc3d774865273c0185b2ab3dd6386b448edd602e2983aa4"
+          "exactSha256": "e6f2018cc763dfcf3eb1fe4fe3d06854fb72f920a3a4bd982e2a1731f1a771cc",
+          "textNormalizedSha256": "e6f2018cc763dfcf3eb1fe4fe3d06854fb72f920a3a4bd982e2a1731f1a771cc",
+          "identitySha256": "e6f2018cc763dfcf3eb1fe4fe3d06854fb72f920a3a4bd982e2a1731f1a771cc"
         }
       ]
     },
@@ -164,16 +164,16 @@
     {
       "name": "orchestration",
       "sourcePath": "skills/orchestration",
-      "packageDigest": "7fff925681af3998ce96b2fa4c30f3099bd9c0bf74143a0c6f414fdc2da180fe",
+      "packageDigest": "8e21d235f6af91c5f3d5c3d021ae9f7b8b2819f8767dfdf7b495d7a1f41095fe",
       "files": [
         {
           "path": "SKILL.md",
-          "size": 4841,
+          "size": 4620,
           "executable": false,
           "classification": "text",
-          "exactSha256": "e38bcfacc887e19e6a6246659ef28fb0b166a16c55beb249b5b652ae97fcdd08",
-          "textNormalizedSha256": "e38bcfacc887e19e6a6246659ef28fb0b166a16c55beb249b5b652ae97fcdd08",
-          "identitySha256": "e38bcfacc887e19e6a6246659ef28fb0b166a16c55beb249b5b652ae97fcdd08"
+          "exactSha256": "6d415ea5bce35789135d9beff74fc27492c4a72ee00df786e0abc94aff05fff9",
+          "textNormalizedSha256": "6d415ea5bce35789135d9beff74fc27492c4a72ee00df786e0abc94aff05fff9",
+          "identitySha256": "6d415ea5bce35789135d9beff74fc27492c4a72ee00df786e0abc94aff05fff9"
         }
       ]
     }

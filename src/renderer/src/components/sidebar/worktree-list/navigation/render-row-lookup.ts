@@ -1,28 +1,28 @@
 import { folderWorkspaceKey } from '../../../../../../shared/workspace-scope'
 import {
-  getWorktreeExecutionHostId,
-  LOCAL_EXECUTION_HOST_ID,
-  type ExecutionHostId
-} from '../../../../../../shared/execution-host'
+  folderWorkspaceToWorktree,
+  getFolderWorkspaceHostIdentity
+} from '../../../../../../shared/folder-workspace-worktree'
+import { getWorktreeExecutionHostId } from '../../../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import type { Worktree } from '../../../../../../shared/worktree/types'
-import { getWorktreeHostIdentity } from '../../../../../../shared/worktree/host-qualified-identity'
-import { getFolderWorkspaceSidebarRowKey, type RenderRow } from '../listing/render-row'
-import type { PinnedWorktreeDisplayPolicy } from '../grouping/row-types'
+import {
+  composeWorktreeHostIdentity,
+  getWorktreeHostIdentity
+} from '../../../../../../shared/worktree/host-qualified-identity'
+import type { RenderRow } from '../listing/render-row'
+import type { PinnedWorktreeDisplayPolicy } from '../../../../../../shared/sidebar-list/row-types'
 import { isPinnedWorktreeRow, type WorktreeItemRow } from '../listing/renderable-rows'
-import { getFolderWorkspaceHostId } from '../../folder-workspace-host-id'
 
-export function getRenderRowSidebarKey(
-  row: RenderRow,
-  defaultHostId: ExecutionHostId = LOCAL_EXECUTION_HOST_ID
-): string | null {
+export function getRenderRowSidebarKey(row: RenderRow): string | null {
   if (row.type === 'header') {
-    return row.renderKey ?? row.key
+    return row.key
   }
   if (row.type === 'item') {
     return row.rowKey
   }
   if (row.type === 'folder-workspace') {
-    return getFolderWorkspaceSidebarRowKey(row, defaultHostId)
+    return getFolderWorkspaceHostIdentity(row.folderWorkspace)
   }
   if (row.type === 'pending-creation') {
     return `pending:${row.creationId}`
@@ -37,15 +37,24 @@ export function getRenderRowSidebarKey(
 }
 
 export function rowKeyMatchesRenderRow(row: RenderRow, rowKey: string): boolean {
+  if (row.type === 'header') {
+    const prefix = 'runtime-offline:'
+    if (rowKey.startsWith(prefix) && !row.key.startsWith(prefix)) {
+      return false
+    }
+    const requested = rowKey.startsWith(prefix) ? rowKey.slice(prefix.length) : rowKey
+    const actual = row.key.startsWith(prefix) ? row.key.slice(prefix.length) : row.key
+    return (
+      actual === requested || (requested.startsWith('repo:') && row.repo?.id === requested.slice(5))
+    )
+  }
   if (row.type === 'lineage-group') {
     return row.rows.some((item) => item.rowKey === rowKey)
   }
-  return (
-    getRenderRowSidebarKey(row) === rowKey ||
-    (row.type === 'header' && row.key === rowKey) ||
-    (row.type === 'header' && row.repo !== undefined && `repo:${row.repo.id}` === rowKey) ||
-    (row.type === 'folder-workspace' && folderWorkspaceKey(row.folderWorkspace.id) === rowKey)
-  )
+  if (row.type === 'folder-workspace' && rowKey === folderWorkspaceKey(row.folderWorkspace.id)) {
+    return true
+  }
+  return getRenderRowSidebarKey(row) === rowKey
 }
 
 function itemMatchesWorktree(
@@ -73,8 +82,8 @@ export function renderRowContainsWorktree(
     return (
       folderWorkspaceKey(row.folderWorkspace.id) === worktreeId &&
       (executionHostId === undefined ||
-        getFolderWorkspaceHostId(row.folderWorkspace, row.projectGroup, executionHostId) ===
-          executionHostId)
+        getFolderWorkspaceHostIdentity(row.folderWorkspace) ===
+          composeWorktreeHostIdentity(executionHostId, worktreeId))
     )
   }
   if (row.type === 'lineage-group') {
@@ -126,14 +135,12 @@ export function findPreferredRenderRowIndexForWorktreeIdentity(
   let fallbackIndex = -1
   for (let index = 0; index < renderRows.length; index++) {
     const row = renderRows[index]
-    // Why: host-qualified reveals are emitted for folder workspaces too, and a
-    // walker that only knows item rows returns -1 so the reveal never lands.
+    // Host-qualified reveals include folder rows, not just worktree item rows.
     if (row.type === 'folder-workspace') {
       if (
         folderWorkspaceKey(row.folderWorkspace.id) === worktree.id &&
         (!worktree.hostId ||
-          getFolderWorkspaceHostId(row.folderWorkspace, row.projectGroup, worktree.hostId) ===
-            worktree.hostId)
+          getWorktreeHostIdentity(folderWorkspaceToWorktree(row.folderWorkspace)) === identity)
       ) {
         return index
       }

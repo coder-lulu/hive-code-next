@@ -12,10 +12,12 @@ type MobilePairingSetupSectionProps = {
   selectedAddressIsCustom: boolean
   onSelectedAddressChange: (address: string) => void
   onCustomAddressSelect: (address: string) => void
+  beforeCustomAddressChange?: (address: string) => boolean | Promise<boolean>
   onCustomAddressRemove: (address: string) => void
   refreshingNetworkInterfaces: boolean
   onRefreshNetworkInterfaces: () => void
   loading: boolean
+  canGenerate?: boolean
   hasQrCode: boolean
   showGenerateAction?: boolean
   onGenerateQr: () => void
@@ -28,15 +30,17 @@ export function MobilePairingSetupSection({
   selectedAddressIsCustom,
   onSelectedAddressChange,
   onCustomAddressSelect,
+  beforeCustomAddressChange,
   onCustomAddressRemove,
   refreshingNetworkInterfaces,
   onRefreshNetworkInterfaces,
   loading,
+  canGenerate = selectedAddress !== undefined,
   hasQrCode,
   showGenerateAction = true,
   onGenerateQr
 }: MobilePairingSetupSectionProps): React.JSX.Element {
-  const generateDisabled = loading || !selectedAddress
+  const generateDisabled = loading || !canGenerate
 
   const addressControls = (
     <div className="space-y-2">
@@ -48,6 +52,7 @@ export function MobilePairingSetupSection({
           selectedAddressIsCustom={selectedAddressIsCustom}
           onSelectedAddressChange={onSelectedAddressChange}
           onCustomAddressSelect={onCustomAddressSelect}
+          beforeCustomAddressChange={beforeCustomAddressChange}
           onCustomAddressRemove={onCustomAddressRemove}
           className="min-w-0 max-w-full justify-between font-normal"
         />

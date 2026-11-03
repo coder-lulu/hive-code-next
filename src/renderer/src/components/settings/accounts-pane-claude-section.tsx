@@ -1,175 +1,395 @@
-import { canOfferClaudeSignInLink, withCopiedClaudeLink } from './claude-sign-in-link-menu'
+import { Loader2, Plus, RefreshCw, Trash2, X } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { selectClaudeProviderAccount } from '@/runtime/runtime-provider-accounts-client'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
-import type { AccountsPaneSectionModel } from './accounts-pane-types'
-import { formatAccountTimestamp } from './accounts-pane-runtime'
+import { ButtonGroup } from '../ui/button-group'
+import { Label } from '../ui/label'
+import { ClaudeIcon } from '../status-bar/icons'
+import { SearchableSetting } from './SearchableSetting'
+import { ClaudeRunningSessionSwitchSetting } from './claude-running-session-switch-setting'
 import {
   getProviderAccountRuntime,
   providerAccountIsActiveInView
 } from './provider-account-visibility'
+import { formatAccountTimestamp, getClaudeAccountRuntimeLabel } from './accounts-pane-runtime'
+import type { AccountsPaneSectionModel } from './accounts-pane-types'
 import {
-  AccountActionMenu,
-  AccountAvatar,
-  AccountLoadState,
-  EmptyAccounts
-} from './accounts-pane-sheet-account-controls'
+  canOfferClaudeSignInLink,
+  ClaudeSignInLinkMenu,
+  withCopiedClaudeLink
+} from './claude-sign-in-link-menu'
+import { addClaudeAccountOnHost } from '@/runtime/runtime-host-account-sign-in-client'
+import { HostAccountSignInPrompt } from './HostAccountSignInPrompt'
+import {
+  accountAdditionShownInPrompt,
+  cancelAccountAddition,
+  trackAccountAddition
+} from './account-add-cancel-target'
 
-export function ClaudeAccountsSheetList({
-  model
-}: {
-  model: AccountsPaneSectionModel
-}): React.JSX.Element {
-  if (model.claudeAccountsLoadState !== 'loaded') {
-    return <AccountLoadState state={model.claudeAccountsLoadState} />
-  }
-  if (model.visibleClaudeAccounts.length === 0) {
-    return <EmptyAccounts />
-  }
-  const systemEmail =
-    model.accountRuntime.runtime === 'host'
-      ? model.claudeAccounts.systemDefaultEmail?.trim()
-      : undefined
-  const copiedSystemLogin =
-    !model.isRemoteAccountScope &&
-    model.accountRuntime.runtime === 'host' &&
-    model.claudeAccounts.systemDefaultMayBeCopied &&
-    !model.settings.claudeCopiedSystemDefaultNoticeDismissed &&
-    systemEmail &&
-    model.visibleClaudeAccounts.some(
-      (account) => account.email.toLocaleLowerCase() === systemEmail.toLocaleLowerCase()
+export function renderClaudeAccountsSection(model: AccountsPaneSectionModel): React.JSX.Element {
+  const {
+    accountRuntime,
+    accountRuntimeSentenceLabel,
+    accountRuntimeUnavailable,
+    accountVisibilityOptions,
+    claudeAccounts,
+    claudeAction,
+    isRemoteAccountScope,
+    remoteAccountScopeNotice,
+    runClaudeAccountAction,
+    setRemoveClaudeTarget,
+    settings,
+    accountOwner,
+    systemClaudeActive,
+    updateSettings,
+    visibleClaudeAccounts,
+    wslCapabilitiesLoading
+  } = model
+  // System default belongs to the host home, never a WSL distro.
+  const systemDefaultEmail =
+    accountRuntime.runtime === 'host' ? claudeAccounts.systemDefaultEmail : undefined
+  // Warn only with copy evidence; saving one’s own login as an account is normal.
+  const systemDefaultIsSaved =
+    !!systemDefaultEmail &&
+    claudeAccounts.systemDefaultMayBeCopied === true &&
+    !settings.claudeCopiedSystemDefaultNoticeDismissed &&
+    claudeAccounts.accounts.some(
+      (account) => account.email.toLowerCase() === systemDefaultEmail.toLowerCase()
+    )
+  const addDisabled = claudeAction !== 'idle' || wslCapabilitiesLoading || accountRuntimeUnavailable
+  // Remote additions must run login on the account owner rather than this device.
+  const addClaudeAccount = (copyLink: boolean): Promise<void> =>
+    runClaudeAccountAction('adding', () =>
+      trackAccountAddition('claude', accountOwner, () =>
+        accountOwner.kind === 'environment'
+          ? addClaudeAccountOnHost(accountOwner)
+          : withCopiedClaudeLink(
+              copyLink,
+              window.api.claudeAccounts.add({
+                runtime: accountRuntime.runtime,
+                wslDistro: accountRuntime.wslDistro,
+                copyLink
+              })
+            )
+      )
     )
   return (
-    <>
-      {systemEmail ? (
+    <section key="claude-accounts" id="accounts-claude" className="space-y-4 scroll-mt-6">
+      <div className="space-y-1">
+        <h3 className="flex items-center gap-2 text-sm font-semibold">
+          <ClaudeIcon size={16} />
+          {translate('auto.components.settings.AccountsPane.26ef4b55be', 'Claude')}
+        </h3>
         <p className="text-xs text-muted-foreground">
-          {translate('accounts.claude.systemDefaultNamed', 'System default: {{value0}}', {
-            value0: systemEmail
-          })}
-        </p>
-      ) : null}
-      {copiedSystemLogin ? (
-        <div className="rounded-lg border border-border/70 p-3 text-sm">
           {translate(
-            'accounts.claude.systemDefaultIsSaved',
-            'System default is signed in as {{value0}}, which is also a saved account. An earlier HiveCode version may have copied that login there. If it is not your own login, select System default and run claude /login.',
-            { value0: systemEmail }
+            'auto.components.settings.AccountsPane.72b36ea174',
+            'Optional. Orca can use your normal Claude login; add accounts only if you want quick switching without moving chat sessions.'
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => model.updateSettings({ claudeCopiedSystemDefaultNoticeDismissed: true })}
-          >
-            {translate('accounts.claude.systemDefaultIsSavedDismiss', 'Dismiss')}
-          </Button>
-        </div>
-      ) : null}
-      <div className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border/70">
-        {model.visibleClaudeAccounts.map((account) => {
-          const runtime = getProviderAccountRuntime(account)
-          const active = providerAccountIsActiveInView(
-            account,
-            model.claudeAccounts,
-            model.accountRuntime,
-            model.accountVisibilityOptions
-          )
-          const busy = model.claudeAction !== 'idle' || model.accountRuntimeUnavailable
-          return (
-            <div key={account.id} className="flex items-center gap-3 px-4 py-3">
-              <AccountAvatar value={account.email} />
-              <div className="min-w-0 flex-1">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <p className="truncate text-sm font-semibold">
-                    {account.organizationName || account.email}
-                  </p>
-                  {active ? (
-                    <Badge variant="secondary">
-                      {translate('auto.components.settings.AccountsPane.e74831fb6b', 'Active')}
-                    </Badge>
-                  ) : null}
-                </div>
-                {account.organizationName ? (
-                  <p className="truncate text-xs text-muted-foreground">{account.email}</p>
-                ) : null}
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  {account.needsSignIn
-                    ? translate(
-                        'accounts.claude.signInRequired',
-                        'Sign in again to use this account'
-                      )
-                    : translate(
-                        'auto.components.settings.AccountsPane.lastVerified',
-                        'Last verified: {{value0}}',
-                        { value0: formatAccountTimestamp(account.lastAuthenticatedAt) }
-                      )}
-                </p>
-              </div>
-              {!active ? (
-                <Button
+        </p>
+      </div>
+
+      <SearchableSetting
+        title={translate('auto.components.settings.AccountsPane.8bbfd74556', 'Claude Accounts')}
+        description={translate(
+          'accounts.claude.profileSwitching',
+          'Switching applies to the next Claude you start in any tab.'
+        )}
+        keywords={['claude', 'account', 'rate limit', 'status bar', 'quota']}
+        className="space-y-3 py-2"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <Label>
+              {translate('auto.components.settings.AccountsPane.94d351af4a', 'Accounts')}
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              {isRemoteAccountScope
+                ? translate(
+                    'accounts.remoteScopeAccountsAddHere',
+                    'Showing accounts managed by {{value0}}. New accounts sign in there; you finish in this device’s browser.',
+                    { value0: accountRuntimeSentenceLabel }
+                  )
+                : translate(
+                    'auto.components.settings.AccountsPane.c0a52abfc5',
+                    'Showing accounts for {{value0}}. New accounts are added there.',
+                    { value0: accountRuntimeSentenceLabel }
+                  )}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <ButtonGroup>
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => void addClaudeAccount(false)}
+                disabled={addDisabled}
+                className="gap-1.5"
+              >
+                {claudeAction === 'adding' ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Plus className="size-3" />
+                )}
+                {translate('auto.components.settings.AccountsPane.b0e948a4f9', 'Add Account')}
+              </Button>
+              {!isRemoteAccountScope && canOfferClaudeSignInLink(accountRuntime.runtime) ? (
+                <ClaudeSignInLinkMenu
                   variant="outline"
-                  size="sm"
-                  disabled={busy || account.needsSignIn}
-                  onClick={() =>
-                    void model.runClaudeAccountAction(
-                      `select:${account.id}`,
-                      () =>
-                        selectClaudeProviderAccount(model.accountOwner, {
-                          accountId: account.id,
-                          ...runtime
-                        }),
-                      runtime
-                    )
-                  }
-                >
-                  {translate('auto.components.settings.AccountsPane.switchToAccount', 'Switch')}
-                </Button>
+                  disabled={addDisabled}
+                  onCopyLink={() => void addClaudeAccount(true)}
+                />
               ) : null}
-              <AccountActionMenu
-                busy={busy}
-                reauthDisabled={model.isRemoteAccountScope || busy}
-                onReauthenticate={() =>
-                  void model.runClaudeAccountAction(
-                    `reauth:${account.id}`,
-                    () => window.api.claudeAccounts.reauthenticate({ accountId: account.id }),
-                    runtime
+            </ButtonGroup>
+            {/* Follow the running addition; hide Cancel only when its server prompt already offers it. */}
+            {claudeAction === 'adding' && !accountAdditionShownInPrompt('claude', accountOwner) ? (
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() =>
+                  void cancelAccountAddition('claude', () =>
+                    window.api.claudeAccounts.cancelPendingLogin()
                   )
                 }
-                onCopySignInLink={
-                  canOfferClaudeSignInLink(runtime.runtime)
-                    ? () =>
-                        void model.runClaudeAccountAction(
-                          `reauth:${account.id}`,
-                          () =>
-                            withCopiedClaudeLink(
-                              true,
-                              window.api.claudeAccounts.reauthenticate({
-                                accountId: account.id,
-                                copyLink: true
-                              })
-                            ),
-                          runtime
-                        )
-                    : undefined
-                }
-                onRemove={() =>
-                  model.setRemoveClaudeTarget({
-                    id: account.id,
-                    ownerKey: model.accountScopeKey,
-                    runtime,
-                    label: account.email,
-                    scopeLabel:
-                      runtime.runtime === 'wsl'
-                        ? `WSL ${runtime.wslDistro || ''}`.trim()
-                        : model.remoteServerName || model.accountRuntime.label,
-                    isActive: active
-                  })
-                }
-              />
+                className="gap-1.5 text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-3" />
+                {translate('auto.components.settings.AccountsPane.dbb9626ed1', 'Cancel')}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+        {remoteAccountScopeNotice}
+        {isRemoteAccountScope ? (
+          <HostAccountSignInPrompt
+            owner={accountOwner}
+            provider="claude"
+            hostLabel={accountRuntimeSentenceLabel}
+          />
+        ) : null}
+
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() =>
+              void runClaudeAccountAction('select:system', () =>
+                selectClaudeProviderAccount(accountOwner, {
+                  accountId: null,
+                  runtime: accountRuntime.runtime,
+                  wslDistro: accountRuntime.wslDistro
+                })
+              )
+            }
+            disabled={claudeAction !== 'idle' || accountRuntimeUnavailable}
+            className={`flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2.5 text-left transition-colors ${
+              systemClaudeActive
+                ? 'border-foreground/20 bg-accent/15'
+                : 'border-border/70 hover:border-border hover:bg-accent/8'
+            } disabled:cursor-default disabled:opacity-100`}
+          >
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="truncate text-sm font-medium">
+                  {systemDefaultEmail
+                    ? translate(
+                        'accounts.claude.systemDefaultNamed',
+                        'System default: {{value0}}',
+                        {
+                          value0: systemDefaultEmail
+                        }
+                      )
+                    : translate(
+                        'auto.components.settings.AccountsPane.f2a265f8c7',
+                        'System default'
+                      )}
+                </span>
+                {systemClaudeActive ? (
+                  <Badge
+                    variant="outline"
+                    className="h-4 shrink-0 rounded px-1.5 text-[10px] font-medium leading-none text-foreground/80"
+                  >
+                    {translate('auto.components.settings.AccountsPane.e74831fb6b', 'Active')}
+                  </Badge>
+                ) : null}
+              </div>
+              <span className="truncate text-[11px] text-muted-foreground">
+                {translate(
+                  'auto.components.settings.AccountsPane.e05d0ff737',
+                  'Use your current {{value0}} Claude login.',
+                  { value0: accountRuntimeSentenceLabel }
+                )}
+              </span>
             </div>
-          )
-        })}
-      </div>
-    </>
+          </button>
+          {systemDefaultIsSaved ? (
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-xs text-muted-foreground">
+                {translate(
+                  'accounts.claude.systemDefaultIsSaved',
+                  'System default is signed in as {{value0}}, which is also a saved account. An earlier Orca version may have copied that login there. If it is not your own login, select System default and run claude /login.',
+                  { value0: systemDefaultEmail }
+                )}
+              </p>
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => updateSettings({ claudeCopiedSystemDefaultNoticeDismissed: true })}
+              >
+                {translate('accounts.claude.systemDefaultIsSavedDismiss', 'Dismiss')}
+              </Button>
+            </div>
+          ) : null}
+          {visibleClaudeAccounts.length === 0 ? (
+            <div className="rounded-md border border-dashed border-border/70 px-3 py-4 text-xs text-muted-foreground">
+              {isRemoteAccountScope
+                ? translate(
+                    'auto.components.settings.AccountsPane.remoteEmptyClaudeAccounts',
+                    'No managed Claude accounts on {{value0}}. It uses its system default Claude login; add accounts on that server.',
+                    { value0: accountRuntimeSentenceLabel }
+                  )
+                : translate(
+                    'auto.components.settings.AccountsPane.3fe7862418',
+                    "No managed Claude accounts for {{value0}}. Orca will use that environment's system default Claude login until you add one here.",
+                    { value0: accountRuntimeSentenceLabel }
+                  )}
+            </div>
+          ) : (
+            visibleClaudeAccounts.map((account) => {
+              const isActive = providerAccountIsActiveInView(
+                account,
+                claudeAccounts,
+                accountRuntime,
+                accountVisibilityOptions
+              )
+              const isReauthing = claudeAction === `reauth:${account.id}`
+              const isBusy = claudeAction !== 'idle' || accountRuntimeUnavailable
+              const accountRuntimeView = getProviderAccountRuntime(account)
+              const reauthenticate = (copyLink: boolean): Promise<void> =>
+                runClaudeAccountAction(
+                  `reauth:${account.id}`,
+                  () =>
+                    withCopiedClaudeLink(
+                      copyLink,
+                      window.api.claudeAccounts.reauthenticate({ accountId: account.id, copyLink })
+                    ),
+                  accountRuntimeView
+                )
+
+              return (
+                <div
+                  key={account.id}
+                  className={`flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2.5 text-left transition-colors ${
+                    isActive
+                      ? 'border-foreground/20 bg-accent/15'
+                      : 'border-border/70 hover:border-border hover:bg-accent/8'
+                  }`}
+                >
+                  <div className="flex w-full items-center justify-between gap-3 max-md:flex-col max-md:items-start">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void runClaudeAccountAction(
+                          `select:${account.id}`,
+                          () =>
+                            selectClaudeProviderAccount(accountOwner, {
+                              accountId: account.id,
+                              ...accountRuntimeView
+                            }),
+                          accountRuntimeView
+                        )
+                      }}
+                      disabled={isBusy || account.needsSignIn}
+                      className="flex min-w-0 flex-1 flex-col gap-0.5 text-left disabled:cursor-default"
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-sm font-medium">{account.email}</span>
+                        <Badge
+                          variant="outline"
+                          className="h-4 shrink-0 rounded px-1.5 text-[10px] font-medium leading-none text-foreground/70"
+                        >
+                          {getClaudeAccountRuntimeLabel(account, accountRuntime.label)}
+                        </Badge>
+                        {isActive ? (
+                          <Badge
+                            variant="outline"
+                            className="h-4 shrink-0 rounded px-1.5 text-[10px] font-medium leading-none text-foreground/80"
+                          >
+                            {translate(
+                              'auto.components.settings.AccountsPane.e74831fb6b',
+                              'Active'
+                            )}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <span className="truncate text-[11px] text-muted-foreground">
+                        {account.needsSignIn
+                          ? translate(
+                              'accounts.claude.signInRequired',
+                              'Sign in again to use this account'
+                            )
+                          : account.organizationName
+                            ? `${account.organizationName} · ${formatAccountTimestamp(account.lastAuthenticatedAt)}`
+                            : formatAccountTimestamp(account.lastAuthenticatedAt)}
+                      </span>
+                    </button>
+                    <div className="flex shrink-0 items-center justify-end gap-1 max-md:w-full max-md:flex-wrap">
+                      <ButtonGroup>
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            void reauthenticate(false)
+                          }}
+                          disabled={isRemoteAccountScope || isBusy}
+                          className="h-6 px-2 text-muted-foreground hover:text-foreground"
+                        >
+                          {isReauthing ? (
+                            <Loader2 className="size-3 animate-spin" />
+                          ) : (
+                            <RefreshCw className="size-3" />
+                          )}
+                          {translate('accounts.claude.signInAgain', 'Sign in again')}
+                        </Button>
+                        {canOfferClaudeSignInLink(accountRuntimeView.runtime) ? (
+                          <ClaudeSignInLinkMenu
+                            variant="ghost"
+                            disabled={isRemoteAccountScope || isBusy}
+                            onCopyLink={() => void reauthenticate(true)}
+                          />
+                        ) : null}
+                      </ButtonGroup>
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          setRemoveClaudeTarget({
+                            ownerKey: model.accountScopeKey,
+                            label: account.email || account.id,
+                            scopeLabel: model.accountRuntimeSentenceLabel,
+                            isActive,
+                            id: account.id,
+                            runtime: getProviderAccountRuntime(account)
+                          })
+                        }}
+                        disabled={isBusy}
+                        className="h-6 px-2 text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="size-3" />
+                        {translate('auto.components.settings.AccountsPane.db209ee572', 'Remove')}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+      </SearchableSetting>
+      {isRemoteAccountScope ? null : (
+        <ClaudeRunningSessionSwitchSetting settings={settings} updateSettings={updateSettings} />
+      )}
+    </section>
   )
 }

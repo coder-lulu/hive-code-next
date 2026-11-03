@@ -2,10 +2,19 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { resetRuntimeEnvironmentStatusOwners } from './runtime-environment-request-connections'
+import {
+  getRuntimeEnvironmentStatusSnapshots,
+  resetRuntimeEnvironmentStatusOwners
+} from './runtime-environments/runtime-environment-request-connections'
 import { encodePairingOffer } from '../../shared/pairing'
-import { addEnvironmentFromPairingCode } from '../../shared/runtime-environment-store'
-import { addWslHostEnvironment } from '../../shared/runtime-environment-wsl-host-store'
+import {
+  addEnvironmentFromPairingCode,
+  listEnvironments
+} from '../../shared/runtime-environment-store'
+import {
+  addWslHostEnvironment,
+  findWslHostDeployment
+} from '../../shared/runtime-environment-wsl-host-store'
 import { WSL_HOSTS_INTERNAL_GATE_ENV } from '../../shared/wsl-host-internal-gate'
 
 const mocks = vi.hoisted(() => ({
@@ -44,13 +53,14 @@ vi.mock('../wsl/wsl-host-e2e-fake-connector', async (importOriginal) => ({
   createFakeWslHostConnector: mocks.createFakeConnector
 }))
 
-vi.mock('../../shared/remote-runtime-client', () => ({
+vi.mock('../../shared/remote-runtime/remote-runtime-client', () => ({
   sendRemoteRuntimeRequest: vi.fn(async () => ({ id: 'status', ok: false, error: {} })),
   subscribeRemoteRuntimeRequest: vi.fn()
 }))
 
-vi.mock('./runtime-environment-request-connections', async () => {
-  const { withRuntimeStatusOwners } = await import('./runtime-environments-ipc-test-harness')
+vi.mock('./runtime-environments/runtime-environment-request-connections', async () => {
+  const { withRuntimeStatusOwners } =
+    await import('./runtime-environments/runtime-environments-ipc-test-harness')
   return withRuntimeStatusOwners({
     sendRemoteRuntimeConnectionRequest: mocks.connectionRequest,
     sendRemoteRuntimeSharedControlRequest: mocks.sharedControlRequest,
@@ -58,19 +68,25 @@ vi.mock('./runtime-environment-request-connections', async () => {
     getRemoteRuntimeSharedControlDiagnostics: vi.fn(() => null),
     reconnectRemoteRuntimeSharedControlConnection: vi.fn(),
     retryRemoteRuntimeSharedControlConnectionsNow: vi.fn(),
-    retryRemoteRuntimeSharedControlConnectionNow: vi.fn(),
     ensureRemoteRuntimeSharedControlConnection: mocks.ensureSharedControl,
     pauseRemoteRuntimeSharedControlRetry: vi.fn(),
     closeRemoteRuntimeRequestConnection: vi.fn()
   })
 })
 
-import { registerRuntimeEnvironmentHandlers } from './runtime-environments'
-import { pairingCode } from './runtime-environments-ipc-test-harness'
+import { registerRuntimeEnvironmentHandlers } from './runtime-environments/runtime-environments'
+import {
+  channelHandlerLookup,
+  pairingCode
+} from './runtime-environments/runtime-environments-ipc-test-harness'
 import { registerWslHostHandlers, WSL_HOST_HANDLER_CHANNELS } from './wsl-host-handlers'
+import { resolveManagedRuntimeEnvironment } from './runtime-environments/runtime-environment-managed-tunnel'
 import { getWslHostService, setWslHostService } from '../wsl/wsl-host-service-instance'
+import { getSavedRuntimeAiVaultHostInfos } from '../ai-vault/runtime-session-scanner'
 
+const handler = channelHandlerLookup(mocks.handle)
 const WSL_ID = 'wsl:ubuntu'
+const GATED = 'WSL hosts are not available in this build.'
 
 function persistWslHost(userDataPath: string): void {
   addWslHostEnvironment(userDataPath, {
@@ -98,7 +114,11 @@ function registeredWslHostChannels(): unknown[] {
     .filter((channel) => String(channel).startsWith('wslHosts:'))
 }
 
-describe('WSL hosts are available by default', () => {
+function touchedWslHost(mock: { mock: { calls: unknown[][] } }): boolean {
+  return mock.mock.calls.some((call) => call[0] === WSL_ID)
+}
+
+describe('WSL hosts with the internal gate closed', () => {
   let userDataPath: string
   const store = {
     getSettings: () => ({ activeRuntimeEnvironmentId: null, experimentalWslHosts: true }),
@@ -139,35 +159,73 @@ describe('WSL hosts are available by default', () => {
     })
   }
 
-  it.each([undefined, '', '0', '1'])(
-    'creates and reuses the WSL host service with legacy gate value %s',
-    (gateValue) => {
-      vi.stubEnv(WSL_HOSTS_INTERNAL_GATE_ENV, gateValue)
-      vi.stubEnv(
-        'ORCA_E2E_FAKE_WSL_HOSTS',
-        JSON.stringify({ distros: [], pairingCode: pairingCode() })
+  it('starts with no WSL host service, holder, process, probe or listing', async () => {
+    startApp()
+
+    expect(getWslHostService()).toBeNull()
+    expect(store.onSettingsChanged).not.toHaveBeenCalled()
+    expect(mocks.createConnector).not.toHaveBeenCalled()
+    expect(mocks.createFakeConnector).not.toHaveBeenCalled()
+    expect(getRuntimeEnvironmentStatusSnapshots().map((s) => s.environmentId)).not.toContain(WSL_ID)
+    expect(touchedWslHost(mocks.ensureSharedControl)).toBe(false)
+    expect(touchedWslHost(mocks.sharedControlRequest)).toBe(false)
+
+    const list = handler<undefined, { id: string }[]>('runtimeEnvironments:list')
+    expect((await list(null, undefined)).map((environment) => environment.id)).not.toContain(WSL_ID)
+    expect(
+      getSavedRuntimeAiVaultHostInfos(userDataPath).map((host) => host.environmentId)
+    ).not.toContain(WSL_ID)
+    expect(registeredWslHostChannels()).toEqual([])
+    expect(mocks.spawnProcess).not.toHaveBeenCalled()
+    expect(mocks.runProcess).not.toHaveBeenCalled()
+  })
+
+  it('refuses every WSL host operation and leaves the persisted host on disk', async () => {
+    startApp()
+
+    expect(registeredWslHostChannels()).toEqual([])
+    await expect(
+      handler('runtimeEnvironments:connect')(null, { selector: WSL_ID })
+    ).rejects.toThrow(GATED)
+    await expect(
+      Promise.resolve().then(() =>
+        handler('runtimeEnvironments:remove')(null, { selector: WSL_ID })
       )
-      mocks.createFakeConnector.mockReturnValue({
-        adoptHolders: vi.fn(async () => {}),
-        dispose: vi.fn(async () => {})
-      })
-      startApp()
+    ).rejects.toThrow(GATED)
+    await expect(resolveManagedRuntimeEnvironment(userDataPath, WSL_ID)).rejects.toThrow(GATED)
 
-      expect(getWslHostService()).not.toBeNull()
-      expect(mocks.createFakeConnector).toHaveBeenCalledTimes(1)
-      expect(registeredWslHostChannels().sort()).toEqual([...WSL_HOST_HANDLER_CHANNELS].sort())
-      expect(store.onSettingsChanged).toHaveBeenCalledTimes(1)
+    expect(listEnvironments(userDataPath).map((environment) => environment.id)).toContain(WSL_ID)
+    expect(findWslHostDeployment(userDataPath, WSL_ID)).not.toBeNull()
+    expect(touchedWslHost(mocks.connectionRequest)).toBe(false)
+    expect(mocks.spawnProcess).not.toHaveBeenCalled()
+    expect(mocks.runProcess).not.toHaveBeenCalled()
+  })
 
-      // Registering again (another window) reuses the service and its one settings listener.
-      mocks.handle.mockClear()
-      startApp()
-      expect(mocks.createFakeConnector).toHaveBeenCalledTimes(1)
-      expect(store.onSettingsChanged).toHaveBeenCalledTimes(1)
-      expect(registeredWslHostChannels().sort()).toEqual([...WSL_HOST_HANDLER_CHANNELS].sort())
-    }
-  )
+  it('creates the WSL host service only once the gate is open', () => {
+    vi.stubEnv(WSL_HOSTS_INTERNAL_GATE_ENV, '1')
+    vi.stubEnv(
+      'ORCA_E2E_FAKE_WSL_HOSTS',
+      JSON.stringify({ distros: [], pairingCode: pairingCode() })
+    )
+    mocks.createFakeConnector.mockReturnValue({
+      adoptHolders: vi.fn(async () => {}),
+      dispose: vi.fn(async () => {})
+    })
+    startApp()
 
-  it('registers nothing on a non-Windows host without the fake', () => {
+    expect(getWslHostService()).not.toBeNull()
+    expect(mocks.createFakeConnector).toHaveBeenCalledTimes(1)
+    expect(registeredWslHostChannels().sort()).toEqual([...WSL_HOST_HANDLER_CHANNELS].sort())
+    expect(store.onSettingsChanged).toHaveBeenCalledTimes(1)
+
+    mocks.handle.mockClear()
+    startApp()
+    expect(mocks.createFakeConnector).toHaveBeenCalledTimes(1)
+    expect(store.onSettingsChanged).toHaveBeenCalledTimes(1)
+    expect(registeredWslHostChannels().sort()).toEqual([...WSL_HOST_HANDLER_CHANNELS].sort())
+  })
+
+  it('registers nothing with the gate open on a non-Windows host without the fake', () => {
     vi.stubEnv(WSL_HOSTS_INTERNAL_GATE_ENV, '1')
     const platform = Object.getOwnPropertyDescriptor(process, 'platform')
     Object.defineProperty(process, 'platform', { value: 'linux' })

@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { pluginCommandIdSchema, pluginRelativePathSchema } from './plugin-manifest-fields'
+import { safePluginDisplayText } from './manifest/plugin-display-text'
+import { pluginCommandIdSchema, pluginRelativePathSchema } from './manifest/plugin-manifest-fields'
 import { normalizeKeybinding } from '../keybindings'
 
 export const PLUGIN_LANGUAGE_PACK_LIMIT = 16
@@ -18,7 +19,8 @@ export const pluginLocaleIdSchema = z
 export const pluginLanguagePackContributionSchema = z
   .object({
     locale: pluginLocaleIdSchema,
-    path: pluginRelativePathSchema
+    path: pluginRelativePathSchema,
+    displayName: safePluginDisplayText(z.string().trim().min(1).max(80)).optional()
   })
   .strict()
 

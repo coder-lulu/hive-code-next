@@ -121,7 +121,7 @@ describe('agent session RPC methods', () => {
       expect(replies[0]).toMatchObject({ ok: true })
       expect(runtime[testCase.runtimeMethod]).toHaveBeenCalledWith(
         { ...testCase.params, presentation: 'background' },
-        { clientId: `paired-${clientKind}`, clientKind }
+        { clientId: `paired-${clientKind}`, clientKind, terminalImageViewerSupported: false }
       )
     }
   })
@@ -249,9 +249,11 @@ describe('agent session RPC methods', () => {
       'id:worktree-1',
       undefined,
       false,
-      expect.any(Function)
+      expect.any(Function),
+      { wslUserAct: true }
     )
     expect(createTerminal).toHaveBeenCalledWith('id:worktree-1', {
+      wslUserAct: true,
       command: 'codex resume provider-session-1',
       startupCommandDelivery: undefined,
       env: undefined,
@@ -328,7 +330,11 @@ describe('agent session RPC methods', () => {
         launchPreferences: { model: 'gpt-5', effort: 'high' },
         viewMode: 'chat'
       },
-      { clientId: 'authenticated-device', clientKind: 'runtime' }
+      {
+        clientId: 'authenticated-device',
+        clientKind: 'runtime',
+        terminalImageViewerSupported: false
+      }
     )
   })
 

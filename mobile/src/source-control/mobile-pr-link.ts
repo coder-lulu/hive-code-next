@@ -1,7 +1,15 @@
+import { translate } from '../i18n/mobile-i18n'
 import type { RpcSendParams } from '../transport/rpc-params-contract'
 import { refusedRpcMessageOrFallback } from '../transport/rpc-refusal-message'
 import type { RpcOperationSender } from '../transport/rpc-operation-sender'
-import { worktreeLinkSet, worktreeSummaryRead } from './mobile-worktree-metadata-operations'
+import {
+  worktreeGitHubLinkBaseRead,
+  worktreeLinkSet,
+  worktreeReviewClear,
+  worktreeSummaryRead,
+  type MobileReviewWorktreeSummary
+} from './mobile-worktree-metadata-operations'
+import type { GitHubLinkBase } from '../../../src/shared/worktree/github-link-base'
 
 // Link / unlink review metadata via worktree.set (the same path desktop uses).
 // GitHub's existing manual link flow writes linkedPR; hosted-review creation maps
@@ -99,13 +107,142 @@ export async function linkMobileHostedReview(
 
 export function unlinkMobilePr(
   client: RpcOperationSender,
-  worktreeId: string
+  worktreeId: string,
+  prNumber: number,
+  githubLinkBase: GitHubLinkBase | null
 ): Promise<MobilePrLinkOutcome> {
+  if (!Number.isSafeInteger(prNumber) || prNumber <= 0) {
+    return Promise.resolve({
+      ok: false,
+      error: translate(
+        'auto.mobile.src.source.control.mobile.pr.link.62c326b385',
+        'Invalid pull request number.'
+      )
+    })
+  }
+  if (!githubLinkBase) {
+    return Promise.resolve({
+      ok: false,
+      error: translate(
+        'auto.mobile.src.source.control.mobile.pr.link.89597fa756',
+        'Refresh the worktree before unlinking its pull request.'
+      )
+    })
+  }
   return setWorktreeReviewLink(
     client,
-    buildWorktreeSetLinkParams(worktreeId, null),
+    {
+      ...buildWorktreeSetLinkParams(worktreeId, null),
+      suppressedGitHubPR: prNumber,
+      githubLinkBase
+    },
     'Failed to update linked pull request'
   )
+}
+
+export type WorktreeGitHubPRLink = {
+  worktreeId: string
+  githubLinkBase: GitHubLinkBase
+  summary: MobileReviewWorktreeSummary | null
+}
+
+async function readWorktreeSummary(
+  client: RpcOperationSender,
+  worktreeId: string
+): Promise<WorktreeGitHubPRLink | null> {
+  try {
+    const reply = await worktreeGitHubLinkBaseRead.request(
+      client,
+      { worktree: `id:${worktreeId}` },
+      { failWhenDisconnected: true }
+    )
+    const result = worktreeGitHubLinkBaseRead.interpret(reply)
+    const value = result.accepted ? result.value : null
+    return value?.id === worktreeId && value.githubLinkBase
+      ? { worktreeId, githubLinkBase: value.githubLinkBase, summary: value.summary }
+      : null
+  } catch {
+    return null
+  }
+}
+
+export function fetchWorktreeGitHubPRLink(
+  client: RpcOperationSender,
+  worktreeId: string
+): Promise<WorktreeGitHubPRLink | null> {
+  return readWorktreeSummary(client, worktreeId)
+}
+
+export async function fetchWorktreeGitHubLinkBase(
+  client: RpcOperationSender,
+  worktreeId: string
+): Promise<GitHubLinkBase | null> {
+  return (await readWorktreeSummary(client, worktreeId))?.githubLinkBase ?? null
+}
+
+// Re-read the exact target before clearing; the producer compares the same persisted snapshot.
+export async function clearMobileWorktreeReviewLink(
+  client: RpcOperationSender,
+  worktreeId: string,
+  expected: WorktreeGitHubPRLink,
+  isCurrent: () => boolean
+): Promise<MobilePrLinkOutcome> {
+  const stale = (): MobilePrLinkOutcome => ({
+    ok: false,
+    error: translate(
+      'auto.mobile.src.source.control.mobile.pr.link.a5f8d09c39',
+      'Pull request cleanup is no longer current.'
+    )
+  })
+  if (
+    !isCurrent() ||
+    expected.worktreeId !== worktreeId ||
+    !expected.summary ||
+    expected.githubLinkBase.linkedPR === null
+  ) {
+    return stale()
+  }
+  const current = await readWorktreeSummary(client, worktreeId)
+  if (!isCurrent() || !current?.summary) {
+    return stale()
+  }
+  const before = expected.githubLinkBase
+  const after = current.githubLinkBase
+  if (
+    before.hostId !== after.hostId ||
+    before.instanceId !== after.instanceId ||
+    before.linkedPR !== after.linkedPR ||
+    before.suppressedGitHubPR !== after.suppressedGitHubPR ||
+    current.summary.branch !== expected.summary.branch ||
+    current.summary.head !== expected.summary.head ||
+    current.summary.pushTargetBranch !== expected.summary.pushTargetBranch ||
+    current.summary.isBare ||
+    current.summary.isArchived
+  ) {
+    return stale()
+  }
+  let reply
+  try {
+    reply = await worktreeReviewClear.request(
+      client,
+      {
+        worktree: `id:${worktreeId}`,
+        linkedPR: null,
+        githubLinkBase: before
+      },
+      { failWhenDisconnected: true }
+    )
+    if (!isCurrent()) {
+      return stale()
+    }
+    worktreeReviewClear.interpret(reply)
+    return { ok: true }
+  } catch (error) {
+    return {
+      ok: false,
+      error: refusedRpcMessageOrFallback(error, 'Failed to clear stale pull request')
+    }
+  }
 }
 
 // Reads the worktree's persisted linkedPR so the sidebar can surface a linked PR even when it's

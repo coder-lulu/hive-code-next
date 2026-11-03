@@ -1,13 +1,4 @@
-import {
-  readLegacyAgentSessionRecords,
-  legacyAgentSessionRecordImport
-} from './agent-session-legacy-record-import'
-/**
- * The one way tests open, seed and read back the durable agent-session record store, so a change
- * to where or how the store persists is made here rather than in every test that uses it. Every
- * function takes the host's state directory: the store is rows in its chat journal database, opened
- * through the test database registry, so `closeTestJournalHostDatabases` closes it too.
- */
+/** Centralize store fixtures in the host chat-journal DB; closeTestJournalHostDatabases owns their cleanup. */
 
 import type { AgentSessionOperationRow } from '../../shared/agent-session-operation-ledger'
 import type { PersistedAgentSessionRecord } from '../../shared/agent-session-legacy-handoff-lease'
@@ -24,14 +15,10 @@ import {
 import type Database from '../sqlite/sync-database'
 import { AgentSessionRecordStore } from './agent-session-record-store'
 import type { RetiredAgentSessionClaimKey } from './agent-session-store-state'
-import { AGENT_SESSION_STORE_SCHEMA_VERSION } from './agent-session-store-contract'
 
 const TEST_HOST_ID = 'local'
 
-/** One committed state of the store, as tests seed it and read it back. */
 export type PersistedTestAgentSessionStore = {
-  schemaVersion?: number
-  hostId?: string
   /** Every record row as stored, including one this build cannot read. */
   records: Record<string, PersistedAgentSessionRecord>
   operations: Record<string, AgentSessionOperationRow>
@@ -46,29 +33,15 @@ function databaseFor(stateDirectory: string): Database.Database {
   return openTestJournalHostDatabase(stateDirectory).db
 }
 
-/** Opens, or reopens, the store in `stateDirectory`: what a fresh app process does at launch. */
 export async function openTestAgentSessionRecordStore(
   stateDirectory: string,
-  options: { hostId?: string } = {}
+  options: { hostId?: string; legacySessionTabIds?: readonly string[] } = {}
 ): Promise<AgentSessionRecordStore> {
   return AgentSessionRecordStore.open({
     journalDatabase: openTestJournalHostDatabase(stateDirectory),
-    hostId: options.hostId ?? TEST_HOST_ID
+    hostId: options.hostId ?? TEST_HOST_ID,
+    legacySessionTabIds: options.legacySessionTabIds ?? []
   })
-}
-
-/** Exercises the production read-only legacy import into a fresh host journal. */
-export async function importTestLegacyAgentSessionRecordStore(
-  stateDirectory: string,
-  options: { hostId?: string } = {}
-): Promise<AgentSessionRecordStore> {
-  const hostId = options.hostId ?? TEST_HOST_ID
-  const legacy = await readLegacyAgentSessionRecords(stateDirectory, hostId)
-  const journalDatabase = openTestJournalHostDatabase(
-    stateDirectory,
-    legacyAgentSessionRecordImport(legacy, hostId, () => undefined)
-  )
-  return AgentSessionRecordStore.open({ journalDatabase, hostId })
 }
 
 function writePersisted(db: Database.Database, persisted: PersistedTestAgentSessionStore): void {
@@ -119,7 +92,7 @@ function writePersisted(db: Database.Database, persisted: PersistedTestAgentSess
   }
 }
 
-/** A seed may be an in-memory fixture or a hand-written row; a row holds handles in stored form. */
+/** Accept live fixtures or raw rows, whose handles already use persisted form. */
 export function storedTestAgentSessionRecord(
   record: AgentSessionRecord | PersistedAgentSessionRecord
 ): PersistedAgentSessionRecord {
@@ -134,8 +107,6 @@ export function storedTestAgentSessionRecord(
   }
 }
 
-/** Leaves `records`, and any tab index, behind as an earlier run of the app would have, before
- *  anything opens it. */
 export async function seedTestAgentSessionRecordStore(
   stateDirectory: string,
   seed: {
@@ -154,7 +125,7 @@ export async function seedTestAgentSessionRecordStore(
   })
 }
 
-/** Leaves an empty store a newer build wrote: this build reads it but never writes it. */
+/** Seed a newer-build database that this host can read but never write. */
 export async function seedTestAgentSessionStoreFromNewerBuild(
   stateDirectory: string
 ): Promise<void> {
@@ -169,13 +140,10 @@ function parsed(json: unknown): unknown {
 }
 
 export async function readPersistedTestAgentSessionStore(
-  stateDirectory: string,
-  options: { hostId?: string } = {}
+  stateDirectory: string
 ): Promise<PersistedTestAgentSessionStore> {
   const db = databaseFor(stateDirectory)
   const persisted: PersistedTestAgentSessionStore = {
-    schemaVersion: AGENT_SESSION_STORE_SCHEMA_VERSION,
-    hostId: options.hostId ?? TEST_HOST_ID,
     records: {},
     operations: {},
     retiredClaimKeys: [],
@@ -220,22 +188,19 @@ export async function readPersistedTestAgentSessionStore(
   return persisted
 }
 
-/** Everything the store has committed, as text: to assert a value never reached disk, or that an
- *  action wrote nothing by comparing two reads. */
+/** Compare committed text to prove a value/action never changed disk state. */
 export async function readPersistedTestAgentSessionStoreText(
-  stateDirectory: string,
-  options: { hostId?: string } = {}
+  stateDirectory: string
 ): Promise<string> {
-  return JSON.stringify(await readPersistedTestAgentSessionStore(stateDirectory, options))
+  return JSON.stringify(await readPersistedTestAgentSessionStore(stateDirectory))
 }
 
-/** Changes the committed state behind the store's back, as an older build or a damaged disk would. */
+/** Simulate older-build or disk changes outside the open store. */
 export async function editPersistedTestAgentSessionStore(
   stateDirectory: string,
-  edit: (persisted: PersistedTestAgentSessionStore) => void,
-  options: { hostId?: string } = {}
+  edit: (persisted: PersistedTestAgentSessionStore) => void
 ): Promise<void> {
-  const persisted = await readPersistedTestAgentSessionStore(stateDirectory, options)
+  const persisted = await readPersistedTestAgentSessionStore(stateDirectory)
   edit(persisted)
   writePersisted(databaseFor(stateDirectory), persisted)
 }

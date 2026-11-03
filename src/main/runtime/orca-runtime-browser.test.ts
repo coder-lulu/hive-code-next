@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentBrowserBridge } from '../browser/agent-browser-bridge'
-import { REMOTE_RUNTIME_MAX_OUTBOUND_BINARY_FRAME_BYTES } from '../../shared/remote-runtime-memory-limits'
+import { REMOTE_RUNTIME_MAX_OUTBOUND_BINARY_FRAME_BYTES } from '../../shared/remote-runtime/remote-runtime-memory-limits'
 import type { RuntimeBrowserCommandHost } from './browser/browser-command-contracts'
 import { RuntimeBrowserPageRegistry } from './runtime-browser-page-registry'
 
@@ -96,10 +96,9 @@ function createHost(overrides: Partial<RuntimeBrowserCommandHost> = {}): Runtime
           ]
         }))
       } as unknown as AgentBrowserBridge)
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: a partial host fake; these tests reach only the methods it defines.
   return {
-    resolveWorktreeSelector: async () => {
-      throw new Error('Browser commands must resolve folder and Git workspaces')
-    },
+    resolveWorkspaceSelector: async (selector) => ({ id: selector.replace(/^id:/, '') }),
     resolveBrowserWorkspace: async (selector) => ({ id: selector.replace(/^id:/, '') }),
     getRuntimeBrowserPageRegistry: () => runtimeBrowserPages,
     getAuthoritativeWindow: vi.fn(),
@@ -138,30 +137,6 @@ describe('RuntimeBrowserCommands browser screencast', () => {
       }
     )
     browserSessionRegistryMock.createProfile.mockReset()
-  })
-
-  it('rejects an unresolved folder before creating, navigating, streaming or closing a page', async () => {
-    const { RuntimeBrowserCommands } = await import('./browser/browser-commands')
-    const getAuthoritativeWindow = vi.fn()
-    const commands = new RuntimeBrowserCommands(
-      createHost({
-        resolveBrowserWorkspace: async () => {
-          throw new Error('selector_not_found')
-        },
-        getAuthoritativeWindow
-      })
-    )
-    const target = { worktree: 'id:folder:missing', page: 'page-1' }
-    await expect(commands.browserTabCreate(target)).rejects.toThrow('selector_not_found')
-    await expect(commands.browserGoto({ ...target, url: 'https://example.com' })).rejects.toThrow(
-      'selector_not_found'
-    )
-    await expect(
-      commands.browserScreencast({ ...target, format: 'jpeg' }, { sendBinary: vi.fn() })
-    ).rejects.toThrow('selector_not_found')
-    await expect(commands.browserTabClose(target)).rejects.toThrow('selector_not_found')
-    expect(getAuthoritativeWindow).not.toHaveBeenCalled()
-    expect(startBrowserScreencastMock).not.toHaveBeenCalled()
   })
 
   it('creates profiles with the requested scope and label', async () => {
@@ -246,67 +221,83 @@ describe('RuntimeBrowserCommands browser screencast', () => {
     expect(bridge.tabList).toHaveBeenCalledWith(undefined)
   })
 
-  it.each(['wt-1', 'folder:folder-1'])(
-    'creates a renderer browser for workspace %s without a Git-only lookup',
-    async (workspaceId) => {
-      const { RuntimeBrowserCommands } = await import('./browser/browser-commands')
-      const webContents = { send: vi.fn() }
-      const send = vi.fn((channel: string, data: { requestId: string }) => {
-        expect(channel).toBe('browser:requestTabCreate')
-        const handler = ipcMainOnMock.mock.calls.find(
-          ([eventName]) => eventName === 'browser:tabCreateReply'
-        )?.[1] as
-          | ((
-              event: unknown,
-              reply: { requestId: string; browserPageId?: string; error?: string }
-            ) => void)
-          | undefined
-        handler?.({ sender: { send: vi.fn() } } as never, {
-          requestId: data.requestId,
-          error: 'spoofed renderer reply'
-        })
-        handler?.({ sender: webContents } as never, {
-          requestId: data.requestId,
-          browserPageId: 'page-new'
-        })
+  it('lists no tabs without waking the window when no saved tab could mount', async () => {
+    const { RuntimeBrowserCommands } = await import('./browser/browser-commands')
+    const bridge = {
+      getRegisteredTabs: vi.fn(() => new Map()),
+      tabList: vi.fn(() => ({ tabs: [] }))
+    } as unknown as AgentBrowserBridge
+    const host = createHost({
+      getAgentBrowserBridge: () => bridge,
+      serveBrowserTabs: {
+        opened: vi.fn(),
+        start: vi.fn(async () => false),
+        hasStartable: () => false
+      }
+    })
+    const commands = new RuntimeBrowserCommands(host)
+
+    await expect(commands.browserTabList({ worktree: 'id:wt-1' })).resolves.toEqual({ tabs: [] })
+
+    expect(host.getAuthoritativeWindow).not.toHaveBeenCalled()
+    expect(waitForWorktreeTabRegistrationMock).not.toHaveBeenCalled()
+  })
+
+  it('creates the first explicit-worktree browser tab without waiting for an existing registration', async () => {
+    const { RuntimeBrowserCommands } = await import('./browser/browser-commands')
+    const webContents = { send: vi.fn() }
+    const send = vi.fn((channel: string, data: { requestId: string }) => {
+      expect(channel).toBe('browser:requestTabCreate')
+      const handler = ipcMainOnMock.mock.calls.find(
+        ([eventName]) => eventName === 'browser:tabCreateReply'
+      )?.[1] as
+        | ((
+            event: unknown,
+            reply: { requestId: string; browserPageId?: string; error?: string }
+          ) => void)
+        | undefined
+      handler?.({ sender: { send: vi.fn() } } as never, {
+        requestId: data.requestId,
+        error: 'spoofed renderer reply'
       })
-      webContents.send = send
-      const bridge = {
-        getRegisteredTabs: vi.fn(() => new Map([['page-new', 101]])),
-        getActivePageId: vi.fn(() => 'page-new'),
-        setActiveTab: vi.fn(),
-        tabList: vi.fn(() => ({ tabs: [] }))
-      } as unknown as AgentBrowserBridge
-      const commands = new RuntimeBrowserCommands(
-        createHost({
-          getAgentBrowserBridge: () => bridge,
-          getAvailableAuthoritativeWindow: vi.fn(() => ({}) as never),
-          getAuthoritativeWindow: vi.fn(() => ({ webContents }) as never)
-        })
-      )
+      handler?.({ sender: webContents } as never, {
+        requestId: data.requestId,
+        browserPageId: 'page-new'
+      })
+    })
+    webContents.send = send
+    const bridge = {
+      getRegisteredTabs: vi.fn(() => new Map([['page-new', 101]])),
+      getActivePageId: vi.fn(() => 'page-new'),
+      setActiveTab: vi.fn(),
+      tabList: vi.fn(() => ({ tabs: [] }))
+    } as unknown as AgentBrowserBridge
+    const commands = new RuntimeBrowserCommands(
+      createHost({
+        getAgentBrowserBridge: () => bridge,
+        getAvailableAuthoritativeWindow: vi.fn(() => ({}) as never),
+        getAuthoritativeWindow: vi.fn(() => ({ webContents }) as never)
+      })
+    )
 
-      await expect(
-        commands.browserTabCreate({ worktree: `id:${workspaceId}`, url: 'about:blank' })
-      ).resolves.toEqual({ browserPageId: 'page-new' })
+    await expect(
+      commands.browserTabCreate({ worktree: 'id:wt-1', url: 'about:blank' })
+    ).resolves.toEqual({ browserPageId: 'page-new' })
 
-      expect(waitForWorktreeTabRegistrationMock).not.toHaveBeenCalled()
-      // Why: with no explicit profile, main must leave sessionProfileId/
-      // sessionPartition undefined so the renderer applies the user's configured
-      // default-profile inheritance instead of being forced onto the shared
-      // default partition.
-      expect(send).toHaveBeenCalledWith(
-        'browser:requestTabCreate',
-        expect.objectContaining({
-          url: 'about:blank',
-          worktreeId: workspaceId,
-          sessionProfileId: undefined,
-          sessionPartition: undefined
-        })
-      )
-      expect(waitForTabRegistrationMock).toHaveBeenCalledWith('page-new')
-      expect(bridge.setActiveTab).toHaveBeenCalledWith(101, workspaceId)
-    }
-  )
+    expect(waitForWorktreeTabRegistrationMock).not.toHaveBeenCalled()
+    // Leave profile/partition absent so renderer default-profile inheritance applies.
+    expect(send).toHaveBeenCalledWith(
+      'browser:requestTabCreate',
+      expect.objectContaining({
+        url: 'about:blank',
+        worktreeId: 'wt-1',
+        sessionProfileId: undefined,
+        sessionPartition: undefined
+      })
+    )
+    expect(waitForTabRegistrationMock).toHaveBeenCalledWith('page-new')
+    expect(bridge.setActiveTab).toHaveBeenCalledWith(101, 'wt-1')
+  })
 
   it('sends the resolved isolated profile partition when creating a renderer tab', async () => {
     const { RuntimeBrowserCommands } = await import('./browser/browser-commands')
@@ -765,7 +756,11 @@ describe('RuntimeBrowserCommands headless offscreen routing', () => {
       createHost({
         getAgentBrowserBridge: () => bridge,
         getAvailableAuthoritativeWindow: vi.fn(() => null),
-        getOffscreenBrowserBackend: vi.fn(() => ({ createTab, closeTab: vi.fn() }))
+        getOffscreenBrowserBackend: vi.fn(() => ({
+          createTab,
+          closeTab: vi.fn(),
+          ownsTab: () => true
+        }))
       })
     )
 
@@ -778,7 +773,6 @@ describe('RuntimeBrowserCommands headless offscreen routing', () => {
       worktreeId: 'wt-1',
       profileId: undefined
     })
-    // No renderer round-trip in headless mode.
     expect(waitForTabRegistrationMock).not.toHaveBeenCalled()
     expect(setActiveTab).toHaveBeenCalledWith(202, 'wt-1')
   })

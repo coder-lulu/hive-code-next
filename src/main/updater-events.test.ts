@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UpdateStatus } from '../shared/update-status-types'
-import { APP_DISPLAY_NAME } from '../shared/brand'
 import type { registerAutoUpdaterHandlers } from './updater-events'
 
 const {
@@ -30,7 +29,7 @@ vi.mock('electron', () => ({
   shell: { showItemInFolder: vi.fn() }
 }))
 
-// Why: only the packaged-marker resolver is faked so the real artifact tracking runs.
+// Use real artifact tracking; fake only package-type detection.
 vi.mock('./linux-update-package-type', () => ({
   getLinuxPackageType: getLinuxPackageTypeMock,
   getLinuxRootPackageType: getLinuxRootPackageTypeMock,
@@ -44,7 +43,7 @@ vi.mock('./updater-changelog', () => ({ fetchChangelog: vi.fn().mockResolvedValu
 vi.mock('./updater-lifecycle-diagnostics', () => ({ recordUpdaterLifecycle: vi.fn() }))
 
 const DEB_PATH = '/home/tester/.cache/orca-updater/pending/orca-ide_1.0.61_amd64.deb'
-// A real 64-byte SHA-512; capture rejects a digest that cannot decode to one.
+// Capture requires a digest that decodes to exactly 64 bytes.
 const DEB_SHA512 =
   'LHlL7dKoqg98gS2nfQv878dK+UoktbAkm4M20/hoJ2Qr0Kqsa3MSL4VmWy/Lll/MYjQFkpvOxduQ/vswentozA=='
 
@@ -72,6 +71,11 @@ function createUpdaterStub(): {
 function createContext(overrides?: Partial<HandlerContext>): HandlerContext {
   return {
     autoUpdater: createUpdaterStub() as never,
+    getUpdateMetadata: vi.fn(() => ({})),
+    isExpectedUpdateOffer: vi.fn(() => true),
+    rejectUnexpectedUpdateOffer: vi.fn(),
+    acceptDownloadedUpdateCandidate: vi.fn(() => true),
+    startMacStaging: vi.fn(),
     clearBackgroundCheckLaunchPending: vi.fn(),
     clearAvailableUpdateContext: vi.fn(),
     consumeMissingManifestPrereleaseFallbackResult: vi.fn(() => null),
@@ -80,7 +84,6 @@ function createContext(overrides?: Partial<HandlerContext>): HandlerContext {
     getCurrentStatus: vi.fn(
       () => ({ state: 'downloading', percent: 42, version: '1.0.61' }) as never
     ),
-    getUpdateMetadata: vi.fn(() => ({})),
     getActiveUpdateCheckEventAttemptId: vi.fn(() => 1),
     getKnownReleaseUrl: vi.fn(() => undefined),
     getPendingInstallVersion: vi.fn(() => '1.0.61'),
@@ -90,9 +93,6 @@ function createContext(overrides?: Partial<HandlerContext>): HandlerContext {
     hasInstallableDownloadedVersion: vi.fn(() => true),
     isLocalBuildCheck: vi.fn(() => false),
     isPinnedBuildCheck: vi.fn(() => false),
-    isExpectedUpdateOffer: vi.fn(() => true),
-    rejectUnexpectedUpdateOffer: vi.fn(),
-    acceptDownloadedUpdateCandidate: vi.fn(() => true),
     shouldHandleUpdaterErrorEvent: vi.fn(() => true),
     clearUpdateAvailableEventPending: vi.fn(),
     isActiveUpdateCheckAttempt: vi.fn(() => true),
@@ -101,7 +101,6 @@ function createContext(overrides?: Partial<HandlerContext>): HandlerContext {
     markMissingManifestPrereleaseFallbackChecking: vi.fn(),
     performQuitAndInstall: vi.fn(),
     commitStagedMacInstall: vi.fn(),
-    startMacStaging: vi.fn(),
     failMacStaging: vi.fn(),
     isAwaitingMacStaging: vi.fn(() => false),
     isMacStagingDeferredToInstall: vi.fn(() => false),
@@ -177,7 +176,6 @@ describe('registerAutoUpdaterHandlers linux package artifact tracking', () => {
 
     emit('update-downloaded', downloadedEvent())
 
-    // Why: path and digest exist only in the event's own fields, so a trimmed event fails here.
     expect(getArtifact()).toEqual({
       packageType: 'deb',
       version: '1.0.61',
@@ -204,7 +202,8 @@ describe('registerAutoUpdaterHandlers linux package artifact tracking', () => {
 
       expect(context.sendStatus).toHaveBeenLastCalledWith({
         state: 'error',
-        message: `Quit ${APP_DISPLAY_NAME} before running the system package install command.`,
+        message: 'Quit Orca before running the system package install command.',
+        messageCode: 'linuxPackageManualInstall',
         recovery: {
           kind: 'linux-package-install',
           packageType,
@@ -225,7 +224,9 @@ describe('registerAutoUpdaterHandlers linux package artifact tracking', () => {
 
     const status = {
       state: 'error',
-      message: `The downloaded package metadata could not be verified. Quit ${APP_DISPLAY_NAME} before downloading and installing the update from the official release page.`,
+      message:
+        'The downloaded package metadata could not be verified. Quit Orca before downloading and installing the update from the official release page.',
+      messageCode: 'linuxPackageMetadataUnusable',
       version: '1.0.61',
       retryable: false
     }
@@ -265,7 +266,9 @@ describe('registerAutoUpdaterHandlers linux package artifact tracking', () => {
 
     expect(context.sendStatus).toHaveBeenLastCalledWith({
       state: 'error',
-      message: `${APP_DISPLAY_NAME} could not verify the installed Linux package format, so it will not install this update automatically. Download the update from the official release page and install it manually.`,
+      message:
+        'Orca could not verify the installed Linux package format, so it will not install this update automatically. Download the update from the official release page and install it manually.',
+      messageCode: 'linuxPackageMarkerUnusable',
       version: '1.0.61',
       retryable: false
     })
@@ -281,7 +284,6 @@ describe('registerAutoUpdaterHandlers linux package artifact tracking', () => {
 
     expect(handleQuitAndInstallFailure).toHaveBeenCalledTimes(1)
     expect(handleQuitAndInstallFailure.mock.calls[0]?.[0]).toBe(failure)
-    // Recovery owns the event; no generic check/download error follows it.
     expect(context.sendErrorStatus).not.toHaveBeenCalled()
   })
 
@@ -289,8 +291,7 @@ describe('registerAutoUpdaterHandlers linux package artifact tracking', () => {
     const { emit, context, getArtifact } = await register()
     emit('update-downloaded', downloadedEvent())
 
-    // Why: the download already produced this exact status, so the assertion below could pass
-    // on that call alone. Clear it so only the second emit can satisfy it.
+    // Clear the initial download status so only the recheck can satisfy the assertion.
     vi.mocked(context.sendStatus).mockClear()
 
     emit('update-not-available')
@@ -298,7 +299,8 @@ describe('registerAutoUpdaterHandlers linux package artifact tracking', () => {
     expect(getArtifact()).toEqual(expect.objectContaining({ version: '1.0.61' }))
     expect(context.sendStatus).toHaveBeenLastCalledWith({
       state: 'error',
-      message: `Quit ${APP_DISPLAY_NAME} before running the system package install command.`,
+      message: 'Quit Orca before running the system package install command.',
+      messageCode: 'linuxPackageManualInstall',
       recovery: {
         kind: 'linux-package-install',
         packageType: 'deb',
@@ -312,8 +314,7 @@ describe('registerAutoUpdaterHandlers linux package artifact tracking', () => {
     const { emit, context, getArtifact } = await register()
     emit('update-downloaded', downloadedEvent())
 
-    // Why: the download already produced this exact status, so the assertion below could pass
-    // on that call alone. Clear it so only the second emit can satisfy it.
+    // Clear the initial download status so only the recheck can satisfy the assertion.
     vi.mocked(context.sendStatus).mockClear()
 
     emit('update-available', { version: '1.0.51' })
@@ -321,7 +322,8 @@ describe('registerAutoUpdaterHandlers linux package artifact tracking', () => {
     expect(getArtifact()).toEqual(expect.objectContaining({ version: '1.0.61' }))
     expect(context.sendStatus).toHaveBeenLastCalledWith({
       state: 'error',
-      message: `Quit ${APP_DISPLAY_NAME} before running the system package install command.`,
+      message: 'Quit Orca before running the system package install command.',
+      messageCode: 'linuxPackageManualInstall',
       recovery: {
         kind: 'linux-package-install',
         packageType: 'deb',
@@ -398,7 +400,8 @@ describe('registerAutoUpdaterHandlers linux package artifact tracking', () => {
     expect(getArtifact()).toEqual(expect.objectContaining({ version: '1.0.61' }))
     expect(context.sendStatus).toHaveBeenLastCalledWith({
       state: 'error',
-      message: `Quit ${APP_DISPLAY_NAME} before running the system package install command.`,
+      message: 'Quit Orca before running the system package install command.',
+      messageCode: 'linuxPackageManualInstall',
       recovery: {
         kind: 'linux-package-install',
         packageType: 'deb',
@@ -433,9 +436,7 @@ describe('registerAutoUpdaterHandlers linux package artifact tracking', () => {
     expect(getArtifact()).toBeNull()
   })
 
-  // #17702: the externallyManaged flag is spread onto the fallback object only, so a retained
-  // manual-install status must still win. Cross-version case: the host could self-update when it
-  // downloaded, and cannot now.
+  // Management can change after download; retained manual-install recovery must survive the recheck.
   it.each([false, true])(
     'keeps manual-install recovery through a same-version recheck (externallyManaged=%s)',
     async (externallyManaged) => {
@@ -446,8 +447,7 @@ describe('registerAutoUpdaterHandlers linux package artifact tracking', () => {
       })
       emit('update-downloaded', downloadedEvent())
 
-      // Why: the download already emitted the manual-install status, so waitFor would pass on that
-      // call alone. Clear it so the assertion can only be satisfied by the recheck.
+      // Clear the download status so waitFor must observe a new recheck result.
       vi.mocked(context.sendStatus).mockClear()
       status = { state: 'checking' }
       emit('update-available', { version: '1.0.61' })
@@ -456,7 +456,8 @@ describe('registerAutoUpdaterHandlers linux package artifact tracking', () => {
       await vi.waitFor(() =>
         expect(context.sendStatus).toHaveBeenLastCalledWith({
           state: 'error',
-          message: `Quit ${APP_DISPLAY_NAME} before running the system package install command.`,
+          message: 'Quit Orca before running the system package install command.',
+          messageCode: 'linuxPackageManualInstall',
           recovery: {
             kind: 'linux-package-install',
             packageType: 'deb',

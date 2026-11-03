@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getRepoBackedTaskEmptyState } from './task-page-empty-state'
+import { getRepoBackedTaskEmptyState } from './task-page/task-page-empty-state'
 import { applyProductBranding } from '@/product-brand'
 
 describe('getRepoBackedTaskEmptyState', () => {

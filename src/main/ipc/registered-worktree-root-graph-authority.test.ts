@@ -6,7 +6,7 @@ import { afterEach, expect, it } from 'vitest'
 import type { Store } from '../persistence'
 import type { Repo } from '../../shared/repo-types'
 import { listWorktreeRootsWithConcurrency } from './registered-worktree-root-probes'
-import { PATH_ACCESS_DENIED_MESSAGE, resolveAuthorizedPath } from './filesystem-auth'
+import { PATH_ACCESS_DENIED_MESSAGE, resolveAuthorizedPath } from './filesystem/filesystem-auth'
 
 const scratch: string[] = []
 function git(path: string, args: string[]) {

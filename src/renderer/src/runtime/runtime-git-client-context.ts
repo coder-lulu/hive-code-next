@@ -33,10 +33,7 @@ export type RuntimePullRequestGenerationInput = {
 
 /** Generation preferences only; routing comes from the context's `target`. */
 export type RuntimeGitPrefs = Partial<
-  Pick<
-    GlobalSettings,
-    'commitMessageAi' | 'sourceControlAi' | 'agentCmdOverrides' | 'defaultTuiAgent'
-  >
+  Pick<GlobalSettings, 'sourceControlAi' | 'agentCmdOverrides' | 'defaultTuiAgent'>
 >
 
 export type RuntimeDiscoverCommitMessageModelsResult =
@@ -84,12 +81,7 @@ export function getRuntimeCommitMessageSettings(
   target: RuntimeClientTarget,
   settings: RuntimeGitPrefs | null | undefined,
   connectionId?: string
-): Partial<
-  Pick<
-    GlobalSettings,
-    'commitMessageAi' | 'sourceControlAi' | 'agentCmdOverrides' | 'defaultTuiAgent'
-  >
-> & {
+): Partial<Pick<GlobalSettings, 'sourceControlAi' | 'agentCmdOverrides' | 'defaultTuiAgent'>> & {
   commitMessageDiscoveryHostKey?: string
 } {
   const scope = getRuntimeGitScope(target, connectionId)
@@ -98,9 +90,6 @@ export function getRuntimeCommitMessageSettings(
     return { commitMessageDiscoveryHostKey: getCommitMessageModelDiscoveryHostKeyForScope(scope) }
   }
   return {
-    ...(settings.commitMessageAi !== undefined
-      ? { commitMessageAi: settings.commitMessageAi }
-      : {}),
     ...(settings.sourceControlAi !== undefined
       ? { sourceControlAi: settings.sourceControlAi }
       : {}),

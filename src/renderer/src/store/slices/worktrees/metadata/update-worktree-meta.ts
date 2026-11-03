@@ -1,13 +1,11 @@
 import {
-  hasExplicitWorkspaceReviewSelection,
+  captureWorkspaceAttachmentMutation,
   getWorkspaceReviewPersistenceUpdates,
   getWorkspaceReviewRefreshHints
 } from './workspace-attachment-review-selection'
-import {
-  getWorkspaceAttachments,
-  normalizeWorkspaceAttachmentUpdate
-} from '../../../../../../shared/workspace-attachments'
+import { normalizeWorkspaceAttachmentUpdate } from '../../../../../../shared/workspace-attachments'
 import { normalizeGitHubPRSuppressionUpdate } from '../../../../../../shared/worktree/github-pr-suppression'
+import { captureGitHubLinkMutation } from './github-link-mutation-snapshot'
 import type { WorktreeSlice } from '../../worktree-helpers'
 import type { WorktreeSliceGet, WorktreeSliceSet } from '../listing/worktree-slice-types'
 import { translate } from '@/i18n/i18n'
@@ -16,7 +14,10 @@ import { displayNameUpdatePinsLabel } from '../../../../../../shared/worktree/di
 import { parseWorkspaceKey } from '../../../../../../shared/workspace-scope'
 import { applyWorktreeUpdates, getRepoIdFromWorktreeId } from '../../worktree-helpers'
 import { getHostedReviewCacheKey } from '../../hosted-review-cache-identity'
-import { getGitHubPRCacheKey, getLegacyGitHubPRCacheKey } from '../../github-cache-key'
+import {
+  getGitHubPRCacheKey,
+  getLegacyGitHubPRCacheKey
+} from '../../../../../../shared/github/github-cache-key'
 import {
   applyDetectedWorktreeUpdates,
   findKnownWorktreeById,
@@ -45,6 +46,7 @@ export function createUpdateWorktreeMeta(
     const shouldApplyUpdate = options?.shouldApply
     const requestedHostId = options?.executionHostId
     const existingWorktree = findKnownWorktreeById(get(), worktreeId, requestedHostId)
+    const githubLink = captureGitHubLinkMutation(get, worktreeId, existingWorktree, options)
     const executionHostId =
       requestedHostId ??
       existingWorktree?.hostId ??
@@ -52,16 +54,7 @@ export function createUpdateWorktreeMeta(
     if (shouldApplyUpdate && !shouldApplyUpdate(existingWorktree)) {
       return { ok: true }
     }
-    const mutationUpdates =
-      updates.linkedItems === undefined
-        ? updates
-        : {
-            ...updates,
-            linkedItems: updates.linkedItems,
-            linkedItemsBase: updates.linkedItemsBase ?? getWorkspaceAttachments(existingWorktree),
-            linkedItemsSelectionChanged:
-              updates.linkedItemsSelectionChanged ?? hasExplicitWorkspaceReviewSelection(updates)
-          }
+    const mutationUpdates = captureWorkspaceAttachmentMutation(updates, existingWorktree)
     const workspaceScope = parseWorkspaceKey(worktreeId)
     if (workspaceScope?.type === 'folder') {
       const folderUpdates = getFolderWorkspaceMetaUpdates(mutationUpdates)
@@ -121,6 +114,10 @@ export function createUpdateWorktreeMeta(
     normalizedUpdates = normalizeGitHubPRSuppressionUpdate(
       normalizeWorkspaceAttachmentUpdate(worktreeForUpdate, mutationUpdates)
     )
+    const conflict = githubLink.conflict(normalizedUpdates, worktreeForUpdate)
+    if (conflict) {
+      return conflict
+    }
     const currentResolvedPushTarget =
       normalizedUpdates.linkedPR === linkedPrForPushTarget ? resolvedPushTarget : undefined
     const existingHostedReviewPushTargetLookup = worktreeForUpdate
@@ -276,7 +273,8 @@ export function createUpdateWorktreeMeta(
         worktreeId,
         getWorkspaceReviewPersistenceUpdates(mutationUpdates, enriched),
         executionHostId ?? existingWorktree?.hostId,
-        worktreeForUpdate?.identity?.key
+        worktreeForUpdate?.identity?.key,
+        githubLink.base
       )
       if (
         !options?.suppressHostedReviewRefresh &&

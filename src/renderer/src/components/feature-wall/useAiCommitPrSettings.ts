@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import type { CommitMessageAiSettings } from '../../../../shared/commit-message-ai-types'
+import type { SourceControlAiSettings } from '../../../../shared/source-control-ai-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import {
   CUSTOM_AGENT_ID,
@@ -10,15 +10,15 @@ import {
 import { getAgentCatalog } from '@/lib/agent-catalog'
 import { useAppStore } from '@/store'
 import {
-  EMPTY_COMMIT_MESSAGE_AI_SETTINGS,
-  readCommitMessageAiSettings,
+  DEFAULT_SOURCE_CONTROL_AI_SETTINGS,
+  readSourceControlAiSettings,
   resolveCommitMessageSelectedModel,
   resolveCommitMessageSelectedThinking,
-  seedCommitMessageAiEnablePatch
+  seedSourceControlAiEnablePatch
 } from './ai-commit-pr-settings-helpers'
 
 export type AiCommitPrSettingsViewModel = {
-  config: CommitMessageAiSettings
+  config: SourceControlAiSettings
   selectPortalRoot: HTMLElement | null
   setSelectPortalHost: (node: HTMLDivElement | null) => void
   agentSelectValue: string | undefined
@@ -31,7 +31,7 @@ export type AiCommitPrSettingsViewModel = {
   onAgentChange: (newAgentId: string) => void
   onModelChange: (newModelId: string) => void
   onThinkingChange: (newLevelId: string) => void
-  writeConfig: (patch: Partial<CommitMessageAiSettings>) => void
+  writeConfig: (patch: Partial<SourceControlAiSettings>) => void
 }
 
 export function useAiCommitPrSettings(): AiCommitPrSettingsViewModel {
@@ -44,7 +44,9 @@ export function useAiCommitPrSettings(): AiCommitPrSettingsViewModel {
     )
   }, [])
 
-  const config = settings ? readCommitMessageAiSettings(settings) : EMPTY_COMMIT_MESSAGE_AI_SETTINGS
+  const config = settings
+    ? readSourceControlAiSettings(settings)
+    : DEFAULT_SOURCE_CONTROL_AI_SETTINGS
   const resolvedAgentId = resolveCommitMessageAgentChoice(
     config.agentId,
     settings?.defaultTuiAgent,
@@ -85,11 +87,11 @@ export function useAiCommitPrSettings(): AiCommitPrSettingsViewModel {
     : null
   const unsupportedAgentLabel = unsupportedConfiguredAgentLabel ?? unsupportedDefaultAgentLabel
 
-  const writeConfig = (patch: Partial<CommitMessageAiSettings>): void => {
+  const writeConfig = (patch: Partial<SourceControlAiSettings>): void => {
     if (!settings) {
       return
     }
-    updateSettings({ commitMessageAi: { ...config, ...patch } })
+    updateSettings({ sourceControlAi: { ...config, ...patch } })
   }
 
   const toggleAi = (): void => {
@@ -107,7 +109,7 @@ export function useAiCommitPrSettings(): AiCommitPrSettingsViewModel {
       writeConfig({ enabled: true, agentId: null })
       return
     }
-    writeConfig(seedCommitMessageAiEnablePatch(config, seedAgentId))
+    writeConfig(seedSourceControlAiEnablePatch(config, seedAgentId))
   }
 
   const onAgentChange = (newAgentId: string): void => {

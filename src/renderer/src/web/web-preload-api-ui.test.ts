@@ -65,6 +65,16 @@ describe('web UI preload API', () => {
     expect(listener).not.toHaveBeenCalled()
   })
 
+  it('detects language from the current browser rather than the connected host', async () => {
+    const { api } = await installApi('Linux')
+    vi.stubGlobal('navigator', { language: 'fr-FR', languages: ['fr-FR'] })
+
+    await expect(api.app.getSystemLanguageDetection()).resolves.toMatchObject({
+      locale: 'fr',
+      source: 'browser'
+    })
+  })
+
   it('migrates missing right sidebar visibility from the effective web legacy default', async () => {
     const { api } = await installApi('Linux')
 
@@ -492,16 +502,20 @@ describe('web UI preload API', () => {
     expect(stored.contextualToursSeenIds).toEqual(['tasks', 'browser'])
   })
 
-  it('keeps the local OSC 52 notice armed when ui.get returns an unmigrated host', async () => {
+  it('drops retired OSC 52 notices from local and host ui.get', async () => {
+    const outgoing: unknown[] = []
     vi.doMock('./web-runtime-client', () => ({
       WebRuntimeClient: class {
-        call(method: string): Promise<RuntimeRpcResponse<unknown>> {
+        call(method: string, params?: unknown): Promise<RuntimeRpcResponse<unknown>> {
+          if (method === 'ui.set') {
+            outgoing.push(params)
+          }
           return Promise.resolve({
             id: method,
             ok: true,
             // Why false: the host store always projects this key, so a plain spread
             // would overwrite the arm the web client's own settings migration raised.
-            result: { ui: { osc52ClipboardDefaultOnNoticePending: false } },
+            result: { ui: { osc52ClipboardDefaultOnNoticePending: true } },
             _meta: { runtimeId: 'runtime-1' }
           })
         }
@@ -520,21 +534,23 @@ describe('web UI preload API', () => {
     installWebPreloadApi()
 
     const ui = await globals.window.api.ui.get()
-    expect(ui.osc52ClipboardDefaultOnNoticePending).toBe(true)
+    expect(ui.osc52ClipboardDefaultOnNoticePending).not.toBe(true)
 
-    await globals.window.api.ui.set({ osc52ClipboardDefaultOnNoticePending: false })
+    await globals.window.api.ui.set({ osc52ClipboardDefaultOnNoticePending: true })
+    expect(outgoing).toHaveLength(1)
+    expect(outgoing[0]).not.toHaveProperty('osc52ClipboardDefaultOnNoticePending')
     const cleared = await globals.window.api.ui.get()
-    expect(cleared.osc52ClipboardDefaultOnNoticePending).toBe(false)
+    expect(cleared.osc52ClipboardDefaultOnNoticePending).not.toBe(true)
   })
 
-  it('keeps the local OSC 52 notice armed when recordFeatureInteraction returns an unmigrated host', async () => {
+  it('drops retired OSC 52 notices from feature interaction responses', async () => {
     vi.doMock('./web-runtime-client', () => ({
       WebRuntimeClient: class {
         call(method: string): Promise<RuntimeRpcResponse<unknown>> {
           return Promise.resolve({
             id: method,
             ok: true,
-            result: { ui: { osc52ClipboardDefaultOnNoticePending: false } },
+            result: { ui: { osc52ClipboardDefaultOnNoticePending: true } },
             _meta: { runtimeId: 'runtime-1' }
           })
         }
@@ -553,7 +569,7 @@ describe('web UI preload API', () => {
     installWebPreloadApi()
 
     const ui = await globals.window.api.ui.recordFeatureInteraction('tasks')
-    expect(ui.osc52ClipboardDefaultOnNoticePending).toBe(true)
+    expect(ui.osc52ClipboardDefaultOnNoticePending).not.toBe(true)
   })
 
   it('does not keep a local shadow copy of main-owned feature telemetry markers', async () => {

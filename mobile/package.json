@@ -76,7 +76,11 @@
     "tweetnacl": "^1.0.3",
     "ws": "^8.22.0",
     "zod": "~4.6.5",
-    "zustand": "^5.0.15"
+    "zustand": "^5.0.15",
+    "i18next": "26.5.11",
+    "expo-localization": "~55.0.19",
+    "@formatjs/intl-pluralrules": "6.3.16",
+    "markdown-it-cjk-friendly": "^2.0.3"
   },
   "devDependencies": {
     "@orca/process-host": "link:../src/packages/process-host",

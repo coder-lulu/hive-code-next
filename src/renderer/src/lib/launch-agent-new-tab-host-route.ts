@@ -1,3 +1,4 @@
+import type { TuiAgent } from '../../../shared/tui-agent'
 import {
   launchAgentThroughHost,
   windowMakesHostLaunchTab,
@@ -13,6 +14,7 @@ import { pasteAgentLaunchPromptOnceReady } from '@/lib/launch-agent-tab-prompt-p
  * or one in a workspace that runs over SSH, which the pane's local spawn cannot start.
  */
 export function newTabPromptLaunchesThroughHost(args: {
+  agent: TuiAgent
   promptDelivery: 'auto-submit' | 'draft' | 'submit-after-ready'
   pastesPrompt: boolean
   isRemote: boolean
@@ -21,7 +23,7 @@ export function newTabPromptLaunchesThroughHost(args: {
     args.promptDelivery === 'submit-after-ready' &&
     args.pastesPrompt &&
     !args.isRemote &&
-    windowMakesHostLaunchTab()
+    windowMakesHostLaunchTab(args.agent)
   )
 }
 

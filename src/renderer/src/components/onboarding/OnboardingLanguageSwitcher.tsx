@@ -1,21 +1,19 @@
 import { useRef, useState } from 'react'
-import { ArrowLeft, ChevronDown, Globe } from 'lucide-react'
+import { ChevronDown, Globe } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { OnboardingLanguageRequest } from './OnboardingLanguageRequest'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { i18n, translate, loadRendererUiLanguage } from '@/i18n/i18n'
+import { translate, loadRendererUiLanguage } from '@/i18n/i18n'
 import { getUiLanguageNativeLabel } from '@/i18n/supported-languages'
 import { useLanguageReadiness } from '@/i18n/language-readiness'
-import { track } from '@/lib/telemetry'
 import { isWebClientLocation } from '@/lib/web-client-location'
 import { useAppStore } from '@/store'
 import {
   SUPPORTED_UI_LOCALES,
   type SupportedUiLocale,
-  getRendererLanguageDetection,
-  shouldShowLanguageSwitcher
+  getRendererLanguageDetection
 } from '../../../../shared/ui-locale'
 
 export function OnboardingLanguageSwitcher({
@@ -24,15 +22,13 @@ export function OnboardingLanguageSwitcher({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-}): React.JSX.Element | null {
-  const cohort = useAppStore((state) => state.settings?.telemetry?.onboardingLanguageCohort)
+}): React.JSX.Element {
   const language = useAppStore((state) => state.settings?.uiLanguage ?? 'system')
   const updateSettings = useAppStore((state) => state.updateSettingsOrThrow)
   const catalogError = useLanguageReadiness((state) => state.error)
   const catalogLoading = useLanguageReadiness((state) => state.loading)
   const detection =
     useLanguageReadiness((state) => state.detection) ?? getRendererLanguageDetection()
-  const [recoveryVisible] = useState(catalogError)
   const [requestView, setRequestView] = useState(false)
   const [draft, setDraft] = useState('')
   const [requestState, setRequestState] = useState<'idle' | 'pending' | 'error' | 'success'>('idle')
@@ -47,16 +43,9 @@ export function OnboardingLanguageSwitcher({
   const contentRef = useRef<HTMLDivElement>(null)
   const busy = selectionPhase !== null || catalogLoading
   const canRequestLanguage = !isWebClientLocation()
-  const metadata = {
-    system_language: detection.detectedTag,
-    system_language_supported: detection.status === 'supported',
-    detection_source: detection.source,
-    effective_language: i18n.language
-  }
   const setOpen = (next: boolean): void => {
     if (next) {
       setRequestView(false)
-      track('onboarding_language_picker_opened', metadata)
     }
     onOpenChange(next)
   }
@@ -70,7 +59,7 @@ export function OnboardingLanguageSwitcher({
     setSelectionFailure(null)
     let stage: 'load' | 'save' = 'load'
     try {
-      const locale = await loadRendererUiLanguage(next)
+      await loadRendererUiLanguage(next)
       stage = 'save'
       setSelectionPhase('save')
       await updateSettings({ uiLanguage: next })
@@ -80,11 +69,6 @@ export function OnboardingLanguageSwitcher({
       if (catalogError && language === next) {
         useLanguageReadiness.getState().retryLanguageLoad()
       }
-      track('onboarding_language_changed', {
-        ...metadata,
-        selected_language: next,
-        effective_language: locale
-      })
     } catch {
       setSelectionFailure({ language: next, stage })
     } finally {
@@ -117,19 +101,11 @@ export function OnboardingLanguageSwitcher({
       }
       successfulRequests.current.add(normalized)
       setRequestState('success')
-      track('onboarding_language_requested', metadata)
     } catch {
       setRequestState('error')
     } finally {
       requestInFlight.current = false
     }
-  }
-
-  if (
-    cohort === 'control' ||
-    (!open && !shouldShowLanguageSwitcher(detection) && !catalogError && !recoveryVisible)
-  ) {
-    return null
   }
 
   return (
@@ -158,77 +134,26 @@ export function OnboardingLanguageSwitcher({
       >
         <div className="scrollbar-sleek max-h-[var(--radix-popover-content-available-height)] overflow-y-auto p-4">
           {requestView ? (
-            <form
-              className="space-y-3"
-              onSubmit={(event) => {
-                event.preventDefault()
+            <OnboardingLanguageRequest
+              draft={draft}
+              busy={busy}
+              requestState={requestState}
+              onSubmit={() => {
                 void submitRequest()
               }}
-            >
-              <Button
-                variant="ghost"
-                size="sm"
-                type="button"
-                onClick={() => {
-                  setRequestView(false)
-                  requestAnimationFrame(() =>
-                    contentRef.current
-                      ?.querySelector<HTMLElement>('[role="radio"][data-state="checked"]')
-                      ?.focus()
-                  )
-                }}
-              >
-                <ArrowLeft />
-                {translate('onboarding.language.back', 'Languages')}
-              </Button>
-              <Label htmlFor="onboarding-language-request">
-                {translate(
-                  'onboarding.language.requestPrompt',
-                  'Which language would you like Orca to support?'
-                )}
-              </Label>
-              <Input
-                id="onboarding-language-request"
-                autoFocus
-                maxLength={80}
-                value={draft}
-                disabled={busy || requestState === 'pending'}
-                onChange={(event) => {
-                  setDraft(event.target.value)
-                  setRequestState('idle')
-                }}
-              />
-              {requestState === 'success' ? (
-                <p role="status" className="text-xs text-muted-foreground">
-                  {translate(
-                    'onboarding.language.requestSuccess',
-                    'Language request recorded. You can continue onboarding.'
-                  )}
-                </p>
-              ) : (
-                <>
-                  {requestState === 'error' && (
-                    <p role="alert" className="text-xs text-destructive">
-                      {translate(
-                        'onboarding.language.requestError',
-                        'Could not record your request. Try again.'
-                      )}
-                    </p>
-                  )}
-                  <Button
-                    type="submit"
-                    size="sm"
-                    disabled={
-                      !draft.trim() || draft.trim().length > 80 || requestState === 'pending'
-                    }
-                  >
-                    {requestState === 'error'
-                      ? translate('onboarding.language.retry', 'Retry')
-                      : translate('onboarding.language.requestAction', 'Request language')}
-                  </Button>
-                </>
-              )}
-            </form>
+              onDraftChange={(value) => {
+                setDraft(value)
+                setRequestState('idle')
+              }}
+              onBack={() => {
+                setRequestView(false)
+                requestAnimationFrame(() =>
+                  contentRef.current
+                    ?.querySelector<HTMLElement>('[role="radio"][data-state="checked"]')
+                    ?.focus()
+                )
+              }}
+            />
           ) : (
             <div className="space-y-3">
               <div className="space-y-1">

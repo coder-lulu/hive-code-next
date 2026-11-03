@@ -1,3 +1,4 @@
+import { findAllByHostType, findByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -69,7 +70,7 @@ describe('Mobile terminal input chrome', () => {
         createElement(MobileTerminalInputActions, { ...defaultProps, ...overrides })
       )
     })
-    return renderer!.root.findAllByType('Pressable')
+    return findAllByHostType(renderer!.root, 'Pressable')
   }
 
   it('preserves image tap/long-press actions with busy and disabled semantics', async () => {
@@ -114,7 +115,7 @@ describe('Mobile terminal input chrome', () => {
       dictation: { isStarting: false, isRecording: true, isProcessing: false }
     })
     const style = flattenStyle(dictation.props.style({ pressed: false }))
-    const mic = renderer!.root.findByType('Mic')
+    const mic = findByHostType(renderer!.root, 'Mic')
 
     expect(dictation.props).toMatchObject({
       accessibilityLabel: '停止语音输入',
@@ -161,7 +162,7 @@ describe('Mobile terminal input chrome', () => {
       )
     })
     const status = renderer!.root.findByProps({ accessibilityLiveRegion: 'polite' })
-    const [title, detail] = renderer!.root.findAllByType('Text')
+    const [title, detail] = findAllByHostType(renderer!.root, 'Text')
 
     expect(status.props.accessibilityLabel).toBe('实时输入：pnpm test')
     expect(title.props).toMatchObject({ maxFontSizeMultiplier: 1.3 })
@@ -212,7 +213,7 @@ describe('Mobile terminal input chrome', () => {
           })
         )
       })
-      const [title, detail] = renderer!.root.findAllByType('Text')
+      const [title, detail] = findAllByHostType(renderer!.root, 'Text')
 
       expect(title.props.children).toBe(expectedTitle)
       expect(detail.props.children).toBe(expectedDetail)

@@ -7,7 +7,7 @@ import {
   type StructuredAgentSessionStatusFeedOwner
 } from '@/runtime/structured-agent-session-status-feed'
 import {
-  getExistingStructuredAgentSessionReadOwner,
+  findStructuredAgentSessionReadOwner,
   subscribeStructuredAgentSessionReadSnapshots
 } from '../native-chat/structured-agent-session-read-owner'
 import { useAppStore } from '@/store'
@@ -66,7 +66,7 @@ function sessionSources(items: readonly SessionListItem[]): Map<string, SessionS
 
 function projectSessionStatus(item: SessionListItem, source: SessionSource, now: number) {
   const { identity, sessionId, target, feed } = source
-  const journal = getExistingStructuredAgentSessionReadOwner(sessionId, target)?.getSnapshot()
+  const journal = findStructuredAgentSessionReadOwner(sessionId, target)?.getSnapshot()
   const summary = feed.getEvidenceSnapshot().get(sessionId)
   const base = {
     identity,
@@ -78,7 +78,7 @@ function projectSessionStatus(item: SessionListItem, source: SessionSource, now:
     identity.providerSessionId === null ||
     journal?.providerSession?.id === identity.providerSessionId
   const journalStatus =
-    journal?.receivedAt && providerMatches
+    journal?.receivedAt != null && providerMatches
       ? resolveSessionListStatus({
           ...base,
           activity: {
@@ -167,10 +167,7 @@ function createSessionStatusProjection(items: readonly SessionListItem[]) {
         const now = Date.now()
         let nextExpiry = Number.POSITIVE_INFINITY
         for (const { sessionId, target, feed } of sources.values()) {
-          const journal = getExistingStructuredAgentSessionReadOwner(
-            sessionId,
-            target
-          )?.getSnapshot()
+          const journal = findStructuredAgentSessionReadOwner(sessionId, target)?.getSnapshot()
           const summary = feed.getEvidenceSnapshot().get(sessionId)
           for (const receivedAt of [journal?.receivedAt, summary?.receivedAt]) {
             if (

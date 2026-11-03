@@ -20,7 +20,9 @@ import { saveClipboardImageBufferAsTempFile } from './clipboard-image-temp-file'
 beforeEach(() => {
   vi.clearAllMocks()
   getPathMock.mockImplementation((name: string) =>
-    path.resolve(name === 'temp' ? '/var/folders/ab/T' : '/Users/me/Library/Application Support/orca')
+    path.resolve(
+      name === 'temp' ? '/var/folders/ab/T' : '/Users/me/Library/Application Support/orca'
+    )
   )
 })
 
@@ -50,4 +52,16 @@ describe('saveClipboardImageBufferAsTempFile', () => {
     )
     expect(writeFileMock).toHaveBeenCalledWith(savedPath, Buffer.from([1, 2, 3]))
   })
+})
+
+it('keeps a picked file extension while removing path and shell syntax', async () => {
+  const bytes = Buffer.from('notes')
+  const saved = await saveClipboardImageBufferAsTempFile(bytes, {
+    fileName: '../notes$(whoami).txt'
+  })
+  expect(path.basename(saved)).toMatch(/\.txt$/)
+  expect(path.basename(saved)).not.toMatch(/[$()]/)
+  expect(path.relative(path.resolve('/var/folders/ab/T'), saved).startsWith('..')).toBe(false)
+  expect(mkdirMock).toHaveBeenCalledWith(path.dirname(saved), { recursive: true })
+  expect(writeFileMock).toHaveBeenCalledWith(saved, bytes)
 })

@@ -15,7 +15,7 @@ import type { AgentSessionRecordStore } from '../../runtime/agent-session-record
 import { openTestAgentSessionRecordStore } from '../../runtime/agent-session-record-store-test-harness'
 import type { StructuredAgentSessionAdapter } from './structured-agent-session-adapter'
 import { StructuredAgentSessionHost } from './structured-agent-session-host'
-import { CodexAppServerRequestError } from '../../codex/codex-app-server-request-error'
+import { CodexAppServerRequestError } from '../../codex/app-server/codex-app-server-request-error'
 import {
   HOST_TEST_NOW as NOW,
   HOST_TEST_SESSION as SESSION,
@@ -84,6 +84,7 @@ beforeEach(async () => {
     },
     store,
     adapter: {
+      open: async () => ({ reportedOptions: {} }),
       acquire,
       dispatch,
       closeSession: vi.fn(async () => true),
@@ -255,8 +256,7 @@ describe('a send with no live owner', () => {
       reason: 'startup deadline',
       cause: 'unexpected-exit',
       fence: params.envelope.expectedRuntimeFence ?? 0,
-      acquisitionGeneration: 'generation-1',
-      startupUnproven: true
+      acquisitionGeneration: 'generation-1'
     })
     expect(store.getRecord(SESSION)?.lease.claimStatus).toBe('released')
     acquire.mockClear()
@@ -522,17 +522,21 @@ describe('a send with no live owner', () => {
     })
   })
 
-  it('rejects the message with the cause when the restart met a lease someone else is settling', async () => {
+  it('rejects the message without stealing an unresolved reservation', async () => {
     await loseOwner()
-    vi.spyOn(
-      host['conversationDelivery'].loop['deps'],
-      'ensureProviderChild'
-    ).mockResolvedValueOnce({
-      ok: false,
-      refusal: {
-        code: 'execution_owner_reconciling',
-        message: 'Another runtime is still adjudicating this lease.'
+    await store.transitionHandoff(SESSION, (current) => ({
+      ...current,
+      lease: {
+        ...current.lease,
+        claimStatus: 'reserved',
+        handoffStage: 'recovering',
+        ownerProcess: null,
+        spawnToken: 'unresolved-other-start'
       }
+    }))
+    host.deps.probeOwner = async () => ({
+      outcome: 'indeterminate',
+      reason: 'owner identity is still being settled'
     })
 
     const id = await accept(sendParams('owner being settled'))
@@ -542,18 +546,22 @@ describe('a send with no live owner', () => {
     expect(await settled(id)).toMatchObject({
       dispatchState: 'rejected',
       reason: cause,
-      rejection: { kind: 'restartFailed', refusal: { code: 'execution_owner_reconciling' } }
+      rejection: { kind: 'restartFailed', refusal: { code: 'agent_session_ownership_unknown' } }
     })
     expect(acquire).not.toHaveBeenCalled()
     expect(await errorStatuses()).toEqual([cause])
+    expect(store.getRecord(SESSION)?.lease).toMatchObject({
+      spawnToken: 'unresolved-other-start',
+      ownerProcess: null,
+      handoffStage: 'recovering'
+    })
   })
 
   it('rejects the message, and reports the fault, when the restart itself faults', async () => {
     await loseOwner()
-    vi.spyOn(
-      host['conversationDelivery'].loop['deps'],
-      'ensureProviderChild'
-    ).mockRejectedValueOnce(new Error('spawn-token mint failed'))
+    host.deps.mintSpawnToken = () => {
+      throw new Error('spawn-token mint failed')
+    }
 
     const id = await accept(sendParams('bookkeeping failed'))
 
@@ -693,7 +701,8 @@ describe('a write fenced to an owner the pane has not seen replaced', () => {
     expect(await submission(firstParams.envelope.clientOperationId)).toMatchObject({
       dispatchState: 'rejected'
     })
-    expect(acquire).toHaveBeenCalledOnce()
+    // Stop retires the aborted start; the later accepted message owns a fresh child.
+    expect(acquire).toHaveBeenCalledTimes(2)
     expect(dispatch).toHaveBeenCalledTimes(1)
   })
 })

@@ -42,7 +42,6 @@ function input(overrides: { appVersion?: string; environment?: NodeJS.ProcessEnv
   }
 }
 
-/** An extracted generation of `appImagePath` as `orca` registration leaves it. */
 function extractGeneration(options: { node?: boolean; version?: string } = {}): string {
   const generation = resolveAppImageExtractedRoot({ appImagePath, cacheRootPath })!.rootPath
   const launcher = join(generation, 'resources', 'bin', PRODUCT_CONFIG.cli.primary)
@@ -73,7 +72,7 @@ describe('resolveAppImageGenerationDaemonLaunch', () => {
         generationRoot: generation,
         nodePath: join(generation, 'resources', 'node-runtime', 'bin', 'node'),
         entryPath: join(generation, ENTRY_IN_APPDIR),
-        // The identity an own-mount daemon of the same file records, so either is adopted.
+        // Match own-mount identity so either host can be adopted.
         identityPath: join(appImagePath, ENTRY_IN_APPDIR)
       }
     })

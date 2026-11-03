@@ -1,13 +1,10 @@
+import type { RpcClient } from '../transport/rpc-client'
 import type { RuntimeMobileSessionCreateTerminalResult } from '../../../src/shared/runtime-types'
-import { MAX_QUICK_COMMAND_AGENT_PROMPT_LENGTH } from '../../../src/shared/terminal-quick-commands'
+import { LEGACY_MAX_QUICK_COMMAND_AGENT_PROMPT_LENGTH } from '../../../src/shared/terminal-quick-command-prompt-limit'
 import type { TuiAgent } from '../../../src/shared/tui-agent'
 import { FLOATING_WORKSPACE_WORKTREE_ID } from '../session/floating-workspace'
 import { z } from 'zod'
-import {
-  defineRpcOperation,
-  runRpcOperation,
-  type RpcOperationClient
-} from '../transport/rpc-operation'
+import { defineRpcOperation, runRpcOperation } from '../transport/rpc-operation'
 import { rpcResultVariant } from '../transport/rpc-operation-result-reader'
 
 const MAX_CLIENT_MUTATION_ID_LENGTH = 128
@@ -46,7 +43,7 @@ const createHomeTerminal = defineRpcOperation({
 })
 
 export type MobileHomeAgentTerminalCreateInput = {
-  client: RpcOperationClient
+  client: RpcClient
   agent: TuiAgent
   prompt: string
   /**
@@ -71,9 +68,9 @@ export async function createMobileHomeAgentTerminal({
   if (!normalizedPrompt) {
     throw new Error('Agent prompt cannot be empty')
   }
-  if (normalizedPrompt.length > MAX_QUICK_COMMAND_AGENT_PROMPT_LENGTH) {
+  if (normalizedPrompt.length > LEGACY_MAX_QUICK_COMMAND_AGENT_PROMPT_LENGTH) {
     throw new Error(
-      `Agent prompt cannot exceed ${MAX_QUICK_COMMAND_AGENT_PROMPT_LENGTH} characters`
+      `Agent prompt cannot exceed ${LEGACY_MAX_QUICK_COMMAND_AGENT_PROMPT_LENGTH} characters`
     )
   }
 

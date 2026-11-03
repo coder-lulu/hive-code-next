@@ -1,3 +1,4 @@
+import { pairedRuntimeConnectionFromOffer } from '../../shared/paired-runtime-connection'
 import type { PairingOffer } from '../../shared/pairing'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type {
@@ -16,13 +17,13 @@ import {
 import type {
   RemoteRuntimeSubscription,
   RemoteRuntimeSubscriptionCallbacks
-} from '../../shared/remote-runtime-client'
+} from '../../shared/remote-runtime/remote-runtime-client'
 
 const { subscribeRemoteRuntimeRequestMock } = vi.hoisted(() => ({
   subscribeRemoteRuntimeRequestMock: vi.fn()
 }))
 
-vi.mock('../../shared/remote-runtime-client', () => ({
+vi.mock('../../shared/remote-runtime/remote-runtime-client', () => ({
   subscribeRemoteRuntimeRequest: subscribeRemoteRuntimeRequestMock
 }))
 
@@ -78,7 +79,7 @@ describe('PairedRuntimeBrowserHostLease', () => {
       browserHostGeneration: 4
     })
     expect(subscribeRemoteRuntimeRequestMock).toHaveBeenCalledWith(
-      pairing,
+      pairedRuntimeConnectionFromOffer(pairing),
       'browser.clientHost.attach',
       {
         authorityRuntimeId: 'runtime-a',
@@ -88,8 +89,6 @@ describe('PairedRuntimeBrowserHostLease', () => {
       expect.any(Number),
       expect.any(Object),
       expect.objectContaining({
-        // Metadata rides this same connection, and its handler gates on the capability being
-        // declared by the connection the publish arrives on.
         clientCapabilities: [
           BROWSER_CLIENT_HOST_RUNTIME_CAPABILITY,
           BROWSER_CLIENT_PAGE_METADATA_RUNTIME_CAPABILITY
@@ -101,9 +100,6 @@ describe('PairedRuntimeBrowserHostLease', () => {
     expect(close).toHaveBeenCalledOnce()
   })
 
-  // Why this is asserted on the lease and not just at the transport: the runtime accepts page
-  // metadata only on the connection the lease attached on, so sending it anywhere else — the very
-  // thing an ordinary runtime call does — is refused as a stale lease and the page's URL is frozen.
   it('sends page metadata over its own attached connection', async () => {
     const sendRequest = vi.fn().mockResolvedValue({
       ok: true,
@@ -152,7 +148,7 @@ describe('PairedRuntimeBrowserHostLease', () => {
 
     await expect(starting).resolves.toMatchObject({ pageCommandProtocolVersion: 1 })
     expect(subscribeRemoteRuntimeRequestMock).toHaveBeenCalledWith(
-      pairing,
+      pairedRuntimeConnectionFromOffer(pairing),
       'browser.clientHost.attach',
       expect.objectContaining({ pageCommandProtocolVersion: 1 }),
       expect.any(Number),
@@ -197,7 +193,7 @@ describe('PairedRuntimeBrowserHostLease', () => {
 
     expect(getPageInventory).toHaveBeenCalledOnce()
     expect(subscribeRemoteRuntimeRequestMock).toHaveBeenCalledWith(
-      pairing,
+      pairedRuntimeConnectionFromOffer(pairing),
       'browser.clientHost.attach',
       expect.objectContaining({
         pageInventoryProtocolVersion: 1,
@@ -254,7 +250,7 @@ describe('PairedRuntimeBrowserHostLease', () => {
 
     await expect(starting).resolves.not.toHaveProperty('pageInventoryProtocolVersion')
     expect(subscribeRemoteRuntimeRequestMock).toHaveBeenCalledWith(
-      pairing,
+      pairedRuntimeConnectionFromOffer(pairing),
       'browser.clientHost.attach',
       expect.objectContaining({ pageInventoryProtocolVersion: 1, pageInventory: [] }),
       expect.any(Number),
@@ -706,7 +702,7 @@ function createLease(
   } = {}
 ): PairedRuntimeBrowserHostLease {
   return new PairedRuntimeBrowserHostLease({
-    connection: pairing,
+    connection: pairedRuntimeConnectionFromOffer(pairing),
     authorityRuntimeId: 'runtime-a',
     browserHostClientId: 'host-a',
     hostCapabilities: ['webview'],

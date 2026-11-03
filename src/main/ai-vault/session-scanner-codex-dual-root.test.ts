@@ -4,11 +4,6 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { scanAiVaultSessions } from './session-scanner'
 import { isolatedScanRoots, jsonLines } from './session-scanner-test-fixtures'
-import { quoteStartupArg } from '../../shared/tui-agent-startup-shell'
-
-// Scan-level coverage for the canonical-root rule when one physical Codex
-// rollout is copied into both the real ~/.codex and the managed runtime home.
-// Hardlinks are deliberately refused by the safe transcript opener.
 
 let tempRoots: string[] = []
 
@@ -18,117 +13,99 @@ afterEach(async () => {
 })
 
 describe('scanAiVaultSessions codex dual-root dedup', () => {
-  it.each(['copy', 'hardlink'] as const)(
-    'scans a both-roots %s without bypassing transcript safety',
-    async (alias) => {
-      const root = await mkdtemp(join(tmpdir(), 'orca-ai-vault-codex-dedup-'))
-      tempRoots.push(root)
-      const roots = isolatedScanRoots(root)
-      // Sandbox the real and managed homes, including an unsafe hardlink alias.
-      const realHome = join(root, 'real-codex-home')
-      const realSessionsDir = join(realHome, 'sessions')
-      const managedHome = join(root, 'codex-runtime-home', 'home')
-      const managedSessionsDir = join(managedHome, 'sessions')
-      const rolloutName = 'rollout-2026-07-01T10-00-00-019f0000-1111-7222-8333-444444444444.jsonl'
-      await mkdir(join(managedSessionsDir, '2026', '07', '01'), { recursive: true })
-      await mkdir(join(realSessionsDir, '2026', '07', '01'), { recursive: true })
+  it('lists a backfilled both-roots session once, attributed to the real home', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'orca-ai-vault-codex-dedup-'))
+    tempRoots.push(root)
+    const roots = isolatedScanRoots(root)
+    const realHome = join(root, 'real-codex-home')
+    const realSessionsDir = join(realHome, 'sessions')
+    const managedHome = join(root, 'codex-runtime-home', 'home')
+    const managedSessionsDir = join(managedHome, 'sessions')
+    const rolloutName = 'rollout-2026-07-01T10-00-00-019f0000-1111-7222-8333-444444444444.jsonl'
+    await mkdir(join(managedSessionsDir, '2026', '07', '01'), { recursive: true })
+    await mkdir(join(realSessionsDir, '2026', '07', '01'), { recursive: true })
 
-      await writeFile(
-        join(managedSessionsDir, '2026', '07', '01', rolloutName),
-        jsonLines([
-          {
-            timestamp: '2026-07-01T10:00:00.000Z',
-            type: 'session_meta',
-            payload: { id: '019f0000-1111-7222-8333-444444444444', cwd: '/repo/app' }
-          },
-          {
-            timestamp: '2026-07-01T10:00:01.000Z',
-            type: 'response_item',
-            payload: {
-              type: 'message',
-              role: 'user',
-              content: [{ type: 'text', text: 'Backfilled both-roots session' }]
-            }
+    await writeFile(
+      join(managedSessionsDir, '2026', '07', '01', rolloutName),
+      jsonLines([
+        {
+          timestamp: '2026-07-01T10:00:00.000Z',
+          type: 'session_meta',
+          payload: { id: '019f0000-1111-7222-8333-444444444444', cwd: '/repo/app' }
+        },
+        {
+          timestamp: '2026-07-01T10:00:01.000Z',
+          type: 'response_item',
+          payload: {
+            type: 'message',
+            role: 'user',
+            content: [{ type: 'text', text: 'Backfilled both-roots session' }]
           }
-        ])
-      )
-      await (alias === 'copy' ? copyFile : link)(
-        join(managedSessionsDir, '2026', '07', '01', rolloutName),
-        join(realSessionsDir, '2026', '07', '01', rolloutName)
-      )
-      // A managed-only session (e.g. a backfill copy failure) must keep its
-      // managed-home stamp so resume still targets the home that has it.
-      await mkdir(join(managedSessionsDir, '2026', '07', '02'), { recursive: true })
-      await writeFile(
-        join(
-          managedSessionsDir,
-          '2026',
-          '07',
-          '02',
-          'rollout-2026-07-02T09-00-00-029f0000-1111-7222-8333-555555555555.jsonl'
-        ),
-        jsonLines([
-          {
-            timestamp: '2026-07-02T09:00:00.000Z',
-            type: 'session_meta',
-            payload: { id: '029f0000-1111-7222-8333-555555555555', cwd: '/repo/app' }
-          },
-          {
-            timestamp: '2026-07-02T09:00:01.000Z',
-            type: 'response_item',
-            payload: {
-              type: 'message',
-              role: 'user',
-              content: [{ type: 'text', text: 'Managed-only session' }]
-            }
+        }
+      ])
+    )
+    await link(
+      join(managedSessionsDir, '2026', '07', '01', rolloutName),
+      join(realSessionsDir, '2026', '07', '01', rolloutName)
+    )
+    // A rollout absent from the real home must retain its managed home for resume.
+    await mkdir(join(managedSessionsDir, '2026', '07', '02'), { recursive: true })
+    await writeFile(
+      join(
+        managedSessionsDir,
+        '2026',
+        '07',
+        '02',
+        'rollout-2026-07-02T09-00-00-029f0000-1111-7222-8333-555555555555.jsonl'
+      ),
+      jsonLines([
+        {
+          timestamp: '2026-07-02T09:00:00.000Z',
+          type: 'session_meta',
+          payload: { id: '029f0000-1111-7222-8333-555555555555', cwd: '/repo/app' }
+        },
+        {
+          timestamp: '2026-07-02T09:00:01.000Z',
+          type: 'response_item',
+          payload: {
+            type: 'message',
+            role: 'user',
+            content: [{ type: 'text', text: 'Managed-only session' }]
           }
-        ])
-      )
+        }
+      ])
+    )
 
-      const result = await scanAiVaultSessions({
-        ...roots,
-        codexSessionsDir: realSessionsDir,
-        defaultCodexHomeDir: realHome,
-        additionalCodexSessionsDirs: [managedSessionsDir],
-        platform: 'darwin'
-      })
+    const result = await scanAiVaultSessions({
+      ...roots,
+      codexSessionsDir: realSessionsDir,
+      defaultCodexHomeDir: realHome,
+      additionalCodexSessionsDirs: [managedSessionsDir],
+      platform: 'darwin'
+    })
 
-      const codexSessions = result.sessions.filter((session) => session.agent === 'codex')
-      if (alias === 'hardlink') {
-        expect(result.issues).toEqual([
-          expect.objectContaining({
-            agent: 'codex',
-            path: join(realSessionsDir, '2026', '07', '01', rolloutName),
-            message: 'Unsafe transcript file'
-          })
-        ])
-        expect(codexSessions.map((session) => session.sessionId)).toEqual([
-          '029f0000-1111-7222-8333-555555555555'
-        ])
-        return
-      }
-      expect(result.issues).toEqual([])
-      expect(codexSessions).toHaveLength(2)
+    expect(result.issues).toEqual([])
+    const codexSessions = result.sessions.filter((session) => session.agent === 'codex')
+    expect(codexSessions).toHaveLength(2)
 
-      const backfilled = codexSessions.find(
-        (session) => session.sessionId === '019f0000-1111-7222-8333-444444444444'
-      )
-      expect(backfilled).toMatchObject({
-        codexHome: null,
-        filePath: join(realSessionsDir, '2026', '07', '01', rolloutName),
-        resumeCommand: "cd '/repo/app' && codex resume '019f0000-1111-7222-8333-444444444444'"
-      })
-      expect(backfilled?.resumeCommand).not.toContain('CODEX_HOME')
+    const backfilled = codexSessions.find(
+      (session) => session.sessionId === '019f0000-1111-7222-8333-444444444444'
+    )
+    expect(backfilled).toMatchObject({
+      codexHome: null,
+      filePath: join(realSessionsDir, '2026', '07', '01', rolloutName),
+      resumeCommand: "cd '/repo/app' && codex resume '019f0000-1111-7222-8333-444444444444'"
+    })
+    expect(backfilled?.resumeCommand).not.toContain('CODEX_HOME')
 
-      const managedOnly = codexSessions.find(
-        (session) => session.sessionId === '029f0000-1111-7222-8333-555555555555'
-      )
-      expect(managedOnly).toMatchObject({
-        codexHome: managedHome,
-        resumeCommand: `cd '/repo/app' && CODEX_HOME=${quoteStartupArg(managedHome, 'posix')} codex resume '029f0000-1111-7222-8333-555555555555'`
-      })
-    }
-  )
+    const managedOnly = codexSessions.find(
+      (session) => session.sessionId === '029f0000-1111-7222-8333-555555555555'
+    )
+    expect(managedOnly).toMatchObject({
+      codexHome: managedHome,
+      resumeCommand: `cd '/repo/app' && CODEX_HOME='${managedHome}' codex resume '029f0000-1111-7222-8333-555555555555'`
+    })
+  })
 
   it('keeps different same-name rollouts from separate roots', async () => {
     const root = await mkdtemp(join(tmpdir(), 'orca-ai-vault-codex-collision-'))

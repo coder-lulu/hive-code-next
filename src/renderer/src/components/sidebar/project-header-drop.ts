@@ -1,12 +1,9 @@
 import { getEffectiveProjectGroupManualRank } from '../../../../shared/project-groups'
-/* eslint-disable max-lines -- Drop geometry keeps virtual-row and cross-group targeting in one contract. */
-
 import {
   computeWorktreeSidebarHeaderDropPreview,
   type WorktreeSidebarHeaderDropPreview
 } from './worktree-sidebar-header-drop-preview'
-import type { Row } from './worktree-list/grouping/row-types'
-import type { ExecutionHostId } from '../../../../shared/execution-host'
+import { getHeaderDragRepo, type Row } from '../../../../shared/sidebar-list/row-types'
 import type { Repo } from '../../../../shared/repo-types'
 
 export type ProjectHeaderDragBucketKey = string
@@ -14,25 +11,11 @@ export type ProjectHeaderDragBucketKey = string
 export type ProjectHeaderDragRect = {
   repoId: string
   bucketKey: ProjectHeaderDragBucketKey
-  // Index among sibling repo headers in the drag bucket (from the row model),
-  // not the mounted subset. Virtualized rows unmount off-screen headers, so
-  // loop index over mounted rects would map drops to the wrong persisted order.
+  // Use sibling row-model indices because virtualized off-screen headers have no mounted rect.
   headerIndex: number
   top: number
   bottom: number
   sectionBottom?: number
-}
-
-export type ProjectHeaderDropZone = {
-  bucketKey: ProjectHeaderDragBucketKey
-  top: number
-  bottom: number
-  sectionBottom?: number
-}
-
-export type ProjectHeaderBucketDropPreview = ProjectHeaderDropPreview & {
-  bucketKey: ProjectHeaderDragBucketKey
-  sidebarRepoHeaderIds: readonly string[]
 }
 
 export type ProjectHeaderDropPreview = WorktreeSidebarHeaderDropPreview
@@ -43,23 +26,18 @@ export function getProjectHeaderDragBucketKey(
   return repo.projectGroupId ? `group:${repo.projectGroupId}` : 'ungrouped'
 }
 
-export function getProjectGroupIdFromHeaderDragBucketKey(
-  bucketKey: ProjectHeaderDragBucketKey
-): string | null {
-  return bucketKey.startsWith('group:') ? bucketKey.slice('group:'.length) || null : null
-}
-
 export function getSidebarOrderedRepoHeaderIdsByBucket(
   rows: readonly Row[]
 ): Map<ProjectHeaderDragBucketKey, string[]> {
   const buckets = new Map<ProjectHeaderDragBucketKey, string[]>()
   for (const row of rows) {
-    if (row.type !== 'header' || !row.repo) {
+    const repo = row.type === 'header' ? getHeaderDragRepo(row) : undefined
+    if (!repo) {
       continue
     }
-    const bucketKey = getProjectHeaderDragBucketKey(row.repo)
+    const bucketKey = getProjectHeaderDragBucketKey(repo)
     const list = buckets.get(bucketKey) ?? []
-    list.push(row.repo.id)
+    list.push(repo.id)
     buckets.set(bucketKey, list)
   }
   return buckets
@@ -94,8 +72,7 @@ export function getProjectGroupOrderForSidebarDrop(args: {
   if (after > before) {
     return before + (after - before) / 2
   }
-  // Why: duplicate legacy ranks leave no numeric slot between neighbors; choose
-  // a deterministic finite value so the next drag has a persisted anchor.
+  // Equal legacy ranks have no interior numeric slot; retain a finite deterministic anchor.
   return before + 1
 }
 
@@ -104,8 +81,7 @@ export function mapSidebarProjectHeaderDropIndexToSiblingInsertIndex(args: {
   sourceIndex: number
   siblingCount: number
 }): number {
-  // Why: sidebar drop indices include the dragged header, but group-order ranks
-  // are computed against the sibling list after that header is removed.
+  // Convert the row-model insertion slot to the sibling list with the dragged header removed.
   const adjustedDropIndex =
     args.sourceIndex >= 0 && args.sidebarDropIndex > args.sourceIndex
       ? args.sidebarDropIndex - 1
@@ -134,21 +110,6 @@ function getOptionalNumberAttribute(element: HTMLElement, attribute: string): nu
   return Number.isFinite(value) ? value : undefined
 }
 
-function getElementContentBounds(
-  element: HTMLElement,
-  container: HTMLElement,
-  containerTop: number
-): { top: number; bottom: number } {
-  const rect = element.getBoundingClientRect()
-  const virtualRow = element.closest<HTMLElement>('[data-worktree-virtual-row]')
-  const virtualRowStart = getVirtualRowStart(virtualRow)
-  const top =
-    virtualRow && virtualRowStart !== null
-      ? virtualRowStart + rect.top - virtualRow.getBoundingClientRect().top
-      : rect.top - containerTop + container.scrollTop
-  return { top, bottom: top + rect.height }
-}
-
 export function measureProjectHeaderDragRects(
   container: HTMLElement,
   bucketKey?: ProjectHeaderDragBucketKey
@@ -166,43 +127,24 @@ export function measureProjectHeaderDragRects(
     if (bucketKey !== undefined && elementBucketKey !== bucketKey) {
       return
     }
-    const bounds = getElementContentBounds(element, container, containerRect.top)
+    const rect = element.getBoundingClientRect()
+    const virtualRow = element.closest<HTMLElement>('[data-worktree-virtual-row]')
+    const virtualRowStart = getVirtualRowStart(virtualRow)
+    const top =
+      virtualRow && virtualRowStart !== null
+        ? virtualRowStart + rect.top - virtualRow.getBoundingClientRect().top
+        : rect.top - containerRect.top + container.scrollTop
     rects.push({
       repoId,
       bucketKey: elementBucketKey,
       headerIndex,
-      top: bounds.top,
-      bottom: bounds.bottom,
+      top,
+      bottom: top + rect.height,
       sectionBottom: getOptionalNumberAttribute(element, 'data-repo-header-section-end')
     })
   })
   rects.sort((left, right) => left.top - right.top)
   return rects
-}
-
-export function measureProjectHeaderDropZones(container: HTMLElement): ProjectHeaderDropZone[] {
-  const containerTop = container.getBoundingClientRect().top
-  const zones: ProjectHeaderDropZone[] = []
-  container
-    .querySelectorAll<HTMLElement>(
-      '[data-project-group-header-id], [data-ungrouped-project-group-header]'
-    )
-    .forEach((element) => {
-      const groupId = element.getAttribute('data-project-group-header-id')?.trim()
-      const isUngrouped = element.hasAttribute('data-ungrouped-project-group-header')
-      if (!groupId && !isUngrouped) {
-        return
-      }
-      const bounds = getElementContentBounds(element, container, containerTop)
-      zones.push({
-        bucketKey: groupId ? `group:${groupId}` : 'ungrouped',
-        top: bounds.top,
-        bottom: bounds.bottom,
-        sectionBottom: getOptionalNumberAttribute(element, 'data-project-group-header-section-end')
-      })
-    })
-  zones.sort((left, right) => left.top - right.top)
-  return zones
 }
 
 export function mapSidebarRepoDropIndexToAllRepoInsertAt(
@@ -243,100 +185,6 @@ export function computeProjectHeaderDropPreview(args: {
   })
 }
 
-export function isProjectHeaderDropBucketHostCompatible(args: {
-  sourceBucketKey: ProjectHeaderDragBucketKey
-  targetBucketKey: ProjectHeaderDragBucketKey
-  sourceExecutionHostId: ExecutionHostId
-  projectGroupHostIdByGroupId: ReadonlyMap<string, ExecutionHostId | null>
-}): boolean {
-  if (args.targetBucketKey === 'ungrouped') {
-    return true
-  }
-  const targetGroupId = getProjectGroupIdFromHeaderDragBucketKey(args.targetBucketKey)
-  return Boolean(
-    targetGroupId &&
-    args.projectGroupHostIdByGroupId.get(targetGroupId) === args.sourceExecutionHostId
-  )
-}
-
-const CROSS_BUCKET_INDICATOR_GAP_PX = 4
-
-export function computeProjectHeaderBucketDropPreview(args: {
-  pointerY: number
-  containerTop: number
-  scrollTop: number
-  rects: readonly ProjectHeaderDragRect[]
-  dropZones: readonly ProjectHeaderDropZone[]
-  sidebarRepoHeaderIdsByBucket: ReadonlyMap<ProjectHeaderDragBucketKey, readonly string[]>
-  sourceBucketKey: ProjectHeaderDragBucketKey
-  sourceExecutionHostId: ExecutionHostId
-  projectGroupHostIdByGroupId: ReadonlyMap<string, ExecutionHostId | null>
-  contentBottom?: number
-}): ProjectHeaderBucketDropPreview | null {
-  const localY = args.pointerY - args.containerTop + args.scrollTop
-  if (args.contentBottom !== undefined && localY > args.contentBottom) {
-    return null
-  }
-
-  const candidates = [
-    ...args.dropZones.map((zone) => ({
-      bucketKey: zone.bucketKey,
-      top: zone.top,
-      bottom: Math.max(zone.bottom, zone.sectionBottom ?? zone.bottom),
-      headerBottom: zone.bottom,
-      kind: 'group' as const
-    })),
-    ...args.rects.map((rect) => ({
-      bucketKey: rect.bucketKey,
-      top: rect.top,
-      bottom: Math.max(rect.bottom, rect.sectionBottom ?? rect.bottom),
-      headerBottom: rect.bottom,
-      kind: 'repo' as const
-    }))
-  ].filter((candidate) => localY >= candidate.top && localY <= candidate.bottom)
-  const target = candidates.reduce<(typeof candidates)[number] | null>(
-    (current, candidate) => (!current || candidate.top >= current.top ? candidate : current),
-    null
-  )
-  if (
-    !target ||
-    !isProjectHeaderDropBucketHostCompatible({
-      sourceBucketKey: args.sourceBucketKey,
-      targetBucketKey: target.bucketKey,
-      sourceExecutionHostId: args.sourceExecutionHostId,
-      projectGroupHostIdByGroupId: args.projectGroupHostIdByGroupId
-    })
-  ) {
-    return null
-  }
-
-  const sidebarRepoHeaderIds = args.sidebarRepoHeaderIdsByBucket.get(target.bucketKey) ?? []
-  const targetRects = args.rects.filter((rect) => rect.bucketKey === target.bucketKey)
-  const firstTargetRect = targetRects[0]
-  if (target.kind === 'group' && (!firstTargetRect || localY < firstTargetRect.top)) {
-    return {
-      bucketKey: target.bucketKey,
-      sidebarRepoHeaderIds,
-      dropIndex: 0,
-      dropIndicatorY: Math.max(
-        args.scrollTop,
-        firstTargetRect
-          ? firstTargetRect.top - CROSS_BUCKET_INDICATOR_GAP_PX
-          : target.headerBottom + CROSS_BUCKET_INDICATOR_GAP_PX
-      )
-    }
-  }
-  const preview = computeProjectHeaderDropPreview({
-    pointerY: args.pointerY,
-    containerTop: args.containerTop,
-    scrollTop: args.scrollTop,
-    rects: targetRects,
-    sidebarRepoHeaderIds,
-    contentBottom: args.contentBottom
-  })
-  return preview ? { bucketKey: target.bucketKey, sidebarRepoHeaderIds, ...preview } : null
-}
-
 export function applyAllRepoInsertAt(
   allRepoIds: readonly string[],
   draggedRepoId: string,
@@ -345,8 +193,7 @@ export function applyAllRepoInsertAt(
   if (!allRepoIds.includes(draggedRepoId) || insertAt < 0 || insertAt > allRepoIds.length) {
     return null
   }
-  // Why: one merged header controls every host-qualified occurrence; moving
-  // them together prevents a drag from persisting a cross-host split project.
+  // Move every host-qualified occurrence together so a merged project header cannot persist a split.
   const draggedBlock = allRepoIds.filter((repoId) => repoId === draggedRepoId)
   const removedBeforeInsert = allRepoIds
     .slice(0, insertAt)

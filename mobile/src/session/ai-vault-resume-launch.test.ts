@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { AiVaultSession } from '../../../src/shared/ai-vault-types'
+import { tokenizeStartupCommand } from '../../../src/shared/tui-agent-startup-shell'
 import { buildAgentResumeStartupPlan } from '../../../src/shared/tui-agent-startup'
 import {
   buildMobileAiVaultResumeLaunch,
@@ -41,9 +42,9 @@ function session(overrides: Partial<AiVaultSession> = {}): AiVaultSession {
 
 describe('buildMobileAiVaultResumeCommand', () => {
   it('delegates POSIX command construction to the shared AI Vault builder', () => {
-    expect(buildMobileAiVaultResumeCommand({ session: session(), hostPlatform: 'darwin' })).toBe(
-      "cd '/Users/ada/repo' && claude --resume 'session 1'"
-    )
+    expect(
+      buildMobileAiVaultResumeCommand({ session: session(), workspacePlatform: 'darwin' })
+    ).toBe("cd '/Users/ada/repo' && claude --resume 'session 1'")
   })
 
   it('uses PowerShell-safe queued command construction for default local Windows terminals', () => {
@@ -55,7 +56,7 @@ describe('buildMobileAiVaultResumeCommand', () => {
           cwd: 'C:\\repo app',
           codexHome: 'C:\\Users\\Ada\\.codex'
         }),
-        hostPlatform: 'win32'
+        workspacePlatform: 'win32'
       })
     ).toBe(
       "Set-Location -LiteralPath 'C:\\repo app'; $env:CODEX_HOME='C:\\Users\\Ada\\.codex'; codex resume 'codex-1'"
@@ -73,7 +74,7 @@ describe('buildMobileAiVaultResumeCommand', () => {
           filePath: '/Users/ada/.omp/agent/sessions/repo/sess.jsonl',
           cwd: '/Users/ada/repo'
         }),
-        hostPlatform: 'darwin'
+        workspacePlatform: 'darwin'
       })
     ).toBe("cd '/Users/ada/repo' && omp --resume '/Users/ada/.omp/agent/sessions/repo/sess.jsonl'")
   })
@@ -88,7 +89,7 @@ describe('buildMobileAiVaultResumeCommand', () => {
         cwd: 'C:\\repo app',
         codexHome: 'C:\\Users\\Ada\\.codex'
       }),
-      hostPlatform: 'win32',
+      workspacePlatform: 'win32',
       hostTerminalWindowsShell: 'cmd.exe'
     })
     expect(command).toBe(
@@ -105,7 +106,7 @@ describe('buildMobileAiVaultResumeCommand', () => {
           cwd: '/home/ada/repo',
           codexHome: '\\\\wsl.localhost\\Ubuntu\\home\\ada\\.codex'
         }),
-        hostPlatform: 'linux'
+        workspacePlatform: 'linux'
       })
     ).toBe("cd '/home/ada/repo' && CODEX_HOME='/home/ada/.codex' codex resume 'codex-1'")
   })
@@ -114,7 +115,7 @@ describe('buildMobileAiVaultResumeCommand', () => {
     expect(
       buildMobileAiVaultResumeCommand({
         session: session({ sessionId: 'abc' }),
-        hostPlatform: 'linux',
+        workspacePlatform: 'linux',
         commandOverride: 'claude-dev'
       })
     ).toBe("cd '/Users/ada/repo' && claude-dev --resume 'abc'")
@@ -130,13 +131,13 @@ describe('buildMobileAiVaultResumeLaunch', () => {
         agent: 'kimi',
         sessionId: 'session_431324d7-2165-42f0-9ecd-9f93437b3201'
       }),
-      hostPlatform: 'darwin'
+      workspacePlatform: 'darwin'
     })
 
     expect(launch).toMatchObject({
       command:
-        "cd '/Users/ada/repo' && kimi '--yolo' '--session' 'session_431324d7-2165-42f0-9ecd-9f93437b3201'",
-      launchConfig: { agentCommand: "kimi '--yolo'" },
+        "cd '/Users/ada/repo' && kimi '--session' 'session_431324d7-2165-42f0-9ecd-9f93437b3201'",
+      launchConfig: { agentCommand: 'kimi' },
       launchAgent: 'kimi'
     })
   })
@@ -148,7 +149,7 @@ describe('buildMobileAiVaultResumeLaunch', () => {
         sessionId: 'omp-custom-1',
         filePath: '/custom/omp-sessions/project/session.jsonl'
       }),
-      hostPlatform: 'linux',
+      workspacePlatform: 'linux',
       settings: {
         agentDefaultArgs: { omp: '--model custom' },
         agentDefaultEnv: { omp: { OMP_PROFILE: 'custom' } }
@@ -185,6 +186,56 @@ describe('buildMobileAiVaultResumeLaunch', () => {
     })
   })
 
+  it('honors Own over the global permission default while retaining user argv and env', () => {
+    const launch = buildMobileAiVaultResumeLaunch({
+      session: session(),
+      workspacePlatform: 'darwin',
+      settings: {
+        agentPermissionDefault: 'full-access',
+        agentPermissionOverrides: { claude: 'own' },
+        agentDefaultArgs: { claude: '--model opus' },
+        agentDefaultEnv: { claude: { ANTHROPIC_BASE_URL: 'https://example.test' } }
+      }
+    })
+    expect(launch.launchConfig?.agentArgs).toBe('--model opus')
+    expect(launch.command).not.toContain('--dangerously-skip-permissions')
+    expect(launch.env).toEqual({ ANTHROPIC_BASE_URL: 'https://example.test' })
+  })
+
+  it('passes the current permission choice to real startup planning', () => {
+    const launch = buildMobileAiVaultResumeLaunch({
+      session: session(),
+      workspacePlatform: 'darwin',
+      settings: {
+        agentPermissionDefault: 'full-access',
+        agentDefaultArgs: { claude: '--model opus' }
+      }
+    })
+    expect(launch.launchConfig?.agentArgs).toContain('--dangerously-skip-permissions')
+    expect(launch.launchConfig?.agentArgs).toContain('--model opus')
+  })
+
+  it('preserves quoted permission-like text and the literal argv separator under Own', () => {
+    const userArgs = '--prompt "literal --dangerously-skip-permissions" -- --model literal'
+    const launch = buildMobileAiVaultResumeLaunch({
+      session: session(),
+      workspacePlatform: 'darwin',
+      settings: { agentPermissionDefault: 'own', agentDefaultArgs: { claude: userArgs } }
+    })
+    expect(launch.launchConfig?.agentArgs).toBe(userArgs)
+    expect(tokenizeStartupCommand(launch.launchConfig?.agentCommand ?? '', 'posix')).toMatchObject({
+      ok: true,
+      tokens: [
+        'claude',
+        '--prompt',
+        'literal --dangerously-skip-permissions',
+        '--',
+        '--model',
+        'literal'
+      ]
+    })
+  })
+
   it('uses shared TUI startup planning for default args, env, and launch config', () => {
     const launch = buildMobileAiVaultResumeLaunch({
       session: session({
@@ -192,7 +243,7 @@ describe('buildMobileAiVaultResumeLaunch', () => {
         sessionId: 'abc 123',
         cwd: '/Users/ada/repo'
       }),
-      hostPlatform: 'darwin',
+      workspacePlatform: 'darwin',
       settings: {
         agentCmdOverrides: { claude: 'claude-dev' },
         agentDefaultArgs: { claude: '--model opus' },
@@ -219,7 +270,7 @@ describe('buildMobileAiVaultResumeLaunch', () => {
     // created pane; desktop already strips the pair at pane spawn.
     const launch = buildMobileAiVaultResumeLaunch({
       session: session({ agent: 'codex', sessionId: 'codex-1', codexHome: null }),
-      hostPlatform: 'darwin',
+      workspacePlatform: 'darwin',
       settings: {
         agentDefaultEnv: { codex: { CODEX_HOME: '/Users/ada/.codex-pinned' } }
       }
@@ -235,7 +286,7 @@ describe('buildMobileAiVaultResumeLaunch', () => {
         sessionId: 'codex-1',
         codexHome: '/Users/ada/.orca/codex-runtime-home/home'
       }),
-      hostPlatform: 'darwin'
+      workspacePlatform: 'darwin'
     })
     expect(launch.command).toContain("CODEX_HOME='/Users/ada/.orca/codex-runtime-home/home'")
     expect(launch.envToDelete).toBeUndefined()
@@ -332,10 +383,7 @@ describe('resumeAiVaultSessionInTerminal', () => {
           agentEnv: { ANTHROPIC_BASE_URL: 'http://localhost:3000' }
         },
         launchAgent: 'claude',
-        clientMutationId: 'resume-1',
-        activate: false,
-        select: true,
-        navigation: 'caller'
+        clientMutationId: 'resume-1'
       })
     ).resolves.toMatchObject({ id: 'tab-1', terminal: 'pty-1' })
     expect(sendRequest).toHaveBeenNthCalledWith(

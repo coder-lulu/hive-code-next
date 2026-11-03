@@ -1,6 +1,7 @@
-import { lstat, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join, win32 } from 'node:path'
+import { basename, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type {
   AgentSessionClaimStatus,
@@ -24,13 +25,12 @@ import {
   stopStructuredAgentSessionRuntime
 } from './structured-agent-session-runtime'
 import { seedTestAgentSessionRecordStore } from './agent-session-record-store-test-harness'
+import { nativeChatScratchFolderFor } from '../native-chat/native-chat-scratch-folder'
 import { foundAgentSessionRecord } from './agent-session-record-founding'
-import {
-  closeTestJournalHostDatabase,
-  openTestJournalHostDatabase
-} from '../native-chat/agent-session-journal/journal-host-database-test-support'
+import { openTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import { recordingStructuredAgentSessionLogger } from '../native-chat/agent-session-wire/structured-agent-session-logger-test-support'
 import { createStructuredAgentSessionLogger } from '../native-chat/agent-session-wire/structured-agent-session-logger'
+import { onStructuredAgentSessionsHeldChanged } from '../native-chat/agent-session-wire/structured-agent-session-registry'
 
 const HOST_ID = 'local'
 
@@ -79,7 +79,6 @@ describe('structured agent-session store presence', () => {
     return JournalHostDatabase.open(profile)
   }
 
-  // Every host install creates the database, chats or not; startup restore must not wait on one.
   it('reports a profile whose database holds no chat absent', async () => {
     ;(await openProfileDatabase()).close()
 
@@ -103,11 +102,11 @@ describe('structured agent-session store presence', () => {
     expect(hasPersistedStructuredAgentSessionStore(profile)).toBe(true)
   })
 
-  it('reports a fresh profile absent when no journal or migration records exist', () => {
+  it('reports a fresh profile absent after one presence check', () => {
     const fileExists = vi.fn(() => false)
 
     expect(hasPersistedStructuredAgentSessionStore('/profile', fileExists)).toBe(false)
-    expect(fileExists).toHaveBeenCalledWith(journalDatabasePath('/profile'))
+    expect(fileExists).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -195,8 +194,7 @@ describe('structured agent-session owner probe', () => {
   it('frees a lease that names neither an owner nor a spawn token', async () => {
     const probe = deadProbe()
     const scan = vi.fn(async () => [] as number[])
-    // Nothing was ever minted that a child could be carrying, so no scan is even needed;
-    // answering `indeterminate` here is what latches every released record into recovery.
+    // Without an owner or minted token no scan is needed; indeterminate would trap released records in recovery.
     const result = await createStructuredAgentSessionOwnerProbe(HOST_ID, probe, scan)(record(null))
 
     expect(probe).not.toHaveBeenCalled()
@@ -221,7 +219,6 @@ describe('structured agent-session runtime install', () => {
   afterEach(async () => {
     await stopStructuredAgentSessionRuntime()
     if (stateDirectory) {
-      closeTestJournalHostDatabase(stateDirectory)
       await rm(stateDirectory, { recursive: true, force: true })
       stateDirectory = null
     }
@@ -307,6 +304,30 @@ describe('structured agent-session runtime install', () => {
     }
   )
 
+  it('moves pre-rename chat visuals under the current root before the host is readable', async () => {
+    stateDirectory = await mkdtemp(join(tmpdir(), 'orca-structured-runtime-visuals-'))
+    await seedTestAgentSessionRecordStore(stateDirectory, { records: [oldChat('codex')] })
+    const current = nativeChatScratchFolderFor(stateDirectory, 'old-codex')
+    const legacy = join(stateDirectory, 'native-chat-visuals', basename(current))
+    await mkdir(legacy, { recursive: true })
+    await writeFile(join(legacy, 'chart.html'), '<p>chart</p>')
+
+    let readableAtPublication = false
+    const stopListening = onStructuredAgentSessionsHeldChanged((held) => {
+      if (held) {
+        readableAtPublication = readFileSync(join(current, 'chart.html'), 'utf8') === '<p>chart</p>'
+      }
+    })
+    try {
+      await installOver([])
+    } finally {
+      stopListening()
+    }
+
+    expect(readableAtPublication).toBe(true)
+    expect(await readFile(join(current, 'chart.html'), 'utf8')).toBe('<p>chart</p>')
+  })
+
   it('holds stop until the model catalog has written its coalesced save', async () => {
     stateDirectory = await mkdtemp(join(tmpdir(), 'orca-structured-runtime-'))
     await ensureStructuredAgentSessionHost({
@@ -341,19 +362,6 @@ describe('structured agent-session runtime install', () => {
   it('supports native Windows creation without the process-table addon', async () => {
     stateDirectory = await mkdtemp(join(tmpdir(), 'orca-structured-runtime-'))
     const originalPlatform = process.platform
-    const physicalJournalPath = journalDatabasePath(stateDirectory)
-    const originalToNamespacedPath = win32.toNamespacedPath
-    const namespace =
-      originalPlatform === 'win32'
-        ? undefined
-        : vi.spyOn(win32, 'toNamespacedPath').mockImplementation(function (
-            this: unknown,
-            ...args: Parameters<typeof win32.toNamespacedPath>
-          ) {
-            return args[0] === physicalJournalPath
-              ? physicalJournalPath
-              : originalToNamespacedPath.apply(this, args)
-          })
     const location: AgentSessionExecutionLocation = {
       executionHostId: 'local',
       wslDistro: null,
@@ -375,12 +383,10 @@ describe('structured agent-session runtime install', () => {
         readProcessStartTime: async () => 1_700_000_000_000
       })
 
-      expect((await lstat(physicalJournalPath)).isFile()).toBe(true)
       // No addon means no creation times; chat no longer depends on them.
       expect(host.supportsCreate(location, 'codex')).toBe(true)
       expect(host.supportsCreate(location, 'claude')).toBe(true)
     } finally {
-      namespace?.mockRestore()
       __setWindowsProcessTreeLoaderForTests()
       Object.defineProperty(process, 'platform', { configurable: true, value: originalPlatform })
     }

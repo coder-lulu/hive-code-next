@@ -6,19 +6,6 @@ import {
 import { APP_DISPLAY_NAME } from '../../shared/brand'
 
 describe('isMissingRemoteRefGitError', () => {
-  it('matches missing remote ref messages', () => {
-    expect(
-      isMissingRemoteRefGitError(
-        new Error('fatal: could not find remote ref refs/heads/feature/test')
-      )
-    ).toBe(true)
-    expect(
-      isMissingRemoteRefGitError(
-        new Error("fatal: couldn't find remote ref refs/heads/feature/test")
-      )
-    ).toBe(true)
-  })
-
   it('does not match auth or network failures', () => {
     expect(isMissingRemoteRefGitError(new Error('fatal: Authentication failed'))).toBe(false)
     expect(

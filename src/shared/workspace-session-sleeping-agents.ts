@@ -63,7 +63,7 @@ const sleepingAgentLaunchEnvSchema = z.preprocess(
   z.record(z.string(), z.string())
 )
 
-const sleepingAgentLaunchConfigBaseSchema = z.object({
+export const sleepingAgentLaunchConfigBaseSchema = z.object({
   agentCommand: z.string().optional(),
   agentArgs: z.string(),
   agentEnv: sleepingAgentLaunchEnvSchema,
@@ -77,7 +77,7 @@ const sleepingAgentLaunchConfigBaseSchema = z.object({
     .refine((value) => !hasUnsafeLaunchEnvChars(value))
     .optional(),
   hostDefaultsAuthoritative: z.literal(true).optional(),
-  agentPermissionMode: z.enum(['manual', 'yolo']).optional()
+  agentPermissionMode: z.enum(['manual', 'yolo', 'auto']).optional()
 })
 
 export const sleepingAgentLaunchConfigSchema = z.preprocess((raw) => {
@@ -85,7 +85,7 @@ export const sleepingAgentLaunchConfigSchema = z.preprocess((raw) => {
   return parsed.success ? parsed.data : undefined
 }, sleepingAgentLaunchConfigBaseSchema.optional())
 
-const sleepingAgentSessionRecordSchema = z
+export const sleepingAgentSessionRecordSchema = z
   .object({
     paneKey: z.string().refine((value) => value.length > 0),
     tabId: terminalTabIdSchema.optional(),

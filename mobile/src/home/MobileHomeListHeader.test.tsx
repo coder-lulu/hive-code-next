@@ -1,3 +1,4 @@
+import { findAllByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -21,7 +22,7 @@ describe('Original Orca home summary', () => {
     act(() => {
       renderer = create(createElement(MobileHomeListHeader, props))
     })
-    return renderer!.root.findAllByType('Text').map((node) => node.children.join(''))
+    return findAllByHostType(renderer!.root, 'Text').map((node) => node.children.join(''))
   }
 
   it('shows the empty computer section heading without fabricated statistics', () => {

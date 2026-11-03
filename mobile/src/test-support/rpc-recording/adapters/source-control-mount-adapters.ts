@@ -1,5 +1,6 @@
 import type { MountAdapter } from '../recording-scenario'
 import { operationModuleLoader } from '../operation-module-loader'
+import type { GitHubLinkBase } from '../../../../../src/shared/worktree/github-link-base'
 
 const WORKTREE = 'repo42::/p'
 
@@ -66,17 +67,19 @@ export function sourceControlMountAdapters(
       )
       let outcome: unknown = 'unlinked'
       let linkedPR: unknown = 'unread'
+      let githubLinkBase: GitHubLinkBase | null = null
       return {
         action(name) {
           if (name === 'read') {
-            return link.fetchWorktreeLinkedPR(client, WORKTREE).then((value) => {
-              linkedPR = value
-              return value
+            return link.fetchWorktreeGitHubLinkBase(client, WORKTREE).then((value) => {
+              githubLinkBase = value
+              linkedPR = value?.linkedPR ?? null
+              return linkedPR
             })
           }
           const request =
             name === 'unlink'
-              ? link.unlinkMobilePr(client, WORKTREE)
+              ? link.unlinkMobilePr(client, WORKTREE, 12, githubLinkBase)
               : name === 'link-review'
                 ? link.linkMobileHostedReview(client, WORKTREE, 'gitlab', 12, {
                     baseRef: ' origin/release '

@@ -1,3 +1,4 @@
+import { PushUnregisterOutbox } from '../push/push-unregister-outbox'
 import type { RuntimeDeviceGrant } from '../rpc/rpc-caller-scope'
 import type { DeviceRegistry, DeviceScope, TokenDeviceEntry } from '../device-registry'
 import type { E2EEKeypair } from '../e2ee-keypair'
@@ -15,6 +16,17 @@ import {
 } from './runtime-rpc-pairing-types'
 
 export class RuntimeRpcPairing extends RuntimeRpcNetworkExposure {
+  private pushUnregisterOutbox: PushUnregisterOutbox | null = null
+  private onPushUnregisterQueued: (() => void) | null = null
+
+  getPushUnregisterOutbox(): PushUnregisterOutbox {
+    return (this.pushUnregisterOutbox ??= new PushUnregisterOutbox(this.userDataPath))
+  }
+
+  setOnPushUnregisterQueued(callback: (() => void) | null): void {
+    this.onPushUnregisterQueued = callback
+  }
+
   getDeviceRegistry(): DeviceRegistry | null {
     return this.deviceRegistry
   }
@@ -44,6 +56,18 @@ export class RuntimeRpcPairing extends RuntimeRpcNetworkExposure {
     const device = this.deviceRegistry?.getDevice(deviceId)
     if (device?.scope !== 'mobile') {
       return false
+    }
+    if (device.pushRegistration) {
+      try {
+        this.getPushUnregisterOutbox().enqueue({
+          deviceId,
+          registrationId: device.pushRegistration.registrationId
+        })
+        this.onPushUnregisterQueued?.()
+      } catch (error) {
+        // Gateway cleanup is best effort; local revocation must still stop access.
+        console.error('[runtime] Failed to persist a push token cleanup:', error)
+      }
     }
     if (!this.deviceRegistry?.removeDevice(deviceId)) {
       return false

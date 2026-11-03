@@ -1,4 +1,9 @@
+import {
+  retireRepoCatalogWorktreeMetadata,
+  type RepoCatalogWorktreeRemoval
+} from './repo-catalog-worktree-removal'
 import type { StateCreator } from 'zustand'
+import { loadRepoCatalog } from './repo-catalog-load'
 import type { AppState } from '../types'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { Repo } from '../../../../shared/repo-types'
@@ -14,17 +19,16 @@ import type { RepoSlice } from './repo-state'
 import {
   filterSetupsForPrunedRepoRows,
   mergeFetchedRepoCatalog,
-  reconcileReadoptedSshWorktreeState,
+  reconcileFetchedCatalogWorktreeState,
   reconcileSupersededSshRepos
 } from './repo-catalog-merge'
 import { getRuntimeTargetHostId } from '../../runtime/runtime-client-target'
 import { mergeFetchedHostProjectCatalog } from '../../../../shared/project-compatibility-host-merge'
 import { scheduleSafeAutoForkSync } from './safe-auto-fork-sync'
-import { loadRepoCatalog } from './repo-catalog-load'
 import {
-  reconcileRepoCatalogWorktrees,
-  retireRepoCatalogWorktreeMetadata
-} from './repo-catalog-worktree-removal'
+  withWslMovedRepoIds,
+  withWslMovedSetupScriptDismissals
+} from './wsl-moved-repo-ui-retention'
 
 export function createRuntimeRepoCatalogActions(
   set: Parameters<StateCreator<AppState>>[0],
@@ -46,7 +50,7 @@ export function createRuntimeRepoCatalogActions(
           return []
         }
         let finalizedHostRepos: Repo[] = []
-        let removedByRepo = new Map<string, string[]>()
+        let removal: RepoCatalogWorktreeRemoval | undefined
         set((s) => {
           if (!isHostCatalogFenceCurrent(get, fence)) {
             return s
@@ -76,13 +80,6 @@ export function createRuntimeRepoCatalogActions(
           finalizedHostRepos = finalizedRepos.filter(
             (repo) => getRepoExecutionHostId(repo) === result.hostId
           )
-          const worktreeState = reconcileReadoptedSshWorktreeState(s, s.pendingSshRepoReadoptions)
-          const removal = reconcileRepoCatalogWorktrees(
-            { ...s, ...worktreeState },
-            finalizedRepos,
-            result.hostId
-          )
-          removedByRepo = removal.removedByRepo
           return {
             repos: finalizedRepos,
             ...(visibilityDefaults === undefined
@@ -117,20 +114,28 @@ export function createRuntimeRepoCatalogActions(
                 : {}
               : {}),
             pendingSshRepoReadoptions: reconciliation.pendingReadoptions,
-            ...worktreeState,
-            ...removal.patch,
+            ...reconcileFetchedCatalogWorktreeState(s, catalog, finalizedRepos, (result) => {
+              removal = result
+            }),
             ...mergedProjectCompatibility,
             activeRepoId:
               s.activeRepoId && validRepoIds.has(s.activeRepoId) ? s.activeRepoId : null,
-            filterRepoIds: retainValidFilterRepoIds(s.filterRepoIds, validRepoIds),
-            setupScriptPromptDismissedRepoIds: filterSetupScriptPromptDismissalsToValidRepos(
+            filterRepoIds: retainValidFilterRepoIds(
+              s.filterRepoIds,
+              withWslMovedRepoIds(validRepoIds, s.wslMovedProjects)
+            ),
+            setupScriptPromptDismissedRepoIds: withWslMovedSetupScriptDismissals(
               s.setupScriptPromptDismissedRepoIds,
-              validRepoHostIdentities
+              filterSetupScriptPromptDismissalsToValidRepos(
+                s.setupScriptPromptDismissedRepoIds,
+                validRepoHostIdentities
+              ),
+              s.wslMovedProjects
             )
           }
         })
+        if (removal) retireRepoCatalogWorktreeMetadata(catalog.hostId, removal.removedByRepo)
         scheduleSafeAutoForkSync(finalizedHostRepos)
-        retireRepoCatalogWorktreeMetadata(targetHostId, removedByRepo)
         return finalizedHostRepos
       } catch (err) {
         console.error(`Failed to fetch repos for runtime environment ${environmentId}:`, err)

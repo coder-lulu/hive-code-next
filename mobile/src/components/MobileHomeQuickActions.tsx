@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { useRef, useState } from 'react'
 import { Plus, QrCode } from 'lucide-react-native'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
@@ -34,6 +35,7 @@ function hostPickerOptions(hosts: HostProfile[]) {
 }
 
 export function MobileHomeQuickActions(props: Props) {
+  const t = useMobileTranslation()
   const styles = createStyles(props.theme)
   const [hostPickerForHostSet, setHostPickerForHostSet] = useState<string | null>(null)
   const pendingHostIdRef = useRef<string | null>(null)
@@ -70,7 +72,9 @@ export function MobileHomeQuickActions(props: Props) {
 
   return (
     <>
-      <Text style={styles.sectionHeading}>快捷操作</Text>
+      <Text style={styles.sectionHeading}>
+        {t('components.homeQuickActions.title', 'Quick Actions')}
+      </Text>
       <View style={styles.quickActions}>
         <Pressable
           accessibilityRole="button"
@@ -80,7 +84,9 @@ export function MobileHomeQuickActions(props: Props) {
           <View style={styles.quickActionIcon}>
             <QrCode size={20} strokeWidth={2} color={props.theme.color.text.secondary} />
           </View>
-          <Text style={styles.quickActionLabel}>连接电脑</Text>
+          <Text style={styles.quickActionLabel}>
+            {t('components.homeQuickActions.pairDesktop', 'Pair Desktop')}
+          </Text>
         </Pressable>
         {props.onCreateWorkspace ? (
           <Pressable
@@ -97,13 +103,15 @@ export function MobileHomeQuickActions(props: Props) {
             <View style={styles.quickActionIcon}>
               <Plus size={20} strokeWidth={2} color={props.theme.color.text.secondary} />
             </View>
-            <Text style={styles.quickActionLabel}>新建工作区</Text>
+            <Text style={styles.quickActionLabel}>
+              {t('components.homeQuickActions.newWorkspace', 'New Workspace')}
+            </Text>
           </Pressable>
         ) : null}
       </View>
       <PickerModal
         visible={hostPickerVisible}
-        title="选择电脑"
+        title={t('auto.mobile.src.components.MobileHomeQuickActions.263649e305', 'Choose computer')}
         options={hostPickerOptions(props.connectedHosts)}
         selected=""
         onSelect={handleHostSelect}

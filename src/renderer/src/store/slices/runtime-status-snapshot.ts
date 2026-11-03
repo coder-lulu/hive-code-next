@@ -2,18 +2,18 @@ import {
   runtimeEnvironmentStatusFromSnapshot,
   type RuntimeHostStatusSnapshot
 } from '../../../../shared/runtime-host-status'
-import type { AppState } from '../types'
-import type { RuntimeEnvironmentStatus } from './runtime-status-types'
+import type {
+  RuntimeEnvironmentStatus,
+  RuntimeStatusSlice,
+  RuntimeStatusStoreState
+} from './runtime-status-types'
 import { ensureBrowserClientHostsForRestoredPages } from '@/runtime/restored-client-hosted-browser-host-attach'
 import { replayClientHostedBrowserCloseIntents } from '@/runtime/client-hosted-browser-close-intent-replay'
 
-/**
- * Main re-paired this environment (an update or rollback run from the CLI) and nothing told this
- * renderer; the status it now publishes under the new revision is that notice (P1-C).
- */
+/** A snapshot’s newer pairing revision signals a CLI update/rollback the renderer catalog missed (P1-C). */
 export function snapshotOutrunsCatalog(
   snapshot: RuntimeHostStatusSnapshot,
-  state: Pick<AppState, 'runtimeEnvironments'>
+  state: Pick<RuntimeStatusSlice, 'runtimeEnvironments'>
 ): boolean {
   const environment = state.runtimeEnvironments.find((entry) => entry.id === snapshot.environmentId)
   return (
@@ -24,9 +24,8 @@ export function snapshotOutrunsCatalog(
 
 export function applyRuntimeHostStatusSnapshot(
   snapshot: RuntimeHostStatusSnapshot,
-  state: AppState,
-  publishEvidence: (entry: RuntimeEnvironmentStatus) => void,
-  refreshAlternateRoutes?: () => void
+  state: RuntimeStatusStoreState,
+  publishEvidence: (entry: RuntimeEnvironmentStatus) => void
 ): void {
   const environment = state.runtimeEnvironments.find((entry) => entry.id === snapshot.environmentId)
   if (
@@ -39,30 +38,12 @@ export function applyRuntimeHostStatusSnapshot(
   if (previous?.snapshot && previous.snapshot.sequence >= snapshot.sequence) {
     return
   }
-  const contactRevoked = Boolean(snapshot.retired || snapshot.verification === 'blocked')
-  const shouldRefreshAlternateRoutes = Boolean(
-    environment.accountClaim && !contactRevoked && snapshot.verification !== 'verified'
-  )
-  // A failed local-pairing snapshot says nothing about an account Relay route. Keep the
-  // last reachable result in place while the aggregate route probe resolves; that probe
-  // will publish null only when every available route is actually unavailable.
-  const alternateRouteStatus = shouldRefreshAlternateRoutes ? (previous?.status ?? null) : null
   const entry: RuntimeEnvironmentStatus = {
     ...runtimeEnvironmentStatusFromSnapshot(snapshot),
     connectionGeneration: previous?.connectionGeneration,
-    hostContactEpoch: previous?.hostContactEpoch,
-    status:
-      snapshot.verification === 'verified' && !snapshot.retired
-        ? snapshot.status
-        : alternateRouteStatus,
-    remoteControl: alternateRouteStatus
-      ? (alternateRouteStatus.remoteControl ?? previous?.remoteControl)
-      : snapshot.remoteControl
+    hostContactEpoch: previous?.hostContactEpoch
   }
-  if (entry.status && snapshot.verification === 'verified') {
-    if (snapshot.remoteControl) {
-      entry.status = { ...entry.status, remoteControl: snapshot.remoteControl }
-    }
+  if (entry.status) {
     state.setRuntimeEnvironmentStatus(snapshot.environmentId, entry)
     if (previous?.status == null) {
       void ensureBrowserClientHostsForRestoredPages(state)
@@ -73,11 +54,7 @@ export function applyRuntimeHostStatusSnapshot(
       })
     }
   } else {
-    // Lost local contact observes no runtime session ending. For a dual-route host this also
-    // records the latest local diagnostics while the effective Relay status remains unchanged.
+    // Lost contact or a failed method observes no runtime session ending.
     publishEvidence(entry)
-  }
-  if (shouldRefreshAlternateRoutes) {
-    refreshAlternateRoutes?.()
   }
 }

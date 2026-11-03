@@ -6,7 +6,9 @@ import { AgentLaunchSettingsSection } from './AgentLaunchSettingsSection'
 import type { SettingsHostScope } from './settings-host-scope'
 
 const state = vi.hoisted(() => ({
-  runtimeEnvironments: [{ id: 'ssh-host', name: 'SSH host', createdAt: 1, pairingRevision: 17 }],
+  runtimeEnvironments: [
+    { id: 'ssh-host', name: 'SSH host', createdAt: 1, pairingRevision: 17, runtimeId: '' }
+  ],
   remote: vi.fn(),
   local: vi.fn()
 }))
@@ -20,24 +22,35 @@ vi.mock('@/store', () => ({
 vi.mock('./HostAgentLaunchSettings', async () => {
   const { useState } = await import('react')
   return {
-    HostAgentLaunchSettings: (props: { environmentId: string; pairingRevision: number }) => {
+    HostAgentLaunchSettings: (props: {
+      environmentId: string
+      pairingRevision: number
+      runtimeId?: string
+    }) => {
       state.remote(props)
       // Stands in for unsaved edits: survives prop changes, dropped only by a remount.
-      const [mountedAt] = useState(props.pairingRevision)
+      const [mountedAt] = useState(
+        String(props.pairingRevision) + (props.runtimeId ? `:${props.runtimeId}` : '')
+      )
       return <p>Remote launch settings mounted at {mountedAt}</p>
     }
   }
 })
 vi.mock('./AgentLaunchSettingsCatalog', () => ({
+  AgentLaunchSettingsLoading: () => <button disabled>Permissions</button>,
   AgentLaunchSettingsCatalog: (props: unknown) => {
     state.local(props)
     return <p>Local launch settings</p>
   }
 }))
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
 beforeEach(() => {
+  vi.stubGlobal('api', { platform: { get: () => ({ platform: 'darwin' }) } })
   state.runtimeEnvironments = [
-    { id: 'ssh-host', name: 'SSH host', createdAt: 1, pairingRevision: 17 }
+    { id: 'ssh-host', name: 'SSH host', createdAt: 1, pairingRevision: 17, runtimeId: '' }
   ]
   state.remote.mockClear()
   state.local.mockClear()
@@ -80,7 +93,7 @@ describe('launch settings host', () => {
     const { rerender } = render(section(SSH_HOST))
     expect(screen.getByText('Remote launch settings mounted at 17')).toBeTruthy()
     state.runtimeEnvironments = [
-      { id: 'ssh-host', name: 'SSH host', createdAt: 1, pairingRevision: 18 }
+      { id: 'ssh-host', name: 'SSH host', createdAt: 1, pairingRevision: 18, runtimeId: '' }
     ]
     rerender(section(SSH_HOST))
     expect(screen.getByText('Remote launch settings mounted at 18')).toBeTruthy()
@@ -89,7 +102,7 @@ describe('launch settings host', () => {
   it('waits for the server list instead of displaying desktop defaults', () => {
     state.runtimeEnvironments = []
     render(section(SSH_HOST))
-    expect(screen.getByText('Loading agent settings…')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Permissions' })).toHaveProperty('disabled', true)
     expect(state.local).not.toHaveBeenCalled()
     expect(state.remote).not.toHaveBeenCalled()
   })
@@ -101,4 +114,14 @@ describe('launch settings host', () => {
     expect(state.local).not.toHaveBeenCalled()
     expect(state.remote).not.toHaveBeenCalled()
   })
+})
+
+it('remounts a replaced runtime even when the pairing revision is unchanged', () => {
+  state.runtimeEnvironments[0].runtimeId = 'runtime-1'
+  const { rerender } = render(section(SSH_HOST))
+  expect(screen.getByText('Remote launch settings mounted at 17:runtime-1')).toBeTruthy()
+  state.runtimeEnvironments[0].runtimeId = 'runtime-2'
+  rerender(section(SSH_HOST))
+  expect(screen.getByText('Remote launch settings mounted at 17:runtime-2')).toBeTruthy()
+  expect(state.remote.mock.calls.at(-1)?.[0]).toMatchObject({ runtimeId: 'runtime-2' })
 })

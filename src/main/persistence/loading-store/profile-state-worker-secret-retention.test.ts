@@ -94,9 +94,10 @@ describe.each(['opencodeSessionCookie'] as const)(
 
 describe('worker protected settings serialization', () => {
   it.each(['selective', 'complete'] as const)(
-    'seals the cookie and retains the legacy Go key privately in a %s SQLite write',
+    'seals current cookie and proxy credentials in a %s SQLite write',
     async (mode) => {
-      const { store, authority, readState } = await fixture(ciphertext('legacy-go-key'))
+      const proxy = 'http://proxy.invalid:8080'
+      const { store, authority, readState } = await fixture({ httpProxyUrl: ciphertext(proxy) })
       const selectiveWrite = vi.spyOn(authority, 'writeSerializedDomains')
       const completeWrite = vi.spyOn(authority, 'writeCompleteSerializedDomains')
       const secrets = {
@@ -113,7 +114,7 @@ describe('worker protected settings serialization', () => {
       const persisted = readState()
       expect(persisted.settings).toMatchObject({
         opencodeSessionCookie: ciphertext(secrets.opencodeSessionCookie),
-        opencodeGoApiKey: ciphertext('legacy-go-key')
+        httpProxyUrl: ciphertext(proxy)
       })
       for (const plaintext of Object.values(secrets)) {
         expect(JSON.stringify(persisted)).not.toContain(plaintext)
@@ -124,23 +125,23 @@ describe('worker protected settings serialization', () => {
   )
 })
 
-it('does not restore the migrated legacy Go ciphertext from a pending worker acknowledgement', async () => {
-  const { store, authority, readState } = await fixture(ciphertext('legacy-go-key'))
+it('does not restore an explicitly cleared current proxy from a pending worker acknowledgement', async () => {
+  const { store, authority, readState } = await fixture({
+    httpProxyUrl: ciphertext('http://proxy.invalid:8080')
+  })
   const gate = authority.pause()
   store.updateSettings({ theme: 'dark' })
   const write = store.flushPendingOrThrowAsync({ drainToStableGeneration: false })
   await gate.started.promise
-  const save = vi.fn()
-  store.migrateLegacyOpenCodeGoApiKey({ has: () => false, read: () => null, save })
+  store.updateSettings({ httpProxyUrl: '' })
   encryptionAvailable = false
   gate.finish.resolve()
   await write
   await store.flushPendingOrThrowAsync()
-  expect(save).toHaveBeenCalledExactlyOnceWith('legacy-go-key')
-  expect(readState().settings).not.toHaveProperty('opencodeGoApiKey')
-  expect(store.getSettings()).not.toHaveProperty('opencodeGoApiKey')
+  expect(readState().settings.httpProxyUrl).toBe('')
+  expect(store.getSettings().httpProxyUrl).toBe('')
   encryptionAvailable = true
   store.updateSettings({ theme: 'light' })
   await store.flushPendingOrThrowAsync()
-  expect(readState().settings).not.toHaveProperty('opencodeGoApiKey')
+  expect(readState().settings.httpProxyUrl).toBe('')
 })

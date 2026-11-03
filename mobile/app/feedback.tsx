@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../src/i18n/use-mobile-translation'
 import { useState } from 'react'
 import {
   FutureFeatureAction,
@@ -11,6 +12,8 @@ import { resolveFutureFeatureActionState } from '../src/capabilities/future-feat
 const feedbackAction = resolveFutureFeatureActionState('feedback', false)
 
 export default function FeedbackScreen() {
+  const t = useMobileTranslation()
+
   const [category, setCategory] = useState('功能建议')
   const [message, setMessage] = useState('')
   const [contact, setContact] = useState('')
@@ -18,10 +21,13 @@ export default function FeedbackScreen() {
   return (
     <FutureFeatureScreen
       capabilityId="feedback"
-      title="帮助与反馈"
-      description="可以整理反馈内容；提交接口接通前，内容只保留在当前页面内。"
+      title={t('auto.mobile.app.feedback.a387c9bdb6', 'Help and feedback')}
+      description={t(
+        'auto.mobile.app.feedback.0d77be4306',
+        'Draft your feedback here. Until submission is connected, it stays on this page only.'
+      )}
     >
-      <FutureFeatureSection title="问题类型">
+      <FutureFeatureSection title={t('auto.mobile.app.feedback.11b8360806', 'Issue type')}>
         {['功能建议', '使用问题', '账号问题', '其他问题'].map((item) => (
           <FutureFeatureRow
             key={item}
@@ -35,24 +41,34 @@ export default function FeedbackScreen() {
 
       <FutureFeatureInput
         multiline
-        label="反馈内容"
+        label={t('auto.mobile.app.feedback.ccc3c394d4', 'Feedback')}
         maxLength={2000}
-        placeholder="请描述问题、期望结果和复现步骤"
+        placeholder={t(
+          'auto.mobile.app.feedback.2bbcd7be90',
+          'Describe the issue, expected result, and steps to reproduce it'
+        )}
         value={message}
         onChangeText={setMessage}
       />
       <FutureFeatureInput
         keyboardType="email-address"
-        label="联系方式（选填）"
-        placeholder="邮箱或其他联系方式"
+        label={t('auto.mobile.app.feedback.00614a343b', 'Contact details (optional)')}
+        placeholder={t('auto.mobile.app.feedback.be4b12bc8a', 'Email or other contact details')}
         value={contact}
         onChangeText={setContact}
       />
-      <FutureFeatureSection title="附件">
-        <FutureFeatureRow label="截图与诊断文件" value="后续支持" />
+      <FutureFeatureSection title={t('auto.mobile.app.feedback.bd8c5695ea', 'Attachments')}>
+        <FutureFeatureRow
+          label={t('auto.mobile.app.feedback.36943f1f75', 'Screenshots and diagnostic files')}
+          value="后续支持"
+        />
       </FutureFeatureSection>
 
-      <FutureFeatureAction disabled label="提交反馈" reason={feedbackAction.reason} />
+      <FutureFeatureAction
+        disabled
+        label={t('auto.mobile.app.feedback.5acab6e376', 'Submit feedback')}
+        reason={feedbackAction.reason}
+      />
     </FutureFeatureScreen>
   )
 }

@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../../i18n/use-mobile-translation'
 import { memo, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import type { MobileTheme } from '../../theme/mobile-theme'
@@ -52,7 +53,7 @@ export const MermaidDiagram = memo(function MermaidDiagram({ source, base }: Mer
     void (async () => {
       try {
         const mermaid = await loadPageMermaid()
-        mermaid.initialize(mermaidDiagramConfig(theme))
+        mermaid.initialize(mermaidDiagramConfig(theme.scheme))
         const { svg } = await mermaid.render(id, source)
         if (disposed) {
           return
@@ -98,11 +99,15 @@ export const MermaidDiagram = memo(function MermaidDiagram({ source, base }: Mer
 
 /** The native component's frame and label, so a diagram and its fallback sit in the same box. */
 function MermaidFrame({ children }: { children: ReactNode }) {
+  const t = useMobileTranslation()
+
   const styles = useMobileThemeStyles(createMermaidDiagramStyles)
   return (
     <View style={styles.frame} testID="mermaid-diagram">
       <View style={styles.label}>
-        <Text style={styles.labelText}>mermaid</Text>
+        <Text style={styles.labelText}>
+          {t('auto.mobile.src.components.pr.sidebar.MermaidDiagram.web.bd13862940', 'mermaid')}
+        </Text>
       </View>
       {children}
     </View>

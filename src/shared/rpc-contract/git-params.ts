@@ -1,3 +1,4 @@
+import { CONFLICT_RESOLUTIONS } from '../source-control-entry-actions'
 import { z } from 'zod'
 import { OptionalGitAdmissionTier } from './git-admission-tier-params'
 import { OptionalTuiAgent } from './worktree-params'
@@ -45,6 +46,8 @@ export const GitFilePath = WorktreeSelector.extend({
     .transform((v) => (typeof v === 'string' ? v : ''))
     .pipe(z.string().min(1, 'Missing file path'))
 })
+
+export const GitResolveConflict = GitFilePath.extend({ resolution: z.enum(CONFLICT_RESOLUTIONS) })
 
 export const GitDiff = GitFilePath.extend({
   staged: z.boolean(),
@@ -110,63 +113,51 @@ export const CommitMessageModelCapability = z.object({
   defaultThinkingLevel: z.string().optional()
 })
 
-export const CommitMessageAiSettings = z.object({
-  enabled: z.boolean(),
-  agentId: z.string().nullable(),
-  selectedModelByAgent: z.record(z.string(), z.string()),
-  selectedModelByAgentByHost: z.record(z.string(), z.record(z.string(), z.string())).optional(),
-  discoveredModelsByAgent: z.record(z.string(), z.array(CommitMessageModelCapability)).optional(),
-  discoveredModelsByAgentByHost: z
-    .record(z.string(), z.record(z.string(), z.array(CommitMessageModelCapability)))
-    .optional(),
-  selectedThinkingByModel: z.record(z.string(), z.string()),
-  customPrompt: z.string(),
-  customAgentCommand: z.string()
-})
-
-export const SourceControlAiSettings = CommitMessageAiSettings.omit({ customPrompt: true }).extend({
-  actions: z
-    .record(
-      z.string(),
-      z.object({
-        agentId: z.string().nullable().optional(),
-        commandInputTemplate: z.string().optional(),
-        agentArgs: z.string().optional()
+export const SourceControlAiSettings = z
+  .object({
+    enabled: z.boolean(),
+    agentId: z.string().nullable(),
+    selectedModelByAgent: z.record(z.string(), z.string()),
+    selectedModelByAgentByHost: z.record(z.string(), z.record(z.string(), z.string())).optional(),
+    discoveredModelsByAgent: z.record(z.string(), z.array(CommitMessageModelCapability)).optional(),
+    discoveredModelsByAgentByHost: z
+      .record(z.string(), z.record(z.string(), z.array(CommitMessageModelCapability)))
+      .optional(),
+    selectedThinkingByModel: z.record(z.string(), z.string()),
+    customAgentCommand: z.string(),
+    actions: z
+      .record(
+        z.string(),
+        z.object({
+          agentId: z.string().nullable().optional(),
+          commandInputTemplate: z.string().optional(),
+          agentArgs: z.string().optional()
+        })
+      )
+      .optional(),
+    instructionsByOperation: z.record(z.string(), z.string()).optional(),
+    modelOverridesByOperation: z
+      .record(
+        z.string(),
+        z.object({
+          selectedModelByAgent: z.record(z.string(), z.string()).optional(),
+          selectedModelByAgentByHost: z
+            .record(z.string(), z.record(z.string(), z.string()))
+            .optional(),
+          selectedThinkingByModel: z.record(z.string(), z.string()).optional()
+        })
+      )
+      .optional(),
+    prCreationDefaults: z
+      .object({
+        draft: z.boolean().optional(),
+        useTemplate: z.boolean().optional(),
+        generateDetailsOnOpen: z.boolean().optional(),
+        openAfterCreate: z.boolean().optional()
       })
-    )
-    .optional(),
-  instructionsByOperation: z.record(z.string(), z.string()).optional(),
-  modelOverridesByOperation: z
-    .record(
-      z.string(),
-      z.object({
-        selectedModelByAgent: z.record(z.string(), z.string()).optional(),
-        selectedModelByAgentByHost: z
-          .record(z.string(), z.record(z.string(), z.string()))
-          .optional(),
-        selectedThinkingByModel: z.record(z.string(), z.string()).optional()
-      })
-    )
-    .optional(),
-  prCreationDefaults: z
-    .object({
-      draft: z.boolean().optional(),
-      useTemplate: z.boolean().optional(),
-      generateDetailsOnOpen: z.boolean().optional(),
-      openAfterCreate: z.boolean().optional()
-    })
-    .optional(),
-  launchActionDefaults: z
-    .record(
-      z.string(),
-      z.object({
-        agentId: z.string().nullable().optional(),
-        commandInputTemplate: z.string().optional(),
-        agentArgs: z.string().optional()
-      })
-    )
-    .optional()
-})
+      .optional()
+  })
+  .strict()
 
 export const ResolvedSourceControlAiGenerationParams = z.object({
   agentId: z.string(),
@@ -180,13 +171,12 @@ export const ResolvedSourceControlAiGenerationParams = z.object({
 })
 
 export const GitGenerateCommitMessage = WorktreeSelector.extend({
-  commitMessageAi: CommitMessageAiSettings.optional(),
   sourceControlAi: SourceControlAiSettings.optional(),
   sourceControlAiResolvedParams: ResolvedSourceControlAiGenerationParams.optional(),
   agentCmdOverrides: z.record(z.string(), z.string()).optional(),
   defaultTuiAgent: OptionalTuiAgent.nullable(),
   commitMessageDiscoveryHostKey: z.string().optional()
-})
+}).strict()
 
 export const GitDiscoverCommitMessageModels = WorktreeSelector.extend({
   agentId: z.string().min(1, 'Missing agent id'),
@@ -267,7 +257,8 @@ export const GitRemoteFileUrl = WorktreeSelector.extend({
     .unknown()
     .transform((v) => (typeof v === 'string' ? v : ''))
     .pipe(z.string().min(1, 'Missing relative path')),
-  line: z.number().int().min(1)
+  line: z.number().int().min(1),
+  endLine: z.number().int().min(1).optional()
 })
 
 export const GitRemoteCommitUrl = WorktreeSelector.extend({

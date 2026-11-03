@@ -1,3 +1,4 @@
+import { AGENT_SESSION_COMMANDS_ON_REQUEST_CAPABILITY } from '../../../../shared/structured-agent-session-surface-capabilities'
 import { describe, expect, it } from 'vitest'
 import {
   PI_STRUCTURED_DIALOGS_RUNTIME_CAPABILITY,
@@ -6,7 +7,9 @@ import {
   STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY
 } from '../../../../shared/protocol-version'
 import {
+  clientRequestsCommands,
   createSupportFollowsHostSetting,
+  isStructuredNativeChatEnabled,
   structuredAgentsReadBy,
   clientRendersStructuredAgent,
   supportsStructuredAgentSessions
@@ -92,4 +95,40 @@ describe('createSupportFollowsHostSetting', () => {
       createSupportFollowsHostSetting({ clientKind: undefined, clientCapabilities: undefined })
     ).toBe(false)
   })
+})
+
+describe('host provider preference', () => {
+  const runtime = (settings: unknown) =>
+    ({
+      getClientSettings: () => settings
+    }) as Parameters<typeof isStructuredNativeChatEnabled>[0]
+
+  it('uses the actual known agent and refuses an unknown agent', () => {
+    const host = runtime({ nativeChatProviders: { codex: false } })
+    expect(isStructuredNativeChatEnabled(host, 'codex')).toBe(false)
+    expect(isStructuredNativeChatEnabled(host, 'claude')).toBe(true)
+    expect(isStructuredNativeChatEnabled(host, 'unknown')).toBe(false)
+  })
+
+  it('does not treat inherited provider values as stored preferences', () => {
+    const host = runtime({ nativeChatProviders: Object.create({ codex: false }) })
+    expect(isStructuredNativeChatEnabled(host, 'codex')).toBe(true)
+  })
+
+  it('refuses when the settings reader throws', () => {
+    const host = {
+      getClientSettings: () => {
+        throw new Error('unavailable')
+      }
+    }
+    expect(isStructuredNativeChatEnabled(host, 'codex')).toBe(false)
+  })
+})
+
+it('requests commands only for the negotiated commands capability', () => {
+  expect(clientRequestsCommands({})).toBe(false)
+  expect(clientRequestsCommands({ clientCapabilities: CAPABLE })).toBe(false)
+  expect(
+    clientRequestsCommands({ clientCapabilities: [AGENT_SESSION_COMMANDS_ON_REQUEST_CAPABILITY] })
+  ).toBe(true)
 })

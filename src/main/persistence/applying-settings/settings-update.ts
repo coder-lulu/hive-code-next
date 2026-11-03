@@ -1,4 +1,5 @@
-import { normalizeNativeChatAppearanceSettings } from '../../../shared/native-chat-appearance-settings'
+import { expandWorkspaceDirHome } from './terminal-settings-migrations'
+import { normalizeNativeChatAppearanceSettings } from '../../../shared/native-chat/native-chat-appearance-settings'
 import type { GlobalSettings } from '../../../shared/global-settings-types'
 import { normalizeDisabledTuiAgents } from '../../../shared/tui-agent-selection'
 import { resolveNestedWorkerMaxDepth } from '../../../shared/nested-worker-depth'
@@ -27,21 +28,24 @@ import {
   normalizeMobilePairingCustomAddress,
   normalizeMobilePairingCustomAddresses
 } from '../../../shared/mobile-pairing-custom-address'
-import {
-  mergeLegacyCommitMessageAiIntoSourceControlAi,
-  normalizeSourceControlAiSettings,
-  projectSourceControlAiToLegacyCommitMessageAi
-} from '../../../shared/source-control-ai'
+import { normalizeSourceControlAiSettings } from '../../../shared/source-control-ai'
 import {
   PROTECTED_SECRET_SLOT,
   type ProtectedSecretPersistence
 } from '../../protected-secret-persistence'
 import { normalizeNotificationSettings } from './onboarding-normalization'
-import { retireLegacyInstructionsForClearedTextActionRecipes } from './source-control-settings'
+import { buildWorkspaceDirHistoryForUpdate } from './terminal-settings-migrations'
+import { pickCurrentGlobalSettings } from '../../../shared/current-global-settings'
+import { clearInstructionsForResetTextActionRecipes } from './source-control-settings'
+import { sanitizeAgentPermissionUpdates } from '../../../shared/tui-agent-permission-choice'
+import { normalizeNativeChatProviders } from '../../../shared/structured-native-chat-launch-route'
 import {
-  buildWorkspaceDirHistoryForUpdate,
-  stripRetiredGlobalSettings
-} from './terminal-settings-migrations'
+  mergeAgentDashboardActiveDays,
+  normalizeCurrentTelemetry
+} from '../loading-store/current-telemetry-settings'
+import { normalizePluginOwnedSettings } from '../../../shared/plugins/capabilities/plugin-owned-settings'
+import { resolveOrchestrationHeartbeatInterval } from '../../../shared/orchestration-heartbeat'
+import { sanitizeNetworkSettings } from '../../ipc/network-settings-sanitization'
 
 export type SettingsMutationOperations = {
   state: PersistedState
@@ -58,14 +62,15 @@ export function updateSettings(
   updates: Partial<GlobalSettings>,
   options: { notifyListeners?: boolean; originWebContentsId?: number } = {}
 ): GlobalSettings {
-  const sanitizedUpdates = stripRetiredGlobalSettings(updates)
+  const sanitizedUpdates = expandWorkspaceDirHome(pickCurrentGlobalSettings(updates))
+  Object.assign(sanitizedUpdates, normalizePluginOwnedSettings(updates))
+  sanitizeNetworkSettings(updates, sanitizedUpdates)
+  sanitizeAgentPermissionUpdates(sanitizedUpdates, sanitizedUpdates)
+  if ('nativeChatProviders' in updates) {
+    sanitizedUpdates.nativeChatProviders = normalizeNativeChatProviders(updates.nativeChatProviders)
+  }
   if ('agentNpmRegistry' in updates) {
     sanitizedUpdates.agentNpmRegistry = updates.agentNpmRegistry === 'china' ? 'china' : 'default'
-  }
-  const linkBehavior = updates.terminalLinkClickBehavior
-  if (linkBehavior === 'actions' || linkBehavior === 'open' || linkBehavior === 'none') {
-    // Loaded defaults are ambiguous; synchronize the legacy switch only on an explicit write.
-    sanitizedUpdates.terminalLinkActionPopoverEnabled = linkBehavior === 'actions'
   }
   if ('opencodeSessionCookie' in updates && !updates.opencodeSessionCookie) {
     operations.removeRetainedBlob(PROTECTED_SECRET_SLOT.opencodeSessionCookie)
@@ -92,6 +97,10 @@ export function updateSettings(
       nestedWorkerMaxDepth: updates.nestedWorkerMaxDepth
     })
   }
+  if ('orchestrationHeartbeatIntervalMinutes' in updates) {
+    sanitizedUpdates.orchestrationHeartbeatIntervalMinutes =
+      resolveOrchestrationHeartbeatInterval(updates)
+  }
   if ('nativeChatAppearance' in updates) {
     sanitizedUpdates.nativeChatAppearance = normalizeNativeChatAppearanceSettings(
       updates.nativeChatAppearance
@@ -110,11 +119,9 @@ export function updateSettings(
   }
   if ('agentDefaultArgs' in updates) {
     sanitizedUpdates.agentDefaultArgs = normalizeTuiAgentArgsRecord(updates.agentDefaultArgs)
-    sanitizedUpdates.agentYoloDefaultsMigrated = true
   }
   if ('agentDefaultEnv' in updates) {
     sanitizedUpdates.agentDefaultEnv = normalizeTuiAgentEnvRecord(updates.agentDefaultEnv)
-    sanitizedUpdates.agentYoloDefaultsMigrated = true
   }
   if ('terminalQuickCommands' in updates) {
     sanitizedUpdates.terminalQuickCommands = normalizeTerminalQuickCommands(
@@ -134,10 +141,7 @@ export function updateSettings(
   if ('terminalCursorStyle' in updates) {
     Object.assign(
       sanitizedUpdates,
-      normalizeTerminalCursorStyleDefault(
-        { terminalCursorStyle: updates.terminalCursorStyle },
-        { preserveExplicitValue: true }
-      )
+      normalizeTerminalCursorStyleDefault({ terminalCursorStyle: updates.terminalCursorStyle })
     )
   }
   if ('terminalScrollbackRows' in updates) {
@@ -152,12 +156,6 @@ export function updateSettings(
       updates.terminalMinimumContrastRatio
     )
   }
-  if (
-    'terminalTuiScrollSensitivity' in updates ||
-    'terminalTuiScrollSensitivityDefaultedToOne' in updates
-  ) {
-    sanitizedUpdates.terminalTuiScrollSensitivityDefaultedToOne = true
-  }
   if ('visibleTaskProviders' in updates || 'defaultTaskSource' in updates) {
     const taskProviderSettings = normalizeTaskProviderSettings({
       visibleTaskProviders:
@@ -171,12 +169,6 @@ export function updateSettings(
     })
     sanitizedUpdates.defaultTaskSource = taskProviderSettings.defaultTaskSource
     sanitizedUpdates.visibleTaskProviders = taskProviderSettings.visibleTaskProviders
-    if ('visibleTaskProviders' in updates) {
-      sanitizedUpdates.visibleTaskProvidersDefaultedForJira = true
-    }
-  }
-  if ('autoRenameBranchFromWork' in updates || 'autoRenameBranchFromWorkDefaultedOn' in updates) {
-    sanitizedUpdates.autoRenameBranchFromWorkDefaultedOn = true
   }
   if ('openInApplications' in updates) {
     sanitizedUpdates.openInApplications = normalizeOpenInApplications(updates.openInApplications)
@@ -242,29 +234,37 @@ export function updateSettings(
   if (historyWithPreviousLayout) {
     sanitizedUpdates.workspaceDirHistory = historyWithPreviousLayout
   }
-  // Why deep-merge telemetry: a partial update (e.g. flipping only `optedIn`) must not clobber siblings like `installId`.
+  // Partial updates retain the current choice and identity; malformed input grants no consent.
+  const currentTelemetry = operations.state.settings.telemetry
+  const requestedTelemetry = sanitizedUpdates.telemetry
+  const choice = requestedTelemetry?.optedIn
+  const installId = requestedTelemetry?.installId
   const mergedTelemetry =
-    sanitizedUpdates.telemetry !== undefined
-      ? { ...operations.state.settings.telemetry, ...sanitizedUpdates.telemetry }
-      : operations.state.settings.telemetry
+    requestedTelemetry !== undefined
+      ? normalizeCurrentTelemetry({
+          optedIn:
+            choice === true || choice === false || choice === null
+              ? choice
+              : currentTelemetry?.optedIn,
+          installId:
+            typeof installId === 'string' && installId.length > 0
+              ? installId
+              : currentTelemetry?.installId,
+          agentDashboardActiveDays: mergeAgentDashboardActiveDays(
+            currentTelemetry?.agentDashboardActiveDays,
+            requestedTelemetry?.agentDashboardActiveDays
+          )
+        })
+      : currentTelemetry
+  if (requestedTelemetry !== undefined) {
+    sanitizedUpdates.telemetry = mergedTelemetry
+  }
   if ('sourceControlAi' in sanitizedUpdates) {
-    sanitizedUpdates.sourceControlAi = retireLegacyInstructionsForClearedTextActionRecipes(
-      sanitizedUpdates.sourceControlAi,
-      operations.state.settings
-    )
-    const normalizedSourceControlAi = normalizeSourceControlAiSettings(
-      sanitizedUpdates.sourceControlAi,
-      operations.state.settings.commitMessageAi
-    )
-    sanitizedUpdates.sourceControlAi = normalizedSourceControlAi
-    sanitizedUpdates.commitMessageAi = projectSourceControlAiToLegacyCommitMessageAi(
-      normalizedSourceControlAi,
-      operations.state.settings.commitMessageAi
-    )
-  } else if ('commitMessageAi' in sanitizedUpdates) {
-    sanitizedUpdates.sourceControlAi = mergeLegacyCommitMessageAiIntoSourceControlAi(
-      operations.state.settings.sourceControlAi,
-      sanitizedUpdates.commitMessageAi
+    sanitizedUpdates.sourceControlAi = normalizeSourceControlAiSettings(
+      clearInstructionsForResetTextActionRecipes(
+        sanitizedUpdates.sourceControlAi,
+        operations.state.settings
+      )
     )
   }
   const previousSettings = operations.state.settings

@@ -18,7 +18,7 @@ import {
   getExecutionHostIdFromWorktreeHostIdentity,
   getWorktreeIdFromHostIdentity
 } from '../../../../shared/worktree/host-qualified-identity'
-import { parseAgentStatusPaneIdentity } from '../../lib/agent-status-worktree-attribution'
+import { parseAgentStatusPaneIdentity } from '../../../../shared/agent-status-worktree-attribution'
 import { isExplicitAgentStatusFresh } from '../../lib/pane-agent-evidence'
 
 export type SessionListIdentity = {
@@ -116,17 +116,17 @@ function summaryActivity(
   if (!isSessionActivityReceiptFresh(receivedAt, now)) {
     return unknownActivity(lastActivityAt)
   }
-  return {
-    activity:
-      summary.activity ??
-      (summary.status === 'working'
-        ? 'running'
-        : summary.status === 'attention'
-          ? 'waiting'
-          : 'unknown'),
-    reason: summary.activityReason ?? null,
-    lastActivityAt
+  let activity: Activity = 'unknown'
+  if (summary.status === 'working') {
+    activity = 'running'
+  } else if (summary.status === 'attention') {
+    activity = 'waiting'
+  } else if (summary.status === 'idle' && summary.turnOutcome === 'success') {
+    activity = 'completed'
+  } else if (summary.status === 'idle' && summary.turnOutcome === 'failure') {
+    activity = 'error'
   }
+  return { activity, reason: null, lastActivityAt }
 }
 
 function hookActivity(

@@ -5,8 +5,8 @@ import { createHiveAccountRuntimeConnectionMaterial } from './hive-account-runti
 import { EMPTY_HIVE_ACCOUNT_RUNTIME_DIRECTORY } from '../../shared/hive-runtime-cloud'
 import { HiveAccountRelayPool } from '../../shared/hive-account-relay-pool'
 import { HiveRuntimeCloudRequestError } from './hive-runtime-cloud-client'
-import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
-import { isRecoverableRemoteRuntimeConnectionError } from '../../shared/remote-runtime-client-error-classification'
+import { RemoteRuntimeClientError } from '../../shared/remote-runtime/remote-runtime-client-error'
+import { isRecoverableRemoteRuntimeConnectionError } from '../../shared/remote-runtime/remote-runtime-client-error-classification'
 
 const uuid = '11111111-1111-4111-8111-111111111111'
 describe('account client authorization boundary', () => {

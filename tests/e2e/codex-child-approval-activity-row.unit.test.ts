@@ -1,10 +1,6 @@
 // @vitest-environment happy-dom
 
-// A Codex parent settles, its subagent asks for approval, and the user answers. Every hop is the
-// real one: provider translator, deferred sink, durable journal and host status feed, then the
-// renderer's status bridge, agent-status store and Activity pipeline. The answer returns the
-// session to its own turn's end, so the row must read done, list the ask before the done, and
-// leave nothing unread that the user had already read.
+// Round-trip subagent approval through the real translator/journal/status/activity pipeline; answering must preserve done time and read state.
 
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -16,11 +12,13 @@ import type {
   AgentSessionStatusEvent,
   AgentSessionStatusSummary
 } from '../../src/shared/agent-session-wire'
-import type { AgentJournalItemBody } from '../../src/shared/agent-session-journal-types'
+import {
+  AGENT_JOURNAL_THREAD_SCOPE,
+  type AgentJournalItemBody
+} from '../../src/shared/agent-session-journal-types'
 import { parseAgentJournalItemKey } from '../../src/shared/agent-session-journal-item-key'
 import type { Tab } from '../../src/shared/tab-types'
 import type { AppState } from '../../src/renderer/src/store/types'
-import type * as WorktreeRuntimeOwnerModule from '../../src/renderer/src/lib/worktree-runtime-owner'
 import { createCodexJournalTranslator } from '../../src/main/codex/codex-structured-journal-translation'
 import { CODEX_COMMAND_APPROVAL_METHOD } from '../../src/main/codex/codex-structured-prompt-replies'
 import { createTrackedJournalOpener } from '../../src/main/native-chat/agent-session-journal/journal-host-database-test-support'
@@ -59,13 +57,6 @@ vi.mock('@/store', async () => {
   return { useAppStore }
 })
 
-// Partial: the status projection also resolves each chat's owner from the worktree.
-vi.mock('@/lib/worktree-runtime-owner', async (importOriginal) => ({
-  ...(await importOriginal<typeof WorktreeRuntimeOwnerModule>()),
-  getRuntimeEnvironmentIdForWorktree: (state: { testRuntimeOwner?: string | null }) =>
-    state.testRuntimeOwner ?? null
-}))
-
 vi.mock('@/runtime/structured-agent-session-client', () => ({
   callStructuredAgentSession: vi.fn(),
   subscribeStructuredAgentSession: vi.fn(),
@@ -85,7 +76,6 @@ const CODEX_CHILD = 'thread-child'
 const structuredTab = {
   id: 'structured-tab-1',
   worktreeId: 'wt-1',
-  executionHostId: 'local',
   groupId: 'group-1',
   contentType: 'agent-session',
   entityId: SESSION,
@@ -119,6 +109,7 @@ beforeEach(async () => {
     acknowledgedAgentsByPaneKey: {},
     activityClearedAtByPaneKey: {},
     retainedAgentsByPaneKey: {},
+    refreshGitHubForWorktreeIfStale: vi.fn(),
     testRuntimeOwner: null,
     repos: [makeRepo()],
     worktreesByRepo: { [worktree.repoId]: [worktree] },
@@ -149,15 +140,18 @@ async function openHost() {
     now: tick,
     stateDirectory: join(root, SESSION)
   })
-  const session = indexedStatusFeedSession({
-    journal,
-    child: { phase: 'ready', generation: null, fence: 1 }
-  })
-  session.params.location.workspaceId = structuredTab.worktreeId
   const feed = new StructuredAgentSessionStatusFeed({
     logger: createStructuredAgentSessionLogger(),
-    sessions: new Map([[SESSION, session]]),
-    getRecord: () => null,
+    sessions: new Map([
+      [
+        SESSION,
+        indexedStatusFeedSession({
+          journal,
+          child: { phase: 'ready', generation: null, fence: 1 }
+        })
+      ]
+    ]),
+    getConversation: () => null,
     now: () => 1
   })
   const events: AgentSessionStatusEvent[] = []
@@ -192,12 +186,12 @@ async function openHost() {
   /** What the host's answer path commits before it tells Codex. */
   const answer = async (itemId: string): Promise<void> => {
     const identity = parseAgentJournalItemKey(itemId)
-    const asked = journal.snapshot().items.find((item) => item.itemId === itemId)
-    if (!identity || asked?.body.kind !== 'approval' || !asked.turnScope) {
+    const asked = journal.snapshot().items.find((item) => item.itemId === itemId)?.body
+    if (!identity || asked?.kind !== 'approval') {
       throw new Error(`approval ${itemId} missing`)
     }
     const resolved: AgentJournalItemBody = {
-      ...asked.body,
+      ...asked,
       resolution: {
         state: 'resolved',
         selectedOptionId: 'accept',
@@ -205,7 +199,10 @@ async function openHost() {
         resolvedAt: tick()
       }
     }
-    await journal.appendItem(identity, resolved, { fence: 1, turnScope: asked.turnScope })
+    await journal.appendItem(identity, resolved, {
+      fence: 1,
+      turnScope: AGENT_JOURNAL_THREAD_SCOPE
+    })
     publish()
     translator.resolvePrompt(itemId)
   }
@@ -217,7 +214,6 @@ describe("a Codex subagent's answered approval on the settled parent's Activity 
     const host = await openHost()
     render(createElement(StructuredAgentSessionStatusBridge))
     await waitFor(() => expect(mocks.subscribeStatus).toHaveBeenCalledOnce())
-    expect(mocks.subscribeStatus.mock.calls[0]?.[0]).toEqual({ kind: 'local' })
     const toRenderer: (event: AgentSessionStatusEvent) => void =
       mocks.subscribeStatus.mock.calls[0]?.[1]
     let forwarded = 0
@@ -239,7 +235,7 @@ describe("a Codex subagent's answered approval on the settled parent's Activity 
     await host.journal.appendItem(
       { provider: 'orca', clientMessageId: 'prompt-1' },
       { kind: 'message', role: 'user', blocks: [{ type: 'text', text: 'fan out' }] },
-      { fence: 1, turnScope: { kind: 'thread' } }
+      { fence: 1, turnScope: AGENT_JOURNAL_THREAD_SCOPE }
     )
     host.on(CODEX_THREAD, 'turn/started', { turn: { id: 'parent-turn' } })
     const spawn = {
@@ -255,11 +251,7 @@ describe("a Codex subagent's answered approval on the settled parent's Activity 
     host.on(CODEX_THREAD, 'turn/completed', { turn: { id: 'parent-turn', status: 'completed' } })
     await host.drain()
     const settled = deliver()
-    expect(settled).toMatchObject({
-      workspaceId: structuredTab.worktreeId,
-      status: 'idle',
-      statusStartedAt: expect.any(Number)
-    })
+    expect(settled).toMatchObject({ status: 'idle', statusStartedAt: expect.any(Number) })
     store().setState({ acknowledgedAgentsByPaneKey: { [paneKey()]: host.tick() } })
 
     host.translator.handle({

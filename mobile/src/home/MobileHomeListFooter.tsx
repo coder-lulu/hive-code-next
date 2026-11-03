@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { StyleSheet, Text, View } from 'react-native'
 import type { AccountsSnapshot } from '../components/AccountUsage'
 import { MobileHomeQuickActions } from '../components/MobileHomeQuickActions'
@@ -22,6 +23,8 @@ export function MobileHomeListFooter(props: {
   onOpenTasks: (provider?: TaskProvider) => void
   onPairDesktop: () => void
 }) {
+  const t = useMobileTranslation()
+
   const theme = useMobileTheme()
   const styles = createStyles(theme)
   const resumeRuntime = props.resumeCard
@@ -32,7 +35,7 @@ export function MobileHomeListFooter(props: {
       {props.resumeCard ? (
         <>
           <Text maxFontSizeMultiplier={1.3} style={styles.sectionHeading}>
-            继续工作
+            {t('auto.mobile.src.home.MobileHomeListFooter.cd49398872', 'Keep working')}
           </Text>
           <MobileHomeResumeCard
             card={props.resumeCard}
@@ -43,7 +46,7 @@ export function MobileHomeListFooter(props: {
         </>
       ) : null}
       <Text maxFontSizeMultiplier={1.3} style={styles.sectionHeading}>
-        任务中心
+        {t('auto.mobile.src.home.MobileHomeListFooter.edd3414ebb', 'Task center')}
       </Text>
       <MobileHomeTasksCard
         enabled={props.primaryHost != null}

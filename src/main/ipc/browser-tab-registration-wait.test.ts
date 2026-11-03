@@ -18,7 +18,9 @@ vi.mock('../browser/browser-manager', () => ({
 
 import {
   waitForAnyTabRegistration,
+  waitForTabRegistration,
   waitForNextTabRegistration,
+  resolveTabRegistrationWaiters,
   waitForWorktreeTabRegistration
 } from './browser-tab-registration-wait'
 import { installDocPreviewGuestPolicy } from '../browser/doc-preview-guest-policy'
@@ -30,7 +32,6 @@ import { buildDocPreviewUrl } from '../../shared/doc-preview-scheme'
 
 const WAIT_MS = 1_000
 
-/** Registers a document guest the way the attach door does, which is what notifies the waiters. */
 function attachDocumentGuest(browserPageId: string): void {
   const grant = mintDocPreviewGrant({
     owner: { kind: 'ssh', connectionId: 'ssh-1' },
@@ -50,7 +51,6 @@ function attachDocumentGuest(browserPageId: string): void {
   installDocPreviewGuestPolicy(guest as never, { id: 91, send: vi.fn() })
 }
 
-/** Whether a wait has settled, without letting its rejection escape as an unhandled one. */
 function track(pending: Promise<void>): () => 'pending' | 'resolved' | 'rejected' {
   let state: 'pending' | 'resolved' | 'rejected' = 'pending'
   pending.then(
@@ -77,6 +77,26 @@ afterEach(() => {
 })
 
 describe('a workspace document registering', () => {
+  it('holds a page-specific caller until its actual guest registers', async () => {
+    const settled = track(waitForTabRegistration('page-a', WAIT_MS))
+    resolveTabRegistrationWaiters('page-b', 'worktree')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(settled()).toBe('pending')
+    resolveTabRegistrationWaiters('page-a', 'worktree')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(settled()).toBe('resolved')
+  })
+
+  it('rejects a page registration deadline so the caller can retry', async () => {
+    const waiting = waitForTabRegistration('page-timeout', WAIT_MS)
+    const failure = expect(waiting).rejects.toThrow('Tab registration timed out')
+    await vi.advanceTimersByTimeAsync(WAIT_MS)
+    await failure
+    const retry = waitForTabRegistration('page-timeout', WAIT_MS)
+    resolveTabRegistrationWaiters('page-timeout', 'worktree')
+    await expect(retry).resolves.toBeUndefined()
+  })
+
   it('settles a wait that already names its page', async () => {
     const settled = track(waitForNextTabRegistration('doc-page-1', WAIT_MS))
 
@@ -86,9 +106,7 @@ describe('a workspace document registering', () => {
     expect(settled()).toBe('resolved')
   })
 
-  // Why these two stay pending: they are how the CLI and agents ask for a browser tab to drive, and
-  // a preview is neither drivable by them nor visible to them. Satisfying either would hand the
-  // caller a surface that answers nothing, instead of letting it keep waiting for a real tab.
+  // CLI/agent any-tab waits need drivable browser tabs; documents satisfy only their own page wait.
   it('leaves the waits that ask for any browser tab still waiting', async () => {
     const worktreeWait = track(waitForWorktreeTabRegistration('wt-1', WAIT_MS))
     const anyWait = track(waitForAnyTabRegistration(WAIT_MS))
@@ -99,8 +117,7 @@ describe('a workspace document registering', () => {
     expect(worktreeWait()).toBe('pending')
     expect(anyWait()).toBe('pending')
 
-    // The presence half: those waits do settle, so a mutant that never resolves them would pass the
-    // assertions above by being uniformly stuck.
+    // Verify unsatisfied waits actually time out.
     await vi.advanceTimersByTimeAsync(WAIT_MS)
     expect(worktreeWait()).toBe('rejected')
     expect(anyWait()).toBe('rejected')

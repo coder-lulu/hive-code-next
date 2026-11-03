@@ -18,6 +18,7 @@ import { MANAGE_SESSIONS_SECTION_ID } from './TerminalTccAttributionNotice'
 import { useAppStore } from '../../store'
 import { translate } from '@/i18n/i18n'
 import { isWebClientLocation } from '@/lib/web-client-location'
+import { openAppHttpLink } from '@/lib/app-http-link-open'
 
 export function TerminalWindowsAdministratorSection(): React.JSX.Element {
   const [administrator, setAdministrator] = useState<boolean | null | undefined>()
@@ -217,7 +218,7 @@ export function TerminalWindowsAdministratorSection(): React.JSX.Element {
             </p>
           )}
           <DialogFooter>
-            {showConfirmation && (
+            {showConfirmation ? (
               <Button
                 variant="link"
                 size="sm"
@@ -230,6 +231,22 @@ export function TerminalWindowsAdministratorSection(): React.JSX.Element {
                 {translate(
                   'settings.terminal.windows.manualAdministratorHelp',
                   'Manual instructions'
+                )}
+              </Button>
+            ) : (
+              <Button
+                variant="link"
+                size="sm"
+                onClick={(event) =>
+                  openAppHttpLink(
+                    'https://www.onorca.dev/docs/terminal#windows-administrator-mode',
+                    { event }
+                  )
+                }
+              >
+                {translate(
+                  'settings.terminal.windows.administratorDocumentation',
+                  'Read the guide'
                 )}
               </Button>
             )}

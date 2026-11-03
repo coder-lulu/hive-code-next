@@ -1,9 +1,15 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { closeTestStores, createStore, testState } from '../persistence-test-harness'
+import {
+  closeTestStores,
+  createStore,
+  makeRepo,
+  testState
+} from '../persistence/persistence-test-harness'
 import type { Store } from '../persistence'
+import { hostWorktreeTarget } from '../../shared/worktree/host-qualified-identity'
 import { wslMoveCutoverFixture as cutover } from '../persistence/__fixtures__/wsl-mover/wsl-move-cutover-fixture'
 import { seedWslMoveCutover } from '../persistence/__fixtures__/wsl-mover/wsl-move-journal-seeding'
 import {
@@ -99,6 +105,43 @@ describe('updateRuntimeManagedWorktreeMetadata under a WSL move', () => {
     expect(store.getWorktreeMeta(MOVING)).toBeUndefined()
   })
 
+  it('refuses unlink instead of acknowledging a write during a move', async () => {
+    const p = ports()
+    await expect(
+      update(
+        MOVING,
+        {
+          linkedPR: null,
+          suppressedGitHubPR: 7,
+          githubLinkBase: {
+            hostId: 'local',
+            instanceId: `${MOVING}#instance`,
+            linkedPR: null,
+            suppressedGitHubPR: null
+          }
+        },
+        p
+      )
+    ).rejects.toBeInstanceOf(WslMoveProjectFencedError)
+    expect(store.getWorktreeMeta(MOVING)).toBeUndefined()
+    expect(p.notifyChanged).not.toHaveBeenCalled()
+  })
+
+  it('refuses a fenced atomic request even when its metadata fields are passive', async () => {
+    await expect(
+      update(MOVING, {
+        isUnread: true,
+        githubLinkBase: {
+          hostId: 'local',
+          instanceId: `${MOVING}#instance`,
+          linkedPR: null,
+          suppressedGitHubPR: null
+        }
+      })
+    ).rejects.toBeInstanceOf(WslMoveProjectFencedError)
+    expect(store.getWorktreeMeta(MOVING)).toBeUndefined()
+  })
+
   it('refuses a lineage change even alongside passive fields', async () => {
     await expect(
       update(MOVING, { isUnread: true, lineage: { noParent: true } })
@@ -109,12 +152,70 @@ describe('updateRuntimeManagedWorktreeMetadata under a WSL move', () => {
     await update(STAYING, { comment: 'mine' })
     expect(store.getWorktreeMeta(STAYING)?.comment).toBe('mine')
   })
+
+  it('persists current auto-PR unlink without storing its concurrency control', async () => {
+    const repoPath = join(testState.dir, 'owned-repo')
+    mkdirSync(repoPath)
+    const repo = makeRepo({ id: 'owned-repo', path: repoPath })
+    store.addRepo(repo)
+    const worktreeId = `${repo.id}::${repoPath}`
+    const instanceId = `${worktreeId}#instance`
+    store.setWorktreeMeta(hostWorktreeTarget({ id: worktreeId, hostId: 'local' }), {
+      instanceId,
+      linkedPR: null,
+      suppressedGitHubPR: null
+    })
+    await update(worktreeId, {
+      linkedPR: null,
+      suppressedGitHubPR: 7,
+      githubLinkBase: { hostId: 'local', instanceId, linkedPR: null, suppressedGitHubPR: null }
+    })
+    await store.flushPendingOrThrowAsync()
+    await closeTestStores()
+    store = createStore()
+    const saved = store.getWorktreeMetaForHost(worktreeId, 'local')
+    expect(saved).toMatchObject({ instanceId, linkedPR: null, suppressedGitHubPR: 7 })
+    expect(saved).not.toHaveProperty('githubLinkBase')
+  })
+
+  it('preserves a newer real stored PR when resolution yielded after the caller snapshot', async () => {
+    const instanceId = `${STAYING}#instance`
+    store.setWorktreeMeta(hostWorktreeTarget({ id: STAYING, hostId: 'local' }), {
+      instanceId,
+      linkedPR: 7,
+      suppressedGitHubPR: null
+    })
+    const p = ports()
+    let calls = 0
+    p.resolveWorktree.mockImplementation(async () => {
+      if (++calls === 2) {
+        store.setWorktreeMeta(hostWorktreeTarget({ id: STAYING, hostId: 'local' }), { linkedPR: 8 })
+      }
+      return resolved(STAYING)
+    })
+    await expect(
+      update(
+        STAYING,
+        {
+          linkedPR: null,
+          suppressedGitHubPR: 7,
+          githubLinkBase: { hostId: 'local', instanceId, linkedPR: 7, suppressedGitHubPR: null }
+        },
+        p
+      )
+    ).rejects.toThrow('github_link_conflict')
+    expect(store.getWorktreeMetaForHost(STAYING, 'local')).toMatchObject({
+      linkedPR: 8,
+      suppressedGitHubPR: null
+    })
+    expect(p.notifyChanged).not.toHaveBeenCalled()
+  })
 })
 
 describe('persistRuntimeManagedWorktreeSortOrder under a WSL move', () => {
   it('drops the moving project from the batch and writes the rest', () => {
-    store.setWorktreeMeta(MOVING, { sortOrder: 1 })
-    store.setWorktreeMeta(STAYING, { sortOrder: 2 })
+    store.setWorktreeMeta(hostWorktreeTarget({ id: MOVING, hostId: 'local' }), { sortOrder: 1 })
+    store.setWorktreeMeta(hostWorktreeTarget({ id: STAYING, hostId: 'local' }), { sortOrder: 2 })
     const result = persistRuntimeManagedWorktreeSortOrder({
       orderedIds: [MOVING, STAYING],
       store,

@@ -1,3 +1,5 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
+import { translate } from '../i18n/mobile-i18n'
 import type { ReactNode } from 'react'
 import { Pressable, ScrollView, Text } from 'react-native'
 import { Code2, ListTodo } from 'lucide-react-native'
@@ -15,8 +17,12 @@ export type MobileTasksSourceView = 'all' | 'local' | 'hosted'
 export const MOBILE_TASK_PROVIDER_OPTIONS: PickerOption<TaskProvider>[] = [
   {
     value: 'github',
-    label: 'GitHub',
-    subtitle: 'Issues and pull requests',
+    get label() {
+      return translate('auto.mobile.src.tasks.MobileTasksSourceTabs.74f2869c19', 'GitHub')
+    },
+    get subtitle() {
+      return translate('tasks.options.githubDescription', 'Issues and pull requests')
+    },
     renderIcon: (selected) => (
       <TaskProviderLogo
         provider="github"
@@ -27,8 +33,12 @@ export const MOBILE_TASK_PROVIDER_OPTIONS: PickerOption<TaskProvider>[] = [
   },
   {
     value: 'gitlab',
-    label: 'GitLab',
-    subtitle: 'Issues and merge requests',
+    get label() {
+      return translate('auto.mobile.src.tasks.MobileTasksSourceTabs.1dc3ffc5ab', 'GitLab')
+    },
+    get subtitle() {
+      return translate('tasks.options.gitlabDescription', 'Issues and merge requests')
+    },
     renderIcon: (selected) => (
       <TaskProviderLogo
         provider="gitlab"
@@ -39,8 +49,12 @@ export const MOBILE_TASK_PROVIDER_OPTIONS: PickerOption<TaskProvider>[] = [
   },
   {
     value: 'linear',
-    label: 'Linear',
-    subtitle: 'Assigned and team issues',
+    get label() {
+      return translate('auto.mobile.src.tasks.MobileTasksSourceTabs.7531b1ea24', 'Linear')
+    },
+    get subtitle() {
+      return translate('tasks.options.linearDescription', 'Assigned and team issues')
+    },
     renderIcon: (selected) => (
       <TaskProviderLogo
         provider="linear"
@@ -117,6 +131,8 @@ export function MobileTasksSourceTabs({
   view: MobileTasksSourceView
   visibleProviders: readonly TaskProvider[]
 }) {
+  const t = useMobileTranslation()
+
   const palette = createMobileTaskScreenPalette(theme)
   const styles = createMobileTaskScreenStyles(theme)
   const allSelected = view === 'all'
@@ -138,7 +154,7 @@ export function MobileTasksSourceTabs({
           icon={
             <ListTodo size={16} color={allSelected ? palette.textPrimary : palette.textSecondary} />
           }
-          label="全部"
+          label={t('agentHistory.panel.all', 'All')}
           onPress={() => onSelectView('all')}
           selected={allSelected}
           styles={styles}
@@ -147,7 +163,7 @@ export function MobileTasksSourceTabs({
           icon={
             <Code2 size={16} color={localSelected ? palette.textPrimary : palette.textSecondary} />
           }
-          label="本地"
+          label={t('auto.mobile.src.tasks.MobileTasksSourceTabs.34a3f81611', 'Local')}
           onPress={() => onSelectView('local')}
           selected={localSelected}
           styles={styles}
@@ -176,7 +192,7 @@ export function MobileTasksSourceTabs({
       </ScrollView>
       <PickerModal
         visible={taskUiReady && providerPickerVisible}
-        title="任务来源"
+        title={t('auto.mobile.src.tasks.MobileTasksSourceTabs.024dd09c91', 'Task source')}
         options={providerOptions}
         selected={provider}
         onSelect={onSelectProvider}

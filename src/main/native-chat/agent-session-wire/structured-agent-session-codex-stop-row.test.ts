@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { computeAgentSessionPayloadFingerprint } from '../../../shared/agent-session-mutation-envelope'
-import { CodexAppServerRequestError } from '../../codex/codex-app-server-connection'
+import { CodexAppServerRequestError } from '../../codex/app-server/codex-app-server-request-error'
 import { CodexAppServerTimeoutError } from '../../codex/codex-app-server-session'
 import {
   THREAD_ID as THREAD,

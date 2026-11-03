@@ -1,4 +1,4 @@
-import { RemoteRuntimeClientError } from './remote-runtime-client-error'
+import { RemoteRuntimeClientError } from './remote-runtime/remote-runtime-client-error'
 
 const TERMINAL_CLOSE_CODES = new Set([1002, 1009, 4403, 4426])
 

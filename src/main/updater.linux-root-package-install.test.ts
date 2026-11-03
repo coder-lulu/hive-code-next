@@ -1,10 +1,10 @@
-import { applyProductBranding } from '../shared/brand'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import type * as UpdaterModule from './updater'
 import type { LinuxRootPackageType, UpdateStatus } from '../shared/update-status-types'
 import { loadUpdaterModule, warmUpdaterModule } from './updater-test-module-loader'
+import { updaterMainWindow } from './updater-test-main-window'
 
 const {
   browserWindowMock,
@@ -22,7 +22,6 @@ const {
 vi.mock('electron', () => moduleFactories.electron())
 vi.mock('electron-updater', () => moduleFactories.electronUpdater())
 vi.mock('./electron-updater-loader', () => moduleFactories.electronUpdaterLoader())
-vi.mock('@electron-toolkit/utils', () => moduleFactories.electronToolkitUtils())
 vi.mock('./ipc/pty/kill-all', () => moduleFactories.ptyKillAll())
 vi.mock('./linux-update-package-type', () => moduleFactories.linuxUpdatePackageType())
 vi.mock('./updater-lifecycle-diagnostics', () => moduleFactories.updaterLifecycleDiagnostics())
@@ -32,11 +31,6 @@ vi.mock('./update-install-exit-watchdog', () => moduleFactories.updateInstallExi
 vi.mock('./updater-prerelease-feed', () => moduleFactories.updaterPrereleaseFeed())
 vi.mock('./local-builds/local-build-switch', () => moduleFactories.localBuildSwitch())
 vi.mock('./local-builds/local-build-feed-server', () => moduleFactories.localBuildFeedServer())
-vi.mock('../shared/product-update-policy', () => moduleFactories.productUpdatePolicy())
-vi.mock('../shared/product-update-source', () => moduleFactories.productUpdateSource())
-vi.mock('./product/product-updater-network-boundary', () =>
-  moduleFactories.productUpdaterNetworkBoundary()
-)
 
 const packageSha512 = Buffer.alloc(64).toString('base64')
 
@@ -71,7 +65,7 @@ describe('updater Linux root packages', () => {
     })
     const send = vi.fn()
     const updater = await loadUpdaterModule()
-    updater.setupAutoUpdater({ webContents: { send } } as never, {
+    updater.setupAutoUpdater(updaterMainWindow(send), {
       getLastUpdateCheckAt: () => Date.now(),
       installMode
     })
@@ -119,9 +113,8 @@ describe('updater Linux root packages', () => {
 
       expect(lastStatus(send)).toEqual({
         state: 'error',
-        message: applyProductBranding(
-          'Quit Orca before running the system package install command.'
-        ),
+        message: 'Quit Orca before running the system package install command.',
+        messageCode: 'linuxPackageManualInstall',
         recovery: {
           kind: 'linux-package-install',
           packageType,
@@ -203,11 +196,11 @@ describe('updater Linux root packages', () => {
     }
   )
 
-  it('keeps explicit install and remote control for non-root packages', async () => {
+  it('keeps interactive install-on-quit and remote control for non-root packages', async () => {
     autoUpdaterMock.autoInstallOnAppQuit = false
     const { updater } = await startUpdater(null)
 
-    expect(autoUpdaterMock.autoInstallOnAppQuit).toBe(false)
+    expect(autoUpdaterMock.autoInstallOnAppQuit).toBe(true)
     expect(updater.getRemoteServerUpdateSupport()).toEqual({
       installMode: 'interactive',
       automatic: true,
@@ -235,9 +228,9 @@ describe('updater Linux root packages', () => {
     })
     expect(lastStatus(send)).toEqual({
       state: 'error',
-      message: applyProductBranding(
-        'Orca could not verify the installed Linux package format, so it will not install this update automatically. Download the update from the official release page and install it manually.'
-      ),
+      message:
+        'Orca could not verify the installed Linux package format, so it will not install this update automatically. Download the update from the official release page and install it manually.',
+      messageCode: 'linuxPackageMarkerUnusable',
       version: '1.0.61',
       retryable: false
     })

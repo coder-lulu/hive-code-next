@@ -100,6 +100,7 @@ export const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
   'github.listAssignableUsers',
   'github.listLabels',
   'github.listWorkItems',
+  'github.markPRReadyForReview',
   'github.mergePR',
   'github.setPRAutoMerge',
   'github.requestPRReviewers',

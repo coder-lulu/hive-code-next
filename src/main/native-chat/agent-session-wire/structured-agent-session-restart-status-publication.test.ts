@@ -1,13 +1,9 @@
-// Startup restore has to publish status, not just index the session.
-//
-// A tab nobody reopens after a restart still owes the sidebar a row. The host restores such a
-// session read-only, without a provider child, so the only thing that can surface its state is
-// the status publication the restore wiring makes.
+// Opening persisted conversation history publishes status without acquiring a provider child.
 
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type {
   AgentSessionMutationEnvelope,
   AgentSessionStatusEvent
@@ -41,7 +37,8 @@ let root = ''
 
 function adapter(): StructuredAgentSessionAdapter {
   return {
-    acquire: async ({ fence, spawnToken }) => ({
+    acquire: vi.fn<StructuredAgentSessionAdapter['acquire']>(async ({ fence, spawnToken }) => ({
+      acquisitionGeneration: `generation-${fence}-${spawnToken}`,
       process: { hostId: 'local', pid: 4242, processStartTimeMs: 1_700_000_000_000, spawnToken },
       link: {
         linkId: `link-${fence}`,
@@ -50,7 +47,8 @@ function adapter(): StructuredAgentSessionAdapter {
         mintedAtFence: fence,
         observedAt: NOW
       }
-    }),
+    })),
+    open: async () => ({ reportedOptions: { model: 'fixture-model' } }),
     dispatch: async () => ({
       state: 'accepted',
       providerIdentity: { provider: 'codex', threadId: THREAD, turnId: 'turn-1', ordinal: 1 }
@@ -122,16 +120,21 @@ afterEach(async () => {
 })
 
 describe('structured session restart status publication', () => {
-  // Served by the subscribe-time re-projection rather than the restore's own publish, so this
-  // covers what a restored journal projects — not the restore wiring. The test below pins that.
-  it('projects the persisted turn of a session restored without a provider', async () => {
+  it('projects the persisted turn of a session opened without a provider', async () => {
     const restarted = await restartWithPersistedTurn()
 
-    await restarted.restoreReadableSessions()
+    expect(await restarted.revealSession(SESSION)).toMatchObject({ readable: true })
+    expect(restarted.deps.adapter.acquire).not.toHaveBeenCalled()
     const events: AgentSessionStatusEvent[] = []
     restarted.subscribeStatus({ id: 'session-list', emit: (event) => events.push(event) })
 
     expect(events).toEqual([
+      {
+        type: 'snapshot',
+        sessions: [],
+        conversationNames: [{ sessionId: SESSION, conversationName: null }],
+        namingActiveSessionIds: []
+      },
       {
         type: 'snapshot',
         sessions: [
@@ -147,15 +150,24 @@ describe('structured session restart status publication', () => {
     ])
   })
 
-  it('publishes a restored session to a list already sitting on the stream', async () => {
+  it('publishes an opened session to a list already sitting on the stream', async () => {
     const restarted = await restartWithPersistedTurn()
     const events: AgentSessionStatusEvent[] = []
     restarted.subscribeStatus({ id: 'session-list', emit: (event) => events.push(event) })
-    expect(events).toEqual([{ type: 'snapshot', sessions: [] }])
+    expect(events).toEqual([
+      {
+        type: 'snapshot',
+        sessions: [],
+        conversationNames: [{ sessionId: SESSION, conversationName: null }],
+        namingActiveSessionIds: []
+      },
+      { type: 'snapshot', sessions: [] }
+    ])
 
-    await restarted.restoreReadableSessions()
+    expect(await restarted.revealSession(SESSION)).toMatchObject({ readable: true })
+    expect(restarted.deps.adapter.acquire).not.toHaveBeenCalled()
 
-    // The restore wiring publishes; without it this list never hears about the session at all.
+    // Opening must publish to readers already subscribed.
     expect(events.at(-1)).toEqual({
       type: 'status',
       session: expect.objectContaining({ sessionId: SESSION, status: 'idle' })

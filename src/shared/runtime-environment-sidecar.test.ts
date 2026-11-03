@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { encodePairingOffer } from './pairing'
+import { pairedRuntimeConnectionFromOffer } from './paired-runtime-connection'
 import {
   addEnvironmentFromPairingCode,
   getEnvironmentStorePath,
@@ -63,10 +64,10 @@ describe('runtime environment sidecar across a downgrade', () => {
       expectedEnvironment: prepared,
       requestId: 'link-request',
       verifiedRuntimeId: 'host-runtime',
-      verifiedConnection: {
+      verifiedConnection: pairedRuntimeConnectionFromOffer({
         ...pairing,
         endpoint: 'ws://127.0.0.1:41000/runtime'
-      },
+      }),
       tunnel,
       now: 90
     })
@@ -119,7 +120,10 @@ describe('runtime environment sidecar across a downgrade', () => {
     expect(() => removeEnvironment(userDataPath, access.id)).toThrow('Unlink')
     const plain = addEnvironmentFromPairingCode(userDataPath, {
       name: 'Plain',
-      pairingCode: encodePairingOffer(pairing)
+      pairingCode: encodePairingOffer({
+        ...pairing,
+        publicKeyB64: Buffer.alloc(32, 2).toString('base64')
+      })
     })
     removeEnvironment(userDataPath, plain.id)
     expect(listEnvironments(userDataPath).map((entry) => entry.id)).toEqual([access.id])

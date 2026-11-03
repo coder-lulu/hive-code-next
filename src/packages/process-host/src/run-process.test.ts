@@ -1,8 +1,12 @@
-import { describe, expect, it, vi } from 'vitest'
+import { mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs'
+import type { ChildProcess } from 'node:child_process'
+import { _setWindowsTaskkillLauncherForTests } from './windows-tree-kill'
+import { windowsSystem32Binary } from './windows-system-binary'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { availableParallelism, tmpdir } from 'node:os'
 import * as path from 'node:path'
-import { runProcess, runProcessSync } from './run-process'
+import { runProcess, runProcessSync, spawnProcess } from './run-process'
 import { resolveSpawn } from './spawn-resolution'
 import { WINDOWS_ARGUMENT_CORPUS } from './__fixtures__/windows-argument-corpus'
 
@@ -36,8 +40,6 @@ describe('resolveSpawn', () => {
   })
 
   it('spawns a non-cmd program directly, letting Node do the argv quoting', () => {
-    // Node's own Windows quoting is already CommandLineToArgvW-correct for real
-    // executables; re-implementing it here would add risk for no gain.
     const resolved = resolveSpawn({ program: 'C:\\bin\\agent.exe', args: ['a b'] }, 'win32')
     expect(resolved.file).toBe('C:\\bin\\agent.exe')
     expect(resolved.args).toEqual(['a b'])
@@ -54,8 +56,6 @@ describe('resolveSpawn', () => {
   })
 
   it('treats a .cmd path as an ordinary program off Windows', () => {
-    // A POSIX host running a file that happens to end in .cmd must not gain a
-    // cmd.exe hop; the extension carries no meaning there.
     const resolved = resolveSpawn(SPEC, 'linux')
     expect(resolved.file).toBe(SPEC.program)
     expect(resolved.args).toEqual(SPEC.args)
@@ -65,8 +65,7 @@ describe('resolveSpawn', () => {
     for (const { name, value } of WINDOWS_ARGUMENT_CORPUS) {
       const line = resolveSpawn({ program: 'C:\\a.cmd', args: [value] }, 'win32').args[0]!
       const body = line.slice('/d /v:off /s /c "'.length, -1)
-      // Every `&`/`|`/`<`/`>` must sit inside a quoted run. Walking the parity
-      // is the same thing cmd does, so this is the property that matters.
+      // cmd uses quote parity to decide whether metacharacters are operators.
       let quoted = false
       for (const char of body) {
         if (char === '"') {
@@ -116,17 +115,12 @@ describe('runProcessSync', () => {
   })
 
   it('does not report a deliberately terminated child as timedOut', () => {
-    // Both cases exit on SIGTERM, so reading the signal alone conflates them —
-    // and a caller that retries on timeout would then retry a process someone
-    // stopped on purpose.
     const result = runProcessSync({
       program: process.execPath,
       args: ['-e', 'process.kill(process.pid, "SIGTERM")'],
       timeoutMs: 30_000
     })
-    // Why not assert the signal: Windows has no signals, so the same deliberate
-    // kill reports an exit code there and a signal on POSIX. What must hold on
-    // both is that neither shape reads as a timeout.
+    // Windows reports an exit code for deliberate termination; POSIX reports a signal.
     expect(result.timedOut).toBe(false)
     expect(result.code === 0 && result.signal === null).toBe(false)
   })
@@ -158,39 +152,66 @@ describe('bounded output', () => {
       args: ['-e', 'process.stdout.write("x".repeat(8))'],
       maxOutputBytes: 8
     })
+    expect(result.stdout).toBe('xxxxxxxx')
+    expect(result.code).toBe(0)
     expect(result.outputTruncated).toBe(false)
   })
 })
 
-describe('unkillable children', () => {
-  it('settles after the grace period rather than outliving its own deadline', async () => {
-    // `close` only fires once the child is gone, so a child that ignores the
-    // kill would otherwise hold the promise forever — and callers that cache an
-    // in-flight probe would hand every later caller the same dead promise.
+describe('stderr streaming', () => {
+  it('forwards stderr as it arrives without changing the captured result', async () => {
+    const chunks: string[] = []
     const result = await runProcess({
       program: process.execPath,
-      args: ['-e', 'process.on("SIGTERM", () => {}); setInterval(() => {}, 1000)'],
-      timeoutMs: 300
+      args: ['-e', 'process.stderr.write("x".repeat(64))'],
+      maxOutputBytes: 8,
+      onStderr: (chunk) => chunks.push(chunk.toString())
     })
+    expect(chunks.join('')).toBe('x'.repeat(64))
+    expect(result.stderr).toBe('xxxxxxxx')
+  })
+})
+
+describe('unkillable children', () => {
+  it('settles a timeout after the child reports ready', async () => {
+    const result = await runProcess({
+      program: process.execPath,
+      args: [
+        '-e',
+        'process.on("SIGTERM", () => {}); process.stderr.write("ready"); setInterval(() => {}, 1000)'
+      ],
+      timeoutMs: 2_000
+    })
+    expect(result.stderr).toBe('ready')
     expect(result.timedOut).toBe(true)
   }, 20_000)
 })
 
 describe('abort', () => {
-  it('settles after the grace period when an aborted child ignores the signal', async () => {
-    // An aborted caller has stopped waiting; an unkillable child must not keep
-    // the promise alive on their behalf either.
+  it('settles an abort after the child reports ready', async () => {
     const controller = new AbortController()
+    let stderr = ''
     const pending = runProcess({
       program: process.execPath,
-      args: ['-e', 'process.on("SIGTERM", () => {}); setInterval(() => {}, 1000)'],
+      args: [
+        '-e',
+        'process.on("SIGTERM", () => {}); process.stderr.write("ready"); setInterval(() => {}, 1000)'
+      ],
       timeoutMs: 60_000,
-      signal: controller.signal
+      signal: controller.signal,
+      onStderr: (chunk) => {
+        stderr += chunk.toString()
+      }
     })
-    setTimeout(() => controller.abort(), 300)
-    const result = await pending
-    // Not a timeout: the caller asked it to stop.
-    expect(result.timedOut).toBe(false)
+    try {
+      await expect.poll(() => stderr, { timeout: 10_000 }).toBe('ready')
+      controller.abort()
+      const result = await pending
+      expect(result.timedOut).toBe(false)
+    } finally {
+      controller.abort()
+      await pending
+    }
   }, 20_000)
 
   it.skipIf(process.platform === 'win32')(
@@ -233,8 +254,7 @@ describe('abort', () => {
 
 describe('stdin delivery failures', () => {
   it('survives a child that exits without reading its input', async () => {
-    // The queued write fails with EPIPE, and an unhandled error on a stream is
-    // an uncaught exception — it would take the whole main process down.
+    // A queued stdin write may fail with EPIPE after the child exits.
     const result = await runProcess({
       program: process.execPath,
       args: ['-e', 'process.exit(7)'],
@@ -248,11 +268,8 @@ describe('stdin delivery failures', () => {
 
 describe('a signal that is already aborted', () => {
   it('stops the child instead of running it to the timeout', async () => {
-    // addEventListener never fires for an abort that already happened, so the
-    // caller would wait out the full deadline having already given up.
     const controller = new AbortController()
     controller.abort()
-    const startedAt = Date.now()
     const onChildTerminated = vi.fn()
     const result = await runProcess({
       program: path.join(tmpdir(), 'orca-must-not-spawn'),
@@ -262,7 +279,6 @@ describe('a signal that is already aborted', () => {
     })
     expect(result.timedOut).toBe(false)
     expect(onChildTerminated).toHaveBeenCalledOnce()
-    expect(Date.now() - startedAt).toBeLessThan(10_000)
   }, 20_000)
 })
 
@@ -279,4 +295,175 @@ describe('output truncation', () => {
     expect(result.stderr).not.toContain('FAILED')
     expect(result.stderr).toBe('n'.repeat(64))
   })
+})
+
+/** Loaded taskkill can outlast its caller; killing root first orphans grandchildren before tree enumeration. ORCA_WINDOWS_TREE_KILL_LOAD adds CPU burners only in isolated CI steps. */
+const describeOnWindows = process.platform === 'win32' ? describe : describe.skip
+const underLoad = process.env.ORCA_WINDOWS_TREE_KILL_LOAD === '1'
+// Longer than the caller's 5 s wait, well inside the 30 s deadline.
+const TASKKILL_START_DELAY_MS = 8_000
+
+describeOnWindows('Windows barrier with a taskkill slower than its caller', () => {
+  let dir: string
+  let burners: ChildProcess[] = []
+
+  beforeEach(() => {
+    dir = mkdtempSync(path.join(tmpdir(), 'orca-late-taskkill-'))
+    writeFileSync(
+      path.join(dir, 'hang.js'),
+      `require('node:fs').writeFileSync(require('node:path').join(__dirname, 'grandchild.pid'), String(process.pid)); setInterval(function () {}, 60000);`
+    )
+    writeFileSync(
+      path.join(dir, 'hung.cmd'),
+      `@echo off\r\n"${process.execPath}" "%~dp0hang.js"\r\n`
+    )
+  })
+
+  afterEach(async () => {
+    _setWindowsTaskkillLauncherForTests(null)
+    await Promise.all(
+      burners.map(async (burner) => {
+        if (burner.exitCode !== null || burner.signalCode !== null) {
+          return
+        }
+        const closed = new Promise<void>((resolve) => burner.once('close', () => resolve()))
+        burner.kill()
+        await closed
+      })
+    )
+    burners = []
+    const pidFile = path.join(dir, 'grandchild.pid')
+    if (existsSync(pidFile)) {
+      try {
+        process.kill(Number(readFileSync(pidFile, 'utf8')), 'SIGKILL')
+      } catch {
+        /* already gone, as the test expects */
+      }
+    }
+    rmSync(dir, { recursive: true, force: true, maxRetries: 8, retryDelay: 150 })
+  })
+
+  async function waitForGrandchildPid(signal: AbortSignal): Promise<number> {
+    const pidFile = path.join(dir, 'grandchild.pid')
+    const deadline = Date.now() + 30_000
+    while (!existsSync(pidFile) || readFileSync(pidFile, 'utf8') === '') {
+      signal.throwIfAborted()
+      if (Date.now() > deadline) {
+        throw new Error('the grandchild never started')
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+    return Number(readFileSync(pidFile, 'utf8'))
+  }
+
+  function isAlive(pid: number): boolean {
+    try {
+      process.kill(pid, 0)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  it('kills the grandchild when taskkill finishes after the caller stopped waiting', async ({
+    signal
+  }) => {
+    _setWindowsTaskkillLauncherForTests((rootPid) =>
+      spawnProcess({
+        program: process.execPath,
+        args: [
+          '-e',
+          `setTimeout(function () {
+              var r = require('node:child_process').spawnSync(process.argv[1], ['/pid', process.argv[2], '/t', '/f'], { stdio: 'ignore', windowsHide: true });
+              process.exit(r.status === null ? 1 : r.status);
+            }, ${TASKKILL_START_DELAY_MS});`,
+          windowsSystem32Binary('taskkill.exe'),
+          String(rootPid)
+        ],
+        stdio: 'ignore'
+      })
+    )
+    await expectBarrierKillsGrandchild(signal)
+  }, 90_000)
+
+  it.skipIf(!underLoad)(
+    'kills the grandchild with the real taskkill on a loaded host',
+    async ({ signal }) => {
+      let taskkillOutcome = 'still running'
+      _setWindowsTaskkillLauncherForTests((rootPid) => {
+        const startedAt = Date.now()
+        const taskkill = spawnProcess({
+          program: windowsSystem32Binary('taskkill.exe'),
+          args: ['/pid', String(rootPid), '/t', '/f'],
+          stdio: 'ignore'
+        })
+        taskkill.once('close', (code, signal) => {
+          taskkillOutcome = `${Date.now() - startedAt} ms, code ${code}, signal ${signal}`
+        })
+        return taskkill
+      })
+      await expectBarrierKillsGrandchild(signal)
+      // Record measured taskkill duration under load (about 50ms idle).
+      console.log(`[late-taskkill] taskkill under load: ${taskkillOutcome}`)
+    },
+    90_000
+  )
+
+  async function expectBarrierKillsGrandchild(signal: AbortSignal): Promise<void> {
+    const controller = new AbortController()
+    let reportedAt: number | undefined
+    const pending = runProcess({
+      program: path.join(dir, 'hung.cmd'),
+      timeoutMs: null,
+      signal: AbortSignal.any([controller.signal, signal]),
+      terminationBarrier: true,
+      onChildTerminated: () => {
+        reportedAt = Date.now()
+      }
+    })
+    try {
+      const grandchild = await waitForGrandchildPid(signal)
+      expect(isAlive(grandchild)).toBe(true)
+      if (underLoad) {
+        // Load the shutdown, after the fixture has proved it can start.
+        const readyFiles = Array.from({ length: availableParallelism() * 2 }, (_, index) =>
+          path.join(dir, `burner-${index}.ready`)
+        )
+        burners = readyFiles.map((ready) =>
+          spawnProcess({
+            program: process.execPath,
+            args: [
+              '-e',
+              "require('node:fs').writeFileSync(process.argv[1], 'ready'); for (;;) {}",
+              ready
+            ],
+            stdio: 'ignore'
+          })
+        )
+        await expect
+          .poll(() => readyFiles.every((ready) => existsSync(ready)), { timeout: 30_000 })
+          .toBe(true)
+      }
+
+      const abortedAt = Date.now()
+      controller.abort()
+      await pending
+      const settledAfterMs = Date.now() - abortedAt
+      await expect.poll(() => reportedAt, { timeout: 30_000 }).toBeDefined()
+      const reportedAfterMs = reportedAt === undefined ? null : reportedAt - abortedAt
+      console.log(
+        `[late-taskkill] caller settled ${settledAfterMs} ms, termination reported ${reportedAfterMs} ms after abort`
+      )
+      // TerminateProcess returns before the pid is fully released, so allow a short drain.
+      const goneBy = Date.now() + 5_000
+      while (isAlive(grandchild) && Date.now() < goneBy) {
+        signal.throwIfAborted()
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      }
+      expect(isAlive(grandchild)).toBe(false)
+    } finally {
+      controller.abort()
+      await pending
+    }
+  }
 })

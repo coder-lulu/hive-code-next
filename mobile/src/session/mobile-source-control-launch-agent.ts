@@ -1,3 +1,4 @@
+import { translate } from '../i18n/mobile-i18n'
 /**
  * Which agent a source-control AI button starts from the phone: the desktop's own resolution
  * (`pickSourceControlLaunchAgent`), fed the same saved recipe, default agent and detected agents.
@@ -26,7 +27,7 @@ export type MobileSourceControlLaunchAgent =
 
 type LaunchAgentSettings = Pick<
   GlobalSettings,
-  'sourceControlAi' | 'commitMessageAi' | 'defaultTuiAgent' | 'disabledTuiAgents'
+  'sourceControlAi' | 'defaultTuiAgent' | 'disabledTuiAgents'
 >
 
 export function resolveMobileSourceControlLaunchAgent(
@@ -46,7 +47,10 @@ export function resolveMobileSourceControlLaunchAgent(
   ) {
     return {
       kind: 'unavailable',
-      message: 'The saved agent for this action is not available on this workspace host.'
+      message: translate(
+        'session.sourceControlLaunchAgent.savedAgentUnavailable',
+        'The saved agent for this action is not available on this workspace host.'
+      )
     }
   }
   const agent = pickSourceControlLaunchAgent({
@@ -57,7 +61,13 @@ export function resolveMobileSourceControlLaunchAgent(
   })
   return agent
     ? { kind: 'agent', agent, recipe }
-    : { kind: 'unavailable', message: 'No enabled AI agent was detected on this workspace host.' }
+    : {
+        kind: 'unavailable',
+        message: translate(
+          'session.sourceControlLaunchAgent.noEnabledAgent',
+          'No enabled AI agent was detected on this workspace host.'
+        )
+      }
 }
 
 function readLaunchAgentSettings(settings: unknown): LaunchAgentSettings | null {

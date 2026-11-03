@@ -34,10 +34,13 @@ diff --git a/binding.gyp b/binding.gyp
 diff --git a/lib/index.js b/lib/index.js
 --- a/lib/index.js
 +++ b/lib/index.js
-@@ -7,11 +7,15 @@
+@@ -7,11 +7,17 @@
  exports.getAllProcesses = exports.getProcessTree = exports.getProcessCpuUsage = exports.getProcessList = exports.filterProcessList = exports.buildProcessTree = exports.ProcessDataFlag = void 0;
  const util_1 = require("util");
- const native = process.platform === 'win32' ? require('../build/Release/windows_process_tree.node') : undefined;
+-const native = process.platform === 'win32' ? require('../build/Release/windows_process_tree.node') : undefined;
++// Per-ABI builds win over the tarball binary in package directories shared across worktrees.
++const orcaNativeBuild = `${__dirname}/../build/orca-napi-win32-${process.arch}/windows_process_tree.node`;
++const native = process.platform === 'win32' ? require(require('fs').existsSync(orcaNativeBuild) ? orcaNativeBuild : '../build/Release/windows_process_tree.node') : undefined;
 +exports.getProcessCreationTime = native === undefined ? undefined : native.getProcessCreationTime;
 +exports.terminateProcessIfCreationTimeMatches = native === undefined ? undefined : native.terminateProcessIfCreationTimeMatches;
 +exports.supportedProcessDataFlags = native === undefined ? undefined : native.supportedProcessDataFlags;
@@ -50,7 +53,7 @@ diff --git a/lib/index.js b/lib/index.js
  })(ProcessDataFlag = exports.ProcessDataFlag || (exports.ProcessDataFlag = {}));
  // requestInProgress is used for any function that uses CreateToolhelp32Snapshot, as multiple calls
  // to this cannot be done at the same time.
-@@ -66,11 +70,12 @@
+@@ -66,11 +72,12 @@
      // • the properties are inlined/splatted
      // • the 'ppid' field is omitted
      // • the depth of the tree is limited by `maxDepth`
@@ -67,10 +70,13 @@ diff --git a/lib/index.js b/lib/index.js
 diff --git a/lib/index.ts b/lib/index.ts
 --- a/lib/index.ts
 +++ b/lib/index.ts
-@@ -6,12 +6,17 @@
+@@ -6,12 +6,19 @@
  import { promisify } from 'util';
  
- const native = process.platform === 'win32' ? require('../build/Release/windows_process_tree.node') : undefined;
+-const native = process.platform === 'win32' ? require('../build/Release/windows_process_tree.node') : undefined;
++// Per-ABI builds win over the tarball binary in package directories shared across worktrees.
++const orcaNativeBuild = `${__dirname}/../build/orca-napi-win32-${process.arch}/windows_process_tree.node`;
++const native = process.platform === 'win32' ? require(require('fs').existsSync(orcaNativeBuild) ? orcaNativeBuild : '../build/Release/windows_process_tree.node') : undefined;
 +export const getProcessCreationTime: ((pid: number) => number | undefined) | undefined = native?.getProcessCreationTime;
 +export const terminateProcessIfCreationTimeMatches: ((pid: number, creationTimeMs: number) => boolean) | undefined = native?.terminateProcessIfCreationTimeMatches;
 +/** The flag bits this compiled addon reports; undefined off win32. */
@@ -86,7 +92,7 @@ diff --git a/lib/index.ts b/lib/index.ts
  }
  
  type RequestCallback = (processList: IProcessInfo[]) => void;
-@@ -81,11 +86,12 @@
+@@ -81,11 +88,12 @@
    // • the properties are inlined/splatted
    // • the 'ppid' field is omitted
    // • the depth of the tree is limited by `maxDepth`
@@ -105,7 +111,8 @@ diff --git a/src/addon.cc b/src/addon.cc
 +++ b/src/addon.cc
 @@ -4,8 +4,10 @@
   *--------------------------------------------------------------------------------------------*/
- 
+-
++
  #include <napi.h>
 +#include <cmath>
  #include "cpu_worker.h"
@@ -237,7 +244,8 @@ diff --git a/src/process.cc b/src/process.cc
 +  CloseHandle(process);
 +  return requested;
  }
- 
+-
++
  void GetProcessMemoryUsage(ProcessInfo& process_info) {
 @@ -49,7 +94,9 @@
    HANDLE hProcess;
@@ -434,7 +442,8 @@ diff --git a/src/process_commandline.cc b/src/process_commandline.cc
 +  if (!NT_SUCCESS(status)) {
 +    return false;
    }
- 
+-
++
 -  CloseHandle(hProcess);
 -  return false;
 +  // Header and characters arrive in one allocation, but treat the header as
@@ -651,7 +660,8 @@ diff --git a/typings/windows-process-tree.d.ts b/typings/windows-process-tree.d.
 +  export const supportedProcessDataFlags: number | undefined;
 +  export const getProcessCreationTime: ((pid: number) => number | undefined) | undefined;
 +  export const terminateProcessIfCreationTimeMatches: ((pid: number, creationTimeMs: number) => boolean) | undefined;
- 
+-
++
    export interface IProcessInfo {
      pid: number;
 @@ -24,6 +34,9 @@

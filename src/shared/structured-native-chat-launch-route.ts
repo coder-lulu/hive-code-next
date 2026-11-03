@@ -8,7 +8,6 @@
  * drifts.
  */
 
-import { isAgentSessionHandleProvider } from './agent-session-provider-handle'
 import { parseExecutionHostId } from './execution-host'
 import type { GlobalSettings } from './global-settings-types'
 import type { ProjectExecutionRuntimeResolution } from './project-execution-runtime'
@@ -18,9 +17,20 @@ import {
   STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY
 } from './protocol-version'
 import type { TuiAgent } from './tui-agent'
+import { isTuiAgent } from './tui-agent-config'
 import type { WorkspaceLaunchKind } from './workspace-launch-kind'
 
-export type NativeChatDefaultSettings = Pick<GlobalSettings, 'experimentalNativeChat'>
+export type NativeChatDefaultSettings = Pick<GlobalSettings, 'nativeChatProviders'>
+
+/** Persist only explicit boolean choices for known agents; this map grants no runtime support. */
+export function normalizeNativeChatProviders(value: unknown): Partial<Record<TuiAgent, boolean>> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {}
+  }
+  return Object.fromEntries(
+    Object.entries(value).filter(([agent, enabled]) => isTuiAgent(agent) && typeof enabled === 'boolean')
+  )
+}
 
 /** Why a launch that the user's default asked to be structured cannot be. */
 export type StructuredNativeChatBlocker =
@@ -53,22 +63,23 @@ export type StructuredNativeChatSupportInput = {
   clientCapabilities?: readonly string[]
   /** Host-derived. Absent means the kind was never established, which is not evidence of any kind. */
   workspaceKind?: WorkspaceLaunchKind
+  projectExecutionKind?: 'host' | 'ssh'
   projectRuntime?: ProjectExecutionRuntimeResolution | null
   startsOutsideWorkspaceRoot?: boolean
   /** A product caller requested an explicit terminal command or permission override. */
   requiresTuiLaunchCommand?: boolean
   /** An existing PTY agent keeps its execution transport. */
   reusesTerminal?: boolean
-  /** The agents the host listed through `agentSession.agents`. Absent: none learned, so only
-   *  Claude and Codex, which every structured host runs, can be offered. */
+  /** The agents this exact host listed through `agentSession.agents`; absent is unknown. */
   hostStructuredAgents?: readonly string[]
 }
 
-/** The single Chat UI switch selects structured chat for supported new launches. */
-export function isNativeChatEnabled(
-  settings: Partial<NativeChatDefaultSettings> | null | undefined
+/** The user's default view does not grant host support or restrict explicit Chat/history routes. */
+export function isNativeChatDefaultFor(
+  settings: Partial<NativeChatDefaultSettings> | null | undefined,
+  agent: TuiAgent
 ): boolean {
-  return settings?.experimentalNativeChat === true
+  return settings?.nativeChatProviders?.[agent] !== false
 }
 
 function clientChoosesStructuredLaunches(capabilities: readonly string[] | undefined): boolean {
@@ -81,18 +92,13 @@ function clientChoosesStructuredLaunches(capabilities: readonly string[] | undef
 export function resolveStructuredNativeChatSupport(
   input: StructuredNativeChatSupportInput
 ): StructuredNativeChatSupport {
-  // A paired Orca server runs structured sessions itself and answers for them below. An SSH host
-  // has no Orca runtime of its own to run one.
+  // Paired runtimes own their sessions; an SSH transport alone cannot establish a runtime.
   const host = parseExecutionHostId(input.executionHostId)
-  if (host?.kind !== 'local' && host?.kind !== 'runtime') {
+  if (input.projectExecutionKind === 'ssh' || (host?.kind !== 'local' && host?.kind !== 'runtime')) {
     return { supported: false, blocker: 'remote-execution-host' }
   }
   if (input.reusesTerminal === true) {
     return { supported: false, blocker: 'reused-terminal' }
-  }
-  const builtInAgent = isAgentSessionHandleProvider(input.agent)
-  if (!builtInAgent && !input.hostStructuredAgents?.includes(input.agent)) {
-    return { supported: false, blocker: 'agent-without-structured-session' }
   }
   if (input.startsOutsideWorkspaceRoot === true) {
     return { supported: false, blocker: 'custom-start-directory' }
@@ -107,24 +113,23 @@ export function resolveStructuredNativeChatSupport(
   if (input.hostCapabilities === null) {
     return { supported: false, blocker: 'runtime-capability-unknown' }
   }
+  if (input.hostStructuredAgents === undefined) {
+    return { supported: false, blocker: 'runtime-capability-unknown' }
+  }
+  if (!input.hostStructuredAgents.includes(input.agent)) {
+    return { supported: false, blocker: 'agent-without-structured-session' }
+  }
   if (
     !input.hostCapabilities.includes(STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY) ||
-    // A host that does not advertise its registered agents accepts only Claude and Codex.
-    (!builtInAgent &&
-      !input.hostCapabilities.includes(
-        STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY
-      ))
+    !input.hostCapabilities.includes(STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY)
   ) {
     return { supported: false, blocker: 'runtime-capability' }
   }
   if (host.kind === 'runtime') {
-    // An older paired host advertises structured sessions but admits them only with its own chat
-    // setting on, so a chat opened there could never start; it keeps the terminal it always got.
+    // Both endpoints must advertise the current launch contract.
     if (!input.hostCapabilities.includes(STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY)) {
       return { supported: false, blocker: 'runtime-capability' }
     }
-    // The host refuses a client that did not say it reads structured sessions, as the browser
-    // client does not; that client keeps the host terminal.
     if (!clientChoosesStructuredLaunches(input.clientCapabilities)) {
       return { supported: false, blocker: 'client-capability' }
     }

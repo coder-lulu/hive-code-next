@@ -33,7 +33,7 @@ import {
 } from '../agent-session-journal/journal-host-database-test-support'
 import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
 import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
-import { NO_STRUCTURED_AGENTS } from './structured-agent-session-adapter-router-test-support'
+import { claudeAndCodexAgents } from './structured-agent-session-adapter-router-test-support'
 import { AgentSessionJournal } from '../agent-session-journal/journal-store'
 
 const CALLER = { callerKey: 'client-1' }
@@ -68,7 +68,9 @@ async function createHarness(options: { attached?: boolean } = {}) {
   const store = await openTestAgentSessionRecordStore(root)
   const setOption = vi.fn<StructuredAgentSessionAdapter['setOption']>(async () => undefined)
   const adapter: StructuredAgentSessionAdapter = {
+    open: vi.fn(async () => ({ reportedOptions: {} })),
     acquire: async ({ fence }) => ({
+      acquisitionGeneration: globalThis.crypto.randomUUID(),
       process: {
         hostId: 'local',
         pid: 4242,
@@ -94,7 +96,7 @@ async function createHarness(options: { attached?: boolean } = {}) {
     setOption
   }
   const host = new StructuredAgentSessionHost({
-    agents: NO_STRUCTURED_AGENTS,
+    agents: claudeAndCodexAgents(),
     logger: createStructuredAgentSessionLogger(),
     store,
     adapter,

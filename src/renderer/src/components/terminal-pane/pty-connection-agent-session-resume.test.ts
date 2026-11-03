@@ -220,7 +220,8 @@ describe('connectPanePty', () => {
     expect(transport.connect).toHaveBeenCalledWith(
       expect.objectContaining({
         sessionId: 'lost-pty',
-        command: "codex '--model' 'gpt-5' '--reasoning-effort' 'high' 'resume' 'codex-session-1'",
+        command:
+          "codex '--model' 'gpt-5' '--reasoning-effort' 'high' '-c' 'disable_paste_burst=true' 'resume' 'codex-session-1'",
         env: expect.objectContaining({
           CODEX_PROFILE: 'captured',
           ORCA_PANE_KEY: paneKey,
@@ -256,7 +257,7 @@ describe('connectPanePty', () => {
       agentArgs: '',
       agentEnv: {},
       hostDefaultsAuthoritative: true as const,
-      agentPermissionMode: 'manual' as const
+      agentPermissionMode: 'ask' as const
     }
     mockStoreState = {
       ...mockStoreState,
@@ -305,7 +306,7 @@ describe('connectPanePty', () => {
       expect.objectContaining({
         sessionId: 'lost-pty',
         launchConfig: hostLaunchConfig,
-        agentPermissionMode: 'manual'
+        agentPermissionMode: 'ask'
       })
     )
     expect(reattachArgs).not.toHaveProperty('agentArgsOverride')
@@ -376,6 +377,14 @@ describe('connectPanePty', () => {
       }
     } as StoreState
 
+    vi.mocked(mockStoreState.registerAgentLaunchConfig).mockImplementation(
+      (key, config, identity) => {
+        mockStoreState.agentLaunchConfigByPaneKey[key] = {
+          launchConfig: config,
+          identity: identity ?? {}
+        }
+      }
+    )
     const binding = connectPanePty(
       createPane(1) as never,
       createManager(1) as never,
@@ -469,7 +478,8 @@ describe('connectPanePty', () => {
     expect(transport.connect).toHaveBeenCalledWith(
       expect.objectContaining({
         sessionId: 'lost-pty',
-        command: "codex '--model' 'gpt-5-mini' 'resume' 'codex-session-1'",
+        command:
+          "codex '--model' 'gpt-5-mini' '-c' 'disable_paste_burst=true' 'resume' 'codex-session-1'",
         env: expect.objectContaining({
           ORCA_AGENT_LAUNCH_TOKEN: expect.stringMatching(new RegExp(`^${UUID_RE}$`))
         })
@@ -529,6 +539,7 @@ describe('connectPanePty', () => {
             state: 'working',
             capturedAt: 1,
             updatedAt: 1,
+            launchConfig: { agentArgs: '', agentEnv: {} },
             ...(kind === 'settled-worker'
               ? { automaticResumeBlockedBy: 'legacy-orchestration-worker' }
               : {})
@@ -560,7 +571,7 @@ describe('connectPanePty', () => {
     }
   )
 
-  it('ignores stale live launch config when cold restore identity lookup rejects it', async () => {
+  it('refuses resume when identity checks leave no current saved launch recipe', async () => {
     const { connectPanePty } = await import('./pty-connection')
     const transport = createMockTransport('fresh-pty')
     transport.connect.mockImplementation(async ({ sessionId }: { sessionId?: string }) => {
@@ -637,23 +648,9 @@ describe('connectPanePty', () => {
     expect(mockStoreState.getAgentLaunchConfigForStatusEntry).toHaveBeenCalledWith(
       expect.objectContaining({ paneKey, agentType: 'codex' })
     )
-    expect(transport.connect).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sessionId: 'lost-pty',
-        command: "codex '--model' 'current' 'resume' 'codex-session-1'"
-      })
-    )
-    expect(mockStoreState.registerAgentLaunchConfig).toHaveBeenCalledWith(
-      paneKey,
-      expect.objectContaining({
-        agentArgs: '--model current'
-      }),
-      expect.objectContaining({
-        agentType: 'codex',
-        tabId: 'tab-1',
-        leafId: LEAF_1
-      })
-    )
+    expect(transport.connect).not.toHaveBeenCalled()
+    expect(mockStoreState.registerAgentLaunchConfig).not.toHaveBeenCalled()
+    expect(mockStoreState.clearSleepingAgentSession).not.toHaveBeenCalled()
   })
 
   it('shows the restored banner when a sleeping resume falls back to a fresh shell', async () => {
@@ -703,7 +700,8 @@ describe('connectPanePty', () => {
           prompt: 'finish the task',
           state: 'working',
           capturedAt: 1,
-          updatedAt: 1
+          updatedAt: 1,
+          launchConfig: { agentArgs: '', agentEnv: {} }
         }
       }
     } as StoreState

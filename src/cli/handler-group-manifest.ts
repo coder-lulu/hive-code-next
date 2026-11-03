@@ -1,21 +1,20 @@
 import type { CommandHandler } from './dispatch'
 import { BROWSER_HANDLER_GROUPS } from './browser-handler-groups'
-import { LINEAR_HANDLER_GROUP } from './linear-handler-group'
 import { JIRA_HANDLER_GROUP } from './jira-handler-group'
+import { LINEAR_HANDLER_GROUP } from './linear-handler-group'
 import { REFERENCE_HANDLER_GROUP } from './reference-handler-group'
 
 export type HandlerGroup = {
   name: string
-  // Why: eager string keys let dispatch build (and duplicate-check) the whole
-  // command table without loading any group's transitive module graph.
+  // Eager keys allow routing and duplicate checks without importing each handler graph.
   keys: readonly string[]
   load: () => Promise<Record<string, CommandHandler>>
 }
 
-// Why: `keys` mirrors each group's exported record and is verified against the
-// real exports by handler-group-manifest.test.ts, so drift fails CI, not dispatch.
+// handler-group-manifest.test.ts checks keys against the real exports to prevent drift.
 export const HANDLER_GROUPS: readonly HandlerGroup[] = [
   JIRA_HANDLER_GROUP,
+  LINEAR_HANDLER_GROUP,
   REFERENCE_HANDLER_GROUP,
   {
     name: 'core',
@@ -36,11 +35,6 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     name: 'account',
     keys: ['account add', 'account list', 'account select', 'account rm'],
     load: async () => (await import('./handlers/account.js')).ACCOUNT_HANDLERS
-  },
-  {
-    name: 'runtime',
-    keys: ['runtime status', 'runtime claim', 'runtime reset-cloud-identity'],
-    load: async () => (await import('./handlers/runtime.js')).RUNTIME_HANDLERS
   },
   {
     name: 'artifacts',
@@ -119,6 +113,7 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
       'terminal wait',
       'terminal stop',
       'terminal rename',
+      'terminal set-pane-title',
       'terminal create',
       'terminal switch',
       'terminal close',
@@ -216,6 +211,19 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     load: async () => (await import('./handlers/agent-launch.js')).AGENT_LAUNCH_HANDLERS
   },
   {
+    name: 'connector',
+    keys: [
+      'connector start',
+      'connector send',
+      'connector prompt',
+      'connector answer',
+      'connector cancel',
+      'connector watch',
+      'connector reply'
+    ],
+    load: async () => (await import('./handlers/connector.js')).CONNECTOR_HANDLERS
+  },
+  {
     name: 'profile-state',
     keys: ['profile state exports', 'profile state rollback'],
     load: async () => (await import('./handlers/profile-state.js')).PROFILE_STATE_HANDLERS
@@ -224,6 +232,11 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     name: 'diagnostics',
     keys: ['diagnostics memory', 'terminal-daemon status', 'terminal-daemon restart'],
     load: async () => (await import('./handlers/diagnostics.js')).DIAGNOSTICS_HANDLERS
+  },
+  {
+    name: 'speech',
+    keys: ['speech openai-key status', 'speech openai-key set', 'speech openai-key clear'],
+    load: async () => (await import('./handlers/speech.js')).SPEECH_HANDLERS
   },
   {
     name: 'introspection',
@@ -255,7 +268,6 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     ],
     load: async () => (await import('./handlers/managed-server.js')).MANAGED_SERVER_HANDLERS
   },
-  LINEAR_HANDLER_GROUP,
   {
     name: 'vm',
     keys: ['vm recipe doctor'],
@@ -275,5 +287,10 @@ export const HANDLER_GROUPS: readonly HandlerGroup[] = [
     name: 'search',
     keys: ['search'],
     load: async () => (await import('./handlers/search.js')).SEARCH_HANDLERS
+  },
+  {
+    name: 'ports',
+    keys: ['ports'],
+    load: async () => (await import('./handlers/ports.js')).PORTS_HANDLERS
   }
 ]

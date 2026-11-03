@@ -1,12 +1,51 @@
+import type * as MetadataPersistence from './worktrees/metadata/worktree-meta-persist'
+import type { WorktreeMeta } from '../../../../shared/worktree/meta-types'
+import type { GitHubLinkBase } from '../../../../shared/worktree/github-link-base'
+import type { ExecutionHostId } from '../../../../shared/execution-host'
+const persistedMetadata = vi.hoisted(() =>
+  vi.fn<
+    (args: {
+      worktreeId: string
+      executionHostId?: ExecutionHostId
+      updates: Partial<WorktreeMeta>
+    }) => Promise<void>
+  >()
+)
+vi.mock('./worktrees/metadata/worktree-meta-persist', async (importOriginal) => ({
+  ...(await importOriginal<typeof MetadataPersistence>()),
+  persistWorktreeMeta: (
+    _target: unknown,
+    worktreeId: string,
+    updates: Partial<WorktreeMeta>,
+    executionHostId?: ExecutionHostId,
+    _identityKey?: string,
+    base?: GitHubLinkBase | null
+  ) => {
+    if (updates.linkedPR === null || 'suppressedGitHubPR' in updates) {
+      expect(base).toBeTruthy()
+      expect(base?.hostId).toBe(executionHostId ?? 'local')
+      expect(base?.instanceId).toBe('generation-1')
+    }
+    return persistedMetadata({
+      worktreeId,
+      updates,
+      ...(executionHostId && executionHostId !== 'local' ? { executionHostId } : {})
+    })
+  }
+}))
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppState } from '../types'
 import { resetHostedReviewLinkMutationGenerationForTests } from './worktrees'
-import { makeWorktree } from './worktrees-slice-test-fixtures'
+import { makeWorktree as fixtureWorktree } from './worktrees-slice-test-fixtures'
+
+function makeWorktree(overrides: Parameters<typeof fixtureWorktree>[0]) {
+  return fixtureWorktree({ hostId: 'local', instanceId: 'generation-1', ...overrides })
+}
 import {
   createTestStore,
-  mockApi,
   resetRemoteRuntimeMocks,
-  resetWorktreeSliceModuleMemory
+  resetWorktreeSliceModuleMemory,
+  worktreeListMock
 } from './worktrees-slice-test-harness'
 
 const requestWorktreeBaseFallbackNotice = vi.hoisted(() => vi.fn())
@@ -30,6 +69,7 @@ beforeEach(resetWorktreeSliceModuleMemory)
 describe('updateWorktreeGitIdentity', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    persistedMetadata.mockReset().mockResolvedValue(undefined)
     resetRemoteRuntimeMocks()
     resetHostedReviewLinkMutationGenerationForTests()
   })
@@ -41,21 +81,29 @@ describe('updateWorktreeGitIdentity', () => {
       repoId: 'repo1',
       path: '/path/wt1',
       branch: 'refs/heads/stack/one',
+      linkedPR: 101,
       pushTarget: { remoteName: 'fork', branchName: 'old/review-head' }
     })
 
     store.setState({ worktreesByRepo: { repo1: [existing] } } as Partial<AppState>)
 
-    store.getState().updateWorktreeGitIdentity('repo1::/path/wt1', {
-      branch: 'refs/heads/stack/two'
-    })
+    store.getState().updateWorktreeGitIdentity(
+      'repo1::/path/wt1',
+      {
+        branch: 'refs/heads/stack/two'
+      },
+      null
+    )
     await Promise.resolve()
 
     expect(store.getState().worktreesByRepo.repo1[0]).toMatchObject({
       branch: 'refs/heads/stack/two',
       pushTarget: undefined
     })
-    expect(mockApi.worktrees.updateMeta).toHaveBeenCalledWith({
+    expect(store.getState().worktreesByRepo.repo1[0]?.linkedItems).toEqual([
+      { provider: 'github', type: 'pr', number: 101 }
+    ])
+    expect(persistedMetadata).toHaveBeenCalledWith({
       worktreeId: 'repo1::/path/wt1',
       updates: {
         linkedPR: null,
@@ -81,7 +129,7 @@ describe('updateWorktreeGitIdentity', () => {
     const clearPersisted = new Promise<void>((resolve) => {
       resolveClearPersist = resolve
     })
-    mockApi.worktrees.updateMeta.mockImplementation(async ({ updates }) => {
+    persistedMetadata.mockImplementation(async ({ updates }) => {
       if (
         updates.linkedPR === null &&
         updates.linkedGitLabMR === null &&
@@ -95,15 +143,19 @@ describe('updateWorktreeGitIdentity', () => {
 
     store.setState({ worktreesByRepo: { repo1: [existing] } } as Partial<AppState>)
 
-    store.getState().updateWorktreeGitIdentity('repo1::/path/wt1', {
-      branch: 'refs/heads/stack/two'
-    })
+    store.getState().updateWorktreeGitIdentity(
+      'repo1::/path/wt1',
+      {
+        branch: 'refs/heads/stack/two'
+      },
+      null
+    )
     await Promise.resolve()
     await store.getState().updateWorktreeMeta('repo1::/path/wt1', { linkedGitLabMR: 202 })
     resolveClearPersist()
 
     await vi.waitFor(() => {
-      expect(mockApi.worktrees.updateMeta).toHaveBeenLastCalledWith({
+      expect(persistedMetadata).toHaveBeenLastCalledWith({
         worktreeId: 'repo1::/path/wt1',
         updates: {
           linkedPR: null,
@@ -131,7 +183,7 @@ describe('updateWorktreeGitIdentity', () => {
     const clearPersisted = new Promise<void>((resolve) => {
       resolveClearPersist = resolve
     })
-    mockApi.worktrees.updateMeta.mockImplementation(async ({ updates }) => {
+    persistedMetadata.mockImplementation(async ({ updates }) => {
       if (
         updates.linkedPR === null &&
         updates.pushTarget === undefined &&
@@ -143,15 +195,19 @@ describe('updateWorktreeGitIdentity', () => {
 
     store.setState({ worktreesByRepo: { repo1: [existing] } } as Partial<AppState>)
 
-    store.getState().updateWorktreeGitIdentity('repo1::/path/wt1', {
-      branch: 'refs/heads/stack/two'
-    })
+    store.getState().updateWorktreeGitIdentity(
+      'repo1::/path/wt1',
+      {
+        branch: 'refs/heads/stack/two'
+      },
+      null
+    )
     await Promise.resolve()
     await store.getState().updateWorktreeMeta('repo1::/path/wt1', { pushTarget: nextPushTarget })
     resolveClearPersist()
 
     await vi.waitFor(() => {
-      expect(mockApi.worktrees.updateMeta).toHaveBeenLastCalledWith({
+      expect(persistedMetadata).toHaveBeenLastCalledWith({
         worktreeId: 'repo1::/path/wt1',
         updates: {
           linkedPR: null,
@@ -180,7 +236,7 @@ describe('updateWorktreeGitIdentity', () => {
       releaseFirstClear = resolve
     })
     let clearCalls = 0
-    mockApi.worktrees.updateMeta.mockImplementation(async ({ updates }) => {
+    persistedMetadata.mockImplementation(async ({ updates }) => {
       if (updates.linkedPR === null && updates.pushTarget === undefined) {
         clearCalls += 1
         if (clearCalls === 1) {
@@ -191,19 +247,27 @@ describe('updateWorktreeGitIdentity', () => {
 
     store.setState({ worktreesByRepo: { repo1: [existing] } } as Partial<AppState>)
 
-    store.getState().updateWorktreeGitIdentity('repo1::/path/wt1', {
-      branch: 'refs/heads/stack/two'
-    })
+    store.getState().updateWorktreeGitIdentity(
+      'repo1::/path/wt1',
+      {
+        branch: 'refs/heads/stack/two'
+      },
+      null
+    )
     await Promise.resolve()
-    store.getState().updateWorktreeGitIdentity('repo1::/path/wt1', {
-      branch: 'refs/heads/stack/three'
-    })
+    store.getState().updateWorktreeGitIdentity(
+      'repo1::/path/wt1',
+      {
+        branch: 'refs/heads/stack/three'
+      },
+      null
+    )
     releaseFirstClear()
 
     await vi.waitFor(() => {
       expect(clearCalls).toBeGreaterThanOrEqual(2)
     })
-    expect(mockApi.worktrees.updateMeta).toHaveBeenLastCalledWith({
+    expect(persistedMetadata).toHaveBeenLastCalledWith({
       worktreeId: 'repo1::/path/wt1',
       updates: {
         linkedPR: null,
@@ -230,7 +294,7 @@ describe('updateWorktreeGitIdentity', () => {
     const clearPersisted = new Promise<void>((resolve) => {
       resolveClearPersist = resolve
     })
-    mockApi.worktrees.updateMeta.mockImplementation(async ({ updates }) => {
+    persistedMetadata.mockImplementation(async ({ updates }) => {
       if (updates.linkedPR === null) {
         await clearPersisted
       }
@@ -238,9 +302,13 @@ describe('updateWorktreeGitIdentity', () => {
 
     store.setState({ worktreesByRepo: { repo1: [existing] } } as Partial<AppState>)
 
-    store.getState().updateWorktreeGitIdentity('repo1::/path/wt1', {
-      branch: 'refs/heads/stack/two'
-    })
+    store.getState().updateWorktreeGitIdentity(
+      'repo1::/path/wt1',
+      {
+        branch: 'refs/heads/stack/two'
+      },
+      null
+    )
     await Promise.resolve()
     const switched = store.getState().worktreesByRepo.repo1[0]
     store.setState({
@@ -263,8 +331,8 @@ describe('updateWorktreeGitIdentity', () => {
         pushTarget: undefined
       })
     })
-    expect(mockApi.worktrees.updateMeta).toHaveBeenCalledTimes(1)
-    expect(mockApi.worktrees.updateMeta).toHaveBeenCalledWith({
+    expect(persistedMetadata).toHaveBeenCalledTimes(1)
+    expect(persistedMetadata).toHaveBeenCalledWith({
       worktreeId: 'repo1::/path/wt1',
       updates: {
         linkedPR: null,
@@ -290,9 +358,13 @@ describe('updateWorktreeGitIdentity', () => {
 
     store.setState({ worktreesByRepo: { repo1: [existing] } } as Partial<AppState>)
 
-    store.getState().updateWorktreeGitIdentity('repo1::/path/wt1', {
-      branch: 'refs/heads/stack/two'
-    })
+    store.getState().updateWorktreeGitIdentity(
+      'repo1::/path/wt1',
+      {
+        branch: 'refs/heads/stack/two'
+      },
+      null
+    )
     const switched = store.getState().worktreesByRepo.repo1[0]
     store.setState({
       worktreesByRepo: {
@@ -313,7 +385,7 @@ describe('updateWorktreeGitIdentity', () => {
         pushTarget: undefined
       })
     })
-    expect(mockApi.worktrees.updateMeta).toHaveBeenCalledWith({
+    expect(persistedMetadata).toHaveBeenCalledWith({
       worktreeId: 'repo1::/path/wt1',
       updates: {
         linkedPR: null,
@@ -348,12 +420,16 @@ describe('updateWorktreeGitIdentity', () => {
 
     store.setState({ worktreesByRepo: { repo1: [existing] } } as Partial<AppState>)
 
-    store.getState().updateWorktreeGitIdentity('repo1::/path/wt1', {
-      head: 'new-head',
-      branch: 'refs/heads/stack/two'
-    })
+    store.getState().updateWorktreeGitIdentity(
+      'repo1::/path/wt1',
+      {
+        head: 'new-head',
+        branch: 'refs/heads/stack/two'
+      },
+      null
+    )
     await vi.waitFor(() => {
-      expect(mockApi.worktrees.updateMeta).toHaveBeenCalledWith({
+      expect(persistedMetadata).toHaveBeenCalledWith({
         worktreeId: 'repo1::/path/wt1',
         updates: {
           linkedPR: null,
@@ -366,9 +442,14 @@ describe('updateWorktreeGitIdentity', () => {
       })
     })
 
-    mockApi.worktrees.list.mockResolvedValue([staleRefetch])
+    worktreeListMock.mockResolvedValue([staleRefetch])
     await store.getState().fetchWorktrees('repo1')
 
+    expect(store.getState().worktreesByRepo.repo1[0]?.linkedItems).toContainEqual({
+      provider: 'github',
+      type: 'pr',
+      number: 101
+    })
     expect(store.getState().worktreesByRepo.repo1[0]).toMatchObject({
       branch: 'refs/heads/stack/two',
       head: 'new-head',
@@ -395,20 +476,28 @@ describe('updateWorktreeGitIdentity', () => {
     })
 
     store.setState({ worktreesByRepo: { repo1: [existing] } } as Partial<AppState>)
-    store.getState().updateWorktreeGitIdentity('repo1::/path/wt1', {
-      branch: 'refs/heads/stack/two'
-    })
+    store.getState().updateWorktreeGitIdentity(
+      'repo1::/path/wt1',
+      {
+        branch: 'refs/heads/stack/two'
+      },
+      null
+    )
     await vi.waitFor(() => {
-      expect(mockApi.worktrees.updateMeta).toHaveBeenCalledWith({
+      expect(persistedMetadata).toHaveBeenCalledWith({
         worktreeId: 'repo1::/path/wt1',
         updates: expect.objectContaining({ linkedPR: null })
       })
     })
 
-    store.getState().updateWorktreeGitIdentity('repo1::/path/wt1', {
-      branch: 'refs/heads/stack/one'
-    })
-    mockApi.worktrees.list.mockResolvedValue([laterBranch])
+    store.getState().updateWorktreeGitIdentity(
+      'repo1::/path/wt1',
+      {
+        branch: 'refs/heads/stack/one'
+      },
+      null
+    )
+    worktreeListMock.mockResolvedValue([laterBranch])
     await store.getState().fetchWorktrees('repo1')
 
     expect(store.getState().worktreesByRepo.repo1[0]).toMatchObject({
@@ -445,20 +534,24 @@ describe('updateWorktreeGitIdentity', () => {
     })
 
     store.setState({ worktreesByRepo: { repo1: [existing] } } as Partial<AppState>)
-    store.getState().updateWorktreeGitIdentity('repo1::/path/wt1', {
-      head: 'new-head',
-      branch: 'refs/heads/stack/two'
-    })
+    store.getState().updateWorktreeGitIdentity(
+      'repo1::/path/wt1',
+      {
+        head: 'new-head',
+        branch: 'refs/heads/stack/two'
+      },
+      null
+    )
     await vi.waitFor(() => {
-      expect(mockApi.worktrees.updateMeta).toHaveBeenCalledWith({
+      expect(persistedMetadata).toHaveBeenCalledWith({
         worktreeId: 'repo1::/path/wt1',
         updates: expect.objectContaining({ linkedPR: null })
       })
     })
 
-    mockApi.worktrees.list.mockResolvedValue([cleanHeadAdvance])
+    worktreeListMock.mockResolvedValue([cleanHeadAdvance])
     await store.getState().fetchWorktrees('repo1')
-    mockApi.worktrees.list.mockResolvedValue([staleLinkedRow])
+    worktreeListMock.mockResolvedValue([staleLinkedRow])
     await store.getState().fetchWorktrees('repo1')
 
     expect(store.getState().worktreesByRepo.repo1[0]).toMatchObject({
@@ -487,17 +580,21 @@ describe('updateWorktreeGitIdentity', () => {
     })
 
     store.setState({ worktreesByRepo: { repo1: [existing] } } as Partial<AppState>)
-    store.getState().updateWorktreeGitIdentity('repo1::/path/wt1', {
-      branch: 'refs/heads/stack/two'
-    })
+    store.getState().updateWorktreeGitIdentity(
+      'repo1::/path/wt1',
+      {
+        branch: 'refs/heads/stack/two'
+      },
+      null
+    )
     await vi.waitFor(() => {
-      expect(mockApi.worktrees.updateMeta).toHaveBeenCalledWith({
+      expect(persistedMetadata).toHaveBeenCalledWith({
         worktreeId: 'repo1::/path/wt1',
         updates: expect.objectContaining({ linkedPR: null })
       })
     })
 
-    mockApi.worktrees.list.mockResolvedValue([laterBranch])
+    worktreeListMock.mockResolvedValue([laterBranch])
     await store.getState().fetchWorktrees('repo1')
 
     expect(store.getState().worktreesByRepo.repo1[0]).toMatchObject({
@@ -506,7 +603,7 @@ describe('updateWorktreeGitIdentity', () => {
       pushTarget: undefined
     })
 
-    mockApi.worktrees.list.mockResolvedValue([
+    worktreeListMock.mockResolvedValue([
       {
         ...existing,
         linkedPR: 101,

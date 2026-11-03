@@ -22,7 +22,7 @@ type UseSavedSourceControlAgentActionAutoStartArgs = {
   savedAgentId?: TuiAgent | null
   savedCommandInputTemplate?: string | null
   savedAgentArgs?: string | null
-  settings: Pick<GlobalSettings, 'sourceControlAi' | 'commitMessageAi'> | null | undefined
+  settings: Pick<GlobalSettings, 'sourceControlAi'> | null | undefined
   repo: Pick<Repo, 'sourceControlAi'> | null
   repoId?: string | null
   worktreeId?: string | null
@@ -69,7 +69,7 @@ function buildSavedLaunchRecipe(input: {
 function getMatchedSavedReceiptTargetValue(input: {
   actionId: SourceControlLaunchActionId
   recipe: SourceControlActionRecipe | null
-  settings: Pick<GlobalSettings, 'sourceControlAi' | 'commitMessageAi'> | null | undefined
+  settings: Pick<GlobalSettings, 'sourceControlAi'> | null | undefined
   repo: Pick<Repo, 'sourceControlAi'> | null
   repoId?: string | null
 }): SavedSourceControlAgentActionTargetValue | null {

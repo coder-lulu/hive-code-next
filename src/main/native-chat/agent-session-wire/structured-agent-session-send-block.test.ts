@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { APP_DISPLAY_NAME } from '../../../shared/brand'
-import type { AgentSessionConversationCommandRecord } from '../../../shared/agent-session-conversation-command'
+import type { AgentSessionConversationCommandRecord } from '../../../shared/agent-session/agent-session-conversation-command'
 import { agentSessionRecordFixture } from '../../../shared/agent-session-record.test-fixture'
 import {
   openConversationForWrite,
@@ -15,7 +14,6 @@ function withCommand(command: AgentSessionConversationCommandRecord) {
 const COMMAND = { operationId: 'operation-1', callerKey: 'client-1', runtimeFence: 7 }
 
 describe('a send refused by the conversation command it follows', () => {
-  // A clear's commit is its only durable write, so a record short of it never changed the chat.
   it("lets a send follow a /clear that never committed, as an older build's record leaves one", () => {
     expect(
       structuredAgentSessionSendBlock(
@@ -111,7 +109,7 @@ describe('a write whose conversation the host could not open', () => {
       refusal: {
         code: 'agent_session_journal_unreadable',
         details: { reason: 'journalUnavailable' },
-        message: `${APP_DISPLAY_NAME} couldn't open this chat's history right now. Try again.`
+        message: "Orca couldn't open this chat's history right now. Try again."
       }
     })
   })

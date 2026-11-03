@@ -1,3 +1,4 @@
+import { launchRecordStore } from '../runtime/structured-agent-launch-composition.test-support'
 import {
   createCodexStructuredLaunchResolver,
   TEST_SPAWN_TOKEN
@@ -10,6 +11,7 @@ import { FLOATING_TERMINAL_WORKTREE_ID } from '../../shared/constants'
 import type { AgentSessionRecord } from '../../shared/agent-session-record'
 import type { AgentSessionProviderHandleLink } from '../../shared/agent-session-provider-handle'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
+import { openCodexThread } from './codex-structured-thread-open'
 import { codexProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
 import {
   LEGACY_NATIVE_CHAT_VISUALS_DIR_ENV,
@@ -63,9 +65,9 @@ function resolverFor(
   resolveLaunchArgs?: () => string[]
 ) {
   return createCodexStructuredLaunchResolver({
-    store: { getRecord: () => value, pinLaunchDirectory: vi.fn() },
+    store: launchRecordStore(() => value, vi.fn()),
     resolveWorkspacePath,
-    resolveCommand: () => '/usr/local/bin/codex',
+    resolveCommand: () => ({ command: '/usr/local/bin/codex', prefixArgs: [] }),
     resolveRollout,
     resolveLaunchArgs: resolveLaunchArgs ?? (() => value?.launchArgs ?? [])
   })
@@ -140,16 +142,16 @@ describe('codex structured launch resolution', () => {
   it('repairs the first launch directory of an unpinned legacy floating session', async () => {
     const pinLaunchDirectory = vi.fn()
     const resolveLaunch = createCodexStructuredLaunchResolver({
-      store: {
-        getRecord: () =>
+      store: launchRecordStore(
+        () =>
           record({
             location: { ...record().location, workspaceId: FLOATING_TERMINAL_WORKTREE_ID }
           }),
         pinLaunchDirectory
-      },
+      ),
       resolveLaunchArgs: () => [],
       resolveWorkspacePath: async () => '/floating/start-folder',
-      resolveCommand: () => '/usr/local/bin/codex'
+      resolveCommand: () => ({ command: '/usr/local/bin/codex', prefixArgs: [] })
     })
 
     await expect(resolveLaunch({ identity: IDENTITY })).resolves.toMatchObject({
@@ -163,6 +165,7 @@ describe('codex structured launch resolution', () => {
 
     expect(launch).toEqual({
       command: '/usr/local/bin/codex',
+      prefixArgs: [],
       args: ['app-server'],
       cwd: '/repos/workspace-1',
       codexHome: '/home/work/.codex',
@@ -170,7 +173,7 @@ describe('codex structured launch resolution', () => {
       // Every launch carries a posture; none is left for config.toml to decide. No mode asks.
       permissionPolicy: {
         approvalPolicy: 'on-request',
-        sandbox: 'workspace-write',
+        sandbox: 'read-only',
         approvalsReviewer: 'user'
       },
       env: { CODEX_HOME: '/home/work/.codex' },
@@ -184,9 +187,9 @@ describe('codex structured launch resolution', () => {
     await withPlatform('win32', async () => {
       const resolveLaunch = createCodexStructuredLaunchResolver({
         resolveLaunchArgs: () => [],
-        store: { getRecord: () => record(), pinLaunchDirectory: vi.fn() },
+        store: launchRecordStore(() => record(), vi.fn()),
         resolveWorkspacePath: async () => String.raw`C:\workspaces\orca`,
-        resolveCommand: () => command
+        resolveCommand: () => ({ command, prefixArgs: [] })
       })
 
       await expect(resolveLaunch({ identity: IDENTITY })).resolves.toMatchObject({
@@ -201,9 +204,9 @@ describe('codex structured launch resolution', () => {
     await withPlatform('win32', async () => {
       const resolveLaunch = createCodexStructuredLaunchResolver({
         resolveLaunchArgs: () => [],
-        store: { getRecord: () => record(), pinLaunchDirectory: vi.fn() },
+        store: launchRecordStore(() => record(), vi.fn()),
         resolveWorkspacePath: async () => String.raw`C:\workspaces\orca`,
-        resolveCommand: () => 'codex.exe'
+        resolveCommand: () => ({ command: 'codex.exe', prefixArgs: [] })
       })
 
       await expect(resolveLaunch({ identity: IDENTITY })).resolves.toMatchObject({
@@ -258,10 +261,7 @@ describe('codex structured launch resolution', () => {
 
   // app-server owns the permission posture on the thread RPC, not process flags.
   it.each([
-    [
-      'ask',
-      { approvalPolicy: 'on-request', sandbox: 'workspace-write', approvalsReviewer: 'user' }
-    ],
+    ['ask', { approvalPolicy: 'on-request', sandbox: 'read-only', approvalsReviewer: 'user' }],
     [
       'auto',
       { approvalPolicy: 'on-request', sandbox: 'workspace-write', approvalsReviewer: 'auto_review' }
@@ -279,6 +279,38 @@ describe('codex structured launch resolution', () => {
 
     expect(launch.args).toEqual(['app-server'])
     expect(launch.permissionPolicy).toEqual(policy)
+  })
+
+  it('leaves a provider-own chat without an injected thread permission policy', async () => {
+    const launch = await resolverFor(record())({
+      identity: IDENTITY,
+      spawnToken: TEST_SPAWN_TOKEN,
+      permissionMode: 'own'
+    })
+    expect(launch).not.toHaveProperty('permissionPolicy')
+    expect(launch.args).toEqual(['app-server'])
+    const request = vi.fn(async (_method: string, _params?: Record<string, unknown>) => ({
+      thread: { id: 'own-thread' }
+    }))
+    await openCodexThread({ request }, launch, 2_000)
+    await openCodexThread({ request }, { ...launch, resumeThreadId: 'own-thread' }, 2_000)
+    const config = Object.fromEntries(
+      Object.entries(launch.commandEnv ?? {}).map(([key, value]) => [
+        `shell_environment_policy.set.${key}`,
+        value
+      ])
+    )
+    expect(config).toMatchObject({
+      'shell_environment_policy.set.ORCA_AGENT_SESSION_ID': IDENTITY.sessionId,
+      'shell_environment_policy.set.ORCA_STRUCTURED_SESSION': '1'
+    })
+    expect(request.mock.calls[0]?.[1]).toEqual({ cwd: launch.cwd, config })
+    expect(request.mock.calls[1]?.[1]).toEqual({
+      threadId: 'own-thread',
+      cwd: launch.cwd,
+      excludeTurns: true,
+      config
+    })
   })
 
   // The chat's mode replaces Agent Permissions: a Yolo terminal setting grants a chat nothing.

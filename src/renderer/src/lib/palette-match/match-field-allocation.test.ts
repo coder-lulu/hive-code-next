@@ -3,9 +3,12 @@ import {
   indexPaletteField,
   type PaletteIdentifierKind,
   type PaletteFieldProfile
-} from './indexed-field'
-import { matchPaletteField } from './match-field'
-import { createPaletteQueryToken, preparePaletteQuery } from './palette-query'
+} from '../../../../shared/palette-match/indexed-field'
+import { matchPaletteField } from '../../../../shared/palette-match/match-field'
+import {
+  createPaletteQueryToken,
+  preparePaletteQuery
+} from '../../../../shared/palette-match/palette-query'
 
 describe('palette atom equality preserves source ranges', () => {
   it.each([

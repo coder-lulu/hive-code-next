@@ -5,7 +5,7 @@ import {
   buildAgentStartupPlan,
   type AgentStartupPlan
 } from '@/lib/tui-agent-startup'
-import type { SessionOptionValue } from '../../../../shared/native-chat-session-options'
+import type { SessionOptionValue } from '../../../../shared/native-chat/input/native-chat-session-options'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { AgentLaunchPermissionMode } from '../../../../shared/tui-agent-permissions'
 import type { AgentStartupShell } from '../../../../shared/tui-agent-startup-shell'

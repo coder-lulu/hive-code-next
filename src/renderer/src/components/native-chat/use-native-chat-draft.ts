@@ -1,33 +1,33 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { appendReturnedDraftText } from '../../../../shared/returned-draft-text'
-import { subscribeToNativeChatComposerDraft } from './native-chat-composer-draft-store'
+import { withNativeChatComposerDraftAddition } from './native-chat-composer-draft-addition'
+import type { NativeChatDraftAppend } from './native-chat-composer-draft-memory'
+import type { NativeChatComposerDraft } from './native-chat-composer-draft-storage'
 import {
-  readNativeChatDraftCache,
-  subscribeToNativeChatDraftAppend,
-  writeNativeChatDraftCache
-} from './native-chat-draft-cache'
+  subscribeToNativeChatComposerDraft,
+  subscribeToNativeChatComposerDraftAppend,
+  readNativeChatComposerDraft,
+  updateNativeChatComposerDraft
+} from './native-chat-composer-draft-store'
+import { readNativeChatDraftCache, writeNativeChatDraftCache } from './native-chat-draft-cache'
 
 /** Text appended mid-IME-composition: saved at once, shown once the composition settles. */
-type CompositionHold = { scopeKey: string; shown: string; appended: string }
+type CompositionHold = {
+  scopeKey: string
+  shown: string
+  base: NativeChatComposerDraft
+  additions: NativeChatDraftAppend[]
+}
 
-/**
- * The composer's draft text, read from the draft store so a typed-but-unsent message survives
- * the composer unmounting on a TUI/GUI toggle, a reload or a quit. Every change is made to the
- * store's current draft, never to a copy this composer holds. `scopeKey` is the stable pane key
- * also used for image attachments.
- */
+/** Mutate the durable scope store’s current draft, never a composer copy, so unsent text survives toggles, remounts and restarts. */
 export function useNativeChatDraft(
   scopeKey: string,
-  isComposing: () => boolean,
-  controlled?: { text: string; onChange: (text: string) => void }
+  isComposing: () => boolean
 ): {
   draft: string
   setDraft: (next: string | ((previous: string) => string), options?: { unsaved?: boolean }) => void
   /** Shows text appended during an IME composition, which owns the field until it settles. */
   flushDraftAppends: () => void
 } {
-  const controlledRef = useRef(controlled)
-  controlledRef.current = controlled
   const subscribe = useCallback(
     (listener: () => void) => subscribeToNativeChatComposerDraft(scopeKey, listener),
     [scopeKey]
@@ -49,60 +49,58 @@ export function useNativeChatDraft(
 
   useEffect(
     () =>
-      subscribeToNativeChatDraftAppend(scopeKey, (text, previous) => {
+      subscribeToNativeChatComposerDraftAppend(scopeKey, (addition, previous) => {
         if (!isComposing()) {
-          const owner = controlledRef.current
-          if (owner) {
-            owner.onChange(appendReturnedDraftText(owner.text, text))
-          }
           return
         }
         const held = holdRef.current?.scopeKey === scopeKey ? holdRef.current : null
         updateHold({
           scopeKey,
-          shown: held ? held.shown : previous,
-          appended: held ? appendReturnedDraftText(held.appended, text) : text
+          shown: held ? held.shown : previous.text,
+          base: held?.base ?? previous,
+          additions: [...(held?.additions ?? []), addition]
         })
       }),
     [isComposing, scopeKey, updateHold]
   )
 
-  // Accepts the same value/updater forms as a useState setter so call sites are drop-in.
   const setDraft = useCallback(
     (next: string | ((previous: string) => string), options?: { unsaved?: boolean }) => {
       const held = holdRef.current?.scopeKey === scopeKey ? holdRef.current : null
-      const previous = held ? held.shown : (controlled?.text ?? readNativeChatDraftCache(scopeKey))
+      const previous = held ? held.shown : readNativeChatDraftCache(scopeKey)
       const resolved = typeof next === 'function' ? next(previous) : next
       if (held) {
         updateHold({ ...held, shown: resolved })
       }
-      if (controlled) {
-        controlled.onChange(resolved)
-        return
+      if (held) {
+        const current = readNativeChatComposerDraft(scopeKey)
+        const base =
+          current.text === resolved
+            ? current
+            : { ...held.base, text: resolved, document: undefined }
+        const merged = held.additions.reduce<NativeChatComposerDraft>(
+          (draft, addition) => ({
+            ...draft,
+            ...(typeof addition === 'function'
+              ? addition(draft)
+              : withNativeChatComposerDraftAddition(draft, addition))
+          }),
+          base
+        )
+        updateNativeChatComposerDraft(scopeKey, merged, 'deferred')
+      } else {
+        writeNativeChatDraftCache(scopeKey, resolved, options)
       }
-      writeNativeChatDraftCache(
-        scopeKey,
-        held ? appendReturnedDraftText(resolved, held.appended) : resolved,
-        options
-      )
     },
-    [scopeKey, updateHold, controlled]
+    [scopeKey, updateHold]
   )
 
   const flushDraftAppends = useCallback(() => {
     if (holdRef.current?.scopeKey === scopeKey) {
-      const held = holdRef.current
-      if (controlledRef.current) {
-        controlledRef.current.onChange(appendReturnedDraftText(held.shown, held.appended))
-      }
       updateHold(null)
     }
   }, [scopeKey, updateHold])
 
   const shownHold = hold?.scopeKey === scopeKey ? hold : null
-  return {
-    draft: shownHold ? shownHold.shown : (controlled?.text ?? stored),
-    setDraft,
-    flushDraftAppends
-  }
+  return { draft: shownHold ? shownHold.shown : stored, setDraft, flushDraftAppends }
 }

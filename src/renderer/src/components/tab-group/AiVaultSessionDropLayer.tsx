@@ -1,8 +1,8 @@
 import { getAiVaultResumeWorkspaceWslDistro } from '@/lib/ai-vault-resume-shell'
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { toast } from 'sonner'
+import { canResumeAiVaultSessionOnTarget } from '../../../../shared/ai-vault-resume-target'
 import {
-  canResumeAiVaultSessionOnTarget,
   getAiVaultResumeWorkspaceExecutionHostId,
   getAiVaultResumeWorkspaceTargetStatus
 } from '@/lib/ai-vault-resume-target'
@@ -24,7 +24,6 @@ import { useAppStore } from '@/store'
 import { resolveDropZone } from './tab-drop-zone'
 import type { TabDropZone } from './useTabDragSplit'
 import { translate } from '@/i18n/i18n'
-import { APP_DISPLAY_NAME } from '@/product-brand'
 import { activateAiVaultStructuredSession } from '@/lib/activate-ai-vault-structured-session'
 
 type PaneDropTarget = {
@@ -179,8 +178,7 @@ export default function AiVaultSessionDropLayer({
         return true
       }
       if (payload.structuredSession) {
-        // Same row, same reveal as clicking Resume. Activating by id alone cannot reach a chat
-        // whose tab is closed, which is the case this drop is most often used for.
+        // Use Resume’s reveal path because activating a chat by ID alone cannot reopen its closed tab.
         void activateAiVaultStructuredSession(payload)
         return true
       }
@@ -252,13 +250,17 @@ export default function AiVaultSessionDropLayer({
                 })
               : payload
           if (!startup) {
-            // Why: the host just proved the prebuilt command pins another
-            // account's home, so an unrepinnable payload (older serializer)
-            // must fail loudly rather than silently resume under it.
+            // Refuse old payloads that cannot repin the startup command; silently using another account’s home is unsafe.
             throw new Error(
               result.substituteCodexHome
-                ? `This session was dragged from an older ${APP_DISPLAY_NAME} window, so ${APP_DISPLAY_NAME} cannot retarget it to the selected Codex account. Resume it from the Session History panel instead.`
-                : `${APP_DISPLAY_NAME} could not prepare this legacy Codex session. Retry resume.`
+                ? translate(
+                    'auto.components.tab.group.AiVaultSessionDropLayer.legacyDragCannotRetarget',
+                    'This session was dragged from an older Orca window, so Orca cannot retarget it to the selected Codex account. Resume it from the Session History panel instead.'
+                  )
+                : translate(
+                    'auto.components.tab.group.AiVaultSessionDropLayer.legacyDragPrepareFailed',
+                    'Orca could not prepare this legacy Codex session. Retry resume.'
+                  )
             )
           }
           const providerSession = getAiVaultAgentProviderSession({

@@ -1,3 +1,4 @@
+import { translate } from '../i18n/mobile-i18n'
 import { classifyConnection } from '../transport/connection-health'
 import { resolveHomeHostConnectionState } from '../transport/home-host-auto-connect'
 import { hostCatalogEntryHasLocalPairing } from '../runtime-directory/account-runtime-catalog'
@@ -46,7 +47,7 @@ export function projectMobileDevices(args: {
       endpoint: host.endpoint,
       pendingPath: args.pendingPaths[host.id],
       pairingRejected: args.pairingRejected[host.id],
-      hostSignedOut: args.signedOut[host.id]
+      relayHostReachability: args.signedOut[host.id] ? 'signed-out' : undefined
     })
     // `state` is projected from a currently registered shared client. That
     // authenticated live connection outranks stale directory availability;
@@ -69,7 +70,13 @@ export function projectMobileDevices(args: {
         : null
     }
     if (connected) {
-      return { ...base, connecting: false, label: '已连接', hint: '连接已建立', tone: 'success' }
+      return {
+        ...base,
+        connecting: false,
+        label: translate('diagnostics.useTroubleshootDiagnostics.connected', 'Connected'),
+        hint: '连接已建立',
+        tone: 'success'
+      }
     }
     if (host.credentialStatus === 'missing' || verdict.kind === 'auth-failed') {
       return {
@@ -89,13 +96,19 @@ export function projectMobileDevices(args: {
           : host.credentialStatus === 'cloud-offline'
             ? '电脑未连接 HiveCloud，恢复连接后重试'
             : '电脑当前没有可用的安全中继连接'
-      return { ...base, connecting: false, label: '暂不可达', hint, tone: 'neutral' }
+      return {
+        ...base,
+        connecting: false,
+        label: translate('auto.mobile.src.devices.mobile.devices.model.7dc3d59727', 'Unreachable'),
+        hint,
+        tone: 'neutral'
+      }
     }
     if (verdict.kind === 'unreachable' || verdict.kind === 'warning') {
       return {
         ...base,
         connecting: false,
-        label: '暂不可达',
+        label: translate('auto.mobile.src.devices.mobile.devices.model.7dc3d59727', 'Unreachable'),
         hint: args.signedOut[host.id]
           ? '请在电脑端登录 HiveCloud 后重试'
           : verdict.hint
@@ -112,7 +125,7 @@ export function projectMobileDevices(args: {
       return {
         ...base,
         connecting: false,
-        label: '在线',
+        label: translate('auto.mobile.src.devices.mobile.devices.model.ba72c03603', 'Online'),
         hint: '电脑已连接 HiveCloud，可按需建立会话',
         tone: 'success'
       }

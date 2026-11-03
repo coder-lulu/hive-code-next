@@ -9,12 +9,13 @@ import type { GitHubOwnerRepo } from '../../shared/github/pull-request-types'
 import type { GitHubWorkItem, ListWorkItemsResult } from '../../shared/github/work-item-types'
 import type { GitHubCreateIssueResult } from '../../shared/issue-mutation-types'
 import type { TaskSourceContext } from '../../shared/task-source-context'
+import type { PreloadApi } from '../api-types'
 
 export const ghPullRequestsAndWorkItemsApi = {
   viewer: () => ipcRenderer.invoke('gh:viewer'),
-  repoSlug: (args: { repoPath: string; repoId?: string | null }) =>
+  repoSlug: (args: { repoPath: string; repoId?: string }) =>
     ipcRenderer.invoke('gh:repoSlug', args),
-  repoUpstream: (args: { repoPath: string; repoId?: string | null }) =>
+  repoUpstream: (args: { repoPath: string; repoId?: string }) =>
     ipcRenderer.invoke('gh:repoUpstream', args),
   prForBranch: (args: {
     repoPath: string
@@ -24,6 +25,7 @@ export const ghPullRequestsAndWorkItemsApi = {
     fallbackPRNumber?: number | null
     acceptMergedFallbackPR?: boolean
     currentHeadOid?: string | null
+    wakeWslDistro?: boolean
   }) => ipcRenderer.invoke('gh:prForBranch', args),
   refreshPRNow: (args: { candidate: GitHubPRRefreshCandidate }) =>
     ipcRenderer.invoke('gh:refreshPRNow', args),
@@ -64,6 +66,7 @@ export const ghPullRequestsAndWorkItemsApi = {
     host?: string
     number: number
     type: 'issue' | 'pr'
+    preview?: boolean
   }) => ipcRenderer.invoke('gh:workItemByOwnerRepo', args),
   workItemDetails: (args: {
     repoPath: string
@@ -90,7 +93,7 @@ export const ghPullRequestsAndWorkItemsApi = {
     headSha: string
     baseSha: string
   }) => ipcRenderer.invoke('gh:prFileContents', args),
-  listIssues: (args: { repoPath: string; repoId?: string | null; limit?: number }) =>
+  listIssues: (args: { repoPath: string; repoId?: string; limit?: number }) =>
     ipcRenderer.invoke('gh:listIssues', args),
   createIssue: (args: {
     repoPath: string
@@ -103,8 +106,9 @@ export const ghPullRequestsAndWorkItemsApi = {
   }): Promise<GitHubCreateIssueResult> => ipcRenderer.invoke('gh:createIssue', args),
   countWorkItems: (args: {
     repoPath: string
-    repoId?: string | null
+    repoId?: string
     query?: string
+    wakeWslDistro?: boolean
   }): Promise<number> => ipcRenderer.invoke('gh:countWorkItems', args),
   listWorkItems: (args: {
     repoPath: string
@@ -113,6 +117,7 @@ export const ghPullRequestsAndWorkItemsApi = {
     query?: string
     page?: number
     noCache?: boolean
+    wakeWslDistro?: boolean
   }): Promise<ListWorkItemsResult<Omit<GitHubWorkItem, 'repoId'>>> =>
     ipcRenderer.invoke('gh:listWorkItems', args),
   prChecks: (args: {
@@ -123,6 +128,7 @@ export const ghPullRequestsAndWorkItemsApi = {
     headSha?: string
     prRepo?: GitHubOwnerRepo | null
     noCache?: boolean
+    wakeWslDistro?: boolean
   }) => ipcRenderer.invoke('gh:prChecks', args),
   prCheckDetails: (args: {
     repoPath: string
@@ -194,4 +200,4 @@ export const ghPullRequestsAndWorkItemsApi = {
     method?: 'merge' | 'squash' | 'rebase'
     prRepo?: GitHubOwnerRepo | null
   }): Promise<{ ok: true } | { ok: false; error: string }> => ipcRenderer.invoke('gh:mergePR', args)
-}
+} satisfies Partial<PreloadApi['gh']>

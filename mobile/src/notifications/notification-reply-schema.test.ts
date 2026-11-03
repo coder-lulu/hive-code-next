@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { z } from 'zod'
 import {
+  missedNotificationsSchema,
+  notificationUnreadReplySchema,
+  PUSH_REGISTER_REFUSAL_REASONS,
   PUSH_TEST_REFUSAL_REASONS,
-  pushDeliveryTestResultSchema
+  pushDeliveryTestResultSchema,
+  pushRouteRegistrationSchema
 } from './notification-reply-schema'
 
 function reads<T>(schema: z.ZodType<T, unknown>, value: unknown): T {
@@ -25,8 +29,7 @@ describe('notification replies tolerate the shapes their call sites guard', () =
     expect(reads(pushDeliveryTestResultSchema, { error: 'refused' })?.accepted).toBe(undefined)
   })
 
-  // The screen interprets this inside a `try` that prints the thrown message, so a refusal would
-  // replace the screen's generic fallback with the reader's own sentence.
+  // Schema refusal would replace the screen’s generic send-failure copy with a parser error.
   it('reads a non-object test-push result as absent, which takes the generic copy', () => {
     for (const value of ['garbage', 7, true, []]) {
       expect(refuses(pushDeliveryTestResultSchema, value)).toBe(false)
@@ -35,9 +38,21 @@ describe('notification replies tolerate the shapes their call sites guard', () =
       expect(result?.reason).toBe(undefined)
     }
   })
+
+  it('reads a registration reply the reconciler reaches through optional chaining', () => {
+    expect(reads(pushRouteRegistrationSchema, { registered: true })?.registered).toBe(true)
+    expect(reads(pushRouteRegistrationSchema, null)).toBe(null)
+    expect(reads(pushRouteRegistrationSchema, { registered: 'yes' })?.registered).toBe(undefined)
+  })
+
+  it('takes every reply at the two sites whose body nothing reads', () => {
+    expect(refuses(notificationUnreadReplySchema, undefined)).toBe(false)
+    expect(refuses(notificationUnreadReplySchema, null)).toBe(false)
+    expect(refuses(notificationUnreadReplySchema, 'anything')).toBe(false)
+  })
 })
 
-describe('closed enums degrade to the copy the existing screen showed', () => {
+describe('closed enums degrade to the copy main showed', () => {
   it('keeps a reason the screen branches on and drops one it does not know', () => {
     expect(
       reads(pushDeliveryTestResultSchema, { accepted: false, reason: 'rate_limited' })?.reason
@@ -50,9 +65,37 @@ describe('closed enums degrade to the copy the existing screen showed', () => {
     )
   })
 
-  it('keeps every refusal reason the host declares for the delivery probe', () => {
+  it('keeps a registration reason and drops an unknown one', () => {
+    const reply = { registered: false, reason: 'throttled' }
+    expect(reads(pushRouteRegistrationSchema, reply)?.reason).toBe('throttled')
+    expect(
+      reads(pushRouteRegistrationSchema, { registered: false, reason: 'moon-phase' })?.reason
+    ).toBe(undefined)
+  })
+
+  // Host-pinned unions cover every arm; these loops prove each survives parsing.
+  it('keeps every refusal reason the host declares for either route', () => {
     for (const reason of PUSH_TEST_REFUSAL_REASONS) {
       expect(reads(pushDeliveryTestResultSchema, { accepted: false, reason })?.reason).toBe(reason)
     }
+    for (const reason of PUSH_REGISTER_REFUSAL_REASONS) {
+      expect(reads(pushRouteRegistrationSchema, { registered: false, reason })?.reason).toBe(reason)
+    }
+  })
+})
+
+describe('dismissal rows stay opaque', () => {
+  it('keeps every row for readPushNotificationIdentity to judge', () => {
+    const rows = [{ notificationId: 'n-1' }, 'not-a-row', 7]
+    expect(reads(missedNotificationsSchema, { dismissedPushes: rows })?.dismissedPushes).toEqual(
+      rows
+    )
+  })
+
+  it('drops a dismissedPushes that is not an array, as Array.isArray did', () => {
+    expect(reads(missedNotificationsSchema, { dismissedPushes: 'all' })?.dismissedPushes).toBe(
+      undefined
+    )
+    expect(reads(missedNotificationsSchema, null)).toBe(null)
   })
 })

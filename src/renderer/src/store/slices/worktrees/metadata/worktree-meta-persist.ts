@@ -18,6 +18,8 @@ import type { RuntimeClientTarget } from '../../../../../../shared/runtime-clien
 import type { WorktreeMeta } from '../../../../../../shared/worktree/meta-types'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import { encodePushTargetClearForRuntimeRpc } from './hosted-review-link-mutation'
+import type { GitHubLinkBase } from '../../../../../../shared/worktree/github-link-base'
+import { captureRuntimeEnvironmentRequestRevision } from '../../../../runtime/runtime-environment-revision'
 
 type PendingDisplayNameWrite = {
   worktreeId: string
@@ -56,14 +58,16 @@ export function persistWorktreeMeta(
   worktreeId: string,
   updates: Partial<WorktreeMeta> & WorkspaceAttachmentMutation,
   executionHostId?: ExecutionHostId,
-  identityKey?: string
+  identityKey?: string,
+  githubLinkBase?: GitHubLinkBase | null
 ): Promise<void> {
   const operation = persistWorktreeMetaUntracked(
     target,
     worktreeId,
     updates,
     executionHostId,
-    identityKey
+    identityKey,
+    githubLinkBase
   )
   if (!('displayName' in updates)) {
     return operation
@@ -85,9 +89,21 @@ async function persistWorktreeMetaUntracked(
   worktreeId: string,
   updates: Partial<WorktreeMeta> & WorkspaceAttachmentMutation,
   executionHostId?: ExecutionHostId,
-  identityKey?: string
+  identityKey?: string,
+  githubLinkBase?: GitHubLinkBase | null
 ): Promise<void> {
-  if (target.kind === 'local') {
+  const requiresBase = updates.linkedPR === null || 'suppressedGitHubPR' in updates
+  if (
+    requiresBase &&
+    (!githubLinkBase || (executionHostId && githubLinkBase.hostId !== executionHostId))
+  ) {
+    throw new Error('Refresh this workspace before changing its GitHub pull request link.')
+  }
+  const expectedEnvironmentPairingRevision =
+    target.kind === 'environment'
+      ? captureRuntimeEnvironmentRequestRevision(target.environmentId)
+      : undefined
+  if (target.kind === 'local' && !requiresBase) {
     await window.api.worktrees.updateMeta({
       worktreeId,
       ...(executionHostId ? { executionHostId } : {}),
@@ -137,34 +153,31 @@ async function persistWorktreeMetaUntracked(
     compatibleUpdates = legacySelection
   }
   if (target.kind === 'environment' && 'suppressedGitHubPR' in updates) {
-    if (typeof updates.suppressedGitHubPR === 'number' && updates.suppressedGitHubPR > 0) {
-      await assertRuntimeEnvironmentCapability(
-        target.environmentId,
-        WORKTREE_GITHUB_PR_SUPPRESSION_RUNTIME_CAPABILITY,
-        translate(
-          'auto.store.slices.worktrees.metadata.worktree.meta.persist.github.pr.suppression',
-          'Update the remote runtime to unlink GitHub pull requests'
-        )
+    await assertRuntimeEnvironmentCapability(
+      target.environmentId,
+      WORKTREE_GITHUB_PR_SUPPRESSION_RUNTIME_CAPABILITY,
+      translate(
+        'auto.store.slices.worktrees.metadata.worktree.meta.persist.github.pr.suppression',
+        'Update the remote runtime to unlink GitHub pull requests'
       )
-    } else if (
-      updates.suppressedGitHubPR === null &&
-      !(await runtimeEnvironmentSupportsCapability(
-        target.environmentId,
-        WORKTREE_GITHUB_PR_SUPPRESSION_RUNTIME_CAPABILITY
-      ))
-    ) {
-      const olderHostUpdates = { ...compatibleUpdates }
-      delete olderHostUpdates.suppressedGitHubPR
-      compatibleUpdates = olderHostUpdates
-    }
+    )
+  }
+  if (
+    (compatibleUpdates.linkedPR === null || 'suppressedGitHubPR' in compatibleUpdates) &&
+    !githubLinkBase
+  ) {
+    throw new Error('Refresh this workspace before changing its GitHub pull request link.')
   }
   await callRuntimeRpc(
     target,
     'worktree.set',
     {
       worktree: identityKey ? `identity:${identityKey}` : toRuntimeWorktreeSelector(worktreeId),
-      ...encodePushTargetClearForRuntimeRpc(compatibleUpdates)
+      ...encodePushTargetClearForRuntimeRpc(compatibleUpdates),
+      ...(compatibleUpdates.linkedPR === null || 'suppressedGitHubPR' in compatibleUpdates
+        ? { githubLinkBase: githubLinkBase! }
+        : {})
     },
-    { timeoutMs: 15_000 }
+    { timeoutMs: 15_000, expectedEnvironmentPairingRevision }
   )
 }

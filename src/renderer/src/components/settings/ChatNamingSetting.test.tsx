@@ -29,10 +29,7 @@ function renderSetting(overrides: Partial<GlobalSettings> = {}) {
   const updateSettings = vi.fn()
   const onDirtyChange = vi.fn()
   const writeSourceControlAiSettings = vi.fn(async (patch: SourceControlAiSettingsPatch) => {
-    const current = normalizeSourceControlAiSettings(
-      settings.sourceControlAi,
-      settings.commitMessageAi
-    )
+    const current = normalizeSourceControlAiSettings(settings.sourceControlAi)
     const resolved = typeof patch === 'function' ? patch(current) : patch
     settings.sourceControlAi = { ...current, ...resolved }
   })
@@ -183,10 +180,7 @@ describe('Chat names setting', () => {
     })
     writeSourceControlAiSettings.mockImplementationOnce(async (patch) => {
       await pendingWrite
-      const current = normalizeSourceControlAiSettings(
-        settings.sourceControlAi,
-        settings.commitMessageAi
-      )
+      const current = normalizeSourceControlAiSettings(settings.sourceControlAi)
       const resolved = typeof patch === 'function' ? patch(current) : patch
       settings.sourceControlAi = { ...current, ...resolved }
     })

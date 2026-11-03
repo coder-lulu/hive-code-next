@@ -47,6 +47,7 @@ vi.mock('@/lib/agent-paste-draft', () => ({ pasteDraftWhenAgentReady: vi.fn(asyn
 vi.mock('@/lib/agent-ready-wait', () => ({
   waitForAgentReady: vi.fn(async () => ({ ready: true, reason: 'foreground-match' }))
 }))
+vi.mock('@/runtime/host-structured-agents', () => ({ readHostStructuredAgents: () => [] }))
 vi.mock('@/runtime/local-runtime-capabilities', () => ({
   readLocalRuntimeCapabilitiesOrUnknown: () => []
 }))
@@ -57,6 +58,7 @@ vi.mock('@/runtime/runtime-rpc-result', () => ({ RuntimeRpcCallError: Error }))
 
 function launchesThroughHost(profile: AgentLaunchCallerProfile): boolean {
   return newTabPromptLaunchesThroughHost({
+    agent: profile.args.agent,
     promptDelivery: profile.args.promptDelivery ?? 'auto-submit',
     pastesPrompt: (profile.args.prompt?.trim() ?? '').length > 0,
     isRemote: false

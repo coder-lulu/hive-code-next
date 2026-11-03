@@ -1,10 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/constants'
+import { FLOATING_TERMINAL_WORKTREE_ID, getDefaultSettings } from '../../../shared/constants'
 import {
   STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY,
-  STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY
+  STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY,
+  STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY
 } from '../../../shared/protocol-version'
+import { decodeAgentSessionAgentsResult } from '../../../shared/agent-session/agent-session-registered-agents'
+import { WEB_RUNTIME_CLIENT_CAPABILITIES } from '../../../shared/web-runtime-client-capabilities'
+import type { RuntimeCapability } from '../../../shared/protocol-version'
 import type { ProjectExecutionRuntimeResolution } from '../../../shared/project-execution-runtime'
+import {
+  TEST_REPO,
+  makeWorktree,
+  makeFolderWorkspace
+} from '@/store/slices/worktrees-slice-test-fixtures'
 import type * as ConnectionOwnerResolutionModule from './connection-owner-resolution'
 
 const mocks = vi.hoisted(() => ({
@@ -13,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   getLocalProjectExecutionRuntimeContext: vi.fn(),
   getLocalRepoProjectExecutionRuntimeContext: vi.fn(),
   readLocalRuntimeCapabilitiesOrUnknown: vi.fn(),
+  readHostStructuredAgents: vi.fn(),
   isWebClientLocation: vi.fn(() => false)
 }))
 
@@ -31,6 +41,9 @@ vi.mock('@/lib/local-preflight-context', () => ({
 }))
 vi.mock('@/lib/web-client-location', () => ({
   isWebClientLocation: mocks.isWebClientLocation
+}))
+vi.mock('@/runtime/host-structured-agents', () => ({
+  readHostStructuredAgents: mocks.readHostStructuredAgents
 }))
 vi.mock('@/runtime/local-runtime-capabilities', () => ({
   readLocalRuntimeCapabilitiesOrUnknown: mocks.readLocalRuntimeCapabilitiesOrUnknown
@@ -58,7 +71,7 @@ const structuredFeasibleFor = (appStore: AgentLaunchRouteStore, args: AgentLaunc
   structuredAgentSessionLaunchFeasible(appStore, { ...args, settings: STRUCTURED_SETTINGS })
 
 const STRUCTURED_SETTINGS = {
-  experimentalNativeChat: true,
+  nativeChatProviders: {},
   agentCmdOverrides: {},
   agentDefaultArgs: {},
   agentDefaultEnv: {}
@@ -76,8 +89,21 @@ const WSL_RUNTIME: ProjectExecutionRuntimeResolution = {
   }
 }
 
-function store(settings: Record<string, unknown> = STRUCTURED_SETTINGS): AgentLaunchRouteStore {
-  return { settings } as unknown as AgentLaunchRouteStore
+function store(
+  settings: Partial<NonNullable<AgentLaunchRouteStore['settings']>> = STRUCTURED_SETTINGS
+): AgentLaunchRouteStore & {
+  settings: ReturnType<typeof getDefaultSettings> & { skipDeleteWorktreeConfirm: boolean }
+} {
+  return {
+    settings: { ...getDefaultSettings('/home/me'), skipDeleteWorktreeConfirm: false, ...settings },
+    activeRepoId: null,
+    activeWorktreeId: null,
+    projects: [],
+    repos: [],
+    worktreesByRepo: {},
+    folderWorkspaces: [],
+    projectGroups: []
+  }
 }
 
 function stageLocalStructuredHost(): void {
@@ -86,8 +112,17 @@ function stageLocalStructuredHost(): void {
   mocks.getConnectionIdFromState.mockReturnValue(null)
   mocks.getLocalProjectExecutionRuntimeContext.mockReturnValue(undefined)
   mocks.getLocalRepoProjectExecutionRuntimeContext.mockReturnValue(undefined)
+  mocks.readHostStructuredAgents.mockReturnValue(
+    decodeAgentSessionAgentsResult({
+      agents: [
+        { agent: 'claude', capabilities: {} },
+        { agent: 'codex', capabilities: {} }
+      ]
+    })
+  )
   mocks.readLocalRuntimeCapabilitiesOrUnknown.mockReturnValue([
-    STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY
+    STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY,
+    STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY
   ])
 }
 
@@ -105,16 +140,20 @@ describe('buildAgentLaunchRouteInput', () => {
     })
     expect(input).toEqual({
       agent: 'codex',
-      settings: STRUCTURED_SETTINGS,
+      settings: appStore.settings,
       executionHostId: 'local',
-      hostCapabilities: [STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY],
+      hostCapabilities: [
+        STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY,
+        STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY
+      ],
+      hostStructuredAgents: ['claude', 'codex'],
+      projectExecutionKind: undefined,
       workspaceKind: 'git-worktree',
       projectRuntime: WSL_RUNTIME,
       promptDelivery: 'auto-submit',
       launchText: 'fix the flaky test',
       nativeChatTranscriptIsLocalReadable: true,
-      startsOutsideWorkspaceRoot: false,
-      requiresTuiLaunchCommand: false
+      startsOutsideWorkspaceRoot: false
     })
     expect(mocks.getExecutionHostIdForWorktree).toHaveBeenCalledWith(appStore, 'wt-1')
     expect(mocks.getLocalProjectExecutionRuntimeContext).toHaveBeenCalledWith(appStore, 'wt-1')
@@ -147,45 +186,45 @@ describe('buildAgentLaunchRouteInput', () => {
     ).toBe(false)
   })
 
-  it('preserves an explicit SSH owner when the raw worktree resolver sees a local ID collision', () => {
+  it('does not let a prospective host hint redirect a stored SSH workspace', () => {
+    mocks.getExecutionHostIdForWorktree.mockReturnValue('ssh:build-box')
+    mocks.getConnectionIdFromState.mockReturnValue('build-box')
     const appStore = store()
     const args = {
       agent: 'codex' as const,
       workspace: {
         kind: 'git-worktree' as const,
         worktreeId: 'same-id',
-        executionHostId: 'ssh:build-box'
+        executionHostId: 'local'
       }
     }
     const input = buildAgentLaunchRouteInput(appStore, args)
     expect(input.executionHostId).toBe('ssh:build-box')
     expect(input.nativeChatTranscriptIsLocalReadable).toBe(false)
     expect(input.projectRuntime).toBeUndefined()
-    expect(mocks.getExecutionHostIdForWorktree).not.toHaveBeenCalled()
-    expect(mocks.getConnectionIdFromState).not.toHaveBeenCalled()
+    expect(mocks.getExecutionHostIdForWorktree).toHaveBeenCalledWith(appStore, 'same-id')
+    expect(mocks.getConnectionIdFromState).toHaveBeenCalledWith(appStore, 'same-id')
     expect(mocks.getLocalProjectExecutionRuntimeContext).not.toHaveBeenCalled()
     expect(routeFor(appStore, args)).not.toBe('structured-native-chat')
-    expect(input.hostCapabilities).toBeNull()
     expect(structuredFeasibleFor(appStore, args)).toBe(false)
-    expect(mocks.readLocalRuntimeCapabilitiesOrUnknown).not.toHaveBeenCalled()
     expect(mocks.getLocalRepoProjectExecutionRuntimeContext).not.toHaveBeenCalled()
   })
 
-  it.each(['manual', 'yolo'] as const)(
-    'keeps %s permission policy on a terminal-backed route',
-    (agentPermissionMode) => {
+  it.each(['ask', 'full-access'] as const)(
+    'preserves %s permission intent without requiring a terminal route',
+    (agentPermissionDefault) => {
       const appStore = store()
+      appStore.settings = { ...appStore.settings, agentPermissionDefault }
       const args = {
         agent: 'codex' as const,
-        workspace: { kind: 'git-worktree' as const, worktreeId: 'wt-1' },
-        tuiCustomization: { agentPermissionMode }
+        workspace: { kind: 'git-worktree' as const, worktreeId: 'wt-1' }
       }
-      expect(buildAgentLaunchRouteInput(appStore, args).requiresTuiLaunchCommand).toBe(true)
-      expect(routeFor(appStore, args)).not.toBe('structured-native-chat')
-      expect(structuredFeasibleFor(appStore, args)).toBe(false)
-      expect(
-        routeFor(appStore, { ...args, tuiCustomization: { agentPermissionMode: 'default' } })
-      ).toBe('structured-native-chat')
+      expect(buildAgentLaunchRouteInput(appStore, args).settings).toMatchObject({
+        agentPermissionDefault
+      })
+      expect(buildAgentLaunchRouteInput(appStore, args).requiresTuiLaunchCommand).toBeUndefined()
+      expect(routeFor(appStore, args)).toBe('structured-native-chat')
+      expect(structuredFeasibleFor(appStore, args)).toBe(true)
     }
   )
 
@@ -307,15 +346,17 @@ describe('buildAgentLaunchRouteInput', () => {
     ['codex', 'wrapper --arg'],
     ['claude', '/missing/claude'],
     ['codex', './codex']
-  ] as const)('keeps explicit %s launch command %s on its terminal route', (agent, command) => {
+  ] as const)('preserves the chat preference with configured %s command %s', (agent, command) => {
     const appStore = store({ ...STRUCTURED_SETTINGS, agentCmdOverrides: { [agent]: command } })
     const args = {
       agent,
       workspace: { kind: 'git-worktree' as const, worktreeId: 'wt-1' }
     }
-    expect(buildAgentLaunchRouteInput(appStore, args).startsOutsideWorkspaceRoot).toBe(false)
-    expect(routeFor(appStore, args)).toBe('terminal-tui')
-    expect(structuredFeasibleFor(appStore, args)).toBe(false)
+    const input = buildAgentLaunchRouteInput(appStore, args)
+    expect(input.startsOutsideWorkspaceRoot).toBe(false)
+    expect(input.settings).toMatchObject({ agentCmdOverrides: { [agent]: command } })
+    expect(routeFor(appStore, args)).toBe('structured-native-chat')
+    expect(structuredFeasibleFor(appStore, args)).toBe(true)
   })
 
   // The reported P0: `--dangerously-skip-permissions --model Opus` matched no blessed string, so
@@ -340,7 +381,7 @@ describe('buildAgentLaunchRouteInput', () => {
   })
 
   // Grok reads its transcript off local disk, so it is the agent the readability answer routes on.
-  const NATIVE_CHAT_SETTINGS = { experimentalNativeChat: true }
+  const NATIVE_CHAT_SETTINGS = {}
   const UNLANDED_WORKSPACE = {
     kind: 'git-worktree',
     worktreeId: 'repo-1::/repo/wt-1',
@@ -351,11 +392,11 @@ describe('buildAgentLaunchRouteInput', () => {
     // Why: "Use" on a PR plans the route in the window between creating the workspace and its row
     // reaching the store; an unresolved owner there must not downgrade native chat to a terminal.
     mocks.getConnectionIdFromState.mockReturnValue(undefined)
-    const appStore = {
-      settings: NATIVE_CHAT_SETTINGS,
-      repos: [{ id: 'repo-1', path: '/repo', connectionId: null }],
+    const appStore: AgentLaunchRouteStore = {
+      ...store(NATIVE_CHAT_SETTINGS),
+      repos: [{ ...TEST_REPO, id: 'repo-1', connectionId: null }],
       worktreesByRepo: {}
-    } as unknown as AgentLaunchRouteStore
+    }
     expect(
       buildAgentLaunchRouteInput(appStore, { agent: 'grok', workspace: UNLANDED_WORKSPACE })
         .nativeChatTranscriptIsLocalReadable
@@ -367,11 +408,11 @@ describe('buildAgentLaunchRouteInput', () => {
 
   it('keeps a worktree on an unresolvable repo off native chat', () => {
     mocks.getConnectionIdFromState.mockReturnValue(undefined)
-    const appStore = {
-      settings: NATIVE_CHAT_SETTINGS,
+    const appStore: AgentLaunchRouteStore = {
+      ...store(NATIVE_CHAT_SETTINGS),
       repos: [],
       worktreesByRepo: {}
-    } as unknown as AgentLaunchRouteStore
+    }
     expect(routeFor(appStore, { agent: 'grok', workspace: UNLANDED_WORKSPACE })).toBe(
       'terminal-tui'
     )
@@ -379,11 +420,11 @@ describe('buildAgentLaunchRouteInput', () => {
 
   it('never lets the repo answer over a resolved local worktree owner', () => {
     mocks.getConnectionIdFromState.mockReturnValue(null)
-    const appStore = {
-      settings: NATIVE_CHAT_SETTINGS,
-      repos: [{ id: 'repo-1', path: '/repo', connectionId: 'build-box' }],
+    const appStore: AgentLaunchRouteStore = {
+      ...store(NATIVE_CHAT_SETTINGS),
+      repos: [{ ...TEST_REPO, id: 'repo-1', connectionId: 'build-box' }],
       worktreesByRepo: {}
-    } as unknown as AgentLaunchRouteStore
+    }
     expect(routeFor(appStore, { agent: 'grok', workspace: UNLANDED_WORKSPACE })).toBe(
       'terminal-tui'
     )
@@ -401,7 +442,8 @@ describe('buildAgentLaunchRouteInput', () => {
   describe('a workspace on a paired server', () => {
     const CURRENT_SERVER = [
       STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY,
-      STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY
+      STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY,
+      STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY
     ]
     const args: AgentLaunchRouteArgs = {
       agent: 'claude',
@@ -409,14 +451,28 @@ describe('buildAgentLaunchRouteInput', () => {
     }
     // The store's host status is what a paired server last reported about itself.
     const pairedStore = (
-      capabilities: readonly string[],
-      settings: Record<string, unknown> = STRUCTURED_SETTINGS
-    ): AgentLaunchRouteStore =>
-      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: only the slices the input reads are staged.
-      ({
-        settings,
-        runtimeStatusByEnvironmentId: new Map([['server-1', { status: { capabilities } }]])
-      }) as unknown as AgentLaunchRouteStore
+      capabilities: readonly RuntimeCapability[],
+      settings: Partial<NonNullable<AgentLaunchRouteStore['settings']>> = STRUCTURED_SETTINGS
+    ): AgentLaunchRouteStore => ({
+      ...store(settings),
+      runtimeStatusByEnvironmentId: new Map([
+        [
+          'server-1',
+          {
+            checkedAt: 1,
+            status: {
+              runtimeId: 'server-runtime',
+              capabilities: [...capabilities],
+              rendererGraphEpoch: 0,
+              graphStatus: 'ready',
+              authoritativeWindowId: null,
+              liveTabCount: 0,
+              liveLeafCount: 0
+            }
+          }
+        ]
+      ])
+    })
 
     beforeEach(() => {
       mocks.getExecutionHostIdForWorktree.mockReturnValue('runtime:server-1')
@@ -443,12 +499,13 @@ describe('buildAgentLaunchRouteInput', () => {
       )
     })
 
-    // The browser client's handshake never says it reads structured sessions, so the server
-    // would refuse its chat.
-    it('keeps the host terminal for a browser client', () => {
+    it('uses the browser handshake capabilities for its structured route', () => {
       mocks.isWebClientLocation.mockReturnValue(true)
       try {
-        expect(routeFor(pairedStore(CURRENT_SERVER), args)).toBe('terminal-tui')
+        expect(
+          buildAgentLaunchRouteInput(pairedStore(CURRENT_SERVER), args).clientCapabilities
+        ).toEqual(WEB_RUNTIME_CLIENT_CAPABILITIES)
+        expect(routeFor(pairedStore(CURRENT_SERVER), args)).toBe('structured-native-chat')
       } finally {
         mocks.isWebClientLocation.mockReturnValue(false)
       }
@@ -466,17 +523,16 @@ describe('buildAgentLaunchRouteInput', () => {
   })
 
   it('does not name a host for a workspace id two hosts publish', () => {
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: only the slices the input reads are staged.
-    const colliding = {
-      settings: STRUCTURED_SETTINGS,
+    const colliding: AgentLaunchRouteStore = {
+      ...store(),
       activeWorktreeId: 'other',
       worktreesByRepo: {
         'repo-1': [
-          { id: 'wt-1', repoId: 'repo-1', hostId: 'local' },
-          { id: 'wt-1', repoId: 'repo-1', hostId: 'runtime:server-1' }
+          makeWorktree({ id: 'wt-1', repoId: 'repo-1', hostId: 'local' }),
+          makeWorktree({ id: 'wt-1', repoId: 'repo-1', hostId: 'runtime:server-1' })
         ]
       }
-    } as unknown as AgentLaunchRouteStore
+    }
     const input = buildAgentLaunchRouteInput(colliding, {
       agent: 'claude',
       workspace: { kind: 'git-worktree', worktreeId: 'wt-1' }
@@ -505,13 +561,13 @@ describe('a cwd that names the workspace root', () => {
   // "Hand Off to Another Agent" always names a cwd; at the root it must not force a terminal.
   beforeEach(stageLocalStructuredHost)
 
-  const withRoot = (): AgentLaunchRouteStore =>
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the route store is the app state narrowed to the slices the input reads; only those are staged.
-    ({
-      settings: STRUCTURED_SETTINGS,
-      worktreesByRepo: { 'repo-1': [{ id: 'wt-1', path: '/repo/app' }] },
-      folderWorkspaces: [{ id: 'folder-1', folderPath: '/srv/notes' }]
-    }) as unknown as AgentLaunchRouteStore
+  const withRoot = (): AgentLaunchRouteStore => ({
+    ...store(),
+    worktreesByRepo: {
+      'repo-1': [makeWorktree({ id: 'wt-1', repoId: 'repo-1', path: '/repo/app' })]
+    },
+    folderWorkspaces: [makeFolderWorkspace({ id: 'folder-1', folderPath: '/srv/notes' })]
+  })
 
   it.each(['/repo/app', '/repo/app/', '.'])(
     'routes structured under the chat default for cwd %s',

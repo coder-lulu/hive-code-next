@@ -29,8 +29,10 @@ let root = ''
 
 function claudeAdapter(): StructuredAgentSessionAdapter {
   return {
+    open: async () => ({ reportedOptions: {} }),
     supportsCreate: (_location, agent) => agent === 'claude',
     acquire: async ({ fence, spawnToken }) => ({
+      acquisitionGeneration: globalThis.crypto.randomUUID(),
       process: {
         hostId: 'local',
         pid: 4242,
@@ -100,13 +102,15 @@ describe('structured session provider restore', () => {
     )
     expect(attached).toMatchObject({ ok: true })
 
+    await host.setSessionTabVisibility(HOST_TEST_SESSION, true)
     const reopenedStore = await openTestAgentSessionRecordStore(root)
     const restarted = createHost(reopenedStore, async () => ({
       outcome: 'indeterminate',
       reason: 'read does not need ownership'
     }))
 
-    await restarted.restoreReadableSessions()
+    await restarted.reconcileRestartLeases()
+    await restarted.seedSessionTabs([HOST_TEST_SESSION])
 
     expect(restarted.listSessionTabs()).toEqual([
       { sessionId: HOST_TEST_SESSION, workspaceId: 'workspace-1', agent: 'claude' }

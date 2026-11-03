@@ -8,7 +8,7 @@ import {
   makeProject,
   makeProjectHostSetup,
   createSqliteTestStore
-} from './persistence-test-harness'
+} from './persistence/persistence-test-harness'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { writeFileSync, rmSync, mkdtempSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -18,7 +18,7 @@ import type { WorkspaceSessionState } from '../shared/workspace-session-state-ty
 import { getDefaultPersistedState, getDefaultWorkspaceSession } from '../shared/constants'
 import { closeTerminalTabInWorkspaceSession } from '../shared/workspace-session-terminal-tab-close'
 
-import { TEST_LEAF_1 } from './persistence-session-fixtures'
+import { TEST_LEAF_1 } from './persistence/persistence-session-fixtures'
 import { ProfileStateSqliteAuthority } from './persistence/profile-state/profile-state-sqlite-authority'
 
 import {
@@ -391,13 +391,16 @@ describe('Store', () => {
     const store = await createStore()
 
     // A re-probe that now prefers the `upstream` remote rewrites the derived project id.
-    store.updateRepo('r1', {
-      gitRemoteIdentity: {
-        canonicalKey: 'git.example.com/acme/app-upstream',
-        remoteName: 'upstream',
-        remoteUrl: 'git@git.example.com:acme/app-upstream.git'
+    store.updateRepo(
+      { id: 'r1', executionHostId: 'local' },
+      {
+        gitRemoteIdentity: {
+          canonicalKey: 'git.example.com/acme/app-upstream',
+          remoteName: 'upstream',
+          remoteUrl: 'git@git.example.com:acme/app-upstream.git'
+        }
       }
-    })
+    )
 
     const upstreamProjectId = 'git:git.example.com/acme/app-upstream'
     expect(store.getProjects().map((project) => project.id)).toEqual([upstreamProjectId])
@@ -410,14 +413,13 @@ describe('Store', () => {
     ).toBe(upstreamProjectId)
   })
 
-  it('migrates legacy WSL agent settings into the global Windows runtime default', async () => {
+  it('loads and saves the current global Windows runtime choice', async () => {
     writeDataFile({
       schemaVersion: 1,
       repos: [],
       worktreeMeta: {},
       settings: {
-        localAgentRuntime: 'wsl',
-        localAgentWslDistro: 'Ubuntu'
+        localWindowsRuntimeDefault: { kind: 'wsl', distro: 'Ubuntu' }
       }
     })
 
@@ -434,7 +436,7 @@ describe('Store', () => {
     })
   })
 
-  it('migrates the legacy host account-runtime default to auto once', async () => {
+  it('preserves an explicit host account-runtime choice across save', async () => {
     writeDataFile({
       schemaVersion: 1,
       repos: [],
@@ -446,15 +448,17 @@ describe('Store', () => {
 
     const store = await createStore()
 
-    expect(store.getSettings().localAccountRuntime).toBe('auto')
-    expect(store.getSettings().localAccountRuntimeDefaultedToAutoForAllUsers).toBe(true)
+    expect(store.getSettings().localAccountRuntime).toBe('host')
+    expect(
+      Object.hasOwn(store.getSettings(), 'localAccountRuntimeDefaultedToAutoForAllUsers')
+    ).toBe(false)
     store.flush()
     const persisted = (readDataFile() as PersistedState).settings
-    expect(persisted.localAccountRuntime).toBe('auto')
-    expect(persisted.localAccountRuntimeDefaultedToAutoForAllUsers).toBe(true)
+    expect(persisted.localAccountRuntime).toBe('host')
+    expect(Object.hasOwn(persisted, 'localAccountRuntimeDefaultedToAutoForAllUsers')).toBe(false)
   })
 
-  it('preserves an explicit WSL account-runtime pin through the migration', async () => {
+  it('preserves an explicit WSL account-runtime pin', async () => {
     writeDataFile({
       schemaVersion: 1,
       repos: [],
@@ -468,17 +472,18 @@ describe('Store', () => {
     const store = await createStore()
 
     expect(store.getSettings().localAccountRuntime).toBe('wsl')
-    expect(store.getSettings().localAccountRuntimeDefaultedToAutoForAllUsers).toBe(true)
+    expect(
+      Object.hasOwn(store.getSettings(), 'localAccountRuntimeDefaultedToAutoForAllUsers')
+    ).toBe(false)
   })
 
-  it('does not re-flip an explicit host pin chosen after migration', async () => {
+  it('preserves an explicit host pin without migration metadata', async () => {
     writeDataFile({
       schemaVersion: 1,
       repos: [],
       worktreeMeta: {},
       settings: {
-        localAccountRuntime: 'host',
-        localAccountRuntimeDefaultedToAutoForAllUsers: true
+        localAccountRuntime: 'host'
       }
     })
 

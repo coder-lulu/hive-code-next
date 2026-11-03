@@ -30,6 +30,7 @@ let root: string
 let store: AgentSessionRecordStore
 let host: StructuredAgentSessionHost
 const providerStarted = vi.fn()
+let finishOpen: () => void
 
 function startHost(phase: 'ready' | 'starting'): void {
   const acquire: StructuredAgentSessionAdapter['acquire'] = async ({ fence, spawnToken }) => ({
@@ -41,14 +42,19 @@ function startHost(phase: 'ready' | 'starting'): void {
       mintedAtFence: fence,
       observedAt: NOW
     },
-    acquisitionGeneration: 'generation-1',
-    providerChildPhase: phase
+    acquisitionGeneration: 'generation-1'
   })
   host = new StructuredAgentSessionHost({
     agents: NO_STRUCTURED_AGENTS,
     logger: createStructuredAgentSessionLogger(),
     store,
     adapter: {
+      open: () =>
+        phase === 'ready'
+          ? Promise.resolve({ reportedOptions: {} })
+          : new Promise((resolve) => {
+              finishOpen = () => resolve({ reportedOptions: { model: 'sonnet' } })
+            }),
       acquire,
       releaseAcquisition: vi.fn(async () => true),
       closeSession: vi.fn(async () => true),
@@ -58,6 +64,12 @@ function startHost(phase: 'ready' | 'starting'): void {
       setOption: vi.fn(async () => undefined)
     },
     modelCatalog: {
+      snapshot: () => ({ origin: 'unknown' }),
+      demand: async () => {},
+      prepareSaved: async () => ({ origin: 'unknown' }),
+      captureSource: () => () => true,
+      retireContext: () => {},
+      peek: () => null,
       read: vi.fn(),
       recordLiveListing: vi.fn(),
       prewarm: vi.fn(async () => {}),
@@ -87,7 +99,7 @@ afterEach(async () => {
 it('a child that proves its start at acquire tells the catalog, with its record', async () => {
   startHost('ready')
   await expect(host.attach(CALLER, hostTestAttachParams(null))).resolves.toMatchObject({ ok: true })
-  expect(providerStarted).toHaveBeenCalledTimes(1)
+  await vi.waitFor(() => expect(providerStarted).toHaveBeenCalledTimes(1))
   expect(providerStarted.mock.calls[0]?.[0]).toMatchObject({ sessionId: SESSION })
 })
 
@@ -99,21 +111,13 @@ it('a re-attach to the live child proves nothing new and tells the catalog nothi
   // A reconnecting client replays its attach; the same operation re-attaches the live child.
   await expect(host.attach(CALLER, params)).resolves.toMatchObject({ ok: true, replayed: true })
   expect(store.getRecord(SESSION)?.lease.runtimeFence).toBe(fence)
-  expect(providerStarted).toHaveBeenCalledTimes(1)
+  await vi.waitFor(() => expect(providerStarted).toHaveBeenCalledTimes(1))
 })
 
 it('a published child tells the catalog only once its start is proven', async () => {
   startHost('starting')
   await expect(host.attach(CALLER, hostTestAttachParams(null))).resolves.toMatchObject({ ok: true })
   expect(providerStarted).not.toHaveBeenCalled()
-  await host.handleAdapterEvent({
-    type: 'started',
-    sessionId: SESSION,
-    fence: store.getRecord(SESSION)?.lease.runtimeFence ?? 0,
-    acquisitionGeneration: 'generation-1',
-    reportedOptions: { model: 'sonnet' },
-    restoreSkippedOptions: [],
-    optionRevision: 0
-  })
-  expect(providerStarted).toHaveBeenCalledTimes(1)
+  finishOpen()
+  await vi.waitFor(() => expect(providerStarted).toHaveBeenCalledTimes(1))
 })

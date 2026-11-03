@@ -31,6 +31,7 @@ export {
   getWorktreeCardModeProperties,
   getWorktreeCardModeUpdates,
   isDefaultedCompactWorktreeCardProperties,
+  isCurrentCompactWorktreeCardProperties,
   normalizeWorktreeCardProperties
 } from './worktree/card-properties'
 
@@ -112,8 +113,6 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     appFontFamily: DEFAULT_APP_FONT_FAMILY,
     editorAutoSaveDelayMs: DEFAULT_EDITOR_AUTO_SAVE_DELAY_MS,
     primarySelectionMiddleClickPaste: getDefaultPrimarySelectionMiddleClickPaste(),
-    primarySelectionDefaultedForLinux:
-      typeof process !== 'undefined' && process.platform === 'linux',
     terminalFontFamily: defaultTerminalFontFamily(),
     terminalInactivePaneOpacity: DEFAULT_TERMINAL_INACTIVE_PANE_OPACITY,
     terminalRightClickToPaste: getDefaultTerminalRightClickToPaste(),
@@ -189,6 +188,7 @@ export const DEFAULT_SIDEBAR_WIDTH = 240
 
 export function getDefaultUIState(): PersistedUIState {
   return {
+    sessionListMetadata: {},
     lastActiveRepoId: null,
     lastActiveWorktreeId: null,
     activeView: 'terminal',

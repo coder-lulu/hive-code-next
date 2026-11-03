@@ -1,3 +1,4 @@
+import { applyProductCliBranding } from '@/product-brand'
 import { i18n, translate } from '@/i18n/i18n'
 
 export type SearchKeywordSpec = {
@@ -9,12 +10,13 @@ export type SearchKeywordSpec = {
   englishOnly?: boolean
 }
 
-// Why: settings search should match localized copy and English aliases devs still type.
+// Index localized copy alongside English aliases users still type.
 export function translateSearchKeyword(
   key: string,
   fallback: string,
   options?: Omit<SearchKeywordSpec, 'key' | 'fallback'>
 ): string[] {
+  fallback = applyProductCliBranding(fallback)
   if (options?.englishOnly || i18n.language === 'en') {
     return uniqueKeywords([fallback, ...(options?.aliases ?? [])])
   }

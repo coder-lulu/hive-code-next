@@ -1,13 +1,9 @@
-import { getIntlLocale } from '@/i18n/i18n'
-import { createLocalizedCatalog } from '@/i18n/localized-catalog'
-
-const getGitHistoryTimestampFormatter = createLocalizedCatalog(
-  () =>
-    new Intl.DateTimeFormat(getIntlLocale(), {
-      dateStyle: 'medium',
-      timeStyle: 'long'
-    })
-)
+import { uiDateTimeFormat } from '@/i18n/ui-intl-formatters'
+// Include the zone to distinguish repeated times when clocks fall back.
+const GIT_HISTORY_TIMESTAMP_OPTIONS: Intl.DateTimeFormatOptions = {
+  dateStyle: 'medium',
+  timeStyle: 'long'
+}
 
 export function formatGitHistoryTimestamp(timestamp: number | undefined): string {
   if (timestamp == null || !Number.isFinite(timestamp)) {
@@ -17,5 +13,5 @@ export function formatGitHistoryTimestamp(timestamp: number | undefined): string
   if (Number.isNaN(date.getTime())) {
     return ''
   }
-  return getGitHistoryTimestampFormatter().format(date)
+  return uiDateTimeFormat(GIT_HISTORY_TIMESTAMP_OPTIONS).format(date)
 }

@@ -41,6 +41,7 @@ export function AccountsHostOwnedSections({
           wslDistro: model.accountRuntime.wslDistro ?? null
         }}
         label={model.accountRuntime.label}
+        ownerPlatform={model.accountVisibilityOptions.ownerPlatform}
       />
     </div>
   )

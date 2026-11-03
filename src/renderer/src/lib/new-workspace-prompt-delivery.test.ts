@@ -76,7 +76,9 @@ vi.mock('@/store', () => ({
 }))
 
 vi.mock('@/runtime/runtime-terminal-inspection', () => ({
-  inspectRuntimeTerminalProcess: mockInspectRuntimeTerminalProcess,
+  inspectRuntimeTerminalProcess: mockInspectRuntimeTerminalProcess
+}))
+vi.mock('@/runtime/runtime-terminal-verified-input', () => ({
   sendRuntimePtyInputVerified: mockSendRuntimePtyInputVerified
 }))
 
@@ -90,7 +92,7 @@ vi.mock('@/lib/browser-uuid', () => ({
 }))
 
 vi.mock('@/lib/worktree-runtime-owner', () => ({
-  getRuntimeEnvironmentIdForWorktree: (_state: unknown, worktreeId: string) =>
+  runtimeEnvironmentIdOrLocalUnlessTwin: (_state: unknown, worktreeId: string) =>
     runtimeEnvironmentIdByWorktree[worktreeId] ?? null
 }))
 
@@ -164,16 +166,21 @@ describe('ensureAgentStartupInTerminal prompt delivery', () => {
       }
     })
 
-    expect(mockSendRuntimePtyInputVerified).toHaveBeenCalledWith(
-      'pty-1',
-      'fix the spinner\r',
-      'launch'
+    expect(mockPasteDraftToAgentPtyWhenReady).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ptyId: 'pty-1',
+        content: 'fix the spinner',
+        agent: 'aider',
+        submit: true,
+        forcePaste: true,
+        beforePaste: expect.any(Function)
+      })
     )
     expect(mockTrack).not.toHaveBeenCalledWith('agent_prompt_sent', expect.anything())
   })
 
   it('does not track when follow-up prompt delivery is rejected by the terminal runtime', async () => {
-    mockSendRuntimePtyInputVerified.mockResolvedValue(false)
+    mockPasteDraftToAgentPtyWhenReady.mockResolvedValue(false)
 
     await ensureAgentStartupInTerminal({
       worktreeId: 'wt-1',

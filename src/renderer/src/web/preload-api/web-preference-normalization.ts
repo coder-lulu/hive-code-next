@@ -1,5 +1,9 @@
-import { isAgentChatPermissionMode } from '../../../../shared/agent-chat-permission-mode'
-import { normalizeNativeChatAppearanceSettings } from '../../../../shared/native-chat-appearance-settings'
+import {
+  isAgentPermissionChoice,
+  normalizeAgentPermissionOverrides
+} from '../../../../shared/tui-agent-permission-choice'
+import { normalizeNativeChatProviders } from '../../../../shared/structured-native-chat-launch-route'
+import { normalizeNativeChatAppearanceSettings } from '../../../../shared/native-chat/native-chat-appearance-settings'
 import { normalizeAutoRenameBranchFromWorkDefaultOn } from '../../../../shared/auto-rename-branch-from-work-settings'
 import {
   getDefaultSettings,
@@ -36,7 +40,7 @@ export function mergeWebUIState(
       featureInteractionTelemetryBuckets?: unknown
     }
   void _reserved
-  return {
+  const merged = {
     ...base,
     ...safeUpdates,
     workspaceCleanup: mergeWorkspaceCleanupUIState(
@@ -58,6 +62,8 @@ export function mergeWebUIState(
       safeUpdates.statusBarUsageMode ?? base.statusBarUsageMode
     )
   }
+  delete merged.osc52ClipboardDefaultOnNoticePending
+  return merged
 }
 
 export function mergeHostWebUIState(
@@ -72,6 +78,7 @@ export function mergeHostWebUIState(
     manualRepoOrder: local.manualRepoOrder,
     workspaceHostOrder: local.workspaceHostOrder,
     sidebarOpen: local.sidebarOpen,
+    showAgentModels: local.showAgentModels,
     agentsVisibleHostIds: local.agentsVisibleHostIds,
     agentsFilterRepoIds: local.agentsFilterRepoIds,
     agentsHideWorkspacesFromOtherDevices: local.agentsHideWorkspacesFromOtherDevices === true,
@@ -130,20 +137,9 @@ export function mergeContextualTourSeenIds(
   return [...merged]
 }
 
-export function mergeOsc52ClipboardNoticePending(
-  current: PersistedUIState,
-  incoming: PersistedUIState
-): boolean {
-  return (
-    current.osc52ClipboardDefaultOnNoticePending === true ||
-    incoming.osc52ClipboardDefaultOnNoticePending === true
-  )
-}
-
 export function mergeSettings(
   base: GlobalSettings,
-  updates: Partial<GlobalSettings>,
-  options: { preserveAutoRenameBranchFromWorkUpdate?: boolean } = {}
+  updates: Partial<GlobalSettings>
 ): GlobalSettings {
   const defaults = getDefaultSettings('~')
   const merged = {
@@ -183,19 +179,73 @@ export function mergeSettings(
     ),
     uiLanguage: normalizeUiLanguage(updates.uiLanguage ?? base.uiLanguage)
   }
-  return {
+  const settings = {
     ...merged,
-    ...normalizeAutoRenameBranchFromWorkDefaultOn(merged, {
-      preserveExplicitValue: options.preserveAutoRenameBranchFromWorkUpdate
-    })
+    ...normalizeAutoRenameBranchFromWorkDefaultOn(merged),
+    ...runtimeChatPermissionSetting(merged)
   }
+  Reflect.deleteProperty(settings, 'autoRenameBranchFromWorkDefaultedOn')
+  Reflect.deleteProperty(settings, 'terminalAllowOsc52ClipboardDefaultedOnForAllUsers')
+  Reflect.deleteProperty(settings, 'terminalCursorStyleDefaultedToBlock')
+  Reflect.deleteProperty(settings, 'nativeChatPermissionMode')
+  Reflect.deleteProperty(settings, 'experimentalNativeChat')
+  return settings
 }
 
-/** The host's new-chat permission default (the host seeds from it), kept only when a known mode. */
+/** Project only current, own settings. Missing fields in a patch never invent a write. */
 export function runtimeChatPermissionSetting(
-  settings: Partial<GlobalSettings>
-): Pick<GlobalSettings, 'nativeChatPermissionMode'> {
-  return isAgentChatPermissionMode(settings.nativeChatPermissionMode)
-    ? { nativeChatPermissionMode: settings.nativeChatPermissionMode }
-    : {}
+  settings: unknown
+): Pick<
+  GlobalSettings,
+  'nativeChatProviders' | 'agentPermissionDefault' | 'agentPermissionOverrides'
+> {
+  if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+    throw new Error('Chat settings unavailable')
+  }
+  const result: Pick<
+    GlobalSettings,
+    'nativeChatProviders' | 'agentPermissionDefault' | 'agentPermissionOverrides'
+  > = {}
+  if (Object.hasOwn(settings, 'nativeChatProviders')) {
+    const providers = Reflect.get(settings, 'nativeChatProviders')
+    if (
+      !providers ||
+      typeof providers !== 'object' ||
+      Array.isArray(providers) ||
+      Object.values(providers).some((value) => typeof value !== 'boolean')
+    ) {
+      throw new Error('Chat provider settings unavailable')
+    }
+    result.nativeChatProviders = normalizeNativeChatProviders(providers)
+  }
+  if (Object.hasOwn(settings, 'agentPermissionDefault')) {
+    const choice = Reflect.get(settings, 'agentPermissionDefault')
+    if (!isAgentPermissionChoice(choice)) {
+      throw new Error('Chat permission settings unavailable')
+    }
+    result.agentPermissionDefault = choice
+  }
+  if (Object.hasOwn(settings, 'agentPermissionOverrides')) {
+    const overrides = Reflect.get(settings, 'agentPermissionOverrides')
+    if (
+      !overrides ||
+      typeof overrides !== 'object' ||
+      Array.isArray(overrides) ||
+      Object.values(overrides).some((value) => !isAgentPermissionChoice(value))
+    ) {
+      throw new Error('Chat permission overrides unavailable')
+    }
+    result.agentPermissionOverrides = normalizeAgentPermissionOverrides(overrides)
+  }
+  return result
+}
+
+export function mergeOsc52ClipboardNoticePending(
+  current: PersistedUIState,
+  incoming: PersistedUIState
+): boolean {
+  return (
+    current.osc52ClipboardDefaultOnNoticePending === true ||
+    incoming.osc52ClipboardDefaultOnNoticePending === true
+  )
 }

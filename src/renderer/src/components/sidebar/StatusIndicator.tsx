@@ -11,10 +11,6 @@ import {
 } from '@/components/StateIndicatorTooltip'
 import { getWorktreeStatusLabel, type WorktreeStatus } from '@/lib/worktree-status'
 
-// Why: re-export WorktreeStatus under the existing `Status` alias so the
-// sidebar component and the canonical lib share one source of truth — the
-// previous local union could silently drift if one side added a new state
-// (e.g., 'error') and the other didn't.
 export type Status = WorktreeStatus
 
 type StatusIndicatorProps = Omit<React.ComponentProps<'span'>, 'title'> & {
@@ -60,7 +56,7 @@ const StatusIndicator = React.memo(function StatusIndicator({
         className={cn('inline-flex h-3 w-3 shrink-0 items-center justify-center', className)}
         {...rest}
       >
-        <Activity className="size-3 text-yellow-500" aria-hidden="true" />
+        <Activity className="size-3 text-agent-working" aria-hidden="true" />
       </span>
     )
   } else if (status === 'failed') {
@@ -73,7 +69,7 @@ const StatusIndicator = React.memo(function StatusIndicator({
       </span>
     )
   } else if (status === 'interrupted') {
-    // Why: a user's Stop is not news; muted, never the fault red or the finished green.
+    // User-requested Stop is neutral rather than failure or completion.
     indicator = (
       <span
         className={cn('inline-flex h-3 w-3 shrink-0 items-center justify-center', className)}
@@ -83,7 +79,7 @@ const StatusIndicator = React.memo(function StatusIndicator({
       </span>
     )
   } else if (status === 'unconfirmed') {
-    // Why: AgentStateDot owns the missing-evidence glyph and tone; the tooltip stays this one's.
+    // Reuse the missing-evidence glyph/tone without nesting its tooltip.
     indicator = (
       <span
         className={cn('inline-flex h-3 w-3 shrink-0 items-center justify-center', className)}
@@ -111,9 +107,7 @@ const StatusIndicator = React.memo(function StatusIndicator({
           className={cn(
             'block size-2 rounded-full',
             status === 'done' || status === 'active'
-              ? // Green dot for both hook-reported 'done' and the heuristic
-                // 'active' (terminal open, quiet). Working uses a yellow
-                // ring above; 'inactive' stays grey.
+              ? // Quiet active terminals share the completed-session dot.
                 'bg-emerald-500'
               : 'bg-neutral-500/40'
           )}

@@ -1,7 +1,8 @@
-import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native'
+import { Pressable, type StyleProp, type ViewStyle } from 'react-native'
 import type { ReactNode } from 'react'
-import type { MobileTheme } from '../theme/mobile-theme'
-import { useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { colors, radii } from '../theme/mobile-theme'
+import { themedStyleSheet } from '../theme/themed-styles'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 
 type Props = {
   children: ReactNode
@@ -18,7 +19,7 @@ export function MobileBrowserToolbarIconButton({
   onPress,
   style
 }: Props): React.JSX.Element {
-  const styles = useMobileThemeStyles(createStyles)
+  useMobileColorScheme()
   return (
     <Pressable
       style={({ pressed }) => [
@@ -29,29 +30,25 @@ export function MobileBrowserToolbarIconButton({
       ]}
       disabled={disabled}
       onPress={onPress}
-      accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ disabled: !!disabled }}
     >
       {children}
     </Pressable>
   )
 }
 
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    button: {
-      width: theme.size.minimumTouchTarget,
-      height: theme.size.minimumTouchTarget,
-      borderRadius: theme.radii.control,
-      alignItems: 'center',
-      justifyContent: 'center'
-    },
-    buttonPressed: {
-      backgroundColor: theme.color.bg.subtle
-    },
-    disabled: {
-      opacity: 0.45
-    }
-  })
-}
+const styles = themedStyleSheet(() => ({
+  button: {
+    width: 26,
+    height: 26,
+    borderRadius: radii.button,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  buttonPressed: {
+    backgroundColor: colors.bgRaised
+  },
+  disabled: {
+    opacity: 0.35
+  }
+}))

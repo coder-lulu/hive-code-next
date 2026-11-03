@@ -21,7 +21,7 @@
  */
 import { Buffer } from 'node:buffer'
 import { describe, expect, it } from 'vitest'
-import { RemoteRuntimeClientError } from './remote-runtime-client-error'
+import { RemoteRuntimeClientError } from './remote-runtime/remote-runtime-client-error'
 import {
   RECOVERABLE_CODES,
   RECOVERABLE_MESSAGE_FRAGMENTS,
@@ -29,7 +29,7 @@ import {
   isRuntimeRpcQueueOverloadError,
   toRemoteRuntimeClientErrorLike,
   type RemoteRuntimeClientErrorLike
-} from './remote-runtime-client-error-classification'
+} from './remote-runtime/remote-runtime-client-error-classification'
 import {
   WS_HANDSHAKE_TIMEOUT_MESSAGE,
   remoteRuntimeConnectFailureMessage
@@ -37,17 +37,36 @@ import {
 import {
   invalidRemoteRuntimeResponseError,
   parseRemoteRuntimeRpcFrame,
-  parseAuthenticatedFrame,
-  parseReadyFrame,
+  remoteRuntimeAuthReplyError,
+  remoteRuntimeReadyError,
   remoteRuntimeTimeoutError,
   remoteRuntimeUnavailableError
-} from './remote-runtime-request-frames'
-import { formatSharedControlCloseMessage } from './remote-runtime-shared-control-protocol'
+} from './remote-runtime/requests/remote-runtime-request-frames'
+import { generateKeyPair } from './e2ee-crypto'
+import { createRemoteRuntimeClientHandshake } from './remote-runtime/remote-runtime-client-handshake'
+import { DesktopMobileE2EEV2Session } from './runtime-e2ee-server-session'
+import { formatSharedControlCloseMessage } from './remote-runtime/control/remote-runtime-shared-control-protocol'
 import { RuntimeRpcCallQueueOverloadError } from './runtime-rpc-call-queue'
-import { withRemoteRuntimeTailscaleHint } from './remote-runtime-tailscale-hint'
+import { withRemoteRuntimeTailscaleHint } from './remote-runtime/remote-runtime-tailscale-hint'
 import { MAX_TIMER_DELAY_MS } from './timer-delay'
 
 type TransportErrorPair = RemoteRuntimeClientErrorLike & { producer: string }
+
+function directHandshake() {
+  const keys = generateKeyPair()
+  const handshake = createRemoteRuntimeClientHandshake(
+    Buffer.from(keys.publicKey).toString('base64')
+  )
+  const server = DesktopMobileE2EEV2Session.create({
+    hello: JSON.parse(handshake.helloText()),
+    serverSecretKey: keys.secretKey,
+    expectedContext: { transport: 'direct' }
+  })
+  if (!server || handshake.acceptReadyText(JSON.stringify(server.ready)) !== 'accepted') {
+    throw new Error('Expected a valid direct v2 handshake fixture')
+  }
+  return handshake
+}
 
 /** Derives the pair from the real producer so a message edit updates the corpus with it. */
 function producedPair(producer: string, error: unknown): TransportErrorPair {
@@ -198,19 +217,29 @@ const REQUEST_TRANSPORT_ERRORS: TransportErrorPair[] = [
   },
   producedPair('remote-runtime-request-frames.ts:24', remoteRuntimeUnavailableError()),
   producedPair('remote-runtime-request-frames.ts:30', remoteRuntimeTimeoutError()),
-  producedPair('parseReadyFrame (invalid)', parseReadyFrame('not-json')),
-  producedPair('parseReadyFrame (unexpected)', parseReadyFrame('{}')),
   producedPair(
-    'parseAuthenticatedFrame (invalid)',
-    parseAuthenticatedFrame('not-json')
+    'v2 ready (invalid)',
+    remoteRuntimeReadyError(directHandshake().acceptReadyText('not-json'))
   ),
   producedPair(
-    'parseAuthenticatedFrame (rejected token)',
-    parseAuthenticatedFrame(JSON.stringify({ error: { code: 'unauthorized' } }))
+    'v2 ready (unexpected)',
+    remoteRuntimeReadyError(directHandshake().acceptReadyText('{}'))
   ),
   producedPair(
-    'parseAuthenticatedFrame (unrecognized auth frame)',
-    parseAuthenticatedFrame(JSON.stringify({ type: 'e2ee_other' }))
+    'v2 auth (invalid)',
+    remoteRuntimeAuthReplyError(directHandshake().classifyAuthReply('not-json'))
+  ),
+  producedPair(
+    'v2 auth (rejected token)',
+    remoteRuntimeAuthReplyError(
+      directHandshake().classifyAuthReply(JSON.stringify({ error: { code: 'unauthorized' } }))
+    )
+  ),
+  producedPair(
+    'v2 auth (unrecognized auth frame)',
+    remoteRuntimeAuthReplyError(
+      directHandshake().classifyAuthReply(JSON.stringify({ type: 'e2ee_other' }))
+    )
   ),
   frameError('remote-runtime-request-frames.ts:91', 'not-json'),
   frameError('remote-runtime-request-frames.ts:103', JSON.stringify({ not: 'an envelope' })),
@@ -266,9 +295,7 @@ const SHARED_CONTROL_TRANSPORT_ERRORS: TransportErrorPair[] = [
 ]
 
 /**
- * `remote_runtime_busy` is semantically transient but absent from `RECOVERABLE_CODES`, so it
- * classifies fatal. It is listed here (not omitted) so the corpus stays complete; STA-3479
- * covers the classification itself.
+ * Admission limits are transient both as coded errors and after IPC retains only the message.
  */
 const BUSY_TRANSPORT_ERRORS: TransportErrorPair[] = [
   {
@@ -536,12 +563,10 @@ describe('transport error code/message classification agreement', () => {
     expect(unbacked).toEqual([])
   })
 
-  it('pins why the guard cannot see the remote_runtime_busy exception (STA-3479)', () => {
+  it('keeps remote_runtime_busy recoverable for coded and message-only errors', () => {
     for (const pair of BUSY_TRANSPORT_ERRORS) {
-      // Fatal by code with a message that matches nothing: the two sides cannot disagree, so the
-      // differential above stays silent. Fixing the classification is STA-3479, not this file.
-      expect(isRecoverableRemoteRuntimeConnectionError(pair)).toBe(false)
-      expect(matchingRecoverableFragment(pair.message)).toBeNull()
+      expect(isRecoverableRemoteRuntimeConnectionError(pair)).toBe(true)
+      expect(isRecoverableRemoteRuntimeConnectionError(new Error(pair.message))).toBe(true)
     }
   })
 })

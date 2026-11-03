@@ -1,3 +1,4 @@
+import type { WorkspaceBoardSearchState } from './use-workspace-kanban-search'
 import React, { useCallback, useMemo, useRef } from 'react'
 import { useAppStore } from '@/store'
 import { useAllWorktrees, useRepoMap } from '@/store/selectors'
@@ -8,6 +9,7 @@ import { useWorkspaceKanbanColumnResize } from './use-workspace-kanban-column-re
 import { useWorkspaceKanbanCreateWorktree } from './use-workspace-kanban-create-worktree'
 import { useWorkspaceKanbanSelection } from './use-workspace-kanban-selection'
 import { useWorkspaceKanbanShiftWheelScroll } from './use-workspace-kanban-shift-wheel-scroll'
+import { useWorkspaceKanbanOutsideDismiss } from './use-workspace-kanban-outside-dismiss'
 import { useWorkspaceBoardTaskStatusSync } from './use-workspace-board-task-status-sync'
 import { useWorkspaceKanbanStatusActions } from './use-workspace-kanban-status-actions'
 import { useWorkspaceKanbanWorktreeActions } from './use-workspace-kanban-worktree-actions'
@@ -20,13 +22,15 @@ import { useWorkspaceKanbanNativeDrag } from './use-workspace-kanban-native-drag
 import { useWorkspaceKanbanRenderLifecycle } from './use-workspace-kanban-render-lifecycle'
 import { useWorkspaceKanbanDrawerLingering } from './use-workspace-kanban-drawer-lingering'
 import { buildWorktreeManualOrderCatalog } from './worktree-manual-order-catalog'
-import type { WorkspaceBoardSearchState } from './use-workspace-kanban-search'
+import { selectFolderWorkspaces } from '@/store/workspace-record-selectors'
+import {
+  useAllOfferedWorkspaceStatuses,
+  useWorkspaceBoardStatuses
+} from './use-workspace-board-statuses'
 
 type WorkspaceKanbanDrawerProps = {
-  leftSidebarStyle?: React.CSSProperties
-  open: boolean
   searchState?: WorkspaceBoardSearchState
-  statusBarVisible: boolean
+  open: boolean
   dragPreview: boolean
   preserveOpenForMenu: boolean
   onOpenChange: (open: boolean) => void
@@ -45,20 +49,23 @@ export default function WorkspaceKanbanDrawer(
 }
 
 function WorkspaceKanbanDrawerContent({
-  open,
   searchState,
+  open,
   dragPreview,
+  preserveOpenForMenu,
   onOpenChange,
   onMenuOpenChange
 }: WorkspaceKanbanDrawerProps): React.JSX.Element {
   const allWorktrees = useAllWorktrees()
-  const folderWorkspaces = useAppStore((s) => s.folderWorkspaces)
+  const folderWorkspaces = useAppStore((s) => selectFolderWorkspaces(s))
   const repoMap = useRepoMap()
   const activeWorktreeId = useAppStore((s) => s.activeWorktreeId)
   const activeWorkspaceExecutionHostId = useAppStore((s) => s.activeWorkspaceExecutionHostId)
   const updateWorktreeMeta = useAppStore((s) => s.updateWorktreeMeta)
   const updateWorktreesMeta = useAppStore((s) => s.updateWorktreesMeta)
-  const workspaceStatuses = useAppStore((s) => s.workspaceStatuses)
+  const localWorkspaceStatuses = useAppStore((s) => s.workspaceStatuses)
+  const boardStatuses = useWorkspaceBoardStatuses()
+  const offeredStatuses = useAllOfferedWorkspaceStatuses()
   const setWorkspaceStatuses = useAppStore((s) => s.setWorkspaceStatuses)
   const syncTaskStatusFromWorkspaceBoard = useAppStore((s) => s.syncTaskStatusFromWorkspaceBoard)
   const setSyncTaskStatusFromWorkspaceBoard = useAppStore(
@@ -86,14 +93,14 @@ function WorkspaceKanbanDrawerContent({
     worktreeById,
     worktreesByStatus
   } = useWorkspaceKanbanBoardProjection({
+    searchState,
     activeWorktreeId,
     activeWorkspaceExecutionHostId,
     allWorktrees,
     open,
-    searchState,
     repoMap,
     sortBy,
-    workspaceStatuses
+    workspaceStatuses: boardStatuses
   })
   const {
     selectedWorktreeIds,
@@ -117,7 +124,7 @@ function WorkspaceKanbanDrawerContent({
   const maybeSyncWorkspaceBoardTaskStatuses = useWorkspaceBoardTaskStatusSync({
     enabled: syncTaskStatusFromWorkspaceBoard,
     worktreesById: worktreeById,
-    workspaceStatuses
+    workspaceStatuses: offeredStatuses
   })
   const {
     dropPointerDraggedWorktreesInStatus,
@@ -135,14 +142,12 @@ function WorkspaceKanbanDrawerContent({
     sortBy,
     updateWorktreeMeta,
     updateWorktreesMeta,
-    workspaceStatuses,
+    workspaceStatuses: boardStatuses,
     worktreeById,
     manualOrderCatalog,
     worktreesByStatus
   })
-  // Why: dragging or right-clicking one visible match must not silently move
-  // hidden selected cards. selectedWorktreeIds stays unfiltered so highlighting
-  // and area-selection anchoring still see the whole selection.
+  // Drag/context actions must exclude hidden selected cards while selection anchoring still retains the full set.
   const renderedSelectedWorktrees = useMemo(
     () =>
       matchingWorktreeIds
@@ -152,8 +157,7 @@ function WorkspaceKanbanDrawerContent({
         : selectedWorktrees,
     [matchingWorktreeIds, selectedWorktrees]
   )
-  // Why: selectForContextMenu closes over the unfiltered selection, so the
-  // "Move to Status" payload has to be narrowed here too.
+  // Narrow the context-menu payload because its selection callback closes over unfiltered cards.
   const selectRenderedForContextMenu = useCallback(
     (event: React.MouseEvent<HTMLElement>, worktree: Worktree): readonly Worktree[] => {
       const selection = selectForContextMenu(event, worktree)
@@ -190,8 +194,7 @@ function WorkspaceKanbanDrawerContent({
     onOpenChange(false)
   }, [onOpenChange])
   const handleHeaderClose = useCallback(() => {
-    // Why: generic Radix close requests stay ignored so sidebar drag/outside
-    // dismiss rules remain explicit; the header X is a board-owned close path.
+    // Only the board’s own close paths bypass its explicit drag/outside-dismiss rules.
     onOpenChange(false)
   }, [onOpenChange])
   const {
@@ -203,7 +206,8 @@ function WorkspaceKanbanDrawerContent({
     handleRemoveStatus
   } = useWorkspaceKanbanStatusActions({
     allWorktrees,
-    workspaceStatuses,
+    workspaceStatuses: localWorkspaceStatuses,
+    boardStatuses,
     setWorkspaceStatuses,
     updateWorktreeMeta
   })
@@ -228,6 +232,7 @@ function WorkspaceKanbanDrawerContent({
   })
 
   useWorkspaceKanbanShiftWheelScroll(boardRef, laneScrollerRef, open, isPointerDragActiveRef)
+  useWorkspaceKanbanOutsideDismiss({ open, boardRef, preserveOpenForMenu, onOpenChange })
   useContextualTour('workspace-board', open && !dragPreview, 'workspace_board_visible')
 
   return (
@@ -248,7 +253,7 @@ function WorkspaceKanbanDrawerContent({
         totalCount: boardWorktrees.length,
         onQueryChange: setQuery,
         onClearQuery: clearQuery,
-        workspaceStatuses,
+        workspaceStatuses: localWorkspaceStatuses,
         syncTaskStatusFromWorkspaceBoard,
         onSyncTaskStatusFromWorkspaceBoardChange: setSyncTaskStatusFromWorkspaceBoard,
         onRenameStatus: handleRenameStatus,
@@ -262,7 +267,7 @@ function WorkspaceKanbanDrawerContent({
       }}
       laneGridProps={{
         laneScrollerRef,
-        statuses: workspaceStatuses,
+        statuses: boardStatuses,
         laneViews,
         laneFullWorktreeIds,
         hasQuery,

@@ -17,11 +17,7 @@ import { isWslDistroRunningForBackgroundWork } from '../wsl-background-distro-ga
 import { readMiniMaxSessionCookie } from '../minimax/minimax-cookie-store'
 import { readMiniMaxApiKey } from '../minimax/minimax-api-key-store'
 import { readZcodePlanApiKey } from '../zcode/zcode-plan-api-key-store'
-import {
-  hasOpenCodeGoApiKey,
-  readOpenCodeGoApiKey,
-  saveOpenCodeGoApiKey
-} from '../opencode/opencode-go-api-key-store'
+import { readOpenCodeGoApiKey } from '../opencode/opencode-go-api-key-store'
 import { createAccountRuntimeTargetSettingsSync } from '../rate-limits/account-runtime-target-sync'
 import { normalizeCodexRuntimeSelection } from '../codex-accounts/runtime-selection'
 import { normalizeClaudeRuntimeSelection } from '../claude-accounts/runtime-selection'
@@ -154,11 +150,6 @@ export function initializeMainProcessAccountServices(): void {
   agentHookServer.setClaudeStatusLineListener((event) => {
     state.rateLimits!.ingestLiveClaudeRateLimits(event)
   })
-  store.migrateLegacyOpenCodeGoApiKey({
-    has: hasOpenCodeGoApiKey,
-    read: readOpenCodeGoApiKey,
-    save: saveOpenCodeGoApiKey
-  })
   state.rateLimits.setOpenCodeGoConfigResolver(() => {
     const settings = store.getSettings()
     return {
@@ -188,12 +179,7 @@ export function initializeMainProcessAccountServices(): void {
   )
   state.rateLimits.setNetworkProxySettingsResolver(() => store.getSettings())
   state.keybindings = new KeybindingService({
-    homePath: app.getPath('home'),
-    getLegacyOverrides: () => store.getSettings().keybindings,
-    legacyTabSwitchSeed: {
-      isPending: () => store.getSettings().tabSwitchKeybindingSeed === 'pending',
-      markSeeded: () => store.updateSettings({ tabSwitchKeybindingSeed: 'done' })
-    }
+    homePath: app.getPath('home')
   })
   browserManager.setSettingsResolver(() => ({ keybindings: state.keybindings?.getOverrides() }))
   state.rateLimits.setInactiveClaudeAccountsResolver(() => {

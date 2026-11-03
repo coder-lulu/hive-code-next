@@ -22,9 +22,27 @@ type MockGitRespond = (response: MockGitResponse) => void
 type MockGitSuccess = (id: string, result: unknown) => MockGitResponse
 
 let fakeGitEntries: FakeGitEntry[] = [
-  { path: 'src/auth/middleware.ts', status: 'modified', area: 'unstaged' },
-  { path: 'src/auth/jwt.ts', status: 'untracked', area: 'untracked' },
-  { path: 'README.md', status: 'modified', area: 'staged' }
+  {
+    path: 'src/auth/middleware.ts',
+    status: 'modified',
+    area: 'unstaged',
+    submodule: undefined,
+    submoduleRoot: undefined
+  },
+  {
+    path: 'src/auth/jwt.ts',
+    status: 'untracked',
+    area: 'untracked',
+    submodule: undefined,
+    submoduleRoot: undefined
+  },
+  {
+    path: 'README.md',
+    status: 'modified',
+    area: 'staged',
+    submodule: undefined,
+    submoduleRoot: undefined
+  }
 ]
 let fakeAhead = 1
 let fakeBehind = 0
@@ -42,7 +60,7 @@ function stageFakeGitEntry(entry: FakeGitEntry, filePaths: Set<string>): FakeGit
   if (entry.area === 'untracked') {
     return { ...entry, area: 'staged', status: 'added', stagedFromUntracked: true }
   }
-  return { ...entry, area: 'staged' }
+  return { ...entry, area: 'staged', submodule: undefined, submoduleRoot: undefined }
 }
 
 function unstageFakeGitEntry(entry: FakeGitEntry, filePaths: Set<string>): FakeGitEntry {
@@ -52,7 +70,7 @@ function unstageFakeGitEntry(entry: FakeGitEntry, filePaths: Set<string>): FakeG
   if (entry.stagedFromUntracked) {
     return { ...entry, area: 'untracked', status: 'untracked', stagedFromUntracked: false }
   }
-  return { ...entry, area: 'unstaged' }
+  return { ...entry, area: 'unstaged', submodule: undefined, submoduleRoot: undefined }
 }
 
 export function handleMockGitRequest(

@@ -48,8 +48,8 @@ export function buildQuickComposerStartup(input: QuickComposerStartupInput): Qui
       : resolveTuiAgentLaunchPermission({
           agent,
           mode: input.agentPermissionMode ?? 'default',
-          agentArgs: resolveTuiAgentLaunchArgs(agent, settings?.agentDefaultArgs),
-          agentEnv: resolveTuiAgentLaunchEnv(agent, settings?.agentDefaultEnv),
+          agentArgs: resolveTuiAgentLaunchArgs(agent, settings),
+          agentEnv: resolveTuiAgentLaunchEnv(agent, settings),
           shell: resolveStartupShell(
             requireExecutionHostPlatform(input.launchHost),
             input.shell ?? undefined

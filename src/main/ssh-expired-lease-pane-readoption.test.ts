@@ -1,17 +1,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { rmSync, mkdtempSync, mkdirSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { rmSync, mkdtempSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { makePaneKey } from '../shared/stable-pane-id'
 import { resolvePersistedStablePaneOwner } from './ipc/pty/pane/stable-owner'
 import { adoptStablePane } from './ipc/pty/pane/adopt-stable'
 import { PtyHostNotDispatchableError } from './ipc/pty/provider/registry'
 import {
   testState,
-  createStoreWithSshRemotePtyLeases,
-  closeTestStores,
-  makeTerminalTab
-} from './persistence-test-harness'
-import { TEST_LEAF_1 } from './persistence-session-fixtures'
+  createStoreWithSshRemotePtyLeases
+} from './persistence/persistence-test-harness'
+import { makeTerminalTab, TEST_LEAF_1 } from './persistence/persistence-session-fixtures'
+
+import { PtyExitProof } from './pty-exit-proof'
 
 vi.mock('electron', () => ({
   app: { getPath: () => testState.dir },
@@ -60,24 +61,13 @@ function storeWithBoundRemotePane(
   return store
 }
 
-/**
- * `adoptStablePane` re-adopts a pane only while `resolvePersistedStablePaneOwner` can still name
- * its PTY. A null owner is what routes `createTerminal` to a fresh spawn — over a remote shell that
- * `expired` never claimed had died.
- */
-const testDirectory = resolve(
-  import.meta.dirname,
-  '../../logs/tests/ssh-expired-lease-pane-readoption'
-)
-
+// An expired lease does not prove the remote shell died; retain its owner for re-adoption.
 describe('a pane whose SSH lease expired can still be re-adopted', () => {
   beforeEach(() => {
-    mkdirSync(testDirectory, { recursive: true })
-    testState.dir = mkdtempSync(join(testDirectory, 'orca-test-'))
+    testState.dir = mkdtempSync(join(tmpdir(), 'orca-test-'))
   })
 
-  afterEach(async () => {
-    await closeTestStores()
+  afterEach(() => {
     rmSync(testState.dir, { recursive: true, force: true })
   })
 
@@ -89,12 +79,10 @@ describe('a pane whose SSH lease expired can still be re-adopted', () => {
     ).toMatchObject({ tabId: TAB, leafId: TEST_LEAF_1, ptyId: APP_PTY_ID })
   })
 
-  // Negative control for #17957: an operator close leaves `terminated`, and that must still unbind
-  // the pane rather than re-adopting a shell the user deliberately stopped.
   it('drops the persisted owner after the lease is terminated', () => {
     const store = storeWithBoundRemotePane()
 
-    store.markSshRemotePtyLease(TARGET, APP_PTY_ID, 'terminated')
+    store.markSshRemotePtyLease(TARGET, APP_PTY_ID, PtyExitProof.from('exit-observed', undefined))
 
     expect(
       resolvePersistedStablePaneOwner(store, makePaneKey(TAB, TEST_LEAF_1), WORKTREE, TARGET)
@@ -102,11 +90,7 @@ describe('a pane whose SSH lease expired can still be re-adopted', () => {
   })
 })
 
-/**
- * The other half of #17958: once `recoverTerminalPane` can find its lease it calls `createTerminal`,
- * whose FIRST act is `adoptStablePane`. This process holds no SSH PTY provider, so that host cannot
- * be asked: the PTY is unverifiable, never gone, and the pane must keep its binding.
- */
+// An unserved SSH host makes the PTY unverifiable; preserve its binding.
 describe('recovery through createTerminal on an SSH host this process cannot reach', () => {
   const PANE_KEY = makePaneKey(TAB, TEST_LEAF_1)
   const ADOPT_ARGS = {
@@ -121,12 +105,10 @@ describe('recovery through createTerminal on an SSH host this process cannot rea
   }
 
   beforeEach(() => {
-    mkdirSync(testDirectory, { recursive: true })
-    testState.dir = mkdtempSync(join(testDirectory, 'orca-test-'))
+    testState.dir = mkdtempSync(join(tmpdir(), 'orca-test-'))
   })
 
-  afterEach(async () => {
-    await closeTestStores()
+  afterEach(() => {
     rmSync(testState.dir, { recursive: true, force: true })
   })
 

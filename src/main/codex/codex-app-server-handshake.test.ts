@@ -1,17 +1,20 @@
 import { describe, expect, it, vi } from 'vitest'
 import { APP_DISPLAY_NAME } from '../../shared/brand'
-import { initializeCodexAppServerConnection } from './codex-app-server-handshake'
-import type { CodexAppServerConnection } from './codex-app-server-connection-types'
+import { initializeCodexAppServerConnection } from './app-server/codex-app-server-handshake'
+import type { CodexAppServerConnection } from './app-server/codex-app-server-connection-types'
 
 describe('initializeCodexAppServerConnection', () => {
   it('advertises the HiveCode title while preserving the app-server client identifier', async () => {
     const request = vi.fn().mockResolvedValue({})
     const notify = vi.fn()
 
-    await initializeCodexAppServerConnection({
-      request,
-      notify
-    } as unknown as CodexAppServerConnection)
+    await initializeCodexAppServerConnection(
+      {
+        request,
+        notify
+      } as unknown as CodexAppServerConnection,
+      15_000
+    )
 
     expect(request).toHaveBeenCalledWith(
       'initialize',

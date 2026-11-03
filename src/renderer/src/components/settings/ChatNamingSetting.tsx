@@ -34,10 +34,7 @@ export function ChatNamingSetting({
   onDirtyChange,
   forceVisible = false
 }: ChatNamingSettingProps): React.JSX.Element {
-  const config = normalizeSourceControlAiSettings(
-    settings.sourceControlAi,
-    settings.commitMessageAi
-  )
+  const config = normalizeSourceControlAiSettings(settings.sourceControlAi)
   const recipe = config.actions?.conversationName
   const persisted: ActionRecipeDraftValue = {
     commandInputTemplate:

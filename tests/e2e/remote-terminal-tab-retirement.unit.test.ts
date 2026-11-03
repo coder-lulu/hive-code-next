@@ -43,6 +43,7 @@ function makeViewerState(): WebSessionTabsSyncState {
     groupsByWorktree: {},
     layoutByWorktree: {},
     openFiles: [],
+    editorBuffers: {},
     ptyIdsByTabId: {},
     remoteBrowserPageHandlesByPageId: {},
     tabBarOrderByWorktree: {},
@@ -137,8 +138,10 @@ describe('remote terminal tab retirement publication', () => {
       },
       flushOrThrow
     })
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: This retirement fixture implements the Store session and durability operations used by the runtime.
-    const runtime = new OrcaRuntimeService(store as never)
+    const runtime = new OrcaRuntimeService(
+      // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: This retirement fixture implements the Store session and durability operations used by the runtime.
+      store as never
+    )
     runtime.attachWindow(1)
     const staleLiveSnapshot = makeHostSnapshot()
     runtime.syncWindowGraph(1, {

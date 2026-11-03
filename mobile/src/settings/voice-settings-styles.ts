@@ -1,64 +1,93 @@
 import { StyleSheet } from 'react-native'
-import type { MobileTheme } from '../theme/mobile-theme'
+import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import { themedStyleSheet } from '../theme/themed-styles'
 
-export function createVoiceSettingsStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    screen: { flex: 1, backgroundColor: theme.color.bg.canvas },
-    content: {
-      gap: theme.spacing.space24,
-      paddingHorizontal: theme.spacing.space20,
-      paddingTop: theme.spacing.space20
-    },
-    centerState: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: theme.spacing.space12,
-      padding: theme.spacing.space20
-    },
-    notice: {
-      width: '100%',
-      gap: theme.spacing.space8,
-      padding: theme.spacing.space16,
-      borderWidth: 1,
-      borderColor: theme.color.border.default,
-      borderRadius: theme.radii.card,
-      backgroundColor: theme.color.bg.surface
-    },
-    noticeTitle: { ...theme.typography.sectionTitle, color: theme.color.text.primary },
-    noticeDetail: { ...theme.typography.meta, color: theme.color.text.secondary },
-    stateText: { ...theme.typography.meta, color: theme.color.text.secondary },
-    row: {
-      minHeight: theme.size.groupedListRowMinHeight,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.space12,
-      paddingHorizontal: theme.spacing.space16,
-      paddingVertical: theme.spacing.space12
-    },
-    modeRow: {
-      gap: theme.spacing.space12,
-      paddingHorizontal: theme.spacing.space16,
-      paddingVertical: theme.spacing.space12
-    },
-    rowCopy: { minWidth: 0, flex: 1, gap: theme.spacing.space4 },
-    rowTitle: { ...theme.typography.body, color: theme.color.text.primary },
-    rowDetail: { ...theme.typography.meta, color: theme.color.text.secondary },
-    errorNotice: {
-      width: '100%',
-      padding: theme.spacing.space16,
-      borderWidth: 1,
-      borderColor: theme.color.status.danger,
-      borderRadius: theme.radii.card,
-      backgroundColor: theme.color.bg.surface
-    },
-    errorText: { ...theme.typography.meta, color: theme.color.status.dangerText },
-    drawerTitle: {
-      ...theme.typography.sectionTitle,
-      color: theme.color.text.primary,
-      paddingHorizontal: theme.spacing.space16,
-      paddingTop: theme.spacing.space8,
-      paddingBottom: theme.spacing.space4
-    }
-  })
-}
+export const voiceSettingsStyles = themedStyleSheet(() => ({
+  container: {
+    flex: 1,
+    backgroundColor: colors.bgBase,
+    paddingHorizontal: spacing.lg
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm
+  },
+  heading: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.textPrimary
+  },
+  scrollContent: {
+    paddingBottom: spacing.xl
+  },
+  loading: { paddingVertical: spacing.xl, alignItems: 'center' },
+  groupHeading: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textMuted,
+    letterSpacing: 0.5,
+    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.xs
+  },
+  section: {
+    backgroundColor: colors.bgPanel,
+    borderRadius: radii.card,
+    overflow: 'hidden'
+  },
+  sectionTopGap: { marginTop: spacing.sm },
+  inputGroupGap: { marginTop: spacing.xl },
+  disabled: { opacity: 0.5 },
+  emptyText: {
+    fontSize: typography.bodySize,
+    color: colors.textSecondary,
+    padding: spacing.md
+  },
+  errorText: {
+    fontSize: typography.bodySize,
+    color: colors.statusRed,
+    padding: spacing.md
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md + 2
+  },
+  rowPressed: { backgroundColor: colors.bgRaised },
+  rowContent: { flex: 1 },
+  rowLabel: {
+    fontSize: typography.bodySize,
+    fontWeight: '500',
+    color: colors.textPrimary
+  },
+  drawerTitle: {
+    fontSize: typography.bodySize,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    paddingHorizontal: spacing.md + 2,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs
+  },
+  rowSublabel: {
+    fontSize: typography.bodySize - 2,
+    color: colors.textSecondary,
+    marginTop: 2
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.borderSubtle,
+    marginHorizontal: spacing.md
+  },
+  error: { color: colors.statusRed, fontSize: typography.metaSize, marginTop: spacing.md }
+}))

@@ -103,6 +103,7 @@ async function chatAtRest(repoConfig: { configured: boolean }): Promise<void> {
   )
   const modelCatalog = createAgentModelCatalogService({
     store,
+    getConversation: (sessionId) => rig.store.getConversation(sessionId) ?? undefined,
     getRecord: (sessionId) => rig.store.getRecord(sessionId) ?? undefined,
     drivesRecord: () => true,
     resolveAccountHome: async () => rig.store.getRecord(SESSION)!.accountHome,
@@ -123,7 +124,7 @@ beforeEach(async () => {
   vi.spyOn(runtime, 'getClientSettings').mockImplementation(
     () =>
       // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the RPC gate reads only this one setting.
-      ({ experimentalNativeChat: true }) as ReturnType<OrcaRuntimeService['getClientSettings']>
+      ({ nativeChatProviders: {} }) as ReturnType<OrcaRuntimeService['getClientSettings']>
   )
   dispatcher = new RpcDispatcher({ runtime, methods: STRUCTURED_AGENT_SESSION_METHODS })
 })

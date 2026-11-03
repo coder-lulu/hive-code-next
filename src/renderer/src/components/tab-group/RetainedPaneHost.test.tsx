@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
+import { useLayoutEffect, useRef } from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { RetainedPaneHost } from './RetainedPaneHost'
 import { registerTabGroupBody } from './tab-group-body-geometry'
@@ -115,18 +116,10 @@ it('allows hidden terminal startup measurement without exposing input or startin
   timeout.mockRestore()
 })
 
-it('follows an explicit session anchor and its owner without reparenting retained content', () => {
-  const focus = vi.fn()
+it('follows the current group anchor and its owner without reparenting retained content', () => {
   const groupFocus = vi.fn()
   const view = render(
-    <RetainedPaneHost
-      groupId={undefined}
-      anchorName="--session-left"
-      anchorTarget={anchors[0]}
-      onFocus={focus}
-      onFocusOwningGroup={groupFocus}
-      isVisible
-    >
+    <RetainedPaneHost groupId="left" onFocusOwningGroup={groupFocus} isVisible>
       <input defaultValue="draft" />
     </RetainedPaneHost>
   )
@@ -134,14 +127,7 @@ it('follows an explicit session anchor and its owner without reparenting retaine
   const input = view.getByRole('textbox')
   fireEvent.change(input, { target: { value: 'retained draft' } })
   view.rerender(
-    <RetainedPaneHost
-      groupId={undefined}
-      anchorName="--session-right"
-      anchorTarget={anchors[1]}
-      onFocus={focus}
-      onFocusOwningGroup={groupFocus}
-      isVisible
-    >
+    <RetainedPaneHost groupId="right" onFocusOwningGroup={groupFocus} isVisible>
       <input defaultValue="draft" />
     </RetainedPaneHost>
   )
@@ -150,23 +136,16 @@ it('follows an explicit session anchor and its owner without reparenting retaine
   expect(view.getByRole('textbox')).toBe(input)
   expect((input as HTMLInputElement).value).toBe('retained draft')
   fireEvent.pointerDown(input)
-  expect(focus).toHaveBeenCalledOnce()
-  expect(groupFocus).not.toHaveBeenCalled()
+  expect(groupFocus).toHaveBeenCalledExactlyOnceWith('right')
 })
 
 function countResizeListeners(spy: ReturnType<typeof vi.spyOn>): number {
   return spy.mock.calls.filter(([type]) => type === 'resize').length
 }
 
-it('shares explicit session anchor measurements and keeps the remaining subscriber live', () => {
+it('shares group anchor measurements and keeps the remaining subscriber live', () => {
   const pane = (key: string) => (
-    <RetainedPaneHost
-      key={key}
-      groupId={undefined}
-      anchorName="--session-left"
-      anchorTarget={anchors[0]}
-      isVisible
-    >
+    <RetainedPaneHost key={key} groupId="left" isVisible>
       <span />
     </RetainedPaneHost>
   )
@@ -256,4 +235,33 @@ it('keeps measuring a hidden pane that asks to measure while hidden', () => {
   anchors[0].getBoundingClientRect = () => new DOMRect(0, 32, 360, 568)
   act(() => notifyResize())
   expect(host.style.width).toBe('360px')
+})
+
+it('mounts its pane only once the host sits at the measured group body', () => {
+  const geometryAtMount: string[] = []
+  function MeasuringChild(): React.JSX.Element {
+    const ref = useRef<HTMLSpanElement | null>(null)
+    // A terminal pane creates and fits xterm in its own layout effect, before the host's.
+    useLayoutEffect(() => {
+      const host = ref.current?.parentElement
+      geometryAtMount.push(`${host?.style.top} ${host?.style.width}`)
+    }, [])
+    return <span ref={ref} />
+  }
+  anchors[0].getBoundingClientRect = () => new DOMRect(1, 36, 449, 800)
+  render(
+    <RetainedPaneHost groupId="left" isVisible>
+      <MeasuringChild />
+    </RetainedPaneHost>
+  )
+  expect(geometryAtMount).toEqual(['36px 449px'])
+})
+
+it('mounts a pane at once when it has no group body to measure', () => {
+  const view = render(
+    <RetainedPaneHost groupId="missing" isVisible>
+      <input />
+    </RetainedPaneHost>
+  )
+  expect(view.getByRole('textbox')).toBeTruthy()
 })

@@ -707,13 +707,14 @@ describe('runtime git client', () => {
   })
 
   it('passes commit-message settings to the active runtime', async () => {
-    const commitMessageAi = {
+    const sourceControlAi = {
       enabled: true,
       agentId: 'codex' as const,
       selectedModelByAgent: { codex: 'gpt-5.3-codex-spark' },
       selectedThinkingByModel: { 'gpt-5.3-codex-spark': 'medium' },
       customPrompt: 'Prefer concise subjects.',
-      customAgentCommand: ''
+      customAgentCommand: '',
+      instructionsByOperation: {}
     }
     const agentCmdOverrides = { codex: 'codex --profile work' }
     runtimeEnvironmentCall.mockResolvedValue({
@@ -727,7 +728,7 @@ describe('runtime git client', () => {
       target: { kind: 'environment', environmentId: 'env-1' },
       prefs: {
         defaultTuiAgent: 'codex',
-        commitMessageAi,
+        sourceControlAi,
         agentCmdOverrides
       },
       worktreeId: 'wt-1',
@@ -740,7 +741,7 @@ describe('runtime git client', () => {
       params: {
         worktree: 'id:wt-1',
         defaultTuiAgent: 'codex',
-        commitMessageAi,
+        sourceControlAi,
         agentCmdOverrides,
         commitMessageDiscoveryHostKey: 'runtime:env-1'
       },

@@ -10,7 +10,6 @@ import { makeTab, makeTabGroup, makeUnifiedTab } from '../store/slices/store-ses
 import { FLOATING_TERMINAL_WORKTREE_ID, getDefaultSettings } from '../../../shared/constants'
 import { makePaneKey } from '../../../shared/stable-pane-id'
 
-// These suites isolate synchronous acknowledgement and layout behavior.
 vi.mock('./agent-auto-ack-presence', async (importOriginal) => ({
   ...(await importOriginal<typeof AgentAutoAckPresence>()),
   createAutoAckPresenceCheck: (_read: unknown, onPresent: () => void) => ({
@@ -61,7 +60,6 @@ function seedFloatingCompletion(): void {
     },
     unreadTerminalTabs: {},
     unreadAgentCompletionPanes: {},
-    unreadAgentCompletionCountByPane: {},
     acknowledgedAgentsByPaneKey: {},
     settings: { ...getDefaultSettings('/home/test'), floatingTerminalEnabled: true },
     floatingWorkspacePanelOpen: false
@@ -100,32 +98,7 @@ describe('useReadOnScreenAttention — floating workspace panel visibility', () 
     expect(selectFloatingWorkspaceHasUnread(useAppStore.getState())).toBe(false)
   })
 
-  it('preserves completion counts on visibility acknowledgement until an explicit pane interaction', () => {
-    openFloatingPanel()
-    useAppStore.getState().markAgentAttentionUnread(
-      {
-        workspaceId: FLOATING_TERMINAL_WORKTREE_ID,
-        subjectKey: FLOATING_PANE_KEY,
-        groupId: FLOATING_TAB_ID,
-        reason: 'agent-completion'
-      },
-      { countCompletion: true }
-    )
-    const readScreen = vi.spyOn(useAppStore.getState(), 'readOnScreenAttention')
-
-    renderHook(() => useReadOnScreenAttention())
-
-    expect(readScreen).toHaveBeenCalled()
-    expect(useAppStore.getState().unreadAgentCompletionPanes[FLOATING_PANE_KEY]).toBeUndefined()
-    expect(useAppStore.getState().unreadAgentCompletionCountByPane[FLOATING_PANE_KEY]).toBe(1)
-    useAppStore.getState().consumeAgentCompletionUnread(FLOATING_PANE_KEY)
-    expect(
-      useAppStore.getState().unreadAgentCompletionCountByPane[FLOATING_PANE_KEY]
-    ).toBeUndefined()
-  })
-
-  // Why: the only case where the scan acks two targets, and acking the first re-enters the scan
-  // synchronously — so this is the path where a stale mid-loop snapshot would surface.
+  // Acknowledging the first visible target synchronously reenters scanning; a stale loop snapshot would re-ack the second.
   it('clears both the active terminal tab and the floating tab in one pass', () => {
     useAppStore.setState({
       activeView: 'terminal',

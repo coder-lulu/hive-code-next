@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync } from 'node:fs'
 import { resolve, join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createStore, testState } from './persistence-test-harness'
+import { createStore, testState } from './persistence/persistence-test-harness'
 import { buildHeadlessMobileSessionTerminalTabs } from './runtime/mobile-session-terminal-projection'
 
 vi.mock('electron', () => ({

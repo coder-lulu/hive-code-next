@@ -58,8 +58,7 @@ vi.mock('@/components/activity/useActivityUnreadCount', () => ({
 }))
 
 vi.mock('./SidebarNav', () => ({
-  shouldShowAgentsButton: (settings: GlobalSettings | null) =>
-    settings?.experimentalActivity === true
+  shouldShowAgentsButton: (settings: GlobalSettings | null) => settings !== null
 }))
 
 vi.mock('./mobile-sidebar-onboarding-badge', () => ({
@@ -381,7 +380,7 @@ describe('SidebarFooter', () => {
 
   it('shows the live activity unread count in the notification menu row', async () => {
     mocks.activityUnreadCount = 3
-    setState({ ...getDefaultSettings('/tmp'), experimentalActivity: true })
+    setState({ ...getDefaultSettings('/tmp') })
     mocks.getAccountState.mockResolvedValue({
       configured: true,
       status: 'signed-in',
@@ -855,7 +854,7 @@ describe('SidebarFooter', () => {
   })
 
   it('uses the activity page when the activity feature is enabled', async () => {
-    setState({ ...getDefaultSettings('/tmp'), experimentalActivity: true })
+    setState({ ...getDefaultSettings('/tmp') })
     const container = await renderFooter()
 
     await act(async () =>

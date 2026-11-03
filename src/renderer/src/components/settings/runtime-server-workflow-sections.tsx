@@ -198,13 +198,13 @@ export function RuntimeServerTroubleshooting(): React.JSX.Element {
           <li>
             {translate(
               'auto.components.settings.RuntimeEnvironmentsPane.troubleshootStepShare',
-              'On the other computer, open Share this host.'
+              'On the other computer, open Devices & connections → Connect to this computer → Direct address.'
             )}
           </li>
           <li>
             {translate(
               'auto.components.settings.RuntimeEnvironmentsPane.troubleshootStepAddress',
-              'Choose Another device and select its Tailscale or LAN address.'
+              'Choose Another device and select a reachable LAN or VPN address, or enter your own address.'
             )}
           </li>
           <li>
@@ -217,7 +217,7 @@ export function RuntimeServerTroubleshooting(): React.JSX.Element {
         <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-xs">
           {translate(
             'auto.components.settings.RuntimeEnvironmentsPane.troubleshootTunnel',
-            'Using an SSH local forward? Return to Connect to a host, paste the loopback link, then enable “I am using an SSH tunnel” under Advanced.'
+            'Using an SSH local forward? Open My hosts, paste the loopback link, then enable “I am using an SSH tunnel” under Advanced.'
           )}
         </div>
       </div>

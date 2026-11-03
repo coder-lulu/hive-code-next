@@ -9,7 +9,6 @@ const RECONNECT_TIMEOUT_MS = 17_000
 // Account connections acquire an API intent (15s) before the Relay handshake (27s).
 const ACCOUNT_RECONNECT_TIMEOUT_MS = 45_000
 
-// Primary hook for screens: acquires the shared client on mount, releases on unmount, re-renders on state change.
 export function useHostClient(hostId: string | undefined): {
   client: RpcClient | null
   clientId: string | null

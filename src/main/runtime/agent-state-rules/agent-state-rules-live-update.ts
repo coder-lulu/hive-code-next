@@ -3,10 +3,9 @@ import { join } from 'node:path'
 import { getAppEnvironment } from '../../../shared/app-environment'
 import { readFetchResponseTextWithinLimit } from '../../../shared/fetch-response-body'
 import type { GlobalSettings } from '../../../shared/global-settings-types'
-import { getVersionChannel } from '../../../shared/release-channel'
-import { resolveProductUpdateSource } from '../../../shared/product-update-source'
+import { getVersionChannel, getReleaseRepoForChannel } from '../../../shared/release-channel'
 import { getMainHttpClient } from '../../network/http-client'
-import { writePluginFileAtomically } from '../../plugins/plugin-atomic-file-write'
+import { writePluginFileAtomically } from '../../plugins/installation/plugin-atomic-file-write'
 import {
   activateAgentStateRules,
   BUNDLED_AGENT_STATE_RULES,
@@ -28,7 +27,6 @@ const FETCH_TIMEOUT_MS = 30_000
 
 export type AgentStateRulesChannel = 'next' | 'stable'
 
-/** Stable apps read the stable tag; RC, hourly, daily and adhoc builds soak the next one first. */
 export function agentStateRulesChannelForAppVersion(
   appVersion: string
 ): AgentStateRulesChannel | null {
@@ -39,18 +37,17 @@ export function agentStateRulesChannelForAppVersion(
   return channel === 'stable' ? 'stable' : 'next'
 }
 
-// Why a fixed release-download URL: no API call or rate limit, and no "latest" lookup to steer.
+// Fixed download URLs avoid API rate limits and latest-release redirects.
 export function agentStateRulesDownloadUrl(channel: AgentStateRulesChannel): string | null {
-  const source = resolveProductUpdateSource()?.github
-  if (!source) {
+  const repo = getReleaseRepoForChannel('stable')
+  if (!repo) {
     return null
   }
   const tag = `agent-state-rules-engine-${AGENT_STATE_RULES_ENGINE_VERSION}-${channel}`
-  return `${source.releasesDownloadBase}/${tag}/agent-state-rules.json`
+  return `https://github.com/${repo}/releases/download/${tag}/agent-state-rules.json`
 }
 
-// Why per channel: stable and RC builds share userData, and a stable app must not run, or be
-// held below, rules that only next has published.
+// Shared userData must not expose next-only rules to stable builds.
 export function agentStateRulesCacheFileName(channel: AgentStateRulesChannel): string {
   return `agent-state-rules-${channel}.json`
 }
@@ -64,7 +61,6 @@ export type AgentStateRulesLiveUpdateDeps = {
   isPackaged: boolean
   fetch: (url: string, init?: RequestInit) => Promise<Response>
   readSettings: () => LiveUpdateSettings
-  /** Called when the active version or source changes, for diagnostics and crash reports. */
   onActivated: (rules: { version: number; source: AgentStateRulesSource }) => void
 }
 
@@ -106,37 +102,37 @@ async function readBundleFile(
   }
 }
 
-/**
- * Keeps the active agent state rules current: a local override, else a downloaded copy newer than
- * the bundled one, else the bundled rules. Any failure keeps the last good copy active.
- */
+/** Prefer override, then newer download, then bundled rules; failures retain the last good copy. */
 export class AgentStateRulesLiveUpdater {
   private override: AgentStateRulesBundle | null = null
-  /** Always newer than the bundled rules, so it is also the floor a download must clear. */
+  /** Newer than bundled; also the download version floor. */
   private downloaded: AgentStateRulesBundle | null = null
-  // Why an identity per start: a settings change restarts while an earlier read or fetch may
-  // still be pending, and a superseded one must not change the active rules.
-  private run: { channel: AgentStateRulesChannel | null; url: string | null } | null = null
+  // Restarted settings must fence still-pending reads/fetches from the previous run.
+  private run: { channel: AgentStateRulesChannel | null } | null = null
   private timer: ReturnType<typeof setInterval> | null = null
 
   constructor(private readonly deps: AgentStateRulesLiveUpdateDeps) {}
 
-  /** Loads the override and the cached download, then fetches now and on an interval. Re-run it
-   *  when the settings it reads change. */
+  /** Reload on settings changes; fetch immediately and periodically after loading local rules. */
   async start(): Promise<void> {
     this.stop()
     const settings = this.deps.readSettings()
-    const live = this.deps.isPackaged && settings.agentStateRulesLiveUpdates !== false
-    const channel = live ? agentStateRulesChannelForAppVersion(this.deps.appVersion) : null
-    const url = channel ? agentStateRulesDownloadUrl(channel) : null
-    if (channel && !url) {
+    if (
+      this.deps.isPackaged &&
+      settings.agentStateRulesLiveUpdates !== false &&
+      getReleaseRepoForChannel('stable') === null
+    ) {
       warn('live updates unavailable: no product rule publication source')
     }
-    const run = { channel: url ? channel : null, url }
+    const live =
+      this.deps.isPackaged &&
+      settings.agentStateRulesLiveUpdates !== false &&
+      getReleaseRepoForChannel('stable') !== null
+    const run = { channel: live ? agentStateRulesChannelForAppVersion(this.deps.appVersion) : null }
     this.run = run
     const overridePath = settings.agentStateRulesPath
     const [override, cached] = await Promise.all([
-      // Why any agent: the user chose this file, so the transcript gate on releases does not apply.
+      // User-selected overrides bypass the release transcript gate.
       overridePath
         ? readBundleFile(`override ${overridePath}`, overridePath, 'any-agent', true)
         : null,
@@ -148,7 +144,7 @@ export class AgentStateRulesLiveUpdater {
       return
     }
     this.override = override
-    // Why re-check the version: an app update may have bundled rules newer than the cache.
+    // An app update may have bundled rules newer than the cache.
     this.downloaded = cached && cached.version > BUNDLED_AGENT_STATE_RULES_VERSION ? cached : null
     this.activate()
     if (run.channel) {
@@ -169,16 +165,15 @@ export class AgentStateRulesLiveUpdater {
   /** Fetches the channel's file now; does nothing unless started with live updates on. */
   async refresh(): Promise<void> {
     const run = this.run
-    if (!run?.channel || !run.url) {
+    if (!run?.channel) {
       return
     }
-    const text = await this.fetchText(run.url)
+    const text = await this.fetchText(run.channel)
     if (this.run !== run || text === null) {
       return
     }
     const bundle = parseOrWarn('download', text, 'live-updatable')
-    // Why higher than both: an app whose bundled rules already hold a fix must not be shadowed by
-    // an older download, and a cached copy must never be replaced by an older one.
+    // Never downgrade either bundled or cached fixes.
     const floor = this.downloaded?.version ?? BUNDLED_AGENT_STATE_RULES_VERSION
     if (!bundle || bundle.version <= floor) {
       return
@@ -196,15 +191,19 @@ export class AgentStateRulesLiveUpdater {
     return join(this.deps.userDataPath, agentStateRulesCacheFileName(channel))
   }
 
-  /** The published file's text, or null after warning why there is none. */
-  private async fetchText(url: string): Promise<string | null> {
+  private async fetchText(channel: AgentStateRulesChannel): Promise<string | null> {
+    const url = agentStateRulesDownloadUrl(channel)
+    if (!url) {
+      warn('Product release source is unavailable; retaining bundled policy')
+      return null
+    }
     try {
       const response = await this.deps.fetch(url, {
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
       })
       if (!response.ok) {
         await response.body?.cancel().catch(() => undefined)
-        // Why not fatal: a 404 is also what a re-upload in progress looks like.
+        // Re-uploads can briefly return 404; retain the last good rules.
         warn(`download failed: HTTP ${response.status}`)
         return null
       }
@@ -242,10 +241,7 @@ type SettingsStore = {
   onSettingsChanged: (listener: (updates: Partial<GlobalSettings>) => void) => unknown
 }
 
-/**
- * Starts live updates on this host: the desktop, `orca serve` and orcad each fetch their own copy,
- * so a paired client never supplies the rules a host evaluates with.
- */
+/** Each host fetches its own rules; paired clients cannot supply host evaluation rules. */
 export function startAgentStateRulesLiveUpdates(
   store: SettingsStore,
   onActivated: AgentStateRulesLiveUpdateDeps['onActivated']

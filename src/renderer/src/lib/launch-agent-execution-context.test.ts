@@ -101,7 +101,8 @@ describe('resolveAgentLaunchExecutionContext from a Windows client', () => {
     )
     expect(context).toMatchObject({
       resolvedLaunchPlatform: 'linux',
-      isRemote: false,
+      worktreeSshConnectionId: null,
+      isRemote: true,
       queuedShell: undefined
     })
   })

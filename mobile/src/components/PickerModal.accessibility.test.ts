@@ -1,8 +1,8 @@
 import { createElement, type ReactNode } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { lightTheme } from '../theme/mobile-theme'
 import { PickerModal } from './PickerModal'
+import { findAllByHostType } from '../test-support/react-test-renderer-host-nodes'
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
@@ -12,10 +12,6 @@ vi.mock('react-native', () => ({
 }))
 
 vi.mock('lucide-react-native', () => ({ Check: 'Check' }))
-
-vi.mock('../theme/mobile-theme-provider', () => ({
-  useMobileTheme: () => lightTheme
-}))
 
 vi.mock('./BottomDrawer', async () => {
   const React = await import('react')
@@ -47,8 +43,7 @@ describe('PickerModal accessibility', () => {
       renderer = create(
         createElement(PickerModal, {
           visible: true,
-          title: '排序方式',
-          subtitle: '在你的设备间同步',
+          title: 'Create Workspace On',
           options: [
             { value: 'desk', label: 'Desk' },
             { value: 'laptop', label: 'Laptop', disabled: true }
@@ -60,15 +55,7 @@ describe('PickerModal accessibility', () => {
       )
     })
 
-    const note = renderer!.root
-      .findAllByType('Text')
-      .find((node) => node.children.includes('在你的设备间同步'))
-    expect(note).toBeDefined()
-    expect(note!.props.style).toMatchObject({
-      color: lightTheme.color.text.secondary,
-      ...lightTheme.typography.caption
-    })
-    const rows = renderer!.root.findAllByType('Pressable')
+    const rows = findAllByHostType(renderer!.root, 'Pressable')
     expect(rows.map((row) => row.props.accessible)).toEqual([true, true])
     expect(rows.map((row) => row.props.accessibilityRole)).toEqual(['button', 'button'])
     expect(rows.map((row) => row.props.accessibilityState)).toEqual([

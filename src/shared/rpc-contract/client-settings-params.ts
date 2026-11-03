@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { AGENT_PERMISSION_CHOICES } from '../tui-agent-permission-choice'
 import { isTaskProvider } from '../task-providers'
 import type { TaskProvider } from '../task-providers'
 import { isTuiAgent } from '../tui-agent-config'
@@ -10,7 +11,6 @@ import {
 import { MACHINE_NAME_MAX_LENGTH } from '../machine-name'
 import { normalizePRBotAuthorOverrides } from '../pr-bot-author-overrides'
 import { WorktreeVisibilityDefaultsUpdate } from './worktree-visibility-defaults-params'
-import { AGENT_CHAT_PERMISSION_MODES } from '../agent-chat-permission-mode'
 
 export const TaskProviderParam = z.custom<TaskProvider>(isTaskProvider, {
   message: 'Unknown task provider'
@@ -126,7 +126,13 @@ export const SettingsUpdate = z
       .unknown()
       .transform((value) => normalizePRBotAuthorOverrides(value))
       .optional(),
-    nativeChatPermissionMode: z.enum(AGENT_CHAT_PERMISSION_MODES).optional()
+    agentPermissionDefault: z.enum(AGENT_PERMISSION_CHOICES).optional(),
+    agentPermissionOverrides: z
+      .record(z.string().refine(isTuiAgent, 'Unknown agent'), z.enum(AGENT_PERMISSION_CHOICES))
+      .optional(),
+    nativeChatProviders: z
+      .record(z.string().refine(isTuiAgent, 'Unknown agent'), z.boolean())
+      .optional()
   })
   .strict()
   .default({})

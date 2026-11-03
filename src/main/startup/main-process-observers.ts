@@ -6,6 +6,7 @@ import { registerSystemResumeBroadcast } from '../system-resume-broadcast'
 import { agentHookServer } from '../agent-hooks/server'
 import { installHookStatusSessionTabsRepublish } from '../agent-hooks/hook-status-session-tabs-republish'
 import { initTelemetry, track } from '../telemetry/client'
+import { runAfterFirstWindowShown } from './first-window-deferral'
 import { setCodexTrustGrantTelemetry } from '../codex/codex-trust-grant-telemetry'
 import { initObservability } from '../observability'
 import { recordDurableCrashBreadcrumb } from '../crash-reporting/durable-crash-breadcrumb'
@@ -13,7 +14,6 @@ import { reportPreviousHangDetection } from '../hang-watchdog/previous-hang-dete
 import { getCanonicalUserDataPath } from '../persistence'
 import { recoverPendingSkillTransactions } from '../skills/skill-transaction-startup-recovery'
 import { initCohortClassifier } from '../telemetry/cohort-classifier'
-import { initOnboardingCohortClassifier } from '../telemetry/onboarding-cohort-classifier'
 import { StatsCollector } from '../stats/collector'
 import { AgentSessionTransitionRecorder } from '../stats/agent-session-transition-recorder'
 import { ClaudeUsageStore } from '../claude-usage/store'
@@ -58,7 +58,7 @@ export function initializeMainProcessObservers(): void {
     uninstallHookStatusRepublish()
   }
   // Why: telemetry must init before any IPC handler/renderer can call track(); it's a no-op in dev and while TELEMETRY_ENABLED is false, so it's safe early.
-  initTelemetry(store)
+  initTelemetry(store, (start) => runAfterFirstWindowShown(start, 15_000))
   const profileStateStartup = state.profileStateStartup
   if (profileStateStartup) {
     track('profile_state_authority_selected', {
@@ -123,7 +123,6 @@ export function initializeMainProcessObservers(): void {
     .catch((error) => console.warn('[skills] startup transaction recovery failed:', error))
   // Why: cohort-classifier reads repo count synchronously at every emit, so hydrate it here — before any IPC handler or window can trigger track().
   initCohortClassifier(store)
-  initOnboardingCohortClassifier(store)
   state.stats = new StatsCollector()
   // Agent-session stats come from hook status transitions, the same truth the
   // sidebar and dashboard read — never from OSC terminal titles, which miss

@@ -1,5 +1,3 @@
-import { LINUX_CLI_COMMAND_NAME } from './bundled-cli-launcher-path'
-import { APPIMAGE_LINUX_GUI_EXECUTABLE_NAME } from '../../shared/appimage-cache-identity'
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -14,7 +12,6 @@ vi.mock('electron', () => ({
 }))
 
 import { CliInstaller } from './cli-installer'
-import { installLinuxBareOrcaDispatcher } from './linux-bare-orca-dispatcher'
 
 const created: string[] = []
 
@@ -23,7 +20,6 @@ afterEach(async () => {
   await Promise.all(created.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
-/** A server run through the stable launcher runs from one extracted generation, with no $APPIMAGE. */
 async function makeGeneration() {
   const root = await mkdtemp(join(tmpdir(), 'orca-generation-launcher-'))
   created.push(root)
@@ -31,10 +27,8 @@ async function makeGeneration() {
   const generationRoot = join(cacheRootPath, 'a'.repeat(24), 'b'.repeat(24))
   const resourcesPath = join(generationRoot, 'resources')
   await mkdir(join(resourcesPath, 'bin'), { recursive: true })
-  await writeFile(join(resourcesPath, 'bin', LINUX_CLI_COMMAND_NAME), '#!/usr/bin/env bash\n', {
-    mode: 0o755
-  })
-  await writeFile(join(generationRoot, APPIMAGE_LINUX_GUI_EXECUTABLE_NAME), '', { mode: 0o755 })
+  await writeFile(join(resourcesPath, 'bin', 'orca-ide'), '#!/usr/bin/env bash\n', { mode: 0o755 })
+  await writeFile(join(generationRoot, 'orca-ide'), '', { mode: 0o755 })
   expect(ensureAppImageStableLauncher(cacheRootPath)).toBe(
     resolveAppImageStableLauncherPath(cacheRootPath)
   )
@@ -51,33 +45,24 @@ async function makeGeneration() {
 describe.skipIf(process.platform === 'win32')(
   'CLI registration from an extracted generation',
   () => {
-    it('points bare `orca` at the stable launcher, never at a generation a later prune deletes', async () => {
-      const fixture = await makeGeneration()
-      const result = await installLinuxBareOrcaDispatcher({
-        resourcesPath: fixture.resourcesPath,
-        homePath: fixture.homePath
-      })
-      expect(result).toMatchObject({ state: 'installed', target: fixture.stableLauncherPath })
-    })
-
-    it('recognises the stable launcher it registered as its own primary command', async () => {
+    it('recognises the stable launcher it registered as its own `orca-ide`', async () => {
       const fixture = await makeGeneration()
       const commandDirectory = join(fixture.homePath, '.local', 'bin')
       await mkdir(commandDirectory, { recursive: true })
-      await symlink(fixture.stableLauncherPath, join(commandDirectory, LINUX_CLI_COMMAND_NAME))
+      await symlink(fixture.stableLauncherPath, join(commandDirectory, 'orca-ide'))
       const installer = new CliInstaller({
         platform: 'linux',
         isPackaged: true,
         userDataPath: join(fixture.homePath, 'user-data'),
         resourcesPath: fixture.resourcesPath,
-        execPath: join(fixture.generationRoot, APPIMAGE_LINUX_GUI_EXECUTABLE_NAME),
+        execPath: join(fixture.generationRoot, 'orca-ide'),
         appPath: join(fixture.resourcesPath, 'app.asar'),
         homePath: fixture.homePath,
         processPathEnv: commandDirectory
       })
       const status = await installer.install()
       expect(status.state).toBe('installed')
-      expect(status.commandPath).toBe(join(commandDirectory, LINUX_CLI_COMMAND_NAME))
+      expect(status.commandPath).toBe(join(commandDirectory, 'orca-ide'))
     })
   }
 )

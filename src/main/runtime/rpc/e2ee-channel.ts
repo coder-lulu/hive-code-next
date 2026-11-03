@@ -48,6 +48,7 @@ export class E2EEChannel {
   private handshakeTimer: ReturnType<typeof setTimeout> | null = null
   private readonly ws: WebSocket
   private readonly serverSecretKey: Uint8Array
+  private readonly resolveDeviceKey: E2EEChannelOptions['resolveDeviceKey']
   private readonly resolveAuthenticatedDevice: E2EEChannelOptions['resolveAuthenticatedDevice']
   private readonly onReady: (channel: E2EEChannel, device: E2EEAuthenticatedDevice) => void
   private readonly resolveCloudManagedSession: E2EECloudManagedSessionResolver | undefined
@@ -75,13 +76,18 @@ export class E2EEChannel {
   constructor(ws: WebSocket, options: E2EEChannelOptions) {
     this.ws = ws
     this.serverSecretKey = options.serverSecretKey
+    this.resolveDeviceKey = options.resolveDeviceKey
     this.resolveAuthenticatedDevice = options.resolveAuthenticatedDevice
     this.onReady = options.onReady
     this.resolveCloudManagedSession = options.resolveCloudManagedSession
     this.onCloudReady = options.onCloudReady
     this.onError = options.onError
     this.transportContext = options.transportContext ?? { transport: 'direct' }
-    this.outbound = new MobileE2EEDesktopOutboundOwner(ws, () => this.closeForOutboundBudget('queue'), options.outboundMemoryBudget)
+    this.outbound = new MobileE2EEDesktopOutboundOwner(
+      ws,
+      () => this.closeForOutboundBudget('queue'),
+      options.outboundMemoryBudget
+    )
 
     this.accountAuthentication = new E2EEAccountAuthentication(
       options.onAccountReady ? options.resolveAccountSession : undefined,
@@ -178,6 +184,7 @@ export class E2EEChannel {
       plaintext,
       v2Session: this.v2Session,
       resolveDevice: this.resolveAuthenticatedDevice,
+      resolveDeviceKey: this.resolveDeviceKey,
       resolveCloudSession: this.resolveCloudManagedSession
     })
     if (!authentication.ok) {
@@ -185,7 +192,8 @@ export class E2EEChannel {
         authentication.code,
         authentication.principalKind,
         (message) => this.sendEncryptedControl(message),
-        this.onError
+        this.onError,
+        authentication.deviceId
       )
       return
     }
@@ -194,7 +202,7 @@ export class E2EEChannel {
       this.authenticatedCloudSession = authentication.principal
       this.completeAuthentication(() => this.onCloudReady?.(this, authentication.principal))
     } else {
-      this.deviceToken = authentication.principal.deviceToken
+      this.deviceToken = authentication.principal.deviceToken ?? null
       this.authenticatedDevice = authentication.principal
       this.completeAuthentication(() => this.onReady(this, authentication.principal))
     }

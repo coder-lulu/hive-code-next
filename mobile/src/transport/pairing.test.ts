@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { decodePairingUrl, extractPairingCodeFromUrl, parsePairingCode } from './pairing'
 import type { PairingOffer } from './types'
+import { PAIRING_INPUT_MAX_CHARACTERS } from '../../../src/shared/mobile-pairing-protocol-limits'
 
 const offer: PairingOffer = {
   v: 2,
@@ -23,11 +24,11 @@ describe('pairing deep links', () => {
   })
 
   it('extracts the pairing code from a query param', () => {
-    expect(extractPairingCodeFromUrl('hivecode://pair?code=abc123')).toBe('abc123')
+    expect(extractPairingCodeFromUrl('orca://pair?code=abc123')).toBe('abc123')
   })
 
   it('accepts scanner casing and surrounding whitespace', () => {
-    expect(extractPairingCodeFromUrl('  HIVECODE://PAIR?code=abc123\n')).toBe('abc123')
+    expect(extractPairingCodeFromUrl('  ORCA://PAIR?code=abc123\n')).toBe('abc123')
   })
 
   it('rejects lookalike routes', () => {
@@ -59,13 +60,31 @@ describe('pairing deep links', () => {
   it('parses a full pairing URL and a bare copied code', () => {
     const code = encodeOffer()
 
-    expect(parsePairingCode(`hivecode://pair?code=${code}`)).toEqual(offer)
+    expect(parsePairingCode(`orca://pair?code=${code}`)).toEqual(offer)
     expect(parsePairingCode(code)).toEqual(offer)
   })
 
-  it('accepts legacy orca URLs during the compatibility window', () => {
+  it('rejects oversized raw codes and URLs before parsing', () => {
     const code = encodeOffer()
-    expect(parsePairingCode(`orca://pair?code=${code}`)).toEqual(offer)
+    const oversizedRawCode = `${code}${' '.repeat(PAIRING_INPUT_MAX_CHARACTERS)}`
+    const oversizedUrl = `orca://pair?code=${code}&ignored=${'A'.repeat(
+      PAIRING_INPUT_MAX_CHARACTERS
+    )}`
+
+    expect(parsePairingCode(oversizedRawCode)).toBeNull()
+    expect(extractPairingCodeFromUrl(oversizedUrl)).toBeNull()
+    expect(decodePairingUrl(oversizedUrl)).toBeNull()
+  })
+
+  it('preserves legacy padding and aliases with the same decoded offer', () => {
+    const paddedOffer = { ...offer, endpoint: `${offer.endpoint}/a` }
+    const code = encodeOffer(paddedOffer)
+    expect(code.length % 4).toBe(2)
+    const alias = `${code.slice(0, -1)}${base64Alias(code.at(-1)!)}`
+
+    expect(parsePairingCode(`${code}=`)).toEqual(paddedOffer)
+    expect(parsePairingCode(`${code}==`)).toEqual(paddedOffer)
+    expect(parsePairingCode(alias)).toEqual(paddedOffer)
   })
 
   it('preserves a TLS reverse-proxy endpoint with an explicit port and path', () => {
@@ -77,13 +96,9 @@ describe('pairing deep links', () => {
 
     expect(parsePairingCode(code)).toEqual(proxiedOffer)
   })
-
-  it('preserves an explicit cloud Runtime id for cross-source deduplication', () => {
-    const identifiedOffer = {
-      ...offer,
-      runtimeRecordId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
-    }
-
-    expect(parsePairingCode(encodeOffer(identifiedOffer))).toEqual(identifiedOffer)
-  })
 })
+
+function base64Alias(character: string): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+  return alphabet[alphabet.indexOf(character) + 1]!
+}

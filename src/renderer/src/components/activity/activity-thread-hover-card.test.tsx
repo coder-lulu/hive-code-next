@@ -155,7 +155,7 @@ describe('ActivityThreadHoverCard and ActivityThreadRow', () => {
     expect(onSelect).not.toHaveBeenCalled()
   })
 
-  it('clears from a keyboard-reachable row action without selecting the row', async () => {
+  it('clears from the row action without selecting the row', async () => {
     const thread = createTestThread()
     const onClear = vi.fn()
     const onSelect = vi.fn()
@@ -203,18 +203,15 @@ describe('ActivityThreadHoverCard and ActivityThreadRow', () => {
 
     const content = container.querySelector('[data-testid="hover-card-content"]')?.textContent ?? ''
 
-    // Workspace & Host info
     expect(content).toContain('Workspace')
     expect(content).toContain('m4air-audit')
     expect(content).toContain('feat/m4air-performance')
     expect(content).toContain('/Users/test/projects/orca/worktrees/m4air-audit')
 
-    // Agent & Task details
     expect(content).toContain('Claude')
     expect(content).toContain('Audit current HEAD on m4air environment')
     expect(content).toContain('Auditing terminal PTY and IME bug categories...')
 
-    // Notes
     expect(content).toContain('Notes')
     expect(content).toContain('Performance investigation notes')
   })
@@ -258,7 +255,7 @@ describe('ActivityThreadHoverCard and ActivityThreadRow', () => {
     expect(container.querySelector('[data-testid="hover-card-content"]')).not.toBeNull()
   })
 
-  it('allows clicking row while preventing inner hover interactions from bubbling', async () => {
+  it('selects the thread when the row body is clicked', async () => {
     const onSelect = vi.fn()
     const thread = createTestThread()
 

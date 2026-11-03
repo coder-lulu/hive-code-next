@@ -1,51 +1,80 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { I18nextProvider } from 'react-i18next'
-
 import { useAppStore } from '../store'
-import { getUiLocale, i18n, setRendererPluginLanguagePacks } from './i18n'
-import { resolveUiLocale } from './supported-languages'
+import { i18n, getIntlLocale, setRendererPluginLanguagePacks, loadRendererUiLanguage } from './i18n'
+import { usePluginLanguagePacks, usePluginLanguagePackStore } from '../store/plugin-language-packs'
 import { isPluginUiLanguage } from '../../../shared/ui-language'
-import { usePluginLanguagePacks } from '../store/plugin-language-packs'
+import { initializeLanguageDetection, useLanguageReadiness } from './language-readiness'
 
 export function I18nProvider({ children }: { children: ReactNode }): React.JSX.Element {
-  // Why: settings arrive async over IPC; until they load we must not apply any
-  // language. Falling back to 'system' here used to kick off an OS-locale
-  // changeLanguage that raced with (and could permanently override) the
-  // persisted preference applied moments later.
   const uiLanguage = useAppStore((state) => state.settings?.uiLanguage ?? null)
-  const pluginLanguagePacks = usePluginLanguagePacks()
-  const selectedPluginLanguage = pluginLanguagePacks.find((pack) => pack.id === uiLanguage)
-  const locale =
-    uiLanguage === null
-      ? null
-      : (selectedPluginLanguage?.resourceLanguage ??
-        (isPluginUiLanguage(uiLanguage) ? 'en' : resolveUiLocale(uiLanguage)))
-  const requestedLocale = useRef<string | null>(null)
+  const packs = usePluginLanguagePacks()
+  const packsLoaded = usePluginLanguagePackStore((state) => state.loaded)
+  const retryCount = useLanguageReadiness((state) => state.retryCount)
+  const systemLocale = useLanguageReadiness((state) =>
+    uiLanguage === 'system' ? state.detection?.locale : null
+  )
+  const generation = useRef(0)
+  // The store keeps unchanged packs by reference, so this changes only when the selected pack's content does.
+  const activePack = isPluginUiLanguage(uiLanguage)
+    ? packs.find((pack) => pack.id === uiLanguage)
+    : undefined
+  const awaitingPack = isPluginUiLanguage(uiLanguage) && !activePack && !packsLoaded
 
   useEffect(() => {
-    setRendererPluginLanguagePacks(pluginLanguagePacks)
-    requestedLocale.current = null
-  }, [pluginLanguagePacks])
+    setRendererPluginLanguagePacks(packs)
+  }, [packs])
 
   useEffect(() => {
-    // Why: track the last *requested* locale instead of checking i18n.language —
-    // an in-flight lazy catalog load leaves i18n.language stale, which made the
-    // guard skip corrections back to the persisted language.
-    if (locale === null || requestedLocale.current === locale) {
+    if (uiLanguage === null) {
       return
     }
-    requestedLocale.current = locale
-    void i18n.changeLanguage(locale)
-  }, [locale, pluginLanguagePacks])
+    const request = ++generation.current
+    let cancelled = false
+    useLanguageReadiness.setState({ loading: true })
+    void (async () => {
+      const detection = initializeLanguageDetection()
+      try {
+        if (uiLanguage === 'system') {
+          await detection
+          if (cancelled || request !== generation.current) {
+            return
+          }
+        }
+        const [, locale] = await Promise.all([
+          detection,
+          loadRendererUiLanguage(awaitingPack ? 'en' : uiLanguage)
+        ])
+        if (cancelled || request !== generation.current) {
+          return
+        }
+        await i18n.changeLanguage(locale)
+        if (!cancelled && request === generation.current) {
+          useLanguageReadiness.setState({ ready: true, error: false, loading: awaitingPack })
+        }
+      } catch {
+        await detection
+        if (!cancelled && request === generation.current) {
+          await i18n.changeLanguage('en')
+          if (!cancelled && request === generation.current) {
+            useLanguageReadiness.setState({ ready: true, error: true, loading: false })
+          }
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [uiLanguage, activePack, retryCount, systemLocale, awaitingPack, packsLoaded])
 
   useEffect(() => {
-    const updateDocumentLanguage = (): void => {
-      document.documentElement.lang = getUiLocale()
+    const updateLanguage = (): void => {
+      document.documentElement.lang = getIntlLocale()
     }
-    updateDocumentLanguage()
-    i18n.on('languageChanged', updateDocumentLanguage)
+    updateLanguage()
+    i18n.on('languageChanged', updateLanguage)
     return () => {
-      i18n.off('languageChanged', updateDocumentLanguage)
+      i18n.off('languageChanged', updateLanguage)
     }
   }, [])
 

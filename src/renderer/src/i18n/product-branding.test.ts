@@ -13,6 +13,24 @@ describe('renderer product branding', () => {
     expect(translate('test.productNameTitle', 'Orca Mobile')).toBe(`${APP_DISPLAY_NAME} Mobile`)
   })
 
+  it('brands canonical plural defaults before interpolating host data', () => {
+    expect(
+      translate('test.canonicalPlural', '{{count}} Orca workspaces on {{host}}', {
+        count: 1,
+        defaultValue_one: '{{count}} Orca workspace on {{host}}',
+        host: '/Orca/user-owned/orca'
+      })
+    ).toBe(`1 ${APP_DISPLAY_NAME} workspace on /Orca/user-owned/orca`)
+  })
+
+  it('brands a current static default while preserving the signed-in user value', () => {
+    expect(
+      translate('test.currentAccountCopy', 'An earlier Orca version may have copied {{login}}.', {
+        login: 'Orca user'
+      })
+    ).toBe(`An earlier ${APP_DISPLAY_NAME} version may have copied Orca user.`)
+  })
+
   it('preserves compatibility identifiers that contain the upstream name', () => {
     expect(translate('test.configFile', 'orca.yaml')).toBe('orca.yaml')
     expect(translate('test.configFileUpper', 'ORCA.YAML')).toBe('ORCA.YAML')
@@ -41,8 +59,8 @@ describe('renderer product branding', () => {
     await i18n.changeLanguage('zh')
 
     expect(translate('auto.components.Landing.6ca6ff404e', 'ORCA')).toBe(APP_DISPLAY_NAME)
-    expect(translate('auto.components.sidebar.SidebarNav.1b5c41caee', 'Orca Mobile')).toBe(
-      `${APP_DISPLAY_NAME} 手机端`
-    )
+    expect(
+      translate('auto.components.settings.AppearancePane.9da1020447', 'Show Orca Mobile Button')
+    ).toBe(`显示 ${APP_DISPLAY_NAME} 手机端按钮`)
   })
 })

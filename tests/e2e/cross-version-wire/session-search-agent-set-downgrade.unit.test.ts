@@ -1,11 +1,9 @@
-import { join } from 'node:path'
-import { extractReleaseCheckoutTree } from './release-checkout-tree'
 import { createSessionSearchService } from '../../../src/main/ai-vault-search/session-search-service'
 import {
   addSyntheticSession,
   openSessionSearchHarness
 } from '../../../src/main/ai-vault-search/session-search-engine-test-fixture'
-import { afterEach, beforeAll, expect, test, vi } from 'vitest'
+import { afterEach, expect, test, vi } from 'vitest'
 import {
   createSessionSearchClient,
   unavailableSessionSearchStatus
@@ -21,51 +19,16 @@ import {
   sessionSearchServiceStatus,
   setSessionSearchService
 } from '../../../src/main/ai-vault-search/session-search-service-registry'
-import {
-  importReleaseCheckoutModule,
-  materializeReleaseCheckout,
-  REPO_ROOT
-} from './release-checkout'
+import { importReleaseCheckoutModule, materializeReleaseCheckout } from './release-checkout'
 
 const LEGACY_REF = 'b49abdb1f4da6b3d62dfa9ccf3c74dc9e74d291c'
-const baselines = new Map<string, Awaited<ReturnType<typeof importReleaseCheckoutModule>>>()
-beforeAll(async () => {
-  for (const [ref, commit] of [
-    [LEGACY_REF, LEGACY_REF],
-    ['v1.4.211', '5534462b50c660888487a2108700d4cf284270db']
-  ]) {
-    const checkout = await materializeReleaseCheckout(ref, {
-      // Only the real shared contract is imported. Keep this source subset in a
-      // distinct cache so it cannot stand in for a complete historical runtime.
-      cacheRoot: join(REPO_ROOT, 'logs', 'session-search-contract-checkouts'),
-      testHooks: {
-        populateStaging: async ({ staging }) => {
-          await extractReleaseCheckoutTree(REPO_ROOT, staging, commit, true, {
-            archivePaths: ['src/shared']
-          })
-        }
-      }
-    })
-    expect(checkout.commit).toBe(commit)
-    baselines.set(
-      ref,
-      await importReleaseCheckoutModule(checkout, 'src/shared/ai-vault-search-contract.ts')
-    )
-  }
-})
-
-function baselineFor(ref: string) {
-  const baseline = baselines.get(ref)
-  if (!baseline) {
-    throw new Error(`Pinned release was not prepared: ${ref}`)
-  }
-  return baseline
-}
-
 afterEach(() => setSessionSearchService(null))
 
 test('the actual pre-Jcode client reads current host pages while current peers retain every provider', async () => {
-  const baseline = baselineFor(LEGACY_REF)
+  const baseline = await importReleaseCheckoutModule(
+    await materializeReleaseCheckout(LEGACY_REF),
+    'src/shared/ai-vault-search-contract.ts'
+  )
   const oldResponse = baseline.AiVaultSearchResponseSchema
   if (
     !oldResponse ||
@@ -142,7 +105,7 @@ test('agent-list negotiation takes precedence over the old flag and tolerates fu
     expect.objectContaining({
       cursor: 'page-2',
       within,
-      filters: { agents: ['codex', 'jcode'], since: '2026-08-01T00:00:00Z', sort: 'newest' },
+      filters: { agents: ['codex', 'jcode'], since: '2026-08-01T00:00:00.000Z', sort: 'newest' },
       supportedAgents: [...AI_VAULT_AGENTS]
     })
   )
@@ -208,22 +171,21 @@ test.each([{ supportedAgents: [] }, { supportedAgents: ['future-agent'] }])(
 test.each(['v1.4.211', LEGACY_REF])(
   'a missing status method still searches through the actual %s request parser',
   async (ref) => {
-    const baseline = baselineFor(ref)
+    const baseline = await importReleaseCheckoutModule(
+      await materializeReleaseCheckout(ref),
+      'src/shared/ai-vault-search-contract.ts'
+    )
     const parser = baseline.AiVaultSearchRequestSchema
-    if (
-      !parser ||
-      typeof parser !== 'object' ||
-      !('parse' in parser) ||
-      typeof parser.parse !== 'function'
-    ) {
+    const parse =
+      parser && typeof parser === 'object' && 'parse' in parser ? parser.parse : undefined
+    if (typeof parse !== 'function') {
       throw new Error('Pinned release has no request parser')
     }
-    const parse = parser.parse.bind(parser)
     const call = vi.fn(async (method: string, request: Record<string, unknown>) => {
       if (method === 'aiVault.searchStatus') {
         throw { code: 'method_not_found' }
       }
-      parse(request)
+      parse.call(parser, request)
       expect(request).toMatchObject({
         filters: {
           agents: AI_VAULT_AGENTS.filter(

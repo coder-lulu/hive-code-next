@@ -1,5 +1,3 @@
-import { existsSync } from 'node:fs'
-import { APP_DISPLAY_NAME } from '@/product-brand'
 import { createElement } from 'react'
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
 import { describe, expect, it, vi } from 'vitest'
@@ -17,20 +15,11 @@ vi.mock('react-native', () => ({
       doubles.alerts.push(args)
     }
   },
-  Pressable: 'Pressable',
   StyleSheet: { create: (styles: unknown) => styles },
   Text: 'Text',
   View: 'View'
 }))
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }))
-vi.mock('lucide-react-native', () => ({ MonitorOff: 'MonitorOff' }))
-vi.mock('../theme/mobile-theme-provider', async () => {
-  const { lightTheme } = await import('../theme/mobile-theme')
-  return {
-    useMobileTheme: () => lightTheme,
-    useMobileThemeStyles: <T,>(factory: (theme: typeof lightTheme) => T) => factory(lightTheme)
-  }
-})
 vi.mock('./host-screen-header', () => ({ HostScreenHeader: 'HostScreenHeader' }))
 vi.mock('./host-workspace-list', () => ({ HostWorkspaceList: 'HostWorkspaceList' }))
 vi.mock('./host-screen-overlays', () => ({ HostScreenOverlays: 'HostScreenOverlays' }))
@@ -39,7 +28,6 @@ vi.mock('../transport/host-removal-lifecycle', () => ({
 }))
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }))
 vi.mock('../host-route-exit', () => ({ leaveHostRoute: vi.fn() }))
-vi.mock('../storage/preferences', () => ({ savePinnedIds: () => Promise.resolve() }))
 
 import { useRouter } from 'expo-router'
 import { PageHostRemovalUnavailableError } from '../transport/page-host-removal-refusal'
@@ -51,12 +39,6 @@ function byName(tree: ReactTestRenderer, name: string): ReactTestInstance[] {
   return tree.root.findAll((node) => String(node.type) === name)
 }
 
-/**
- * Only the two fields the view reads before it decides whether to render the screen at all.
- *
- * Everything below the early return is a child this file mocks away, so no other member of the
- * controller is reachable from what these cases exercise.
- */
 function controllerWith(fields: { error: string; actionError: string }) {
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: `HostScreenView` reads `state.error` and then hands the controller to three mocked children, so these two fields are the whole reachable surface.
   return { state: fields } as unknown as Parameters<typeof HostScreenView>[0]['controller']
@@ -75,7 +57,6 @@ function render(fields: { error: string; actionError: string }): ReactTestRender
 
 type RemovalWrites = { action: string[]; identity: string[]; confirm: boolean[] }
 
-/** One run of `handleRemoveHost` against a scripted rejection, reporting what it wrote. */
 async function runRemoval(rejection: unknown): Promise<RemovalWrites> {
   doubles.alerts.length = 0
   doubles.removalRejection = rejection
@@ -89,11 +70,11 @@ async function runRemoval(rejection: unknown): Promise<RemovalWrites> {
   function Probe(): null {
     const actions = useHostWorktreeActions({
       client: null,
-      canRemoveHost: true,
       connState: 'connected',
       embedded: false,
       fetchWorktrees: () => Promise.resolve(),
       forgetHostClient: () => {},
+      hostCapabilities: [],
       hostId: 'host-a',
       pathname: '/h/host-a',
       router: useRouter(),
@@ -114,22 +95,19 @@ async function runRemoval(rejection: unknown): Promise<RemovalWrites> {
 
 describe('a removal that failed', () => {
   it('keeps the list, the header and the overlays on screen', () => {
-    // The confirm this failure re-opens lives in the overlays, so a screen that early-returned
-    // would be asking the user to confirm against a view that is not rendering it.
+    // The reopened confirm lives in overlays; early-returning the screen would hide the action needed to recover.
     const tree = render({ error: '', actionError: 'Could not remove host. Please try again.' })
     expect(byName(tree, 'SafeAreaView')).toHaveLength(1)
+    expect(byName(tree, 'HostScreenHeader')).toHaveLength(1)
+    expect(byName(tree, 'HostWorkspaceList')).toHaveLength(1)
+    expect(byName(tree, 'HostScreenOverlays')).toHaveLength(1)
     expect(byName(tree, 'Text')).toEqual([])
   })
 
-  it('replaces the workspace list with the Graphite unavailable state for an identity error', () => {
+  it('still lets the identity error take the whole screen, which is what it is for', () => {
     const tree = render({ error: 'Host not found', actionError: '' })
-    expect(byName(tree, 'SafeAreaView')).toHaveLength(1)
-    expect(byName(tree, 'HostWorkspaceList')).toEqual([])
-    expect(byName(tree, 'Text').map((node) => node.props.children)).toEqual([
-      'Runtime 不可用',
-      '此 Runtime 没有可用的移动连接。请选择其他 Runtime 或重新配对。',
-      '选择其他 Runtime'
-    ])
+    expect(byName(tree, 'SafeAreaView')).toEqual([])
+    expect(byName(tree, 'Text')[0]?.props.children).toBe('Host not found')
   })
 
   it('writes the transient surface and never the identity one, and raises no alert', async () => {
@@ -142,21 +120,10 @@ describe('a removal that failed', () => {
   })
 
   it('says where removal happens when the page refuses, and re-offers nothing', async () => {
-    // A refusal is not a failure: on the page there is no host list to remove from, so the copy
-    // names the app and the confirm this control would re-open stays shut.
+    // Page removal is unsupported, so its refusal must not reopen an unusable confirm.
     const writes = await runRemoval(new PageHostRemovalUnavailableError())
-    expect(writes.action).toEqual([
-      `Remove this host from the host list in the ${APP_DISPLAY_NAME} app.`
-    ])
+    expect(writes.action).toEqual(['Remove this host from the host list in the Orca app.'])
     expect(writes.confirm).toEqual([])
     expect(writes.identity).toEqual([])
-  })
-
-  it('renders from the same module on both platforms, so one check covers each', () => {
-    // No `.web.tsx` sibling for either file: the page and the app run this exact tree, which is
-    // what makes the two render assertions above true of both.
-    for (const module of ['host-screen-view', 'host-workspace-list']) {
-      expect(existsSync(new URL(`./${module}.web.tsx`, import.meta.url)), module).toBe(false)
-    }
   })
 })

@@ -9,22 +9,14 @@ import {
 } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { copyScriptWithLocalModules } from './script-module-dependencies.mjs'
 import { peImage } from './windows-pe-image-fixture.mjs'
 
-/**
- * The strict ownership export name, as it sits in a real addon. A
- * fixture addon without it is a build that predates the MSYS breakaway denial,
- * which is what these tests need to be able to represent.
- *
- * Taken from the gate itself: a re-typed copy agrees with a stale gate by
- * construction, which is the one thing these fixtures must not do.
- */
-const { STRICT_PTY_JOB_MARKER, STRICT_PTY_JOB_MARKER_TEXT } = createRequire(import.meta.url)(
-  './node-pty-job-ownership.cjs'
-)
+// Use the gate's UTF-16 literal so fixtures distinguish pre-denial addons.
+const { CYGWIN_BREAKAWAY_MARKER, CYGWIN_BREAKAWAY_MARKER_TEXT, NATIVE_HOST_JOB_MARKER } =
+  createRequire(import.meta.url)('./node-pty-job-ownership.cjs')
 const { CREATION_TIME_FLAG } = createRequire(import.meta.url)(
   './windows-process-tree-creation-time.cjs'
 )
@@ -39,8 +31,7 @@ const sourceNodePtyJobOwnershipPath = fileURLToPath(
 const sourceWindowsProcessTreeGypRebuildPath = fileURLToPath(
   new URL('./windows-process-tree-gyp-rebuild.mjs', import.meta.url)
 )
-// Reached through projectRequire, so the module walker cannot see it: that
-// specifier resolves against the project root, not against the script.
+// projectRequire resolves at project root, so module walker cannot discover this edge.
 const sourceWindowsProcessTreeCreationTimePath = fileURLToPath(
   new URL('./windows-process-tree-creation-time.cjs', import.meta.url)
 )
@@ -48,17 +39,7 @@ const sourceWindowsProcessTreePatchPath = fileURLToPath(
   new URL('../patches/@vscode__windows-process-tree@0.8.0.patch', import.meta.url)
 )
 
-/**
- * The command-line reader as it is *before* the patch, taken from the patch's
- * own pre-image so no upstream copy has to be vendored.
- *
- * Written back as **CRLF**, which is what `@vscode/windows-process-tree@0.8.0`
- * actually ships: all 67 pre-image lines of this file carried a CR before the
- * patch was normalized to LF. Rebuilding it with the patch's current newline
- * instead would make fixture and patch agree by construction, on any encoding —
- * which is exactly how a repair that cannot apply to the real package passed
- * this suite.
- */
+// Derive reader from patch pre-image but write upstream CRLF; using patch’s LF made fixture agree by construction while real repair failed.
 function unpatchedWindowsProcessTreeCommandLineSource() {
   const lines = readFileSync(sourceWindowsProcessTreePatchPath, 'utf8').split('\n')
   const start = lines.findIndex((line) =>
@@ -71,21 +52,11 @@ function unpatchedWindowsProcessTreeCommandLineSource() {
     .filter((line) => !line.startsWith('---'))
     .map((line) => line.slice(1).replace(/\r$/, ''))
     .join('\r\n')
-  // Splitting drops the file's own trailing newline as an empty element, and
-  // `git apply` needs the bytes exact.
+  // Retain exact bytes: split drops trailing newline into empty element and git apply requires it.
   return `${preImage}\r\n`
 }
 
-/**
- * Pin `core.autocrlf` for a spawned repair, whatever the host is set to.
- *
- * The repair blinds git to the surrounding repo with `GIT_DIR`, so the value it
- * sees comes from global/system config — on a Git for Windows box that is
- * whichever line-ending option the installer wrote, and `false` (Git's built-in
- * default, "checkout as-is") is the one the repair used to fail under. A global
- * config in a temp HOME outranks the system file, so this is deterministic
- * rather than whatever the developer happens to have.
- */
+// Pin autocrlf via temporary global HOME config: repair sets GIT_DIR, bypassing repo config, and host defaults (especially false) affect patch matching.
 export function gitLineEndingEnv(autocrlf) {
   const home = mkdtempSync(join(tmpdir(), `orca-git-home-${autocrlf}-`))
   writeFileSync(join(home, '.gitconfig'), `[core]\n\tautocrlf = ${autocrlf}\n`)
@@ -127,7 +98,6 @@ export function mkTempProject() {
 export function runRebuildScript(projectDir, extraEnv = {}, args = []) {
   const env = {
     ...process.env,
-    HIVECODE_BUILD_HOME: join(projectDir, 'build-home'),
     npm_config_platform: 'linux',
     npm_config_arch: 'x64',
     ORCA_ELECTRON_PACKAGE_EXTRACTOR: join(projectDir, 'fake-extractor.cjs')
@@ -243,17 +213,8 @@ const FAKE_ADDON_BYTES = {
   unpatched: 'MZ\0KERNEL32.dll\0ReadProcessMemory\0'
 }
 
-/**
- * A rebuild that produces nothing leaves no addon to inspect, and the script now
- * asserts the binary it just built is a patched one. Emit a stand-in so the
- * fixture models a rebuild that actually succeeded. `addon` picks which kind,
- * because "produced the upstream reader" and "produced nothing" are both real
- * outcomes that assertion has to tell apart.
- */
-export function writeFakeElectronRebuild(
-  projectDir,
-  { logPathEnv = null, addon = 'clean', captureNodePtyBindingGyp = false } = {}
-) {
+// Emit an addon stand-in for successful builds; addon selects clean/stale output so post-build gate distinguishes unsafe output from missing output.
+export function writeFakeElectronRebuild(projectDir, { logPathEnv = null, addon = 'clean' } = {}) {
   const rebuildDir = join(projectDir, 'node_modules', '@electron', 'rebuild')
   mkdirSync(rebuildDir, { recursive: true })
   writeFileSync(join(rebuildDir, 'package.json'), JSON.stringify({ type: 'module' }))
@@ -277,7 +238,7 @@ export function writeFakeElectronRebuild(
     join(rebuildDir, 'index.js'),
     logPathEnv
       ? `
-import { appendFileSync, readFileSync } from 'node:fs'
+import { appendFileSync } from 'node:fs'
 ${emitImports}
 export async function rebuild(options) {${emitAddon}
   const logPath = process.env[${JSON.stringify(logPathEnv)}]
@@ -290,15 +251,10 @@ export async function rebuild(options) {${emitAddon}
       arch: options.arch,
       electronVersion: options.electronVersion,
       force: options.force,
-      headerURL: options.headerURL,
       ignoreModules: options.ignoreModules,
       trackFileAccess: process.env.TrackFileAccess ?? null,
       onlyModules: options.onlyModules,
-      platform: options.platform${
-        captureNodePtyBindingGyp
-          ? ",\n      nodePtyBindingGyp: readFileSync('node_modules/node-pty/binding.gyp', 'utf8')"
-          : ''
-      }
+      platform: options.platform
     }) + '\\n'
   )
 }
@@ -313,14 +269,9 @@ export async function rebuild() {${emitAddon}
 export function writeFakeUsableElectronPackage(projectDir, { platform = 'linux' } = {}) {
   writeFakeElectronPackage(projectDir)
   const electronDir = join(projectDir, 'node_modules', 'electron')
-  const platformExecutable =
-    platform === 'darwin'
-      ? 'Electron.app/Contents/MacOS/Electron'
-      : platform === 'win32'
-        ? 'electron.exe'
-        : 'electron'
+  const platformExecutable = platform === 'win32' ? 'electron.exe' : 'electron'
   const electronPath = join(electronDir, 'dist', platformExecutable)
-  mkdirSync(dirname(electronPath), { recursive: true })
+  mkdirSync(join(electronDir, 'dist'), { recursive: true })
   writeFileSync(join(electronDir, 'path.txt'), platformExecutable)
   writeFileSync(join(electronDir, 'dist', 'version'), 'v41.5.0')
   if (platform === 'win32') {
@@ -360,7 +311,8 @@ export function writeFakeNodePtyConptyPayload(
     join(releaseDir, 'conpty.node'),
     Buffer.concat([
       peImage({ arch }),
-      cygwinBreakawayDenied ? STRICT_PTY_JOB_MARKER : Buffer.alloc(0)
+      cygwinBreakawayDenied ? CYGWIN_BREAKAWAY_MARKER : Buffer.alloc(0),
+      NATIVE_HOST_JOB_MARKER
     ])
   )
   const sourceDir = join(
@@ -377,14 +329,14 @@ export function writeFakeNodePtyConptyPayload(
   writeFileSync(join(sourceDir, 'OpenConsole.exe'), `OpenConsole.exe ${arch}`)
 }
 
-/** The C++ a Windows rebuild would compile; the ownership export must be present. */
+/** The C++ a Windows rebuild would compile; only the wide literal the source gate reads has to be real. */
 export function writeFakeNodePtyConptySource(projectDir, { cygwinBreakawayDenied = true } = {}) {
   const sourceDir = join(projectDir, 'node_modules', 'node-pty', 'src', 'win')
   mkdirSync(sourceDir, { recursive: true })
   writeFileSync(
     join(sourceDir, 'conpty.cc'),
     cygwinBreakawayDenied
-      ? `exports.Set("${STRICT_PTY_JOB_MARKER_TEXT}", Napi::Boolean::New(env, true));\n`
+      ? `for (const wchar_t* dll : {L"${CYGWIN_BREAKAWAY_MARKER_TEXT}", L"cygwin1.dll"}) {}\n"assignCurrentProcessToStrictJob";\n`
       : 'JOB_OBJECT_LIMIT_BREAKAWAY_OK\n'
   )
 }
@@ -397,7 +349,8 @@ function writeFakeNodePtyAddon(nodePtyDir, nativeDir, { cygwinBreakawayDenied })
       join(addonDir, `${nativeName}.node`),
       Buffer.concat([
         peImage({ arch: process.arch === 'arm64' ? 'arm64' : 'x64' }),
-        cygwinBreakawayDenied ? STRICT_PTY_JOB_MARKER : Buffer.alloc(0)
+        cygwinBreakawayDenied ? CYGWIN_BREAKAWAY_MARKER : Buffer.alloc(0),
+        NATIVE_HOST_JOB_MARKER
       ])
     )
   }
@@ -409,9 +362,7 @@ export function writeFakeLoadableNodePty(
 ) {
   const nodePtyDir = join(projectDir, 'node_modules', 'node-pty')
   mkdirSync(join(nodePtyDir, 'lib'), { recursive: true })
-  // Why a real file: the job-ownership gate reads the addon it was told about,
-  // because every job export predates the MSYS breakaway denial and so cannot
-  // distinguish a current build from one that leaks Git Bash children.
+  // Use actual file: marker gate reads binary because old job exports cannot detect MSYS breakaway leaks.
   writeFakeNodePtyAddon(nodePtyDir, nativeDir, { cygwinBreakawayDenied })
   writeFileSync(join(nodePtyDir, 'index.js'), 'module.exports = {}\n')
   writeFileSync(
@@ -426,7 +377,8 @@ exports.loadNativeModule = function loadNativeModule(nativeName) {
         ? {
             listJobProcessIds() {},
             terminateJob() {},
-            assignCurrentProcessToJob() {}
+            assignCurrentProcessToJob() {},
+            assignCurrentProcessToStrictJob() {}
           }
         : {})
     }
@@ -436,34 +388,31 @@ exports.loadNativeModule = function loadNativeModule(nativeName) {
   )
 }
 
-export function writeFakeWindowsRegistry(projectDir, { loadable = true } = {}) {
+export function writeFakeWindowsRegistry(projectDir) {
   const registryDir = join(projectDir, 'node_modules', '@orca', 'windows-registry')
   mkdirSync(registryDir, { recursive: true })
   writeFileSync(
     join(registryDir, 'index.js'),
-    `exports.HK = { CU: 0x80000001 }; exports.getRegistryKey = () => {
-      ${loadable ? 'return {}' : 'throw new Error("fixture registry addon cannot load")'}
-    }\n`
+    'exports.HK = { CU: 0x80000001 }; exports.getRegistryKey = () => ({})\n'
   )
 }
 
 export function writeFakeWindowsSecurity(projectDir) {
   const securityDir = join(projectDir, 'node_modules', '@orca', 'windows-security')
   mkdirSync(securityDir, { recursive: true })
-  writeFileSync(join(securityDir, 'index.js'), "exports.currentUserSid = () => 'S-1-5-18'\n")
+  writeFileSync(
+    join(securityDir, 'index.js'),
+    "exports.currentUserSid = () => 'S-1-5-18'; exports.hasNativeExport = () => true\n"
+  )
 }
 
-/**
- * A healthy one: the addon reports CreationTime, which is what a build of the
- * patched source does and what the probe has required since the creation-time
- * gate landed. Exporting nothing means "the tarball prebuilt" to that gate.
- */
+// Healthy patched addon must report CreationTime; no exports represents upstream tarball prebuild to the probe.
 export function writeFakeWindowsProcessTree(projectDir) {
   const processTreeDir = join(projectDir, 'node_modules', '@vscode', 'windows-process-tree')
   mkdirSync(processTreeDir, { recursive: true })
   writeFileSync(
     join(processTreeDir, 'index.js'),
-    `module.exports = { supportedProcessDataFlags: ${CREATION_TIME_FLAG}, getProcessCreationTime: () => undefined, terminateProcessIfCreationTimeMatches: () => false }\n`
+    `module.exports = { supportedProcessDataFlags: ${CREATION_TIME_FLAG}, getProcessCreationTime: () => undefined }\n`
   )
 }
 
@@ -550,7 +499,10 @@ export function writePatchedNodePtyBuildArtifacts(
   if (process.platform === 'win32') {
     writeFileSync(
       join(buildDir, 'conpty.node'),
-      cygwinBreakawayDenied ? STRICT_PTY_JOB_MARKER : Buffer.alloc(0)
+      Buffer.concat([
+        cygwinBreakawayDenied ? CYGWIN_BREAKAWAY_MARKER : Buffer.alloc(0),
+        NATIVE_HOST_JOB_MARKER
+      ])
     )
     mkdirSync(join(buildDir, 'conpty'), { recursive: true })
     writeFileSync(join(buildDir, 'conpty', 'conpty.dll'), '')

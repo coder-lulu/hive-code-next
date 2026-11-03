@@ -1,9 +1,11 @@
 #!/usr/bin/env node
-import { access, copyFile, mkdir, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { spawnSync } from 'node:child_process'
-import { homedir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
-import { isDirectInvocation } from './script-entry-detection.mjs'
+import { runProcessSync } from '@orca/process-host'
+import { FEATURE_WALL_TILES } from '../../src/shared/feature-wall-tiles.ts'
+import { verifyLosslessFeatureWallMedia } from './verify-feature-wall-lossless-media.mjs'
 
 const __dirname = import.meta.dirname
 const ROOT = path.join(__dirname, '..', '..')
@@ -15,10 +17,14 @@ const DEFAULT_MARKETING_REPO = path.join(
   'orca-marketing-website'
 )
 const MARKETING_REPO = process.env.ORCA_MARKETING_REPO || DEFAULT_MARKETING_REPO
+const DEST_ROOT = path.join(ROOT, 'resources', 'onboarding', 'feature-wall')
+
 const TILES = [
   {
     id: 'tile-01',
-    owned: true
+    sourceRoot: ROOT,
+    gifRelativePath: 'docs/site/public/docs/tab-split.gif',
+    posterRelativePath: 'docs/site/public/docs/posters/tab-split.jpg'
   },
   {
     id: 'tile-02',
@@ -77,11 +83,14 @@ const TILES = [
   }
 ]
 
-function gitRecordedAtSeconds(sourceRoot, relativePath) {
+function sourceRootForTile(tile) {
+  return tile.sourceRoot ?? MARKETING_REPO
+}
+
+function gitRecordedAtSeconds(tile, relativePath) {
   const result = spawnSync('git', ['log', '--format=%at', '-1', '--', relativePath], {
-    cwd: sourceRoot,
-    encoding: 'utf8',
-    windowsHide: true
+    cwd: sourceRootForTile(tile),
+    encoding: 'utf8'
   })
   if (result.status !== 0) {
     throw new Error(`git log failed for ${relativePath}: ${result.stderr || result.stdout}`)
@@ -93,32 +102,40 @@ function gitRecordedAtSeconds(sourceRoot, relativePath) {
   return Number(value)
 }
 
-export async function vendorFeatureWallAssets({
-  root = ROOT,
-  marketingRepo = MARKETING_REPO
-} = {}) {
-  const destRoot = path.join(root, 'resources', 'onboarding', 'feature-wall')
-  await mkdir(destRoot, { recursive: true })
+await mkdir(DEST_ROOT, { recursive: true })
 
+const originals = new Map()
+const stagingRoot = await mkdtemp(path.join(tmpdir(), 'orca-feature-wall-media-'))
+try {
   for (const tile of TILES) {
-    if (tile.owned) {
-      // The public product owns these imported bytes and their original recording provenance.
-      for (const extension of ['gif', 'poster.jpg', 'recorded-at.json']) {
-        await access(path.join(destRoot, `${tile.id}.${extension}`))
-      }
-      console.log(`Preserved owned recording ${tile.id}`)
-      continue
+    const sourceRoot = sourceRootForTile(tile)
+    const sourceGif = path.join(sourceRoot, ...tile.gifRelativePath.split('/'))
+    const sourcePoster = path.join(sourceRoot, ...tile.posterRelativePath.split('/'))
+    const media = FEATURE_WALL_TILES.find((item) => item.id === tile.id)
+    if (!media || media.kind !== 'media') {
+      throw new Error(`Unknown media tile: ${tile.id}`)
     }
-    const sourceGif = path.join(marketingRepo, ...tile.gifRelativePath.split('/'))
-    const sourcePoster = path.join(marketingRepo, ...tile.posterRelativePath.split('/'))
-    const destGif = path.join(destRoot, `${tile.id}.gif`)
-    const destPoster = path.join(destRoot, `${tile.id}.poster.jpg`)
-    const recordedAtSeconds = gitRecordedAtSeconds(marketingRepo, tile.gifRelativePath)
+    const destAnimation = path.join(stagingRoot, media.gifPath)
+    const destPoster = path.join(stagingRoot, `${tile.id}.poster.jpg`)
+    const recordedAtSeconds = gitRecordedAtSeconds(tile, tile.gifRelativePath)
 
-    await copyFile(sourceGif, destGif)
+    originals.set(tile.id, await readFile(sourceGif))
+    if (media.gifPath.endsWith('.gif')) {
+      await copyFile(sourceGif, destAnimation)
+    } else {
+      // gif2webp defaults to lossless; the verifier rejects changed pixels or timing.
+      const result = runProcessSync({
+        program: 'gif2webp',
+        args: ['-m', '6', '-min_size', '-metadata', 'all', sourceGif, '-o', destAnimation],
+        timeoutMs: 120_000
+      })
+      if (result.code !== 0) {
+        throw new Error(`gif2webp failed for ${tile.id}: ${result.stderr}`)
+      }
+    }
     await copyFile(sourcePoster, destPoster)
     await writeFile(
-      path.join(destRoot, `${tile.id}.recorded-at.json`),
+      path.join(stagingRoot, `${tile.id}.recorded-at.json`),
       `${JSON.stringify(
         {
           recordedAtUnixSeconds: recordedAtSeconds,
@@ -133,8 +150,20 @@ export async function vendorFeatureWallAssets({
 
     console.log(`Vendored ${tile.gifRelativePath} -> ${tile.id}`)
   }
-}
 
-if (isDirectInvocation(import.meta.url, process.argv[1])) {
-  await vendorFeatureWallAssets()
+  await verifyLosslessFeatureWallMedia(originals, stagingRoot)
+  for (const tile of TILES) {
+    const media = FEATURE_WALL_TILES.find((item) => item.id === tile.id)
+    if (media?.kind !== 'media') {
+      throw new Error(`Unknown media tile: ${tile.id}`)
+    }
+    for (const file of [media.gifPath, media.posterPath, media.recordedAtPath]) {
+      await copyFile(path.join(stagingRoot, file), path.join(DEST_ROOT, file))
+    }
+    if (media.gifPath.endsWith('.webp')) {
+      await rm(path.join(DEST_ROOT, `${tile.id}.gif`), { force: true })
+    }
+  }
+} finally {
+  await rm(stagingRoot, { recursive: true, force: true })
 }

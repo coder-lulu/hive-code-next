@@ -2,7 +2,7 @@ import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import { describe, expect, it } from 'vitest'
 import { sshConnectFailureText, sshHostServerStatusLine } from './ssh-host-server-status-copy'
 
-const plain = {}
+const plain = { label: 'Test host' }
 
 describe('SSH host server status line', () => {
   it('says nothing for a plain host before any decision', () => {
@@ -13,7 +13,7 @@ describe('SSH host server status line', () => {
     expect(
       sshHostServerStatusLine(plain, { managedServer: { kind: 'setting-up', phase: 'starting' } })
         ?.text
-    ).toBe('Starting managed server…')
+    ).toBe('Starting HiveCode on Test host…')
     const detail = 'orcad did not become ready.\nLast lines of orcad.log:\nboom'
     expect(
       sshHostServerStatusLine(plain, {
@@ -25,7 +25,7 @@ describe('SSH host server status line', () => {
       })
     ).toEqual({
       tone: 'warning',
-      text: `${APP_DISPLAY_NAME} couldn’t confirm that the managed server is answering.`,
+      text: `${APP_DISPLAY_NAME} couldn’t confirm that its server on Test host is answering.`,
       detail
     })
   })
@@ -46,7 +46,7 @@ describe('SSH host server status line', () => {
       })
     ).toEqual({
       tone: 'warning',
-      text: 'HiveCode couldn’t confirm that the managed server is answering.',
+      text: 'HiveCode couldn’t confirm that its server on Test host is answering.',
       detail
     })
   })
@@ -55,12 +55,14 @@ describe('SSH host server status line', () => {
     expect(
       sshHostServerStatusLine(plain, { managedServer: { kind: 'setting-up', phase: 'updating' } })
         ?.text
-    ).toBe('Updating managed server…')
+    ).toBe('Updating HiveCode on Test host…')
     const managed = (update: { state: 'host-newer' | 'deferred' | 'failed'; detail?: string }) =>
       sshHostServerStatusLine(plain, {
         managedServer: { kind: 'managed', environmentId: 'e', update }
       })
-    expect(managed({ state: 'host-newer' })?.text).toContain(`from a newer ${APP_DISPLAY_NAME}`)
+    expect(managed({ state: 'host-newer' })?.text).toBe(
+      `Runs a newer version of ${APP_DISPLAY_NAME}’s server than this app; it keeps that version.`
+    )
     expect(managed({ state: 'deferred', detail: '2 terminals are running.' })).toMatchObject({
       tone: 'muted',
       detail: '2 terminals are running.'
@@ -91,22 +93,24 @@ describe('SSH host server status line', () => {
   })
 
   it('keeps durable reasons visible without a live state', () => {
-    expect(sshHostServerStatusLine({ orcadFence: { environmentId: 'e' } }, undefined)).toBeNull()
+    expect(
+      sshHostServerStatusLine({ ...plain, orcadFence: { environmentId: 'e' } }, undefined)
+    ).toBeNull()
     expect(
       sshHostServerStatusLine(
-        { orcadFence: { environmentId: 'e', sourceChangedAt: '2026-10-05T00:00:00Z' } },
+        { ...plain, orcadFence: { environmentId: 'e', sourceChangedAt: '2026-10-05T00:00:00Z' } },
         { managedServer: { kind: 'managed', environmentId: 'e' } }
       )
     ).toMatchObject({ tone: 'warning' })
     expect(
       sshHostServerStatusLine(
-        { managedServerUnavailable: { reason: 'native_preflight', appVersion: '1.5.0' } },
+        { ...plain, managedServerUnavailable: { reason: 'native_preflight', appVersion: '1.5.0' } },
         undefined
       )?.text
     ).toContain('missing system libraries')
     expect(
       sshHostServerStatusLine(
-        { managedServerUnavailable: { reason: 'future_reason', appVersion: '1.5.0' } },
+        { ...plain, managedServerUnavailable: { reason: 'future_reason', appVersion: '1.5.0' } },
         undefined
       )
     ).toMatchObject({ text: expect.not.stringContaining('future_reason'), detail: 'future_reason' })
@@ -132,7 +136,10 @@ describe('SSH host server status line', () => {
       }
     })
     const recorded = sshHostServerStatusLine(
-      { managedServerUnavailable: { reason: 'ssh_tunnel_unavailable', appVersion: '1.5.0' } },
+      {
+        ...plain,
+        managedServerUnavailable: { reason: 'ssh_tunnel_unavailable', appVersion: '1.5.0' }
+      },
       undefined
     )
     for (const line of [live, recorded]) {
@@ -184,7 +191,7 @@ describe('SSH host server status line', () => {
 
   it('says a host an older HiveCode changed is blocked until moved, not served by the relay', () => {
     const changed = sshHostServerStatusLine(
-      { orcadFence: { environmentId: 'e', sourceChangedAt: '2026-10-05T00:00:00Z' } },
+      { ...plain, orcadFence: { environmentId: 'e', sourceChangedAt: '2026-10-05T00:00:00Z' } },
       undefined
     )
     const unserved = sshConnectFailureText(

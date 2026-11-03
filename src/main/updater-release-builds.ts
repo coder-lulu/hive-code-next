@@ -9,22 +9,35 @@ import {
   type ReleaseBuild,
   type ReleaseChannel
 } from '../shared/release-channel'
-import { cancelUnreadResponseBody } from './lib/unread-response-body'
 import { parseRetryAfterHeaderMs } from '../shared/retry-after-header'
-import { isValidVersion } from './updater-fallback'
+import { getGhRateLimitBlockedUntilMs, recordGhPrimaryRateLimit } from './git/gh-rate-limit-breaker'
+import { cancelUnreadResponseBody } from './lib/unread-response-body'
 import { fetchWithProductUpdaterSession } from './product/product-updater-session'
+import { isValidVersion } from './updater-fallback'
 import { readResponseTextWithLimit } from './updater-response-body'
+import { UpdaterCodedError } from './updater/updater-coded-error'
 
 const FETCH_TIMEOUT_MS = 8000
 const MAX_LISTED_BUILDS = 100
 const MAX_RELEASE_API_BYTES = 1024 * 1024
 const RETRY_AFTER_MAX_MS = 60 * 60_000
 
-function getReleasesApiUrl(releasesApiUrl: string): string {
-  return `${releasesApiUrl}?per_page=${MAX_LISTED_BUILDS}`
+function getReleasesApiUrl(apiUrl: string): string {
+  return `${apiUrl}?per_page=${MAX_LISTED_BUILDS}`
 }
 
-/** GitHub answers a spent primary bucket with 403 + `x-ratelimit-remaining: 0`; secondary limits carry Retry-After. */
+function fetchReleases(apiUrl: string, token: string | null): Promise<Response> {
+  const headers: Record<string, string> = { Accept: 'application/vnd.github+json' }
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+  return fetchWithProductUpdaterSession(getReleasesApiUrl(apiUrl), {
+    headers,
+    redirect: 'error',
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
+  })
+}
+
 function isRateLimited(res: Response): boolean {
   return (
     res.status === 429 ||
@@ -33,12 +46,12 @@ function isRateLimited(res: Response): boolean {
   )
 }
 
-/**
- * Retry-After wins when GitHub sends it: it is the bounded wait the server actually
- * asked for, while `x-ratelimit-reset` describes the primary window and can be an hour
- * out — quoting that for a 90-second secondary throttle overstates the wait to the user.
- * Retry-After arrives as seconds or an HTTP date; the reset epoch is the fallback.
- */
+// Retry-After marks secondary limits: neither trip the primary breaker nor retry immediately.
+function isPrimaryRateLimited(res: Response): boolean {
+  return res.headers.get('x-ratelimit-remaining') === '0' && !res.headers.has('retry-after')
+}
+
+// Retry-After gives the requested wait; the primary reset can overstate a secondary throttle.
 export function rateLimitResetAtMs(headers: Headers, nowMs: number): number | null {
   const retryAfterMs = parseRetryAfterHeaderMs(
     headers.get('retry-after'),
@@ -52,24 +65,34 @@ export function rateLimitResetAtMs(headers: Headers, nowMs: number): number | nu
   return resetEpochSeconds > 0 ? resetEpochSeconds * 1000 : null
 }
 
-export function describeRateLimitReset(resetAtMs: number | null, nowMs: number): string {
+function rateLimitError(resetAtMs: number | null, nowMs: number, signedIn: boolean): Error {
   if (resetAtMs === null) {
-    return 'in a few minutes'
+    return new UpdaterCodedError(signedIn ? 'rateLimitedSoon' : 'rateLimitedSoonSignedOut')
   }
   const minutes = Math.ceil((resetAtMs - nowMs) / 60_000)
-  return minutes <= 1 ? 'in about a minute' : `in about ${minutes} minutes`
+  if (minutes <= 1) {
+    return new UpdaterCodedError(signedIn ? 'rateLimitedInMinute' : 'rateLimitedInMinuteSignedOut')
+  }
+  return new UpdaterCodedError(
+    signedIn ? 'rateLimitedInMinutes' : 'rateLimitedInMinutesSignedOut',
+    { count: minutes }
+  )
 }
 
-function releaseListError(res: Response, repo: string, channel: ReleaseChannel): Error {
+function releaseListError(
+  res: Response,
+  repo: string,
+  channel: ReleaseChannel,
+  signedIn: boolean
+): Error {
   if (res.status === 404) {
-    return new Error(`No releases repository found at ${repo}.`)
+    return new UpdaterCodedError('releaseRepoNotFound', { repo })
   }
   if (isRateLimited(res)) {
     const nowMs = Date.now()
-    const retry = describeRateLimitReset(rateLimitResetAtMs(res.headers, nowMs), nowMs)
-    return new Error(`GitHub rate limit reached. Try again ${retry}.`)
+    return rateLimitError(rateLimitResetAtMs(res.headers, nowMs), nowMs, signedIn)
   }
-  return new Error(`Could not list ${channel} builds (HTTP ${res.status}).`)
+  return new UpdaterCodedError('releaseListFailed', { channel, status: res.status })
 }
 
 export function getReleaseDownloadUrlForRepo(repo: string, tag: string): string {
@@ -108,18 +131,12 @@ function parseReleaseEntry(
   if (!isValidVersion(version) || !channel) {
     return null
   }
-  // Why filter on assets rather than on a per-channel platform table: a release
-  // is published as soon as one platform's leg finishes, and a leg can fail
-  // outright. Asking what the release actually carries covers both without the
-  // picker ever offering a row whose download 404s.
+  // Platform release legs publish independently; offer only artifacts that actually exist.
   const assetNames = readAssetNames(entry.assets)
   if (!hasInstallableArtifactForPlatform(platform, assetNames)) {
     return null
   }
   const installerAsset = findInstallerAssetName(platform, assetNames)
-  // Why null when it merely repeats the tag: GitHub titles an untitled release
-  // with its tag name, and hourlies predating the naming change were created that
-  // way too. Neither says anything the version beside it does not.
   const name = typeof entry.name === 'string' ? entry.name.trim() : ''
   return {
     tag,
@@ -134,51 +151,61 @@ function parseReleaseEntry(
   }
 }
 
-/**
- * Lists published releases for a channel so the dev picker can offer an exact
- * build — including older ones — to jump to.
- *
- * Why the REST API rather than the atom feed the routine update path uses: the
- * feed caps at the 10 newest entries, which cannot express "jump back to
- * yesterday's hourly". This runs only on explicit dev interaction, so it never
- * touches background checks. Requests use the product updater session and
- * its configured repository authority.
- */
+// REST exposes older builds the short Atom feed omits; use only for explicit picker requests.
 export async function listReleaseBuilds(
   channel: ReleaseChannel,
   platform: NodeJS.Platform = process.platform
 ): Promise<ReleaseBuild[]> {
-  const github = resolveProductUpdateSource()?.github
   const repo = getReleaseRepoForChannel(channel)
+  const github = resolveProductUpdateSource()?.github
   if (!github || !repo || github.repo !== repo) {
     return []
   }
-  const res = await fetchWithProductUpdaterSession(getReleasesApiUrl(github.releasesApiUrl), {
-    headers: { Accept: 'application/vnd.github+json' },
-    redirect: 'error',
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
-  })
+  const { resolveReleaseApiToken, rejectReleaseApiToken } =
+    await import('./updater-release-api-token')
+  // Skip a known-exhausted token bucket and try the separate per-IP quota.
+  const credential = await resolveReleaseApiToken()
+  const tokenBucketBlocked =
+    credential !== null &&
+    getGhRateLimitBlockedUntilMs('core', Date.now(), credential.rateLimitScope) !== null
+  const token = tokenBucketBlocked ? null : (credential?.token ?? null)
+  let signedIn = credential !== null
+  let res = await fetchReleases(github.releasesApiUrl, token)
+  if (token && res.status === 401) {
+    // A rejected token must not prevent listing a public repo unauthenticated.
+    rejectReleaseApiToken()
+    signedIn = false
+    await cancelUnreadResponseBody(res)
+    res = await fetchReleases(github.releasesApiUrl, null)
+  } else if (token && isRateLimited(res) && isPrimaryRateLimited(res)) {
+    // The per-IP quota may still be available; mark the token bucket spent before retrying.
+    const resetAtMs = rateLimitResetAtMs(res.headers, Date.now())
+    if (resetAtMs !== null && credential) {
+      recordGhPrimaryRateLimit('core', resetAtMs, credential.rateLimitScope)
+    }
+    await cancelUnreadResponseBody(res)
+    res = await fetchReleases(github.releasesApiUrl, null)
+  }
   if (!res.ok) {
     await cancelUnreadResponseBody(res)
-    throw releaseListError(res, repo, channel)
+    throw releaseListError(res, repo, channel, signedIn)
   }
   const body = await readResponseTextWithLimit(res, MAX_RELEASE_API_BYTES)
   if (body === null) {
-    throw new Error(`The ${channel} release list is too large.`)
+    throw new UpdaterCodedError('releaseListUnreadable', { channel })
   }
   let payload: unknown
   try {
     payload = JSON.parse(body)
   } catch {
-    throw new Error(`Could not read the ${channel} release list.`)
+    throw new UpdaterCodedError('releaseListUnreadable', { channel })
   }
   if (!Array.isArray(payload)) {
-    throw new Error(`Could not read the ${channel} release list.`)
+    throw new UpdaterCodedError('releaseListUnreadable', { channel })
   }
   const builds = payload
     .map((entry) => parseReleaseEntry(entry as GitHubReleaseEntry, repo, platform))
     .filter((build): build is ReleaseBuild => build !== null)
-    // Why: the main repo serves both stable and rc, so filter to the asked-for channel.
     .filter((build) => build.channel === channel)
   return sortReleaseBuildsNewestFirst(builds)
 }
@@ -189,24 +216,18 @@ export type ResolvedTargetBuild = {
   feedUrl: string
 }
 
-/** Resolves a tag the user picked into a pinned generic feed URL. */
 export function resolveTargetBuild(channel: ReleaseChannel, tag: string): ResolvedTargetBuild {
   const version = normalizeTagToVersion(tag)
   if (!isValidVersion(version)) {
-    throw new Error(`"${tag}" is not a valid release tag.`)
+    throw new UpdaterCodedError('invalidReleaseTag', { tag })
   }
-  const targetChannel = getVersionChannel(version)
-  if (targetChannel !== channel) {
+  const repo = getReleaseRepoForChannel(channel)
+  const github = resolveProductUpdateSource()?.github
+  if (getVersionChannel(version) !== channel) {
     throw new Error(`"${tag}" does not belong to the ${channel} channel.`)
   }
-  const github = resolveProductUpdateSource()?.github
-  const repo = getReleaseRepoForChannel(channel)
   if (!github || !repo || github.repo !== repo) {
     throw new Error(`The ${channel} product release repository is not configured.`)
   }
-  return {
-    tag,
-    version,
-    feedUrl: `${github.releasesDownloadBase}/${encodeURIComponent(tag)}`
-  }
+  return { tag, version, feedUrl: `${github.releasesDownloadBase}/${encodeURIComponent(tag)}` }
 }

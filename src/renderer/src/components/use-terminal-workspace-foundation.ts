@@ -1,6 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { useShallow } from 'zustand/react/shallow'
-import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/constants'
+import { useMemo, useRef } from 'react'
 import { parseWorkspaceKey } from '../../../shared/workspace-scope'
 import type { TerminalTab } from '../../../shared/terminal-tab-types'
 import { useAppStore } from '../store'
@@ -8,12 +6,15 @@ import { useWorktreeMap } from '../store/selectors'
 import { getResolvedExecutionHostIdForWorktree } from '@/lib/resolved-worktree-execution-host'
 import type { WorktreeTabBucketProjection } from '@/lib/worktree-tab-bucket-projection'
 import { projectWorkspaceSurfaces } from './workspace-surface-projection'
+import {
+  parseWslMovedSurfacesKey,
+  selectWslMovedSurfacesKey
+} from '@/store/repos/wsl-moved-projects'
 import { useReusedArrayIdentity } from './sidebar/worktree-list/listing/use-reused-array-identity'
-import { selectPairedRuntimeParkingEnvironmentIds } from './terminal-pane/terminal-hidden-view-parking'
+import { usePairedRuntimeParkingEnvironmentIds } from '@/store/use-runtime-status-view'
 import { createTerminalWorktreeTopologyProjection } from './terminal-pane/terminal-hidden-worktree-retention'
 import { isMainTerminalSideEffectAuthorityForPty } from './terminal-pane/terminal-side-effect-facts-handler'
-import { isFloatingTerminalWorkspaceId } from '@/lib/floating-terminal'
-import { resolveActiveFloatingWorkspaceSurface } from '@/lib/floating-workspace-surface-ownership'
+import { selectFolderWorkspaces } from '@/store/workspace-record-selectors'
 
 export function useTerminalWorkspaceFoundation() {
   const terminalTopologyProjectionRef = useRef<WorktreeTabBucketProjection<
@@ -29,63 +30,20 @@ export function useTerminalWorkspaceFoundation() {
   const terminalWorktreeParkCooldownUntilRef = useRef(new Map<string, number>())
   const terminalWorktreeParkingTimersRef = useRef(new Map<string, number>())
   const worktreesById = useWorktreeMap()
-  const folderWorkspaces = useAppStore((state) => state.folderWorkspaces)
+  const folderWorkspaces = useAppStore((state) => selectFolderWorkspaces(state))
   const activeWorktreeId = useAppStore((state) => state.activeWorktreeId)
-  const activeView = useAppStore((state) => state.activeView)
-  const floatingWorkspaceIds = useAppStore(
-    useShallow((state) =>
-      state.activeView === 'sessions'
-        ? [
-            ...new Set([
-              ...Object.keys(state.tabsByWorktree),
-              ...Object.keys(state.unifiedTabsByWorktree)
-            ])
-          ].filter(isFloatingTerminalWorkspaceId)
-        : isFloatingTerminalWorkspaceId(state.activeWorktreeId)
-          ? [state.activeWorktreeId!]
-          : []
-    )
-  )
-  const needsLocalFloatingCwd = floatingWorkspaceIds.includes(FLOATING_TERMINAL_WORKTREE_ID)
-  const floatingTerminalCwd = useAppStore((state) => state.settings?.floatingTerminalCwd ?? '')
-  const [floatingCwdResolution, setFloatingCwdResolution] = useState<{
-    requestedPath: string
-    cwd: string
-  } | null>(null)
-  const resolvedFloatingTerminalCwd =
-    needsLocalFloatingCwd && floatingCwdResolution?.requestedPath === floatingTerminalCwd
-      ? floatingCwdResolution.cwd
-      : null
-  useEffect(() => {
-    if (!needsLocalFloatingCwd) {
-      return
-    }
-    let cancelled = false
-    void window.api.app
-      .getFloatingTerminalCwd({ path: floatingTerminalCwd })
-      .then((cwd) => {
-        if (!cancelled) {
-          setFloatingCwdResolution({ requestedPath: floatingTerminalCwd, cwd })
-        }
-      })
-      .catch((error) => {
-        console.error('Could not resolve the temporary-session directory', error)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [needsLocalFloatingCwd, floatingTerminalCwd])
   const renderedActiveWorktreeId = activeWorktreeId
   const activeWorktreeDeferralHostId = useAppStore((state) =>
     getResolvedExecutionHostIdForWorktree(state, renderedActiveWorktreeId)
   )
-  // Why narrow it: only the folder-collision tie-break reads this host, so a git
-  // workspace's ownership settling must not re-identify the whole mount projection.
+  // Only folder collision resolution needs host state; git ownership changes must not rebuild the mount projection.
   const activeFolderSurfaceHostId =
     parseWorkspaceKey(renderedActiveWorktreeId ?? '')?.type === 'folder'
       ? activeWorktreeDeferralHostId
       : null
+  // Without a resolved host, active workspace cannot affect projection; omit it to avoid rebuilding every surface on switches.
   const activeFolderSurfaceId = activeFolderSurfaceHostId ? renderedActiveWorktreeId : null
+  const wslMovedSurfacesKey = useAppStore(selectWslMovedSurfacesKey)
   const workspaceSurfaces = useMemo(() => {
     const surfaces = projectWorkspaceSurfaces({
       worktreesById,
@@ -93,26 +51,17 @@ export function useTerminalWorkspaceFoundation() {
       activeWorkspaceId: activeFolderSurfaceId,
       activeWorkspaceResolvedHostId: activeFolderSurfaceHostId
     })
-    const floatingSurfaces = floatingWorkspaceIds.flatMap((id) => {
-      const surface = resolveActiveFloatingWorkspaceSurface(
-        id,
-        id === FLOATING_TERMINAL_WORKTREE_ID ? resolvedFloatingTerminalCwd : null
-      )
-      return surface && !surfaces.some((entry) => entry.id === id) ? [surface] : []
-    })
-    return [...surfaces, ...floatingSurfaces]
+    // A WSL-moved project's chats mount beside the catalog; it lists none of its workspaces.
+    const moved = parseWslMovedSurfacesKey(wslMovedSurfacesKey)
+    return moved.length > 0 ? [...surfaces, ...moved] : surfaces
   }, [
-    floatingWorkspaceIds,
-    activeFolderSurfaceHostId,
+    worktreesById,
     folderWorkspaces,
     activeFolderSurfaceId,
-    resolvedFloatingTerminalCwd,
-    worktreesById
+    activeFolderSurfaceHostId,
+    wslMovedSurfacesKey
   ])
-  // Why split the ids out: every mount/park/activation pass reads only `.id`, but
-  // the surface array is re-identified on any worktree write. Reusing the previous
-  // id-array identity keeps those effects and their per-fire Sets from re-firing
-  // when the workspace set itself did not change.
+  // Reuse equal ID arrays across worktree row replacements to avoid restarting mount/park effects and rebuilding their Sets.
   const workspaceSurfaceIds = useReusedArrayIdentity(
     useMemo(() => workspaceSurfaces.map((workspace) => workspace.id), [workspaceSurfaces])
   )
@@ -120,9 +69,8 @@ export function useTerminalWorkspaceFoundation() {
     () => new Set(workspaceSurfaceIds),
     [workspaceSurfaceIds]
   )
-  // Why: terminal titles are leaf chrome. The root host only subscribes to
-  // mount/parking semantics; a real transition publishes fresh tab objects,
-  // while LiveTerminalTabBar reads title-only updates from the active bucket.
+  const activeView = useAppStore((state) => state.activeView)
+  // Root subscriptions track mount/parking transitions; LiveTerminalTabBar alone consumes title-only updates.
   const tabsByWorktree = useAppStore((state) =>
     terminalTopologyProjectionRef.current!.project(state.tabsByWorktree)
   )
@@ -133,11 +81,7 @@ export function useTerminalWorkspaceFoundation() {
   const terminalSshParkingEnabled = useAppStore(
     (state) => state.settings?.terminalSshViewParking !== false
   )
-  const runtimeStatusByEnvironmentId = useAppStore((state) => state.runtimeStatusByEnvironmentId)
-  const pairedRuntimeParkingEnvironmentIds = useMemo(
-    () => selectPairedRuntimeParkingEnvironmentIds(runtimeStatusByEnvironmentId),
-    [runtimeStatusByEnvironmentId]
-  )
+  const pairedRuntimeParkingEnvironmentIds = usePairedRuntimeParkingEnvironmentIds()
   const terminalRetentionBudgetEnabled = useAppStore(
     (state) => state.settings?.terminalHiddenWorktreeRetentionBudget !== false
   )
@@ -171,7 +115,6 @@ export function useTerminalWorkspaceFoundation() {
     pendingStartupByTabId,
     terminalParkingEnabled,
     terminalSshParkingEnabled,
-    runtimeStatusByEnvironmentId,
     pairedRuntimeParkingEnvironmentIds,
     terminalRetentionBudgetEnabled,
     browserGuestRetentionBudgetEnabled,

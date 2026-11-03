@@ -3,11 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const removeHostMock = vi.hoisted(() => vi.fn())
 const asyncStorage = vi.hoisted(() => ({
   getItem: vi.fn(async () => null),
-  setItem: vi.fn(async () => undefined),
+  setItem: vi.fn(async (): Promise<void> => undefined),
   // Why removeItem is here: clearWatermark() swallows its own failures, so a mock
   // missing this method turns the persisted-watermark cleanup into a caught
   // TypeError — the assertion below would pass even if the call were deleted.
-  removeItem: vi.fn(async () => undefined)
+  removeItem: vi.fn(async (): Promise<void> => undefined)
 }))
 
 vi.mock('@react-native-async-storage/async-storage', () => ({ default: asyncStorage }))
@@ -24,8 +24,8 @@ vi.mock('./host-descriptor-store', () => ({
 }))
 
 vi.mock('../mobile-web-shell/removed-host-shell-cache', () => ({
-  forgetHostUpdateFailures: (hostId: string) => forgetUpdateFailuresMock(hostId),
-  deleteHostPageCache: (hostId: string) => deletePageCacheMock(hostId)
+  forgetHostUpdateFailures: forgetUpdateFailuresMock,
+  deleteHostPageCache: deletePageCacheMock
 }))
 
 import { removeHostAndCloseClient } from './host-removal-lifecycle'
@@ -45,10 +45,12 @@ describe('host removal lifecycle', () => {
   })
 
   it('closes the client only after metadata removal commits', async () => {
-    let commitRemoval: (() => void) | null = null
+    let commitRemoval: () => void = () => {
+      throw new Error('Expected pending operation')
+    }
     removeHostMock.mockReturnValue(
-      new Promise<void>((resolve) => {
-        commitRemoval = resolve
+      new Promise<undefined>((resolve) => {
+        commitRemoval = () => resolve(undefined)
       })
     )
     const closeHostClient = vi.fn()
@@ -104,11 +106,11 @@ describe('host removal lifecycle', () => {
   it('holds the metadata mutation until failed native cleanup and catalog cleanup both settle', async () => {
     let rejectNative!: (error: Error) => void
     let finishCatalog!: () => void
-    const nativeCleanup = new Promise<void>((_resolve, reject) => {
+    const nativeCleanup = new Promise<undefined>((_resolve, reject) => {
       rejectNative = reject
     })
-    const catalogCleanup = new Promise<void>((resolve) => {
-      finishCatalog = resolve
+    const catalogCleanup = new Promise<undefined>((resolve) => {
+      finishCatalog = () => resolve(undefined)
     })
     let queueReleased = false
     removeHostMock.mockImplementation(async (_id, _revision, afterCommit: () => Promise<void>) => {
@@ -136,8 +138,8 @@ describe('host removal lifecycle', () => {
 
   it('waits for native cleanup when catalog cleanup throws synchronously', async () => {
     let finishNative!: () => void
-    const nativeCleanup = new Promise<void>((resolve) => {
-      finishNative = resolve
+    const nativeCleanup = new Promise<undefined>((resolve) => {
+      finishNative = () => resolve(undefined)
     })
     let queueReleased = false
     removeHostMock.mockImplementation(async (_id, _revision, afterCommit: () => Promise<void>) => {

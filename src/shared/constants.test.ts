@@ -43,11 +43,7 @@ describe('getDefaultSettings', () => {
   })
 
   it('enables Source Control AI by default without pinning a separate agent', () => {
-    expect(getDefaultSettings('/tmp').commitMessageAi).toMatchObject({
-      enabled: true,
-      agentId: null,
-      selectedModelByAgent: {}
-    })
+    expect(Object.hasOwn(getDefaultSettings('/tmp'), 'commitMessageAi')).toBe(false)
     expect(getDefaultSettings('/tmp').sourceControlAi).toMatchObject({
       enabled: true,
       agentId: null,
@@ -83,24 +79,13 @@ describe('getDefaultSettings', () => {
     expect(getDefaultSettings('/tmp').notifications.suppressWhenFocused).toBe(true)
   })
 
-  it('defaults agent launch args to yolo mode where the CLI supports it', () => {
+  it('uses typed Own permission defaults without injecting permission argv or environment', () => {
     const settings = getDefaultSettings('/tmp')
-
-    expect(settings.agentDefaultArgs).toMatchObject({
-      claude: '--dangerously-skip-permissions',
-      codex: '--dangerously-bypass-approvals-and-sandbox',
-      gemini: '--yolo',
-      cursor: '--yolo',
-      muse: '--yolo',
-      copilot: '--yolo',
-      grok: '--permission-mode bypassPermissions'
-    })
-    expect(settings.agentDefaultArgs).not.toHaveProperty('opencode')
-    expect(settings.agentDefaultArgs).not.toHaveProperty('kilo')
-    expect(settings.agentDefaultEnv).toMatchObject({
-      goose: { GOOSE_MODE: 'auto' }
-    })
-    expect(settings.agentYoloDefaultsMigrated).toBe(true)
+    expect(settings.agentPermissionDefault).toBe('own')
+    expect(settings.agentPermissionOverrides).toEqual({})
+    expect(settings.agentDefaultArgs).toEqual({})
+    expect(settings.agentDefaultEnv).toEqual({})
+    expect(Object.hasOwn(settings, 'agentYoloDefaultsMigrated')).toBe(false)
   })
 })
 

@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   clearNativeChatSessionOptionModel,
+  parseStructuredLaunchSeedOptions,
+  structuredLaunchSeedOptions,
   narrowStructuredLaunchSeedOptions,
   resolveNativeChatSessionOptionDefaults,
   resolveStructuredLaunchSeedOptions,
   updateNativeChatSessionOptionDefaults
 } from './native-chat-session-option-defaults'
-import type { PersistedNativeChatSessionOptions } from './native-chat-session-options'
+import type { PersistedNativeChatSessionOptions } from './native-chat/input/native-chat-session-options'
 
 const persistedGrok = (
   model: string | undefined,
@@ -183,5 +185,37 @@ describe('narrowStructuredLaunchSeedOptions', () => {
     // `agent_session_options_invalid` is not a wire refusal code: the throw escapes as a raw
     // error the client reads as unknown, stranding the launch with no fallback.
     expect(narrowStructuredLaunchSeedOptions(values as never)).toBeUndefined()
+  })
+})
+
+describe('current typed launch permission seeds', () => {
+  it('keeps the provider-own default and its serialized seed', () => {
+    const seed = structuredLaunchSeedOptions(undefined, 'claude')
+    expect(seed).toEqual({ permissionMode: 'own' })
+    expect(parseStructuredLaunchSeedOptions(seed)).toEqual(seed)
+  })
+
+  it('reads explicit current Ask without interpreting user arguments', () => {
+    expect(structuredLaunchSeedOptions({ agentPermissionDefault: 'ask' }, 'claude')).toEqual({
+      permissionMode: 'ask'
+    })
+  })
+
+  it('lets an explicit agent Own override the global Ask preference', () => {
+    expect(
+      structuredLaunchSeedOptions(
+        { agentPermissionDefault: 'ask', agentPermissionOverrides: { claude: 'own' } },
+        'claude'
+      )
+    ).toEqual({ permissionMode: 'own' })
+  })
+
+  it('retains the selected model alongside the typed permission', () => {
+    expect(
+      structuredLaunchSeedOptions(
+        { agentPermissionDefault: 'ask', nativeChatSessionOptions: { claude: { model: 'opus' } } },
+        'claude'
+      )
+    ).toEqual({ model: 'opus', permissionMode: 'ask' })
   })
 })

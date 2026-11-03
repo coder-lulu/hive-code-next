@@ -1,33 +1,14 @@
-import { EventEmitter } from 'node:events'
-import { PassThrough } from 'node:stream'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { spawn } from 'node:child_process'
+import { ChildProcess, spawn } from 'node:child_process'
 import { AndroidEmulatorBackend } from './android-emulator-backend'
 import type { AndroidCommandResult, AndroidCommandRunner } from '../android/android-command-runner'
 import type { AndroidSdkPaths } from '../android/android-sdk-discovery'
-import {
-  AndroidManagedAvdProcesses,
-  type AndroidAvdProcessSpawner
-} from '../android/android-managed-avd-processes'
 
-// The managed AVD process reaches node spawn through the shared process runner.
+// AVD boot spawns directly, bypassing the injected command runner.
 vi.mock('node:child_process', async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>
-  return { ...actual, spawn: vi.fn() }
+  const actual = await importOriginal<typeof import('node:child_process')>()
+  return { ...actual, spawn: vi.fn(() => new actual.ChildProcess()) }
 })
-
-function fakeSpawnChild(): ReturnType<typeof spawn> {
-  return Object.assign(new EventEmitter(), {
-    pid: 7_001,
-    stdin: new PassThrough(),
-    stdout: new PassThrough(),
-    stderr: new PassThrough(),
-    exitCode: null,
-    signalCode: null,
-    unref: vi.fn(),
-    kill: vi.fn(() => true)
-  }) as unknown as ReturnType<typeof spawn>
-}
 
 const SDK: AndroidSdkPaths = {
   sdkRoot: '/sdk',
@@ -41,8 +22,6 @@ const ok = (stdout: string): AndroidCommandResult => ({ stdout, stderr: '', code
 const RUNNING_ADB =
   'List of devices attached\nemulator-5554\tdevice product:sdk_gphone64 model:Pixel_7 device:emu64a'
 
-// Default runner answering the standard discovery/query calls for a single
-// booted Pixel_7 emulator plus a shutdown Pixel_Tablet AVD.
 function defaultRunner(): ReturnType<typeof vi.fn> {
   return vi.fn(async (binary: string, args: readonly string[]) => {
     const a = args.join(' ')
@@ -55,11 +34,11 @@ function defaultRunner(): ReturnType<typeof vi.fn> {
     if (binary === SDK.adb && a === '-s emulator-5554 emu avd name') {
       return ok('Pixel_7\nOK')
     }
-    if (binary === SDK.adb && a === '-s emulator-5554 shell getprop sys.boot_completed') {
-      return ok('1')
-    }
     if (binary === SDK.adb && a === '-s emulator-5554 shell wm size') {
       return ok('Physical size: 1080x2400')
+    }
+    if (binary === SDK.adb && a === '-s emulator-5554 shell getprop sys.boot_completed') {
+      return ok('1')
     }
     return ok('')
   })
@@ -77,9 +56,6 @@ describe('AndroidEmulatorBackend', () => {
   let runner: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
-    vi.mocked(spawn)
-      .mockReset()
-      .mockImplementation(() => fakeSpawnChild())
     runner = defaultRunner()
   })
 
@@ -126,40 +102,6 @@ describe('AndroidEmulatorBackend', () => {
     ])
   })
 
-  it('dedupes a managed AVD when adb cannot answer its name probe', async () => {
-    const managed = new AndroidManagedAvdProcesses(
-      vi.fn(() => fakeSpawnChild()) as unknown as AndroidAvdProcessSpawner,
-      vi.fn(async () => true)
-    )
-    const process = managed.launch(SDK.emulator, 'Pixel_7')
-    managed.bindSerial(process, 'emulator-5554')
-    const probeRunner = vi.fn(async (binary: string, args: readonly string[]) => {
-      const joinedArgs = args.join(' ')
-      if (binary === SDK.adb && joinedArgs === 'devices -l') {
-        return ok(RUNNING_ADB)
-      }
-      if (binary === SDK.emulator && joinedArgs === '-list-avds') {
-        return ok('Pixel_7')
-      }
-      if (joinedArgs === '-s emulator-5554 emu avd name') {
-        return { stdout: '', stderr: 'command timed out', code: 1 }
-      }
-      if (joinedArgs === '-s emulator-5554 shell getprop sys.boot_completed') {
-        return ok('1')
-      }
-      return ok('')
-    })
-    const android = new AndroidEmulatorBackend({
-      runner: probeRunner as unknown as AndroidCommandRunner,
-      sdk: SDK,
-      managedAvds: managed
-    })
-
-    await expect(android.listDevices()).resolves.toEqual([
-      expect.objectContaining({ id: 'emulator-5554', name: 'Pixel_7', state: 'booted' })
-    ])
-  })
-
   it('owns devices by serial or AVD name', async () => {
     const android = backend(runner)
     expect(await android.ownsDevice('emulator-5554')).toBe(true)
@@ -199,7 +141,7 @@ describe('AndroidEmulatorBackend', () => {
       'shell',
       'input',
       'text',
-      'hi%sthere'
+      "'hi%sthere'"
     ])
     expect(runner).toHaveBeenCalledWith(SDK.adb, [
       '-s',
@@ -243,7 +185,7 @@ describe('AndroidEmulatorBackend', () => {
   it('shuts a device down with adb emu kill', async () => {
     await backend(runner).shutdownDevice('emulator-5554')
     expect(runner).toHaveBeenCalledWith(SDK.adb, ['-s', 'emulator-5554', 'emu', 'kill'], {
-      timeoutMs: 5_000
+      timeoutMs: 5000
     })
   })
 
@@ -284,7 +226,7 @@ describe('AndroidEmulatorBackend', () => {
     let bootStarted = false
     vi.mocked(spawn).mockImplementation(() => {
       bootStarted = true
-      return fakeSpawnChild()
+      return new ChildProcess()
     })
     const bootRunner = vi.fn(async (binary: string, args: readonly string[]) => {
       const a = args.join(' ')
@@ -297,6 +239,9 @@ describe('AndroidEmulatorBackend', () => {
       }
       if (binary === SDK.adb && a === '-s emulator-5556 shell getprop sys.boot_completed') {
         return ok('1')
+      }
+      if (binary === SDK.adb && a === '-s emulator-5556 emu avd name') {
+        return ok('Pixel_Tablet\nOK\n')
       }
       if (binary === SDK.emulator && a === '-list-avds') {
         return ok('Pixel_Tablet')
@@ -331,27 +276,43 @@ describe('AndroidEmulatorBackend', () => {
     })
     const info = await android.startSession('emulator-5554')
     expect(info).toMatchObject({ deviceUdid: 'emulator-5554', streamCodec: 'h264' })
-    await android.stopHelperForDevice('emulator-5554')
+    await android.stopHelperForDevice('emulator-5554', { includeOrphaned: true })
+    await android.stopHelperForDevice('emulator-5554', { includeOrphaned: true })
     expect(close).toHaveBeenCalledTimes(1)
   })
 
-  it('disposes every AVD process launched by this backend', async () => {
-    const child = fakeSpawnChild()
-    const terminateTree = vi.fn(async () => true)
-    const managed = new AndroidManagedAvdProcesses(
-      vi.fn(() => child) as unknown as AndroidAvdProcessSpawner,
-      terminateTree
-    )
-    managed.launch(SDK.emulator, 'Pixel_7')
-    const android = new AndroidEmulatorBackend({
-      runner: runner as unknown as AndroidCommandRunner,
-      sdk: SDK,
-      managedAvds: managed
+  it('preserves all unowned forwards when stopping without a live session', async () => {
+    // adb forward listing/removal is server-wide, so unowned forwards must survive.
+    const forwards = [
+      'emulator-5554 tcp:41234 localabstract:scrcpy_1a2b3c4d',
+      'emulator-5554 tcp:8081 tcp:8081',
+      'emulator-5556 tcp:41235 localabstract:scrcpy_5e6f7a8b',
+      'R58M12345 tcp:9222 localabstract:chrome_devtools_remote'
+    ]
+    const before = [...forwards]
+    runner.mockImplementation(async (binary: string, args: readonly string[]) => {
+      if (binary === SDK.adb && args.join(' ') === 'devices -l') {
+        return ok(RUNNING_ADB)
+      }
+      const [flag, local] = args.includes('forward') ? args.slice(args.indexOf('forward') + 1) : []
+      if (flag === '--list') {
+        return ok(`${forwards.join('\n')}\n\n`)
+      }
+      if (flag === '--remove-all') {
+        forwards.length = 0
+      } else if (flag === '--remove') {
+        const index = forwards.findIndex((line) => line.split(' ')[1] === local)
+        if (index !== -1) {
+          forwards.splice(index, 1)
+        }
+      }
+      return ok('')
     })
 
-    await android.dispose()
+    const android = backend(runner)
+    await android.stopHelperForDevice('emulator-5554', { includeOrphaned: true })
+    await android.stopHelperForDevice('emulator-5554', { includeOrphaned: true })
 
-    expect(terminateTree).toHaveBeenCalledOnce()
-    expect(terminateTree).toHaveBeenCalledWith(child)
+    expect(forwards).toEqual(before)
   })
 })

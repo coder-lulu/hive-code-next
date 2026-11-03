@@ -121,11 +121,7 @@ function explicitTokenAuthContext(
 export class ArtifactCloudService {
   private readonly publisher: ArtifactPublisher
 
-  /**
-   * `isSharingEnabled` is the publish capability gate. It is read per call, never cached, so
-   * revoking it in Settings takes effect on the next request. List, unshare, and delete stay
-   * ungated: a user who turns publishing off must still be able to audit and revoke old links.
-   */
+  /** Read the publish gate per request; revoking old links remains available when publishing is disabled. */
   constructor(
     private readonly userDataPath: string,
     // Why default denied: callers that only inspect an unconfigured product can omit
@@ -156,8 +152,7 @@ export class ArtifactCloudService {
     })
   }
 
-  // Why async: the gate must surface as a rejection, not a synchronous throw, so every caller's
-  // promise chain handles it the same way.
+  // Keep gate failures asynchronous for callers’ promise chains.
   async share(request: ArtifactWriteRequest): Promise<ArtifactCloudOperation<ArtifactListItem>> {
     const endpoint = getProductArtifactCloudConfig(request.apiUrl)
     if (!endpoint.configured) {

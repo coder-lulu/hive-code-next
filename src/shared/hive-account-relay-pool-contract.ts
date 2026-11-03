@@ -1,5 +1,5 @@
 import type { HiveAccountRelayChannel, HiveAccountRelaySocket } from './hive-account-relay-channel'
-import type { RemoteRuntimeClientError } from './remote-runtime-client-error'
+import type { RemoteRuntimeClientError } from './remote-runtime/remote-runtime-client-error'
 import type { RuntimeRpcResponse } from './runtime-rpc-envelope'
 import type { HiveAccountRelayMaterial } from './hive-account-relay-material'
 import type { RuntimeCapability } from './protocol-version'

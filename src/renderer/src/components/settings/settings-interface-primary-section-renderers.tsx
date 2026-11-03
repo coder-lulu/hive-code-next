@@ -22,6 +22,7 @@ export function renderTerminalSettingsSection(context: SettingsRenderContext): R
     >
       {view.isSectionMounted('terminal') ? (
         <TerminalPane
+          hostScope={model.settingsHostScope}
           settings={model.settings}
           updateSettings={model.updateSettings}
           scrollbackMode={model.scrollbackMode}

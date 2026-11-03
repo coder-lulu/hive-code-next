@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import './__mocks__/new-workspace'
 import {
   canUseIssueCommandForLinkedItemProvider,
-  getSetupConfig,
   getWorkspaceSeedName,
   isGitLabIssueUrl
 } from './new-workspace'
+import { getSetupConfig } from '../../../shared/orca-hook-setup-config'
 
 describe('linked-item issue commands', () => {
   it('keeps Jira and Linear sentinel numbers out of repository issue templates', () => {

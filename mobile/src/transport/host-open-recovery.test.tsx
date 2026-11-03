@@ -10,7 +10,7 @@ const findAccountRuntimeProfileMock = vi.fn()
 const mergeAccountRuntimeProfilesMock = vi.fn((profiles: unknown[]) => profiles)
 const revival = vi.hoisted(() => ({ callback: null as null | ((reason: 'focus') => void) }))
 
-// Why: the opener starts a descriptor status probe per connection; these fakes have no RPC surface.
+// Descriptor probes need RPC methods these clients do not provide.
 const descriptorProbe = vi.hoisted(() => ({ start: vi.fn((..._args: unknown[]) => vi.fn()) }))
 vi.mock('./runtime-status-probe', () => ({
   startRuntimeStatusProbe: (...args: unknown[]) => descriptorProbe.start(...args)
@@ -27,7 +27,7 @@ vi.mock('./host-store', () => ({
 }))
 vi.mock('../runtime-directory/account-runtime-profile-registry', () => ({
   findAccountRuntimeProfile: (...args: unknown[]) => findAccountRuntimeProfileMock(...args),
-  mergeAccountRuntimeProfiles: (...args: unknown[]) => mergeAccountRuntimeProfilesMock(...args)
+  mergeAccountRuntimeProfiles: (profiles: unknown[]) => mergeAccountRuntimeProfilesMock(profiles)
 }))
 vi.mock('./connection-revival-triggers', () => ({
   subscribeConnectionRevivalTriggers: (callback: (reason: 'focus') => void) => {
@@ -41,14 +41,14 @@ vi.mock('./connection-log-background-flush', () => ({
   subscribeConnectionLogBackgroundFlush: () => () => {}
 }))
 
+import { RpcClientProvider } from './client-context'
 import {
   useDisconnectHostClient,
-  RpcClientProvider,
   useForgetHostClient,
   useForceReconnect,
   useHostClient,
   useRefreshHostClient
-} from './client-context'
+} from './host-client-hooks'
 
 const HOST = {
   id: 'host-1',

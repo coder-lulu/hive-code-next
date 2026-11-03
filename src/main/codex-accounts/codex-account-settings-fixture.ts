@@ -22,8 +22,6 @@ export function createCodexAccountSettings(
     localAccountRuntime: 'host',
     floatingTerminalEnabled: false,
     terminalMacOptionAsAlt: 'false',
-    terminalMacOptionAsAltMigrated: true,
-    experimentalActivity: true,
     terminalWindowsPowerShellImplementation: 'powershell.exe',
     ...overrides,
     diffWordWrap: overrides.diffWordWrap ?? false,

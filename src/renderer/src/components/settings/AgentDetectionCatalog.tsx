@@ -1,152 +1,196 @@
-import { AlertTriangle, LoaderCircle, RefreshCw } from 'lucide-react'
+import { Fragment } from 'react'
+import { AlertTriangle, RefreshCw } from 'lucide-react'
 import type { AgentCatalogEntry } from '@/lib/agent-catalog'
-import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
+import { translate } from '@/i18n/i18n'
 import { Button } from '../ui/button'
 import { AgentCatalogRow, type AgentCatalogRowProps } from './AgentCatalogRow'
+import { SettingsBadge, SettingsSubsectionHeader } from './SettingsFormControls'
+import { AGENTS_INSTALLED_SECTION_ID } from './agents-search'
 
 export function AgentDetectionCatalog({
   detectedAgents,
   undetectedAgents,
   detectionPending,
   detectionFailed,
-  environmentUnavailable = false,
   isRefreshing,
+  activeServerEnvironmentId,
+  activeServerName,
   onRefresh,
-  onCheckUpdates,
-  isCheckingUpdates,
   getRowProps
 }: {
   detectedAgents: AgentCatalogEntry[]
   undetectedAgents: AgentCatalogEntry[]
   detectionPending: boolean
   detectionFailed: boolean
-  environmentUnavailable?: boolean
   isRefreshing: boolean
+  activeServerEnvironmentId: string | null
+  activeServerName: string | null
   onRefresh: () => void
-  onCheckUpdates?: () => void
-  isCheckingUpdates: boolean
   getRowProps: (agent: AgentCatalogEntry, isDetected: boolean) => AgentCatalogRowProps
-}) {
+}): React.JSX.Element {
   return (
-    <div className="space-y-8">
-      {detectionFailed ? (
-        <div
-          role="alert"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive"
-        >
-          <span className="flex min-w-0 items-start gap-2">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-            {environmentUnavailable
-              ? translate(
-                  'agentsSettings.environmentUnavailable',
-                  'The current environment could not be verified. Check the runtime or WSL connection and refresh detection.'
-                )
-              : translate(
-                  'auto.components.settings.AgentsPane.remoteDetectionFailed',
-                  'Couldn’t detect installed agents. Check the host connection and try again.'
-                )}
+    <>
+      {detectedAgents.length === 0 && !detectionPending && !detectionFailed && (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-dashed border-border/50 px-3 py-3 text-sm text-muted-foreground">
+          <span>
+            {translate(
+              'auto.components.settings.AgentsPane.noAgentsDetected',
+              'No agents detected. If one is installed, the probe may have timed out.'
+            )}
           </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={isRefreshing}
-            onClick={onRefresh}
-          >
-            <RefreshCw className={cn('size-4', isRefreshing && 'animate-spin')} />
-            {translate('agentsSettings.retry', 'Retry')}
-          </Button>
+          <RefreshButton isRefreshing={isRefreshing} onRefresh={onRefresh} />
         </div>
-      ) : null}
-      {detectionPending && !detectionFailed ? (
-        <div
-          role="status"
-          className="flex items-center gap-3 rounded-settings-card border border-dashed border-border p-6 text-sm text-muted-foreground"
-        >
-          <LoaderCircle className="size-4 animate-spin" />
+      )}
+
+      <section id={AGENTS_INSTALLED_SECTION_ID}>
+        {[
+          ...detectedAgents.map((agent) => ({ agent, installed: true })),
+          ...undetectedAgents.map((agent) => ({ agent, installed: false }))
+        ].map(({ agent, installed }, index) => {
+          const firstInSection = index === 0 || index === detectedAgents.length
+          return (
+            <Fragment key={agent.id}>
+              {firstInSection ? (
+                <div className={cn('mb-3', index > 0 && 'mt-8')}>
+                  {installed ? (
+                    <SettingsSubsectionHeader
+                      title={
+                        <span className="flex items-center gap-2">
+                          {translate('auto.components.settings.AgentsPane.02e0143be5', 'Installed')}
+                          <SettingsBadge tone="accent">
+                            {detectedAgents.length}{' '}
+                            {translate(
+                              'auto.components.settings.AgentsPane.ed3e110e61',
+                              'detected'
+                            )}
+                          </SettingsBadge>
+                          {activeServerName ? (
+                            <SettingsBadge tone="muted">
+                              {translate(
+                                'auto.components.settings.AgentsPane.03e1a5081a',
+                                'on {{value0}}',
+                                {
+                                  value0: activeServerName
+                                }
+                              )}
+                            </SettingsBadge>
+                          ) : null}
+                        </span>
+                      }
+                      action={
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="xs"
+                          onClick={onRefresh}
+                          disabled={isRefreshing}
+                          title={
+                            activeServerEnvironmentId
+                              ? translate(
+                                  'auto.components.settings.AgentsPane.25a41a9aad',
+                                  'Re-detect agents installed on this server'
+                                )
+                              : translate(
+                                  'auto.components.settings.AgentsPane.13647f9f80',
+                                  'Re-read your shell PATH and re-detect installed agents'
+                                )
+                          }
+                          className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          <RefreshCw className={cn('size-3', isRefreshing && 'animate-spin')} />
+                          {isRefreshing
+                            ? translate(
+                                'auto.components.settings.AgentsPane.c9b33eb5c0',
+                                'Refreshing…'
+                              )
+                            : translate(
+                                'auto.components.settings.AgentsPane.0d9e293a02',
+                                'Refresh'
+                              )}
+                        </Button>
+                      }
+                    />
+                  ) : (
+                    <SettingsSubsectionHeader
+                      title={
+                        <span className="flex items-center gap-2 text-muted-foreground">
+                          {translate(
+                            'auto.components.settings.AgentsPane.e8da2af684',
+                            'Available to install'
+                          )}
+                          <SettingsBadge tone="muted">
+                            {undetectedAgents.length}{' '}
+                            {translate('auto.components.settings.AgentsPane.024bd95089', 'agents')}
+                          </SettingsBadge>
+                        </span>
+                      }
+                    />
+                  )}
+                </div>
+              ) : null}
+              <div className={cn(!firstInSection && 'border-t border-border/40')}>
+                <AgentCatalogRow {...getRowProps(agent, installed)} />
+              </div>
+            </Fragment>
+          )
+        })}
+      </section>
+
+      {detectionPending && !detectionFailed && (
+        <div className="flex items-center justify-center rounded-md border border-dashed border-border/50 py-6 text-sm text-muted-foreground">
           {translate(
             'auto.components.settings.AgentsPane.d83834f5e6',
             'Detecting installed agents…'
           )}
         </div>
-      ) : null}
-      {!detectionPending || detectedAgents.length > 0 ? (
-        <section className="space-y-4" id="agents-installed">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <h3 className="flex items-baseline gap-3 text-base font-semibold leading-6">
-              {translate('agentsSettings.installed', 'Installed')}
-              <span className="font-normal tabular-nums text-muted-foreground">
-                {detectedAgents.length}
-              </span>
-            </h3>
-            {onCheckUpdates ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={isCheckingUpdates || detectionFailed || detectedAgents.length === 0}
-                onClick={onCheckUpdates}
-                className="gap-2 px-0 text-muted-foreground"
-              >
-                <RefreshCw className={cn('size-4', isCheckingUpdates && 'animate-spin')} />
-                {translate(
-                  isCheckingUpdates
-                    ? 'agentsSettings.checkingUpdates'
-                    : 'agentsSettings.checkUpdates',
-                  isCheckingUpdates ? 'Checking…' : 'Check for updates'
-                )}
-              </Button>
-            ) : null}
-          </div>
-          {detectedAgents.length > 0 ? (
-            <div className="agents-installed-grid">
-              {detectedAgents.map((agent) => (
-                <AgentCatalogRow key={agent.id} {...getRowProps(agent, true)} />
-              ))}
-            </div>
-          ) : !detectionFailed ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-settings-card border border-dashed border-border p-6 text-[13px] leading-[18px] text-muted-foreground">
-              <span>
-                {translate(
-                  'auto.components.settings.AgentsPane.noAgentsDetected',
-                  'No agents detected. If one is installed, the probe may have timed out.'
-                )}
-              </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={isRefreshing}
-                onClick={onRefresh}
-              >
-                <RefreshCw className="size-4" />
-                {translate('agentsSettings.refreshDetection', 'Refresh detection')}
-              </Button>
-            </div>
-          ) : null}
-        </section>
-      ) : null}
-      {undetectedAgents.length > 0 && !detectionFailed ? (
-        <section className="space-y-4" id="agents-available">
-          <div className="flex flex-wrap items-baseline justify-between gap-3">
-            <h3 className="flex items-baseline gap-3 text-base font-semibold leading-6">
-              {translate('agentsSettings.available', 'Available to install')}
-              <span className="font-normal tabular-nums text-muted-foreground">
-                {undetectedAgents.length}
-              </span>
-            </h3>
-            <p className="text-[13px] leading-[18px] text-muted-foreground">
-              {translate('agentsSettings.notDetected', 'Not detected in the current environment')}
-            </p>
-          </div>
-          <div className="agents-available-grid">
-            {undetectedAgents.map((agent) => (
-              <AgentCatalogRow key={agent.id} {...getRowProps(agent, false)} />
-            ))}
-          </div>
-        </section>
-      ) : null}
-    </div>
+      )}
+
+      {detectionFailed && (
+        <div className="flex items-start justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          <span className="flex min-w-0 items-start gap-2">
+            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+            {translate(
+              'auto.components.settings.AgentsPane.remoteDetectionFailed',
+              'Couldn’t detect installed agents. Check the host connection and try again.'
+            )}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            onClick={onRefresh}
+            className="h-6 shrink-0 gap-1.5 px-2 text-destructive hover:text-destructive"
+          >
+            <RefreshCw className="size-3" />
+            {translate('auto.components.settings.AgentsPane.retryDetection', 'Retry')}
+          </Button>
+        </div>
+      )}
+    </>
+  )
+}
+
+function RefreshButton({
+  isRefreshing,
+  onRefresh
+}: {
+  isRefreshing: boolean
+  onRefresh: () => void
+}): React.JSX.Element {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="xs"
+      onClick={onRefresh}
+      disabled={isRefreshing}
+      className="h-7 shrink-0 gap-1.5 text-xs"
+    >
+      <RefreshCw className={cn('size-3', isRefreshing && 'animate-spin')} />
+      {isRefreshing
+        ? translate('auto.components.settings.AgentsPane.c9b33eb5c0', 'Refreshing…')
+        : translate('auto.components.settings.AgentsPane.0d9e293a02', 'Refresh')}
+    </Button>
   )
 }

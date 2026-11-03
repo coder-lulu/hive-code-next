@@ -4,16 +4,14 @@ import {
   createStore,
   readDataFile,
   writeDataFile
-} from './persistence-test-harness'
+} from './persistence/persistence-test-harness'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { getDefaultPersistedState } from '../shared/constants'
-import type {
-  NativeChatUpgradeTipAudience,
-  NativeChatUpgradeTipVariant
-} from '../shared/native-chat-upgrade-tip-audience'
+import type { NativeChatUpgradeTipAudience } from '../shared/native-chat/native-chat-upgrade-tip-audience'
+import { isNativeChatDefaultFor } from '../shared/structured-native-chat-launch-route'
 import { normalizeProfileProjectState } from './orca-profiles/profile-project-state-file'
 
 vi.mock('electron', () => ({
@@ -30,130 +28,55 @@ afterEach(async () => {
   rmSync(testState.dir, { recursive: true, force: true })
 })
 
-// Every build before the chat upgrade saved the whole settings document, defaults included.
-const preUpgradeSettings = (
-  experimentalNativeChat?: boolean,
-  openAgentTabsInChatByDefault = experimentalNativeChat === true
-): Record<string, unknown> => ({
-  openAgentTabsInChatByDefault,
-  ...(experimentalNativeChat === undefined ? {} : { experimentalNativeChat })
-})
-
 async function reopen(): Promise<ReturnType<typeof createStore>> {
   await closeTestStores()
   return createStore()
 }
 
-/** Turns Chat UI on, restarts, and reports the tip variant after each of several launches. */
-async function variantAfterLaterOptIn(
-  store: ReturnType<typeof createStore>
-): Promise<NativeChatUpgradeTipVariant[]> {
-  store.updateSettings({ experimentalNativeChat: true })
-  store.flush()
-  const launches: NativeChatUpgradeTipVariant[] = []
-  for (let launch = 0; launch < 3; launch += 1) {
-    const reopened = await reopen()
-    launches.push(reopened.getNativeChatUpgradeTipVariant())
-    reopened.updateSettings({ experimentalNativeChat: true })
-    reopened.flush()
-  }
-  return launches
-}
-
 describe('native chat upgrade tip audience', () => {
-  it.each([
-    ['Chat UI on', preUpgradeSettings(true), 'eligible', 'chat-ui-on', 'standard'],
-    [
-      'Chat UI on but new tabs opening in the terminal',
-      preUpgradeSettings(true, false),
-      'eligible',
-      'chat-ui-on-terminal-default',
-      'keep-terminal'
-    ],
-    ['Chat UI off', preUpgradeSettings(false), 'excluded', 'chat-ui-off', 'none'],
-    ['Chat UI never set', preUpgradeSettings(), 'excluded', 'chat-ui-unset', 'none'],
-    [
-      'Chat UI on but saved by a build that already had the chat upgrade',
-      { experimentalNativeChat: true },
-      'excluded',
-      'chat-ui-on-unproven',
-      'none'
-    ]
-  ])(
-    'decides an existing profile with %s from what it saved',
-    (_, settings, membership, basis, variant) => {
-      writeDataFile({ settings })
-      const store = createStore()
-      expect(store.getNativeChatUpgradeTipVariant()).toBe(variant)
-      store.flush()
-      expect(readDataFile()).toHaveProperty('nativeChatUpgradeTipAudience', {
+  it('keeps a saved terminal-view audience through current provider changes and reload', async () => {
+    writeDataFile({
+      settings: {},
+      nativeChatUpgradeTipAudience: {
         version: 1,
-        membership,
-        basis
-      })
-    }
-  )
+        membership: 'eligible',
+        basis: 'chat-ui-on-terminal-default'
+      }
+    })
+    const store = createStore()
+    expect(store.getNativeChatUpgradeTipVariant()).toBe('keep-terminal')
+    store.updateSettings({ nativeChatProviders: { claude: false } })
+    store.flush()
+    expect((await reopen()).getNativeChatUpgradeTipVariant()).toBe('keep-terminal')
+  })
 
   it('keeps a brand new profile out of the audience', () => {
     const store = createStore()
     expect(store.getNativeChatUpgradeTipVariant()).toBe('none')
     store.flush()
-    expect(readDataFile()).toHaveProperty('nativeChatUpgradeTipAudience.basis', 'new-profile')
+    expect(readDataFile()).not.toHaveProperty('nativeChatUpgradeTipAudience')
   })
 
-  it.each([
-    ['saved Chat UI off', () => writeDataFile({ settings: preUpgradeSettings(false) })],
-    ['no saved Chat UI choice', () => writeDataFile({ settings: preUpgradeSettings() })],
-    ['a brand new profile', () => {}]
-  ])(
-    'never lets a profile with %s join by turning Chat UI on later, across restarts',
-    async (_, seed) => {
-      seed()
-      const store = createStore()
-      expect(store.getNativeChatUpgradeTipVariant()).toBe('none')
-      expect(await variantAfterLaterOptIn(store)).toEqual(['none', 'none', 'none'])
+  it('defaults current native chat views on without an opt-in flag', () => {
+    const store = createStore()
+    for (const agent of ['claude', 'codex', 'opencode'] as const) {
+      expect(isNativeChatDefaultFor(store.getSettings(), agent)).toBe(true)
     }
-  )
+    expect(Object.hasOwn(store.getSettings(), 'experimentalNativeChat')).toBe(false)
+  })
 
-  it('turns Chat UI off for a profile whose new tabs opened in the terminal, once', async () => {
-    writeDataFile({ settings: preUpgradeSettings(true, false) })
+  it('persists an explicit current provider opt-out without disabling other providers', async () => {
     const store = createStore()
-    expect(store.getSettings().experimentalNativeChat).toBe(false)
+    store.updateSettings({ nativeChatProviders: { claude: false } })
     store.flush()
-    expect(readDataFile()).toHaveProperty('settings.experimentalNativeChat', false)
-    // Turning it back on later sticks: the saved Default view is gone after the first save.
-    store.updateSettings({ experimentalNativeChat: true })
-    store.flush()
-    expect((await reopen()).getSettings().experimentalNativeChat).toBe(true)
+    const loaded = (await reopen()).getSettings()
+    expect(isNativeChatDefaultFor(loaded, 'claude')).toBe(false)
+    expect(isNativeChatDefaultFor(loaded, 'codex')).toBe(true)
   })
 
-  it('keeps Chat UI on for a profile whose new tabs opened in chat', () => {
-    writeDataFile({ settings: preUpgradeSettings(true) })
-    expect(createStore().getSettings().experimentalNativeChat).toBe(true)
-  })
-
-  it('keeps a chat-view member on the standard tip after turning Chat UI off', async () => {
-    writeDataFile({ settings: preUpgradeSettings(true) })
-    const store = createStore()
-    store.updateSettings({ experimentalNativeChat: false })
-    store.flush()
-    expect((await reopen()).getNativeChatUpgradeTipVariant()).toBe('standard')
-  })
-
-  it('keeps a terminal-view member on the chat mode switch tip after turning Chat UI on', async () => {
-    writeDataFile({ settings: preUpgradeSettings(true, false) })
-    const store = createStore()
-    expect(await variantAfterLaterOptIn(store)).toEqual([
-      'keep-terminal',
-      'keep-terminal',
-      'keep-terminal'
-    ])
-  })
-
-  it('keeps an excluded record when a later build turns Chat UI on by default', async () => {
-    // A future build where Chat UI is a regular setting that defaults on.
+  it('keeps an excluded saved record with current native chat enabled', async () => {
     writeDataFile({
-      settings: { experimentalNativeChat: true },
+      settings: { nativeChatProviders: { claude: true } },
       nativeChatUpgradeTipAudience: { version: 1, membership: 'excluded', basis: 'chat-ui-off' }
     })
     for (let launch = 0; launch < 3; launch += 1) {
@@ -164,23 +87,23 @@ describe('native chat upgrade tip audience', () => {
     expect(readDataFile()).toHaveProperty('nativeChatUpgradeTipAudience.basis', 'chat-ui-off')
   })
 
-  it('fails closed when a later build finds Chat UI on but no record and no pre-upgrade save', () => {
-    // A record lost by some later rewrite must not be recaptured from the live switch.
-    writeDataFile({ settings: { experimentalNativeChat: true } })
+  it('does not invent an audience from current native chat preferences', () => {
+    writeDataFile({ settings: { nativeChatProviders: { claude: true } } })
     const store = createStore()
     expect(store.getNativeChatUpgradeTipVariant()).toBe('none')
     store.flush()
-    expect(readDataFile()).toHaveProperty(
-      'nativeChatUpgradeTipAudience.basis',
-      'chat-ui-on-unproven'
-    )
+    expect(readDataFile()).not.toHaveProperty('nativeChatUpgradeTipAudience')
   })
 
-  it('removes the pre-upgrade marker on the first save, so no later load can prove membership again', () => {
-    writeDataFile({ settings: preUpgradeSettings(false) })
+  it('drops retired chat flags without disabling current native chat', () => {
+    writeDataFile({
+      settings: { openAgentTabsInChatByDefault: true, experimentalNativeChat: false }
+    })
     const store = createStore()
     store.flush()
     expect(readDataFile()).not.toHaveProperty('settings.openAgentTabsInChatByDefault')
+    expect(readDataFile()).not.toHaveProperty('settings.experimentalNativeChat')
+    expect(isNativeChatDefaultFor(store.getSettings(), 'claude')).toBe(true)
   })
 
   it('never seeds a record or the pre-upgrade marker from defaults', () => {
@@ -195,16 +118,16 @@ describe('native chat upgrade tip audience', () => {
     ['a non-object', 'eligible'],
     ['null', null]
   ])('fails closed on a saved record with %s', (_, record) => {
-    writeDataFile({ settings: preUpgradeSettings(true), nativeChatUpgradeTipAudience: record })
+    writeDataFile({ settings: {}, nativeChatUpgradeTipAudience: record })
     const store = createStore()
     expect(store.getNativeChatUpgradeTipVariant()).toBe('none')
     store.flush()
-    expect(readDataFile()).toHaveProperty('nativeChatUpgradeTipAudience.basis', 'unreadable-record')
+    expect(createStore().getNativeChatUpgradeTipVariant()).toBe('none')
   })
 
-  it('keeps a saved record even when the current settings disagree', () => {
+  it('keeps a saved audience independent of current provider preferences', () => {
     writeDataFile({
-      settings: preUpgradeSettings(false),
+      settings: { nativeChatProviders: { claude: false } },
       nativeChatUpgradeTipAudience: { version: 1, membership: 'eligible', basis: 'chat-ui-on' }
     })
     expect(createStore().getNativeChatUpgradeTipVariant()).toBe('standard')
@@ -218,7 +141,7 @@ describe('native chat upgrade tip audience', () => {
     }
     const settings = {
       ...getDefaultPersistedState('/home/test').settings,
-      experimentalNativeChat: true
+      nativeChatProviders: { claude: true }
     }
     expect(
       normalizeProfileProjectState({ settings, nativeChatUpgradeTipAudience: excluded })
@@ -229,7 +152,7 @@ describe('native chat upgrade tip audience', () => {
   })
 
   it('keeps the tip dismissed when a stale client writes an older seen list', async () => {
-    writeDataFile({ settings: preUpgradeSettings(true) })
+    writeDataFile({ settings: {} })
     const store = createStore()
     store.updateUI({ featureTipsSeenIds: ['native-chat-upgrade'] })
     // A paired client hydrated before the tip was shown marks another tip seen.

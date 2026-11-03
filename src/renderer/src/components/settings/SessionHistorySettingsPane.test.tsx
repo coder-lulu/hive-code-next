@@ -2,7 +2,6 @@
 import '@testing-library/jest-dom/vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import type * as I18nModule from '@/i18n/i18n'
 import { toast } from 'sonner'
 import { getDefaultSettings } from '../../../../shared/constants'
 import { unavailableSessionSearchStatus } from '../../../../shared/ai-vault-search-client'
@@ -52,8 +51,8 @@ vi.mock('@/lib/web-client-location', () => ({ isWebClientLocation: () => mocks.w
 vi.mock('@/hooks/use-window-stream-visibility', () => ({
   useWindowStreamVisible: () => mocks.visible
 }))
-vi.mock('@/i18n/i18n', async () => ({
-  ...(await vi.importActual<typeof I18nModule>('@/i18n/i18n')),
+vi.mock('@/i18n/i18n', () => ({
+  getIntlLocale: () => 'en',
   translate: (_key: string, fallback: string, args?: Record<string, unknown>) =>
     fallback.replace(/{{(\w+)}}/g, (_, key: string) => String(args?.[key]))
 }))
@@ -99,7 +98,6 @@ const OFFLINE_DETAILS = {
   compatibility: null,
   error: 'unreachable'
 }
-/** Answers status per host so one pane can hold servers in different states. */
 function statusByHost(): void {
   mocks.status.mockImplementation(async (hostId: string) => {
     const answer = mocks.statusByHost[hostId]
@@ -163,14 +161,7 @@ it('turns search on from the switch alone, touching no transcript while it is of
   const confirm = vi.fn().mockResolvedValue(true)
   pane(false, confirm, save)
   expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false')
-  const disclosure = screen.getByText(
-    /Authorized remote clients can search it and receive matching text/
-  )
-  expect(disclosure).toHaveTextContent('full agent conversations')
-  expect(disclosure).toHaveTextContent('3,072 characters per tool output')
-  expect(disclosure).toHaveTextContent('Content is not redacted')
-  expect(disclosure).toHaveTextContent('Each switch controls only that computer')
-  expect(screen.queryByText(/Nothing leaves that computer/)).not.toBeInTheDocument()
+  expect(screen.getByText(/Nothing leaves that computer/)).toBeInTheDocument()
   await act(async () => {
     await vi.advanceTimersByTimeAsync(60_000)
   })
@@ -336,15 +327,11 @@ it('keeps the last index status visible while a save is in flight', async () => 
   )
   pane(true, vi.fn().mockResolvedValue(true), save)
   await act(async () => {})
-  const indexedStatus = `12 sessions · ${(3_400).toLocaleString('en', {
-    notation: 'compact',
-    maximumFractionDigits: 1
-  })} messages searchable`
-  expect(screen.getByRole('status')).toHaveTextContent(indexedStatus)
+  expect(screen.getByRole('status')).toHaveTextContent('12 sessions · 3.4K messages searchable')
   await act(async () => {
     fireEvent.click(screen.getByRole('switch'))
   })
-  expect(screen.getByRole('status')).toHaveTextContent(indexedStatus)
+  expect(screen.getByRole('status')).toHaveTextContent('12 sessions · 3.4K messages searchable')
   await act(async () => {
     finishSave()
   })
@@ -379,7 +366,6 @@ it('offers only this computer to a paired client, with no server rows', async ()
   expect(mocks.status).not.toHaveBeenCalled()
 })
 
-/** Local on, one server on, one off, one offline, one too old. */
 function mixedFleet(): void {
   mocks.environments = [
     { id: 'on', name: 'build-01' },
@@ -417,7 +403,6 @@ it('offers the button only while a paired server is reachable and off', async ()
   await act(async () => {})
   expect(enableAllButton()).toBeInTheDocument()
 
-  // gpu-a was the only eligible one; with it on, the offline and too-old rows leave nothing to do.
   mocks.statusByHost = { ...mocks.statusByHost, 'runtime:off': current }
   statusByHost()
   cleanup()
@@ -445,7 +430,7 @@ it('enables every reachable server and skips the ones it cannot', async () => {
     fireEvent.click(screen.getByRole('button', { name: 'Enable on all computers' }))
   })
   expect(confirm).not.toHaveBeenCalled()
-  // linux 1 is offline and m4 air is too old, so neither is asked; build-01 is already on.
+  // Ask only the reachable off host; exclude offline, too-old and already-on servers.
   expect(mocks.setEnabled.mock.calls.map((call) => call[0])).toEqual(['runtime:off'])
 })
 
@@ -495,7 +480,6 @@ it('remembers nothing after a server is turned back off by hand', async () => {
   await act(async () => {
     fireEvent.click(screen.getByRole('switch', { name: 'Search sessions on gpu-a' }))
   })
-  // The row went off, so the offer comes straight back; no preference was written either way.
   expect(enableAllButton()).toBeInTheDocument()
   expect(save).not.toHaveBeenCalled()
 })
@@ -528,7 +512,7 @@ it('folds the list past six computers and orders it by what the user can act on'
   statusByHost()
   pane(true)
   await act(async () => {})
-  // The local row's label is the host's own name, which differs per platform; the servers are the order under test.
+  // Exclude the platform-dependent local machine name from server-order assertions.
   const serverNames = (): string[] =>
     screen
       .getAllByRole('switch')

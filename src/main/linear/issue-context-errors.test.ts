@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { LinearAgentAccessError, sanitizeLinearErrorMessage } from './issue-context-errors'
+import { LinearAgentAccessError, sanitizeLinearErrorMessage } from './issue-context/errors'
 
 describe('sanitizeLinearErrorMessage', () => {
   it('preserves provider text in the structured error', () => {

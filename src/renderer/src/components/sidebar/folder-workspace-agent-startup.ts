@@ -12,6 +12,7 @@ import {
 } from '@/lib/tui-agent-startup'
 import type { ProjectGroup } from '../../../../shared/project-group-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
+import type { AgentLaunchPermissionMode } from '../../../../shared/tui-agent-permissions'
 import type { AgentStartupShell } from '../../../../shared/tui-agent-startup-shell'
 
 /** OS of the host that owns a folder group; its agents are quoted for that host's shell. */
@@ -33,7 +34,6 @@ export function getFolderWorkspaceAgentLaunchFact(
   )
 }
 
-/** Resolve the linked context that should appear in the agent input without submitting. */
 export function resolveFolderWorkspaceLaunchDraft(
   linkedWorkItem: LinkedWorkItemSummary,
   note: string
@@ -49,6 +49,7 @@ export function buildFolderWorkspaceLinkedStartupPlan(args: {
   agentCmdOverrides: Record<string, string> | undefined
   agentArgs?: string | null
   agentEnv?: Record<string, string>
+  agentPermissionMode?: AgentLaunchPermissionMode
   platform: NodeJS.Platform
   shell?: AgentStartupShell
   isRemote: boolean
@@ -61,6 +62,7 @@ export function buildFolderWorkspaceLinkedStartupPlan(args: {
         cmdOverrides: args.agentCmdOverrides ?? {},
         agentArgs: args.agentArgs,
         agentEnv: args.agentEnv,
+        agentPermissionMode: args.agentPermissionMode,
         platform: args.platform,
         shell: args.shell,
         isRemote: args.isRemote
@@ -73,6 +75,9 @@ export function buildFolderWorkspaceLinkedStartupPlan(args: {
       expectedProcess: draftLaunchPlan.expectedProcess,
       followupPrompt: null,
       launchConfig: draftLaunchPlan.launchConfig,
+      ...(args.agentPermissionMode && args.agentPermissionMode !== 'default'
+        ? { agentPermissionMode: args.agentPermissionMode }
+        : {}),
       ...(draftLaunchPlan.startupCommandDelivery
         ? { startupCommandDelivery: draftLaunchPlan.startupCommandDelivery }
         : {}),
@@ -87,6 +92,7 @@ export function buildFolderWorkspaceLinkedStartupPlan(args: {
     cmdOverrides: args.agentCmdOverrides ?? {},
     agentArgs: args.agentArgs,
     agentEnv: args.agentEnv,
+    agentPermissionMode: args.agentPermissionMode,
     platform: args.platform,
     shell: args.shell,
     isRemote: args.isRemote,

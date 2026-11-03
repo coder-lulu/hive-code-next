@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { RpcClientStreamRegistry } from './rpc-client-stream-registry'
 import {
   DIRECT_WIRE_DEVICE_TOKEN,
   directWire,
@@ -8,11 +9,26 @@ import {
 import {
   RPC_TRANSPORT_FIELDS,
   buildDirectRpcWireRequest,
-  withRpcEnvelopeFields
+  withRpcEnvelopeFields,
+  type RpcRequestFrame
 } from './rpc-envelope-fields'
 import type { RpcResponse } from './types'
 
 const ENVELOPE = { executionHost: 'runtime:a' }
+
+function directStreams() {
+  const frames: RpcRequestFrame[] = []
+  let counter = 0
+  const streams = new RpcClientStreamRegistry({
+    nextId: () => `rpc-${++counter}`,
+    sendFrame: (frame) => {
+      frames.push(frame)
+      return true
+    },
+    getState: () => 'connected'
+  })
+  return { streams, frames }
+}
 
 function answered(id: string): RpcResponse {
   return { id, ok: true, result: null, _meta: { runtimeId: 'runtime-1' } }
@@ -134,6 +150,7 @@ describe('direct transport envelope', () => {
     streams.handleResponse(streaming('rpc-1', { type: 'ready', subscriptionId: 'server-1' }))
     expect(socket.frames().at(-1)).toMatchObject({
       method: 'runtime.clientEvents.unsubscribe',
+      params: { subscriptionId: 'server-1' },
       ...ENVELOPE
     })
   })
@@ -148,6 +165,40 @@ describe('direct transport envelope', () => {
       method: 'browser.screencast.unsubscribe',
       params: { subscriptionId: 'stale' },
       ...ENVELOPE
+    })
+  })
+})
+
+describe('deferred direct transport envelope', () => {
+  it('keeps it on a session tabs unsubscribe deferred until the snapshot', async () => {
+    const { streams, frames } = directStreams()
+    const dispose = streams.subscribe('session.tabs.subscribe', { worktree: 'w' }, () => {}, {
+      envelope: ENVELOPE
+    })
+    await Promise.resolve()
+    dispose()
+    expect(frames).toHaveLength(1)
+    streams.handleResponse(streaming(frames[0]!.id, { type: 'snapshot', tabs: [] }))
+    expect(frames.at(-1)).toMatchObject({
+      method: 'session.tabs.unsubscribe',
+      params: { worktree: 'w', subscriptionId: 'rpc-1' },
+      envelope: ENVELOPE
+    })
+  })
+
+  it('keeps it on a ready-id unsubscribe deferred until the ready', async () => {
+    const { streams, frames } = directStreams()
+    const dispose = streams.subscribe('runtime.clientEvents.subscribe', {}, () => {}, {
+      envelope: ENVELOPE
+    })
+    await Promise.resolve()
+    dispose()
+    expect(frames).toHaveLength(1)
+    streams.handleResponse(streaming(frames[0]!.id, { type: 'ready', subscriptionId: 'server-1' }))
+    expect(frames.at(-1)).toMatchObject({
+      method: 'runtime.clientEvents.unsubscribe',
+      params: { subscriptionId: 'server-1' },
+      envelope: ENVELOPE
     })
   })
 })

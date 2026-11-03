@@ -1,210 +1,49 @@
-import { useRef } from 'react'
-import { Pressable, Text, View } from 'react-native'
-import { Check, ChevronRight, Moon } from 'lucide-react-native'
 import { openExternalLink } from '../platform/external-link'
+import { Pressable, Text, View } from 'react-native'
+import { Moon, Pin, PinOff } from 'lucide-react-native'
 import { buildWorktreeNavigationActions } from '../agent-history/worktree-navigation-actions'
 import { workspaceRouteHref } from '../navigation/workspace-execution-host'
+import { useWorkspaceServer } from '../transport/workspace-server'
 import { ActionSheetContent } from '../components/ActionSheetModal'
 import { BottomDrawer } from '../components/BottomDrawer'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { NewWorktreeModalController } from '../components/NewWorktreeModalController'
-import { PickerModal } from '../components/PickerModal'
-import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
-import {
-  hostNewWorktreeRoute,
-  hostNewWorktreeSessionRoute,
-  hostRoute
-} from '../host-route-action-state'
-import { MobileRuntimeSelector } from '../runtime-directory/MobileRuntimeSelector'
-import {
-  WORKSPACE_GROUP_OPTIONS as GROUP_OPTIONS,
-  WORKSPACE_SORT_OPTIONS as SORT_OPTIONS,
-  WORKSPACE_VIEW_SHARED_NOTE
-} from '../worktree/workspace-list-picker-options'
+import { hostNewWorktreeSessionRoute } from '../host-new-worktree-session-route'
 import { isWorktreePinned } from '../worktree/workspace-list-sections'
-import { createHostScreenStyles } from './host-screen-styles'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
+import { hostScreenStyles as styles } from './host-screen-styles'
+import { WorkspaceOptionsSheet } from './workspace-options-sheet'
+import { WorkspaceDetailsSheet } from './workspace-details-sheet'
 import type { HostScreenController } from './use-host-screen-controller'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 
 export function HostScreenOverlays({ controller }: { controller: HostScreenController }) {
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createHostScreenStyles)
-  const pendingPickerRef = useRef<'group' | 'sort' | null>(null)
+  const t = useMobileTranslation()
+  useMobileColorScheme()
   const {
     actions,
     catalog,
     client,
+    connState,
     existingWorktreePaths,
     hostCapabilities,
     hostId,
-    runtimeCatalog,
-    runtimeConnectionStates,
-    settings,
-    showNewWorktree,
     state
   } = controller
   const actionTarget = state.actionTarget
+  // A server row's screens are offered by what that server supports, not the desktop.
+  const actionServer = useWorkspaceServer({
+    client,
+    connState,
+    desktopCapabilities: hostCapabilities,
+    executionHost: actionTarget?.hostId
+  })
 
   return (
     <>
-      <MobileRuntimeSelector
-        catalog={runtimeCatalog}
-        connectionStates={runtimeConnectionStates}
-        onClose={() => state.setShowRuntimeSelector(false)}
-        onPair={() => controller.router.push('/pair-scan')}
-        onSelect={(runtimeId) => {
-          if (runtimeId !== hostId) {
-            controller.router.replace(hostRoute(runtimeId))
-          }
-        }}
-        selectedId={hostId ?? null}
-        theme={theme}
-        visible={!controller.embedded && state.showRuntimeSelector}
-      />
+      <WorkspaceOptionsSheet controller={controller} />
 
-      <PickerModal
-        visible={state.showSortPicker}
-        title="排序方式"
-        subtitle={WORKSPACE_VIEW_SHARED_NOTE}
-        options={SORT_OPTIONS}
-        selected={state.sortMode}
-        onSelect={settings.handleSortChange}
-        onClose={() => state.setShowSortPicker(false)}
-      />
-
-      <PickerModal
-        visible={state.showGroupPicker}
-        title="分组方式"
-        subtitle={WORKSPACE_VIEW_SHARED_NOTE}
-        options={GROUP_OPTIONS}
-        selected={state.groupMode}
-        onSelect={settings.handleGroupChange}
-        onClose={() => state.setShowGroupPicker(false)}
-      />
-
-      <BottomDrawer
-        visible={state.showFilterModal}
-        onAfterClose={() => {
-          const pendingPicker = pendingPickerRef.current
-          pendingPickerRef.current = null
-          if (pendingPicker === 'sort') {
-            state.setShowSortPicker(true)
-          } else if (pendingPicker === 'group') {
-            state.setShowGroupPicker(true)
-          }
-        }}
-        onClose={() => state.setShowFilterModal(false)}
-      >
-        <View style={styles.filterModalHeader}>
-          <View style={styles.filterModalHeading}>
-            <Text maxFontSizeMultiplier={1.3} style={styles.filterModalTitle}>
-              筛选与视图
-            </Text>
-            <Text maxFontSizeMultiplier={1.3} style={styles.filterModalSubtitle}>
-              {WORKSPACE_VIEW_SHARED_NOTE}
-            </Text>
-          </View>
-          {settings.activeFilterCount > 0 && (
-            <Pressable onPress={settings.clearFilters}>
-              <Text maxFontSizeMultiplier={1.3} style={styles.clearFiltersText}>
-                清除筛选
-              </Text>
-            </Pressable>
-          )}
-        </View>
-
-        <Text maxFontSizeMultiplier={1.3} style={styles.filterSectionLabel}>
-          视图
-        </Text>
-        <View style={styles.filterGroup}>
-          <Pressable
-            style={styles.filterRow}
-            onPress={() => {
-              pendingPickerRef.current = 'sort'
-              state.setShowFilterModal(false)
-            }}
-          >
-            <Text maxFontSizeMultiplier={1.3} style={styles.filterRowText}>
-              排序
-            </Text>
-            <Text maxFontSizeMultiplier={1.3} style={styles.filterRowValue}>
-              {settings.selectedSortLabel}
-            </Text>
-            <ChevronRight color={theme.color.text.tertiary} size={18} strokeWidth={1.9} />
-          </Pressable>
-          <View style={styles.filterSeparator} />
-          <Pressable
-            style={styles.filterRow}
-            onPress={() => {
-              pendingPickerRef.current = 'group'
-              state.setShowFilterModal(false)
-            }}
-          >
-            <Text maxFontSizeMultiplier={1.3} style={styles.filterRowText}>
-              分组
-            </Text>
-            <Text maxFontSizeMultiplier={1.3} style={styles.filterRowValue}>
-              {groupModeLabel(state.groupMode)}
-            </Text>
-            <ChevronRight color={theme.color.text.tertiary} size={18} strokeWidth={1.9} />
-          </Pressable>
-        </View>
-
-        <Text maxFontSizeMultiplier={1.3} style={styles.filterSectionLabel}>
-          工作区
-        </Text>
-        <View style={styles.filterGroup}>
-          <Pressable style={styles.filterRow} onPress={settings.toggleHideSleeping}>
-            <Text maxFontSizeMultiplier={1.3} style={styles.filterRowText}>
-              隐藏休眠工作区
-            </Text>
-            {state.filters.hideSleeping && (
-              <Check size={16} color={theme.color.text.primary} strokeWidth={2} />
-            )}
-          </Pressable>
-          <View style={styles.filterSeparator} />
-          <Pressable style={styles.filterRow} onPress={settings.toggleHideDefaultBranch}>
-            <Text maxFontSizeMultiplier={1.3} style={styles.filterRowText}>
-              隐藏默认分支
-            </Text>
-            {state.filters.hideDefaultBranch && (
-              <Check size={16} color={theme.color.text.primary} strokeWidth={2} />
-            )}
-          </Pressable>
-        </View>
-
-        {controller.sectionsResult.uniqueRepos.length > 1 && (
-          <>
-            <Text maxFontSizeMultiplier={1.3} style={styles.filterSectionLabel}>
-              代码仓库
-            </Text>
-            <View style={styles.filterGroup}>
-              {controller.sectionsResult.uniqueRepos.map((repo, i) => (
-                <View key={repo.key}>
-                  {i > 0 && <View style={styles.filterSeparator} />}
-                  <Pressable
-                    style={styles.filterRow}
-                    onPress={() => settings.toggleRepoFilter(repo.id)}
-                  >
-                    <View style={[styles.filterRepoDot, { backgroundColor: repo.color }]} />
-                    <Text
-                      maxFontSizeMultiplier={1.3}
-                      style={styles.filterRowText}
-                      numberOfLines={1}
-                    >
-                      {repo.name}
-                    </Text>
-                    {state.filters.filterRepoIds.has(repo.id) && (
-                      <Check size={16} color={theme.color.text.primary} strokeWidth={2} />
-                    )}
-                  </Pressable>
-                </View>
-              ))}
-            </View>
-          </>
-        )}
-      </BottomDrawer>
-
-      {/* Worktree long-press action sheet (inline confirm to avoid double-Modal lag) */}
+      {/* Confirm inline to avoid stacking native Modals. */}
       <BottomDrawer
         visible={actionTarget != null}
         onClose={() => {
@@ -215,12 +54,18 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
         {state.confirmDelete ? (
           <View>
             <View style={styles.confirmContent}>
-              <Text maxFontSizeMultiplier={1.3} style={styles.confirmTitle}>
-                删除工作区
+              <Text style={styles.confirmTitle}>
+                {t('hostScreen.hostScreenOverlays.deleteWorktree', 'Delete Worktree')}
               </Text>
-              <Text maxFontSizeMultiplier={1.3} style={styles.confirmMessage}>
-                确定删除“{state.confirmDelete.displayName || state.confirmDelete.repo}”（
-                {state.confirmDelete.branch}）吗？
+              <Text style={styles.confirmMessage}>
+                {t(
+                  'hostScreen.hostScreenOverlays.deleteConfirmMessage',
+                  'Delete "{{name}}" ({{branch}})?',
+                  {
+                    name: state.confirmDelete.displayName || state.confirmDelete.repo,
+                    branch: state.confirmDelete.branch
+                  }
+                )}
               </Text>
             </View>
             <View style={styles.confirmButtons}>
@@ -232,9 +77,7 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
                 ]}
                 onPress={() => state.setConfirmDelete(null)}
               >
-                <Text maxFontSizeMultiplier={1.3} style={styles.confirmBtnCancelText}>
-                  取消
-                </Text>
+                <Text style={styles.confirmBtnCancelText}>{t('common.cancel', 'Cancel')}</Text>
               </Pressable>
               <Pressable
                 style={({ pressed }) => [
@@ -250,86 +93,107 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
                   state.setActionTarget(null)
                 }}
               >
-                <Text maxFontSizeMultiplier={1.3} style={styles.confirmBtnDestructiveText}>
-                  删除
-                </Text>
+                <Text style={styles.confirmBtnDestructiveText}>{t('common.delete', 'Delete')}</Text>
               </Pressable>
             </View>
           </View>
         ) : (
           <ActionSheetContent
-            title={actionTarget ? actionTarget.displayName || actionTarget.repo : undefined}
-            message={actionTarget?.branch}
             actions={
-              actionTarget && !actionTarget.hostId?.startsWith('runtime:')
+              actionTarget
                 ? [
                     ...buildWorktreeNavigationActions({
                       hostId,
                       worktreeId: actionTarget.worktreeId,
                       worktreeName: actionTarget.displayName || actionTarget.repo,
-                      hostCapabilities,
+                      executionHost: actionServer.routeHost,
+                      hostCapabilities:
+                        actionServer.server?.gates.hostCapabilities ?? hostCapabilities,
                       navigate: actions.navigateFromHostList,
                       onDone: () => state.setActionTarget(null)
-                    }).map((action) => ({ ...action, label: localizedActionLabel(action.label) })),
+                    }),
+                    // Server sleep is not offered yet; the desktop would sleep its own id.
+                    ...(actionServer.server
+                      ? []
+                      : [
+                          {
+                            id: 'sleep',
+                            label: t('hostScreen.hostScreenOverlays.sleep', 'Sleep'),
+                            icon: Moon,
+                            onPress: () => {
+                              actions.putWorktreeToSleep(actionTarget)
+                              state.setActionTarget(null)
+                            }
+                          }
+                        ]),
                     {
-                      label: '休眠',
-                      icon: Moon,
-                      onPress: () => {
-                        actions.putWorktreeToSleep(actionTarget)
-                        state.setActionTarget(null)
-                      }
-                    },
-                    {
-                      label: isWorktreePinned(actionTarget, state.pinnedIds) ? '取消置顶' : '置顶',
+                      id: 'togglePin',
+                      label: isWorktreePinned(actionTarget, state.pinnedIds)
+                        ? t('hostScreen.hostScreenOverlays.unpin', 'Unpin')
+                        : t('hostScreen.hostScreenOverlays.pin', 'Pin'),
+                      icon: isWorktreePinned(actionTarget, state.pinnedIds) ? PinOff : Pin,
                       onPress: () => {
                         actions.togglePin(actionTarget)
                         state.setActionTarget(null)
                       }
                     },
                     {
-                      label: '删除',
+                      id: 'delete',
+                      label: t('common.delete', 'Delete'),
                       destructive: true,
-                      onPress: () => state.setConfirmDelete(actionTarget)
+                      onPress: () => state.setConfirmDelete(actionTarget),
+                      // Like desktop, git can't remove a primary checkout; older hosts omit the flag.
+                      ...(actionTarget.isMainWorktree === true
+                        ? {
+                            disabled: true,
+                            hint: t(
+                              'hostScreen.hostScreenOverlays.primaryWorktreeDeleteHint',
+                              "Primary worktree — can't be deleted. Remove the project instead."
+                            )
+                          }
+                        : {})
                     }
                   ]
                 : []
             }
-          />
+          >
+            {actionTarget ? (
+              <WorkspaceDetailsSheet
+                row={actionTarget}
+                onOpenLink={(url) => {
+                  openExternalLink(url)
+                  state.setActionTarget(null)
+                }}
+              />
+            ) : null}
+          </ActionSheetContent>
         )}
       </BottomDrawer>
 
-      {/* Host remove confirmation */}
       <ConfirmModal
-        visible={state.confirmRemoveHost && controller.canRemoveHost}
-        title="移除本地配对"
-        message={`从这台手机移除“${state.hostName}”的本地配对？此操作不会解除云端认领，之后仍可重新配对。`}
-        confirmLabel="移除"
+        visible={state.confirmRemoveHost}
+        title={t('hostScreen.hostScreenOverlays.removeHost', 'Remove Host')}
+        message={t(
+          'hostScreen.hostScreenOverlays.removeHostMessage',
+          'Remove "{{name}}"? You can re-pair later.',
+          { name: state.hostName }
+        )}
+        confirmLabel={t('common.remove', 'Remove')}
         destructive
         onConfirm={() => void actions.handleRemoveHost()}
         onCancel={() => state.setConfirmRemoveHost(false)}
       />
 
       <NewWorktreeModalController
-        runtimeSelection={{
-          name: state.hostName,
-          catalog: runtimeCatalog,
-          connectionStates: runtimeConnectionStates,
-          onSelect: (runtimeId) => controller.router.replace(hostNewWorktreeRoute(runtimeId)),
-          onPair: () => controller.router.push('/pair-scan')
-        }}
-        ref={state.newWorktreeModalRef}
-        routeVisible={showNewWorktree}
+        visible={state.showNewWorktree}
         client={client}
+        hostCapabilities={hostCapabilities}
         hostId={hostId}
         hostLabelById={state.hostLabelById}
         existingWorktreePaths={existingWorktreePaths}
         existingWorktrees={state.worktrees}
-        // The seam, not react-native's `Linking`: this screen is in the tasks page closure, and
-        // inside the shell's WebView `openURL` resolves without opening anything.
+        // Use the platform opener: React Native Linking.openURL resolves without opening anything inside the shell’s WebView.
         openExternalUrl={openExternalLink}
-        onVisibleChange={(visible) => {
-          state.newWorktreeModalVisibleRef.current = visible
-        }}
         onCreated={(worktreeId, worktreeName, warning, executionHost) => {
           void catalog.fetchWorktrees({ allowDuringModal: true })
           actions.navigateFromHostList(
@@ -339,31 +203,8 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
             )
           )
         }}
-        onRouteVisibleChange={actions.setShowNewWorktreeVisible}
+        onClose={actions.closeNewWorktreeModal}
       />
     </>
   )
-}
-
-function groupModeLabel(mode: HostScreenController['state']['groupMode']): string {
-  if (mode === 'none') {
-    return '不分组'
-  }
-  if (mode === 'workspaceStatus') {
-    return '状态'
-  }
-  if (mode === 'repo') {
-    return '代码仓库'
-  }
-  return 'PR 状态'
-}
-
-function localizedActionLabel(label: string): string {
-  if (label === 'Source Control') {
-    return '源代码管理'
-  }
-  if (label === 'Agent Session History') {
-    return 'Agent 会话历史'
-  }
-  return label
 }

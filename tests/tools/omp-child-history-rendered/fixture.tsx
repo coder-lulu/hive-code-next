@@ -122,6 +122,7 @@ function App() {
             buildResumeStartup={(session) => ({ command: session.resumeCommand })}
             getOriginalPaneTarget={() => null}
             getSessionLiveState={() => null}
+            isStructuredSessionOpen={() => false}
             getWorktreeInfo={() => null}
             getSessionResumeState={() => ({
               blocked: false,

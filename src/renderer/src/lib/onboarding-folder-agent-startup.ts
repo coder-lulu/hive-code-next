@@ -1,16 +1,14 @@
 import { buildAgentStartupPlan } from '@/lib/tui-agent-startup'
 import { tuiAgentToAgentKind } from '@/lib/telemetry'
 import { isTuiAgentEnabled } from '../../../shared/tui-agent-selection'
-import {
-  resolveTuiAgentLaunchArgs,
-  resolveTuiAgentLaunchEnv
-} from '../../../shared/tui-agent-launch-defaults'
 import type { AgentStartedTelemetry } from '@/lib/worktree-startup-payload'
 import type { StartupCommandDelivery } from '../../../shared/codex-startup-delivery'
 import type { SleepingAgentLaunchConfig } from '../../../shared/agent-session-resume'
 import type { GlobalSettings } from '../../../shared/global-settings-types'
 import type { OnboardingState } from '../../../shared/onboarding-state-types'
 import type { TuiAgent } from '../../../shared/tui-agent'
+import { resolveAgentStartupPlanInputs } from '../../../shared/agent-startup-plan-inputs'
+import type { AgentStartupShell } from '../../../shared/tui-agent-startup-shell'
 
 export type OnboardingFolderAgentStartup = {
   command: string
@@ -28,26 +26,31 @@ function getClientPlatform(): NodeJS.Platform {
   return navigator.userAgent.includes('Mac') ? 'darwin' : 'linux'
 }
 
-export function buildOnboardingFolderAgentStartup(
-  settings: GlobalSettings | null
-): OnboardingFolderAgentStartup | undefined {
+export function onboardingFolderDefaultAgent(settings: GlobalSettings | null): TuiAgent | null {
   const agent = settings?.defaultTuiAgent
-  if (
-    !settings ||
-    !agent ||
-    agent === 'blank' ||
-    !isTuiAgentEnabled(agent, settings.disabledTuiAgents)
-  ) {
+  return agent && agent !== 'blank' && isTuiAgentEnabled(agent, settings?.disabledTuiAgents)
+    ? agent
+    : null
+}
+
+export function buildOnboardingFolderAgentStartup(
+  settings: GlobalSettings | null,
+  context?: { platform: NodeJS.Platform; shell?: AgentStartupShell; isRemote: boolean }
+): OnboardingFolderAgentStartup | undefined {
+  const agent = onboardingFolderDefaultAgent(settings)
+  if (!settings || !agent) {
     return undefined
   }
 
   const startupPlan = buildAgentStartupPlan({
-    agent,
+    ...resolveAgentStartupPlanInputs({
+      agent,
+      settings,
+      platform: context?.platform ?? getClientPlatform(),
+      shell: context?.shell,
+      isRemote: context?.isRemote === true
+    }),
     prompt: '',
-    cmdOverrides: settings.agentCmdOverrides ?? {},
-    agentArgs: resolveTuiAgentLaunchArgs(agent, settings.agentDefaultArgs),
-    agentEnv: resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
-    platform: getClientPlatform(),
     allowEmptyPromptLaunch: true
   })
   if (!startupPlan) {

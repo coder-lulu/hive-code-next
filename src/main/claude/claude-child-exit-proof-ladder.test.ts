@@ -49,8 +49,6 @@ function rootStoppedBySigterm(stopMs: number, platform: NodeJS.Platform) {
   return { child, managed }
 }
 
-/** A root that leaves on stdin end when `leavesOnStdinEnd`, otherwise once killed (or, with
- *  `leavesOnKill` false, only when the test emits its exit). Closed under `closePlatform`'s rules. */
 function fixtureRoot(
   closePlatform: NodeJS.Platform,
   leavesOnStdinEnd: boolean,
@@ -76,25 +74,14 @@ function fixtureRoot(
 
 function windowsTree(
   root: ReturnType<typeof fixtureRoot>,
-  terminateWindowsTree: (rootPid: number) => Promise<boolean>,
-  descendantVerdict: 'exited' | 'unverifiable' = 'unverifiable'
+  terminateWindowsTree: (rootPid: number) => Promise<boolean>
 ) {
   const captureDescendants = vi.fn(async () => null)
   const tree = createClaudeChildTreeReaper(root.child, {
     platform: 'win32',
     exited: () => root.managed.rootVerdict === 'exited',
     captureDescendants,
-    captureWindowsDescendants: vi.fn(async () => ({
-      root: { pid: 4321, creationTimeMs: 100 },
-      descendants: [{ pid: 4322, creationTimeMs: 101 }],
-      unidentifiedCount: 0,
-      capturedAtMs: 200
-    })),
-    verifyRootIdentity: async () => true,
-    terminateWindowsTree: async (identity) => {
-      await terminateWindowsTree(identity.pid)
-    },
-    terminateWindowsDescendants: async () => descendantVerdict
+    terminateWindowsTree
   })
   return { tree, reap: vi.spyOn(tree, 'reap'), captureDescendants }
 }
@@ -131,23 +118,24 @@ describe('Claude child exit proof ladder', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  it('on Windows keeps a natural root exit unproven when its descendants remain unverified', async () => {
+  it('on Windows proves a close when Claude leaves on its own after its stdin ends', async () => {
     const root = fixtureRoot('win32', true)
     const terminateWindowsTree = vi.fn(async () => true)
     const { tree, reap, captureDescendants } = windowsTree(root, terminateWindowsTree)
 
     await expect(
       proveClaudeChildExitWithReaper({ managed: root.managed, tree }, () => tree)
-    ).resolves.toBe(false)
+    ).resolves.toBe(true)
 
-    // Root exit retains the captured descendants; a termination request cannot replace their proof.
-    expect(reap).toHaveBeenCalledOnce()
+    // Voluntary Windows exit makes no claim about Claude's descendants.
+    expect(reap).not.toHaveBeenCalled()
     expect(terminateWindowsTree).not.toHaveBeenCalled()
     expect(captureDescendants).not.toHaveBeenCalled()
     expect(root.child.kill).not.toHaveBeenCalled()
     expect(root.managed.lastCloseResult).toEqual({
       root: 'exited',
-      tree: 'unverifiable'
+      tree: 'unverifiable',
+      selfExit: true
     })
   })
 
@@ -155,18 +143,28 @@ describe('Claude child exit proof ladder', () => {
     { taskkill: true, proven: true },
     { taskkill: false, proven: false }
   ])(
-    'on Windows a forced close is proven only by observed descendant exit: observed $taskkill',
+    'on Windows a forced close is proven only by taskkill: taskkill $taskkill',
     async ({ taskkill, proven }) => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
       const root = fixtureRoot('win32', false)
       const terminateWindowsTree = vi.fn(async () => taskkill)
-      const { tree } = windowsTree(root, terminateWindowsTree, proven ? 'exited' : 'unverifiable')
+      const { tree } = windowsTree(root, terminateWindowsTree)
 
-      await expect(
-        proveClaudeChildExitWithReaper({ managed: root.managed, tree }, () => tree)
-      ).resolves.toBe(proven)
+      let settled = false
+      const proof = proveClaudeChildExitWithReaper(
+        { managed: root.managed, tree },
+        () => tree
+      ).finally(() => (settled = true))
+      await new Promise((resolve) => setImmediate(resolve))
+      expect(root.child.stdin.writableEnded).toBe(true)
+      await vi.advanceTimersByTimeAsync(1_499)
+      expect(settled).toBe(false)
+      expect(terminateWindowsTree).not.toHaveBeenCalled()
+      expect(root.managed.rootVerdict).toBe('live')
+      await vi.advanceTimersByTimeAsync(1)
+      await expect(proof).resolves.toBe(proven)
 
       expect(terminateWindowsTree).toHaveBeenCalledWith(4321)
-      // The root still leaves through its held handle whatever taskkill reported.
       expect(root.managed.rootVerdict).toBe('exited')
     },
     10_000
@@ -183,13 +181,27 @@ describe('Claude child exit proof ladder', () => {
   })
 
   it('on Windows a retried close after a failed taskkill stays unproven once the root exits', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     const root = fixtureRoot('win32', false, false)
     const terminateWindowsTree = vi.fn(async () => false)
     const { tree } = windowsTree(root, terminateWindowsTree)
     const close = () => proveClaudeChildExitWithReaper({ managed: root.managed, tree }, () => tree)
 
-    await expect(close()).resolves.toBe(false)
-    // The exit lands only after the forced wait: it is not Claude leaving on its own.
+    let settled = false
+    const proof = close().finally(() => (settled = true))
+    await new Promise((resolve) => setImmediate(resolve))
+    expect(root.child.stdin.writableEnded).toBe(true)
+    await vi.advanceTimersByTimeAsync(1_499)
+    expect(settled).toBe(false)
+    expect(terminateWindowsTree).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(terminateWindowsTree).toHaveBeenCalledOnce()
+    await vi.advanceTimersByTimeAsync(999)
+    expect(settled).toBe(false)
+    expect(root.managed.rootVerdict).toBe('live')
+    await vi.advanceTimersByTimeAsync(1)
+    await expect(proof).resolves.toBe(false)
+    // Exit after a forced reap must not count as voluntary.
     root.child.emit('exit', null, 'SIGKILL')
     await expect(close()).resolves.toBe(false)
 
@@ -202,12 +214,11 @@ describe('Claude child exit proof ladder', () => {
     { taskkill: true, proven: true },
     { taskkill: false, proven: false }
   ])(
-    'on Windows a reap outside a close keeps observed descendant exit as the verdict: observed $taskkill',
+    'on Windows a reap outside a close keeps taskkill as the verdict: taskkill $taskkill',
     async ({ taskkill, proven }) => {
-      // The transport-failure reap (stdin error, reader failure) kills the live tree itself.
       const root = fixtureRoot('win32', false)
       const terminateWindowsTree = vi.fn(async () => taskkill)
-      const { tree } = windowsTree(root, terminateWindowsTree, proven ? 'exited' : 'unverifiable')
+      const { tree } = windowsTree(root, terminateWindowsTree)
       await tree.reap()
       expect(root.managed.rootVerdict).toBe('exited')
 

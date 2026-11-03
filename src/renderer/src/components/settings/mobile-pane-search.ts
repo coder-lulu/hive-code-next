@@ -1,6 +1,7 @@
 import { translate } from '@/i18n/i18n'
 import { translateSearchKeyword } from './settings-search-keywords'
 import { createLocalizedCatalog } from '@/i18n/localized-catalog'
+import { matchesSettingsSearch, normalizeSettingsSearchQuery } from './settings-search'
 import { getMachineNameSearchEntries } from './machine-name-search'
 
 const getNetworkInterfaceSearchEntries = createLocalizedCatalog(() => [
@@ -43,6 +44,13 @@ const getNetworkInterfaceSearchEntries = createLocalizedCatalog(() => [
     ]
   }
 ])
+
+export function shouldOpenMobilePairingAddress(searchQuery: string): boolean {
+  return (
+    normalizeSettingsSearchQuery(searchQuery) !== '' &&
+    matchesSettingsSearch(searchQuery, getNetworkInterfaceSearchEntries())
+  )
+}
 
 export const getMobilePaneSearchEntries = createLocalizedCatalog(() => [
   {
@@ -113,8 +121,7 @@ export const getMobilePaneSearchEntries = createLocalizedCatalog(() => [
       ...translateSearchKeyword('auto.components.settings.mobile.pane.search.dbccde3a60', 'close')
     ]
   },
-  // Why: the machine name is one setting shown on several panes; the Mobile pane only adds its
-  // own keyword so "mobile machine name" still lands here.
+  // Reuse machine-name entries across panes, adding only Mobile-specific search keywords.
   ...getMachineNameSearchEntries().map((entry) => ({
     ...entry,
     keywords: [

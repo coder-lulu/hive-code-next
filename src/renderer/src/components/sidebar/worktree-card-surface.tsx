@@ -1,6 +1,8 @@
 import React from 'react'
 import { LoaderCircle } from 'lucide-react'
 
+import { useProjectTree } from './project-tree-context'
+import { ProjectWorkspaceCardDisclosure } from './ProjectWorkspaceDisclosure'
 import { cn } from '@/lib/utils'
 import { AutoRenameFailedDialog } from './AutoRenameFailedDialog'
 import WorktreeContextMenu from './WorktreeContextMenu'
@@ -8,22 +10,9 @@ import { useIsSleepingWorktree } from './use-worktree-sleep-state'
 import { WorktreeCardParentContent } from './worktree-card-parent-content'
 import { buildWorktreeCardPresentation } from './worktree-card-presentation'
 import type { WorktreeCardController } from './use-worktree-card-controller'
-import { useProjectTree, ProjectWorkspaceDisclosureContext } from './project-tree-context'
-import { useWorktreeAgentExpansionState } from './worktree-card-agents-expansion-state'
-import { useWorktreeSessionRows } from './useWorktreeSessionRows'
-import { getWorktreeHostIdentity } from '../../../../shared/worktree/host-qualified-identity'
 
 export function WorktreeCardSurface({ card }: { card: WorktreeCardController }): React.JSX.Element {
   const projectTree = useProjectTree()
-  const expansion = useWorktreeAgentExpansionState(
-    projectTree ? getWorktreeHostIdentity(card.worktree) : card.worktree.id,
-    projectTree && card.isActive
-  )
-  const agents = useWorktreeSessionRows(card.worktree.id, projectTree)
-  const disclosure = React.useMemo(
-    () => (projectTree ? { agents, expansion } : null),
-    [projectTree, agents, expansion]
-  )
   const presentation = buildWorktreeCardPresentation(card)
   const {
     worktree,
@@ -47,6 +36,9 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
     isQueuedForDeletion,
     deleteLabel,
     handleClick,
+    handlePointerDown,
+    handlePointerEnter,
+    handlePointerLeave,
     handleDoubleClick,
     handleDragStart,
     handleDragEnd,
@@ -66,8 +58,7 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
         titleOnlyCard ? 'py-2' : 'pt-1.25 pb-1.5',
         flushSurface ? 'ml-1 w-[calc(100%-0.25rem)]' : 'ml-1',
         'overflow-hidden rounded-lg',
-        // Why: the live data attribute updates before React state during navigation,
-        // so it must own the complete active style without stale utility classes.
+        // Navigation updates the live attribute before React; it must own the complete active style.
         isLineageDropTarget
           ? 'border border-worktree-sidebar-foreground/40 bg-worktree-sidebar-accent text-worktree-sidebar-accent-foreground ring-1 ring-inset ring-worktree-sidebar-ring/60'
           : isActiveSurface
@@ -79,15 +70,9 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
           revealHighlightTone === 'ai' && 'scroll-to-current-workspace-reveal-highlight--ai'
         ],
         titleRenaming && '!border-transparent !bg-transparent !shadow-none !ring-0',
-        isDeleting && !projectTree && 'opacity-50 grayscale cursor-not-allowed',
-        isDeleting && projectTree && 'cursor-not-allowed',
-        // Why: sleep dim carries the awake/sleeping distinction in new-card style,
-        // where quiet statuses share the branch/PR lane (#19624). Same token as
-        // the disconnected dim; legacy keeps its green/gray dots untouched.
-        // Why: no SSH dim — the inline host control now states the disconnected state
-        // explicitly, and a subtree opacity would composite its destructive tint and spinner
-        // down to an illegible alpha (a descendant cannot escape an ancestor's opacity).
-        isRuntimeDisconnected && !isDeleting && !projectTree && 'opacity-60'
+        isDeleting && 'opacity-50 grayscale cursor-not-allowed',
+        // Dim disconnected runtimes only; ancestor opacity would make the SSH control’s error tint/spinner illegible.
+        isRuntimeDisconnected && !isDeleting && 'opacity-60'
       )}
       data-worktree-card-surface="true"
       data-worktree-card-active={
@@ -98,12 +83,15 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
       }
       data-worktree-lineage-drop-target={isLineageDropTarget || undefined}
       onClick={handleClick}
+      onPointerDown={affiliateListMode ? undefined : handlePointerDown}
+      onPointerEnter={affiliateListMode ? undefined : handlePointerEnter}
+      onPointerLeave={affiliateListMode ? undefined : handlePointerLeave}
       onDoubleClick={affiliateListMode ? undefined : handleDoubleClick}
       draggable={!affiliateListMode && nativeDragEnabled && !isDeleting && !titleRenaming}
       onDragStart={!affiliateListMode && nativeDragEnabled ? handleDragStart : undefined}
       onDragEnd={!affiliateListMode && nativeDragEnabled ? handleDragEnd : undefined}
       aria-busy={isDeleting}
-      style={projectTree ? undefined : cardStyle}
+      style={cardStyle}
     >
       {isDeleting && (
         <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/50 backdrop-blur-[1px]">
@@ -116,27 +104,17 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
         </div>
       )}
       {isSleeping && newCardStyle && !isDeleting ? (
-        // Why a token mix (see [data-worktree-sleeping-dim] in main.css), not opacity:
-        // opacity dims toward whatever is painted behind, so the step shrank on lighter
-        // surfaces and vanished on custom backgrounds (#19624). Scoped to the parent row
-        // so awake lineage children keep their own brightness.
+        // Mix tokens for background-independent sleep dimming; scope to the parent so awake children stay bright.
         <div data-worktree-sleeping-dim="">{parentCardContent}</div>
       ) : (
         parentCardContent
       )}
 
-      {(newCardStyle || projectTree) && lineageChildren ? (
+      {lineageChildren ? (
         <div
-          className="mt-1.5 space-y-1"
+          className={cn('space-y-1', newCardStyle ? 'mt-1.5' : 'mt-3')}
           data-worktree-lineage-children=""
-          style={
-            projectTree
-              ? {
-                  marginLeft: 'var(--project-tree-indent-step)',
-                  width: 'calc(100% - var(--project-tree-indent-step))'
-                }
-              : lineageChildrenStyle
-          }
+          style={lineageChildrenStyle}
         >
           {lineageChildren}
         </div>
@@ -144,8 +122,8 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
     </div>
   )
 
-  return (
-    <ProjectWorkspaceDisclosureContext.Provider value={disclosure}>
+  const surface = (
+    <>
       {affiliateListMode ? (
         cardBody
       ) : (
@@ -165,10 +143,18 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
             open={showRenameErrorDialog}
             onOpenChange={setShowRenameErrorDialog}
             worktreeId={worktree.id}
+            executionHostId={worktree.hostId}
             worktreeName={worktree.displayName}
             error={worktree.firstAgentMessageRenameError}
           />
         )}
-    </ProjectWorkspaceDisclosureContext.Provider>
+    </>
+  )
+  return projectTree ? (
+    <ProjectWorkspaceCardDisclosure worktree={worktree} agents={card.compactInlineAgentRows}>
+      {surface}
+    </ProjectWorkspaceCardDisclosure>
+  ) : (
+    surface
   )
 }

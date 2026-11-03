@@ -1,3 +1,4 @@
+import { quotePosixShellDoubleQuotedApostrophe } from '../shared/shell-argument-quoting'
 import { statSync } from 'node:fs'
 import path from 'node:path'
 import type { LinuxRootPackageType } from '../shared/update-status-types'
@@ -41,7 +42,7 @@ type LinuxPackageInstallCommandOptions = {
 
 /** POSIX single-quoting: the only metacharacter left is `'`, closed and re-opened around a literal. */
 export function quoteForPosixShell(value: string): string {
-  return `'${value.split("'").join(`'"'"'`)}'`
+  return quotePosixShellDoubleQuotedApostrophe(value)
 }
 
 /**

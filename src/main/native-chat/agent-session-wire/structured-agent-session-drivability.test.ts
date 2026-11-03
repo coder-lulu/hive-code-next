@@ -104,10 +104,12 @@ function params(
 
 function grokAdapter(): StructuredAgentSessionAdapter {
   return {
+    open: async () => ({ reportedOptions: {} }),
     supportsLocation: () => true,
     acquire: vi
       .fn<StructuredAgentSessionAdapter['acquire']>()
       .mockImplementation(async ({ fence, spawnToken }) => ({
+        acquisitionGeneration: globalThis.crypto.randomUUID(),
         process: { hostId: 'local', pid: 4242, processStartTimeMs: NOW, spawnToken },
         link: {
           linkId: `grok-link-${fence}`,
@@ -148,7 +150,6 @@ async function attach(input: {
       probe: { outcome: 'reservation-unused' }
     },
     callerKey: 'client-1',
-    optionRevision: () => 0,
     params: input.params,
     now: () => NOW,
     onAttached: async (attached) => {
@@ -223,13 +224,12 @@ it('keeps saved history readable without a registration and resumes when it retu
   try {
     expect(router.supportsCreate(params('2', created.fence).location, 'grok')).toBe(false)
     expect(store.listVisibleSessionIds()).toEqual([SESSION])
-    await host.restoreReadableSessions([SESSION])
-    expect(host.hasSession(SESSION)).toBe(true)
     await expect(host.revealSession(SESSION)).resolves.toMatchObject({
       sessionId: SESSION,
       agent: 'grok',
       readable: true
     })
+    expect(host.hasSession(SESSION)).toBe(true)
     const history = await host.history({ sessionId: SESSION, direction: 'tail' })
     expect(history).toMatchObject({
       ok: true,

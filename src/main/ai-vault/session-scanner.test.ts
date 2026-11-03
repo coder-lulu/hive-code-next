@@ -3,15 +3,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AI_VAULT_AGENTS } from '../../shared/ai-vault-types'
-import { quoteStartupArg } from '../../shared/tui-agent-startup-shell'
 import { scanAiVaultSessions } from './session-scanner'
 import { isolatedScanRoots, jsonLines } from './session-scanner-test-fixtures'
 import { KIRO_FIXTURE_SESSION_ID } from './session-scanner-kiro-fixtures'
 import { writeEveryAgentVault } from './session-scanner-every-agent-fixture'
 
-// Why: the SQLite worker bundle does not exist in the test runtime; route the
-// v1/v2 worker calls to their synchronous implementations so scanning stays
-// end-to-end without spawning a real worker thread.
+// Use synchronous SQLite implementations because worker bundles are absent in the test runtime.
 vi.mock('./session-scanner-opencode-sqlite-worker-spawn', async () => {
   const v1List = await import('./session-scanner-opencode-sqlite-list')
   const v1Parse = await import('./session-scanner-opencode-sqlite')
@@ -204,7 +201,6 @@ describe('scanAiVaultSessions', () => {
       totalTokens: 155,
       resumeCommand: "cd '/repo/app' && claude --resume 'claude-session'"
     })
-    // Why: list scans omit firstUserPrompt so the vault payload stays bounded.
     expect(claude?.firstUserPrompt).toBeUndefined()
 
     const codex = result.sessions.find((session) => session.agent === 'codex')
@@ -215,7 +211,7 @@ describe('scanAiVaultSessions', () => {
       model: 'gpt-5.3-codex',
       messageCount: 2,
       totalTokens: 625,
-      resumeCommand: `cd '/repo/app/packages/web' && CODEX_HOME=${quoteStartupArg(root, 'posix')} codex resume '019f0000-1111-7222-8333-444444444444'`
+      resumeCommand: `cd '/repo/app/packages/web' && CODEX_HOME='${root}' codex resume '019f0000-1111-7222-8333-444444444444'`
     })
     expect(codex?.firstUserPrompt).toBeUndefined()
   })
@@ -270,7 +266,7 @@ describe('scanAiVaultSessions', () => {
       sessionId: '019e9693-64fc-7370-9c18-7e625c595d0f',
       cwd: '/Users/nwparker/orca/workspaces/orca/mem4',
       codexHome: runtimeHome,
-      resumeCommand: `cd '/Users/nwparker/orca/workspaces/orca/mem4' && CODEX_HOME=${quoteStartupArg(runtimeHome, 'posix')} codex resume '019e9693-64fc-7370-9c18-7e625c595d0f'`
+      resumeCommand: `cd '/Users/nwparker/orca/workspaces/orca/mem4' && CODEX_HOME='${runtimeHome}' codex resume '019e9693-64fc-7370-9c18-7e625c595d0f'`
     })
   })
 
@@ -403,9 +399,7 @@ describe('scanAiVaultSessions', () => {
     const { roots, antigravitySessionId, ompSessionFile, primeAgentSessionFile } =
       await writeEveryAgentVault(root)
 
-    // Why the headroom: the limit is a newest-first cap, so a limit equal to the
-    // agent count silently drops one agent as soon as any fixture writes a second
-    // session — which is how adding jcode's fixture knocked Claude out of this set.
+    // Allow multiple fixtures per agent without evicting another agent under the recency cap.
     const result = await scanAiVaultSessions({
       ...roots,
       platform: 'darwin',
@@ -423,7 +417,7 @@ describe('scanAiVaultSessions', () => {
       "cd '/tmp/claude' && claude --resume 'claude-session'"
     )
     expect(commandByAgent.get('codex')).toBe(
-      `cd '/tmp/codex' && CODEX_HOME=${quoteStartupArg(root, 'posix')} codex resume 'codex-session'`
+      `cd '/tmp/codex' && CODEX_HOME='${root}' codex resume 'codex-session'`
     )
     expect(commandByAgent.get('gemini')).toBe("gemini --resume 'gemini-session'")
     expect(commandByAgent.get('antigravity')).toBe(`agy --conversation '${antigravitySessionId}'`)
@@ -449,13 +443,9 @@ describe('scanAiVaultSessions', () => {
       "cd '/tmp/openclaw' && openclaw --resume 'openclaw-session'"
     )
     expect(commandByAgent.get('pi')).toBe("cd '/tmp/pi' && pi --session 'pi-session'")
-    // OMP resumes by absolute transcript path, not by internal session id.
-    expect(commandByAgent.get('omp')).toBe(
-      `cd '/tmp/omp' && omp --resume ${quoteStartupArg(ompSessionFile, 'posix')}`
-    )
-    // Prime Agent's `--resume <path|id>` takes the same absolute-path form as OMP.
+    expect(commandByAgent.get('omp')).toBe(`cd '/tmp/omp' && omp --resume '${ompSessionFile}'`)
     expect(commandByAgent.get('prime-agent')).toBe(
-      `cd '/tmp/prime-agent' && prime-agent --resume ${quoteStartupArg(primeAgentSessionFile, 'posix')}`
+      `cd '/tmp/prime-agent' && prime-agent --resume '${primeAgentSessionFile}'`
     )
     expect(commandByAgent.get('cline')).toBe("cd '/tmp/cline' && cline --id 'cline-session'")
     expect(commandByAgent.get('devin')).toBe("cd '/tmp/devin' && devin --resume 'devin-session'")
@@ -471,21 +461,22 @@ describe('scanAiVaultSessions', () => {
       `cd '/tmp/kiro' && kiro-cli chat --tui --resume-id '${KIRO_FIXTURE_SESSION_ID}'`
     )
 
+    expect(result.sessions.find((session) => session.agent === 'rovo')).toMatchObject({
+      filePath: join(roots.rovoSessionsDir, 'rovo-session', 'metadata.json'),
+      messageCount: 1,
+      previewMessages: [expect.objectContaining({ text: 'Rovo title' })]
+    })
+
     const ompSession = result.sessions.find((session) => session.agent === 'omp')
     expect(ompSession?.model).toBe('gpt-5.4-mini')
     expect(ompSession?.totalTokens).toBe(160)
 
-    // Prime Agent keeps Pi's `model_change.modelId` key, so the pre-reply model
-    // must come through even though no assistant message was written yet.
     const primeAgentSession = result.sessions.find((session) => session.agent === 'prime-agent')
     expect(primeAgentSession?.model).toBe('inference/big-model')
     expect(primeAgentSession?.title).toBe('Prime Agent title')
   })
 
   it('captures an in-progress OMP model from model_change before any assistant reply', async () => {
-    // OMP writes the model on `model_change.model` (not Pi's `modelId`). With no
-    // assistant message yet, the model must still come through — proving the
-    // model_change fallback rather than assistant-message capture.
     const root = await mkdtemp(join(tmpdir(), 'orca-ai-vault-omp-mc-'))
     tempRoots.push(root)
     const roots = isolatedScanRoots(root)

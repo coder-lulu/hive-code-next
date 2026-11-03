@@ -1,10 +1,9 @@
+import { findAllByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MobileAgentIcon } from './MobileAgentIcon'
-import { darkThemeColors, lightThemeColors } from '../theme/mobile-theme'
-
-const themeState = vi.hoisted(() => ({ scheme: 'light' as 'light' | 'dark' }))
+import { applyMobileColorScheme, paletteForScheme } from '../theme/mobile-theme'
 
 vi.mock('react-native', () => ({
   Image: 'Image',
@@ -26,28 +25,16 @@ vi.mock('react-native-svg', () => ({
 
 vi.mock('./mobile-agent-icon-assets', () => ({ MOBILE_AGENT_ICON_ASSETS: {} }))
 
-vi.mock('../theme/mobile-theme-provider', () => ({
-  useMobileTheme: () => ({
-    color: {
-      text: {
-        primary:
-          themeState.scheme === 'light'
-            ? lightThemeColors.text.primary
-            : darkThemeColors.text.primary
-      }
-    }
-  })
-}))
-
 describe('MobileAgentIcon theme colors', () => {
+  afterEach(() => applyMobileColorScheme('light'))
   it.each(['light', 'dark'] as const)('keeps both Pi glyph paths readable on %s', (scheme) => {
-    themeState.scheme = scheme
+    applyMobileColorScheme(scheme)
     let renderer: ReactTestRenderer | null = null
     act(() => {
       renderer = create(createElement(MobileAgentIcon, { agentId: 'pi' }))
     })
-    const color = scheme === 'light' ? lightThemeColors.text.primary : darkThemeColors.text.primary
-    expect(renderer?.root.findAllByType('Path').map((path) => path.props.fill)).toEqual([
+    const color = paletteForScheme(scheme).textPrimary
+    expect(findAllByHostType(renderer!.root, 'Path').map((path) => path.props.fill)).toEqual([
       color,
       color
     ])
@@ -55,22 +42,26 @@ describe('MobileAgentIcon theme colors', () => {
   })
 
   it('uses graphite for the OpenAI icon on a light theme', () => {
-    themeState.scheme = 'light'
+    applyMobileColorScheme('light')
     let renderer: ReactTestRenderer | null = null
     act(() => {
       renderer = create(createElement(MobileAgentIcon, { agentId: 'codex' }))
     })
 
-    expect(renderer?.root.findAllByType('Path')[0]?.props.fill).toBe(lightThemeColors.text.primary)
+    expect(findAllByHostType(renderer!.root, 'Path')[0]?.props.fill).toBe(
+      paletteForScheme('light').textPrimary
+    )
   })
 
   it('keeps the OpenAI icon readable on a dark theme', () => {
-    themeState.scheme = 'dark'
+    applyMobileColorScheme('dark')
     let renderer: ReactTestRenderer | null = null
     act(() => {
       renderer = create(createElement(MobileAgentIcon, { agentId: 'codex' }))
     })
 
-    expect(renderer?.root.findAllByType('Path')[0]?.props.fill).toBe(darkThemeColors.text.primary)
+    expect(findAllByHostType(renderer!.root, 'Path')[0]?.props.fill).toBe(
+      paletteForScheme('dark').textPrimary
+    )
   })
 })

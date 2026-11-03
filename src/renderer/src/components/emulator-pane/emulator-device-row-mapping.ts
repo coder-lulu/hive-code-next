@@ -1,7 +1,6 @@
 import { translate } from '@/i18n/i18n'
 import type { SimulatorDeviceRow, SimulatorDeviceState } from './emulator-pane-types'
 
-// Raw shape returned by the unified `emulator.listDevices` RPC (iOS simulators + Android AVDs).
 export type RawEmulatorDevice = {
   id: string
   name: string

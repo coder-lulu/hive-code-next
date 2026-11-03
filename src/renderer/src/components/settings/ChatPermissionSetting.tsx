@@ -1,11 +1,11 @@
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
-import { AGENT_CHAT_PERMISSION_MODES } from '../../../../shared/agent-chat-permission-mode'
+import { AGENT_PERMISSION_CHOICES, applyAllAgentsPermission, isAgentPermissionChoice } from '../../../../shared/tui-agent-permission-choice'
 import { NativeChatPermissionModePicker } from '../native-chat/NativeChatPermissionModePicker'
 import { SettingsRow } from './SettingsFormControls'
 import { SearchableSetting } from './SearchableSetting'
 import { getChatPermissionSearchEntry } from './chat-permission-search'
 
-/** This host's mode for new Claude and Codex chats; each chat keeps its own once created. */
+/** This host's profile default; explicit per-agent and existing chat choices survive. */
 export function ChatPermissionSetting({
   settings,
   updateSettings,
@@ -15,10 +15,7 @@ export function ChatPermissionSetting({
   updateSettings: (updates: Partial<GlobalSettings>) => void
   forceVisible: boolean
 }): React.JSX.Element | null {
-  const current = settings.nativeChatPermissionMode
-  if (current === undefined) {
-    return null
-  }
+  const current = isAgentPermissionChoice(settings.agentPermissionDefault) ? settings.agentPermissionDefault : 'own'
   const entry = getChatPermissionSearchEntry()
   return (
     <SearchableSetting
@@ -33,8 +30,8 @@ export function ChatPermissionSetting({
         control={
           <NativeChatPermissionModePicker
             current={current}
-            modes={AGENT_CHAT_PERMISSION_MODES}
-            onSelect={(nativeChatPermissionMode) => updateSettings({ nativeChatPermissionMode })}
+            modes={AGENT_PERMISSION_CHOICES}
+            onSelect={(choice) => updateSettings(applyAllAgentsPermission(settings, choice))}
           />
         }
       />

@@ -1,3 +1,4 @@
+import { TUI_AGENT_AUTO_PICK_ORDER } from '../../../../shared/tui-agent-selection'
 // @vitest-environment happy-dom
 
 import { resetLocalStructuredChatsForTests } from '@/runtime/local-structured-chats'
@@ -72,7 +73,7 @@ describe('NativeChatResumeStatusSegment', () => {
     consumeNativeChatResumeOnRestartDialogRequest()
     useAppStore.setState({
       ...useAppStore.getInitialState(),
-      settings: { ...getDefaultSettings(''), experimentalNativeChat: true }
+      settings: { ...getDefaultSettings(''),  }
     })
   })
 
@@ -186,7 +187,7 @@ describe('NativeChatResumeStatusSegment', () => {
   it('hides when no chat exists and the setting is off, or the host offers nothing', async () => {
     rpc.mockResolvedValue({ sessions: candidates })
     useAppStore.setState({
-      settings: { ...getDefaultSettings(''), experimentalNativeChat: false }
+      settings: { ...getDefaultSettings(''), nativeChatProviders: Object.fromEntries(TUI_AGENT_AUTO_PICK_ORDER.map((agent) => [agent, false])) }
     })
     await mount()
     expect(screen.queryByRole('button')).toBeNull()
@@ -196,7 +197,7 @@ describe('NativeChatResumeStatusSegment', () => {
     cleanup()
     rpc.mockResolvedValue({ sessions: [] })
     useAppStore.setState({
-      settings: { ...getDefaultSettings(''), experimentalNativeChat: true }
+      settings: { ...getDefaultSettings(''),  }
     })
     await mount()
     expect(screen.queryByRole('button')).toBeNull()
@@ -206,7 +207,7 @@ describe('NativeChatResumeStatusSegment', () => {
   it('offers to continue the chats this machine holds while the setting is off', async () => {
     rpc.mockResolvedValue({ sessions: candidates })
     useAppStore.setState({
-      settings: { ...getDefaultSettings(''), experimentalNativeChat: false }
+      settings: { ...getDefaultSettings(''), nativeChatProviders: Object.fromEntries(TUI_AGENT_AUTO_PICK_ORDER.map((agent) => [agent, false])) }
     })
     stageLocalHost(true)
     await mount()
@@ -219,7 +220,7 @@ describe('NativeChatResumeStatusSegment', () => {
   it("does not ask this machine for an offer over a paired server's chats", async () => {
     rpc.mockResolvedValue({ sessions: candidates })
     useAppStore.setState({
-      settings: { ...getDefaultSettings(''), experimentalNativeChat: false },
+      settings: { ...getDefaultSettings(''), nativeChatProviders: Object.fromEntries(TUI_AGENT_AUTO_PICK_ORDER.map((agent) => [agent, false])) },
       unifiedTabsByWorktree: {
         'wt-1': [
           {

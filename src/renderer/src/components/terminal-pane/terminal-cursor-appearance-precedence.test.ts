@@ -66,13 +66,9 @@ async function actAndAwaitRender(
 describe('#12729 — cursor style and opacity survive the settings path', () => {
   it('keeps an explicitly chosen bar across the settings write and the next load', () => {
     // The write path stamps the migration flag alongside the user's choice.
-    const written = normalizeTerminalCursorStyleDefault(
-      { terminalCursorStyle: 'bar' },
-      { preserveExplicitValue: true }
-    )
+    const written = normalizeTerminalCursorStyleDefault({ terminalCursorStyle: 'bar' })
     expect(written).toEqual({
-      terminalCursorStyle: 'bar',
-      terminalCursorStyleDefaultedToBlock: true
+      terminalCursorStyle: 'bar'
     })
 
     // The load path re-runs the migration over what was persisted and must not re-default it.
@@ -82,7 +78,7 @@ describe('#12729 — cursor style and opacity survive the settings path', () => 
   it('composes terminalCursorOpacity into the theme cursor colour', () => {
     const theme = composeActiveTerminalTheme(
       { background: '#112233', foreground: '#aabbcc', cursor: '#ffffff' },
-      { terminalCursorOpacity: 0.1 }
+      { terminalCursorOpacity: 0.1 } as never
     )
 
     expect(theme?.cursor).toBe('rgba(255, 255, 255, 0.1)')

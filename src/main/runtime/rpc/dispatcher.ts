@@ -1,3 +1,4 @@
+import { resolveOrcadFeatureRequirement, rpcMethodFeatureWait } from './orcad-feature-readiness'
 import {
   buildRegistry,
   isStreamingMethod,
@@ -57,7 +58,12 @@ export class RpcDispatcher {
   private readonly hiveRuntimeCloud: HiveRuntimeCloudControl | undefined
   private readonly pinnedCallerScope: RpcCallerScope | undefined
 
-  constructor({ runtime, methods = ALL_RPC_METHODS, callerScope, hiveRuntimeCloud }: DispatcherOptions) {
+  constructor({
+    runtime,
+    methods = ALL_RPC_METHODS,
+    callerScope,
+    hiveRuntimeCloud
+  }: DispatcherOptions) {
     this.runtime = runtime
     this.hiveRuntimeCloud = hiveRuntimeCloud
     this.pinnedCallerScope = callerScope
@@ -86,6 +92,13 @@ export class RpcDispatcher {
       emulatorProbe(`rpc ${request.method}`, request.params)
     }
     try {
+      const featureWait = rpcMethodFeatureWait(
+        resolveOrcadFeatureRequirement(admission.method.requires, admission.params),
+        [options?.signal, options?.connectionSignal]
+      )
+      if (featureWait) {
+        await featureWait
+      }
       return successResponse(request.id, meta, await this.invokeUnary(admission, options))
     } catch (error) {
       if (probeEmulator) {
@@ -117,6 +130,19 @@ export class RpcDispatcher {
       return
     }
     const { method, request, params, caller } = admission
+
+    const featureWait = rpcMethodFeatureWait(
+      resolveOrcadFeatureRequirement(method.requires, params),
+      [options?.signal, options?.connectionSignal]
+    )
+    if (featureWait) {
+      try {
+        await featureWait
+      } catch (error) {
+        reply(JSON.stringify(mapDispatcherError(request, meta, error)))
+        return
+      }
+    }
 
     if (!isStreamingMethod(method)) {
       try {
@@ -178,7 +204,13 @@ export class RpcDispatcher {
   ): Promise<unknown> {
     const { runtime, orchestrationMutations, legacyOrchestration } = this
     assertRpcRequestAuthorized(request.method, options)
-    const context = rpcContextFromTransport(runtime, request, options, caller, this.hiveRuntimeCloud)
+    const context = rpcContextFromTransport(
+      runtime,
+      request,
+      options,
+      caller,
+      this.hiveRuntimeCloud
+    )
     // Why: test fakes of the runtime omit the client-hosted browser route.
     const clientHostedBrowser = await (runtime.routeClientHostedBrowserRpc?.(
       request.method,

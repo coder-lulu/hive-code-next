@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, expect, it } from 'vitest'
 import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -13,11 +13,8 @@ import {
 
 restoreUserDataPathAfterEach()
 
-const describeLiveZsh = process.platform === 'win32' ? describePosix : describeIfZsh
-
-// End-to-end validation that wrapper ZDOTDIR discovery preserves top-level zsh semantics (spawns real zsh; gated on availability).
-describeLiveZsh('live zsh subprocess tests', () => {
-  describe('terminal emulator edge cases', () => {
+describePosix('live zsh subprocess tests', () => {
+  describeIfZsh('terminal emulator edge cases', () => {
     let testHome: string
     let userDataPath: string
 
@@ -88,8 +85,7 @@ describeLiveZsh('live zsh subprocess tests', () => {
     })
 
     it('handles sudo -E where HOME and ZDOTDIR mismatch', async () => {
-      // Why a real dir: an inherited ZDOTDIR only counts as the user's config
-      // root when it actually holds a zsh startup file.
+      // Inherited ZDOTDIR counts as user configuration only when it contains a startup file.
       const userZdotdir = join(testHome, '.config', 'zsh')
       mkdirSync(userZdotdir, { recursive: true })
       writeFileSync(join(userZdotdir, '.zshrc'), '')
@@ -103,7 +99,6 @@ describeLiveZsh('live zsh subprocess tests', () => {
         const { getShellReadyLaunchConfig } = await importFreshLocalPtyShellReady()
         const config = getShellReadyLaunchConfig('/bin/zsh')
 
-        // Should preserve user's ZDOTDIR from spawn env, not fall back to /root
         expect(config.env.ORCA_ORIG_ZDOTDIR).toBe(userZdotdir)
       } finally {
         if (previousZdotdir === undefined) {
@@ -145,7 +140,6 @@ describeLiveZsh('live zsh subprocess tests', () => {
         })
 
         expect(result.status).toBe(0)
-        // Should discover fresh value from .zshenv, not use stale wrapper path
         expect(result.stdout).toContain(`ZDOTDIR=${currentZdotdir}`)
       } finally {
         if (previousOrcaZdotdir === undefined) {
@@ -183,7 +177,6 @@ describeLiveZsh('live zsh subprocess tests', () => {
         })
 
         expect(result.status).toBe(0)
-        // Should use fresh discovery (user updated .zshenv)
         expect(result.stdout).toContain(`ZDOTDIR=${freshZdotdir}`)
       } finally {
         if (previousOrcaZdotdir === undefined) {
@@ -216,9 +209,7 @@ describeLiveZsh('live zsh subprocess tests', () => {
       try {
         const { getShellReadyLaunchConfig } = await importFreshLocalPtyShellReady()
         const config = getShellReadyLaunchConfig('/bin/zsh')
-        // One channel now does what ORCA_ORIG_ZDOTDIR and ORCA_ZSHENV_SOURCE_DIR
-        // split between them: the wrapper hands this back as ZDOTDIR, and zsh
-        // reads .zshenv through it.
+        // The wrapper restores this one user directory before zsh reads .zshenv.
         expect(config.env.ORCA_ORIG_ZDOTDIR).toBe(inheritedZdotdir)
 
         const cleanEnv: Record<string, string | undefined> = {

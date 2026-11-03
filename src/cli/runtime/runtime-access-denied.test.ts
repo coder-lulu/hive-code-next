@@ -1,6 +1,5 @@
 import { EventEmitter } from 'node:events'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '../../shared/brand'
 import type { RuntimeMetadata } from '../../shared/runtime-bootstrap'
 import { formatCliError, reportCliError } from '../cli-error'
 import { RuntimeClient } from './client'
@@ -32,9 +31,8 @@ class TestSocket extends EventEmitter {
   write = vi.fn()
 }
 
-const RESTART_OR_ABSENT_ADVICE = new RegExp(
-  `Restart ${APP_DISPLAY_NAME} and try again|${APP_DISPLAY_NAME} is not running|Run '${PRIMARY_CLI_COMMAND} open' first`
-)
+const RESTART_OR_ABSENT_ADVICE =
+  /Restart Orca and try again|Orca is not running|Run 'orca open' first/
 
 let socket: TestSocket
 
@@ -80,11 +78,9 @@ describe('runtime access denied', () => {
     expect(socket.write).not.toHaveBeenCalled()
     const human = formatCliError(error)
     expect(human).toContain(
-      `Permission denied connecting to ${APP_DISPLAY_NAME} (${code}). ${APP_DISPLAY_NAME} may be running normally`
+      `Permission denied connecting to Orca (${code}). Orca may be running normally`
     )
-    expect(human).toContain(
-      `Next step: Do not restart ${APP_DISPLAY_NAME} or run '${PRIMARY_CLI_COMMAND} open'`
-    )
+    expect(human).toContain("Next step: Do not restart Orca or run 'orca open'")
     expect(human).not.toMatch(RESTART_OR_ABSENT_ADVICE)
     expect(human).not.toContain('private-runtime')
   })
@@ -93,9 +89,7 @@ describe('runtime access denied', () => {
     vi.stubEnv('CODEX_SANDBOX', 'seatbelt')
     const human = formatCliError(await deniedRequest('EPERM'))
 
-    expect(human).toContain(
-      `The Codex sandbox blocked this command from connecting to ${APP_DISPLAY_NAME}`
-    )
+    expect(human).toContain('The Codex sandbox blocked this command from connecting to Orca')
     expect(human).toContain('escalated permissions, outside the Codex sandbox')
     expect(human).not.toMatch(RESTART_OR_ABSENT_ADVICE)
   })
@@ -115,16 +109,12 @@ describe('runtime access denied', () => {
     }
   )
 
-  // Why: a dead Orca leaves its socket behind, and the sandbox denies it before ECONNREFUSED.
-  it('classifies a dead endpoint as unavailable and reports stale bootstrap without claiming a live process', async () => {
+  // Sandbox denial can mask ECONNREFUSED on a dead runtime’s leftover socket.
+  it('gives not-running advice when the denied endpoint belongs to a dead pid', async () => {
     mockKill('ESRCH')
-    const error = await deniedRequest('EPERM')
-    expect(error).toMatchObject({ code: 'runtime_unavailable' })
-    const human = formatCliError(error)
+    const human = formatCliError(await deniedRequest('EPERM'))
 
-    expect(human).toContain(
-      `Could not connect to the running ${APP_DISPLAY_NAME} app. Restart ${APP_DISPLAY_NAME} and try again.`
-    )
+    expect(human).toContain("Orca is not running. Run 'orca open' first.")
     expect(human).not.toContain('Do not restart')
     const pending = getCliStatus('/test')
     failConnect('EPERM')

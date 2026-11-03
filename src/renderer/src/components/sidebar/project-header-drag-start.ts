@@ -3,7 +3,6 @@ import type { PointerEvent } from 'react'
 import {
   getProjectHeaderDragBucketKey,
   measureProjectHeaderDragRects,
-  measureProjectHeaderDropZones,
   type ProjectHeaderDragBucketKey
 } from './project-header-drop'
 import {
@@ -12,13 +11,11 @@ import {
   type ProjectHeaderDragSession
 } from './project-header-drag-contract'
 import type { Repo } from '../../../../shared/repo-types'
-import { getRepoExecutionHostId } from '../../../../shared/execution-host'
 
 export function createProjectHeaderDragSession(args: {
   event: PointerEvent<HTMLElement>
   repo: Repo
   sidebarRepoHeaderIdsByBucket: ReadonlyMap<ProjectHeaderDragBucketKey, readonly string[]>
-  canMoveAcrossProjectGroups: boolean
   getScrollContainer: () => HTMLElement | null
 }): ProjectHeaderDragSession | null {
   if (args.event.button !== 0) {
@@ -32,9 +29,8 @@ export function createProjectHeaderDragSession(args: {
   }
   const bucketKey = getProjectHeaderDragBucketKey(args.repo)
   const sidebarRepoHeaderIds = args.sidebarRepoHeaderIdsByBucket.get(bucketKey) ?? []
-  // A lone sibling can still leave its current group. Preserve the old
-  // click-only behavior only when cross-group movement is unavailable.
-  if (sidebarRepoHeaderIds.length <= 1 && !args.canMoveAcrossProjectGroups) {
+  // A lone project cannot move within its bucket; preserve the collapse click instead.
+  if (sidebarRepoHeaderIds.length <= 1) {
     return null
   }
   const container = args.getScrollContainer()
@@ -42,16 +38,13 @@ export function createProjectHeaderDragSession(args: {
     return null
   }
   const handleEl = args.event.currentTarget
-  // Why: defer setPointerCapture until the drag threshold is crossed so a
-  // header click still reaches the inner collapse handler on pointerup.
+  // Delay pointer capture until promotion so ordinary clicks can still toggle collapse.
   return {
-    repoId: args.repo.id,
+    repo: args.repo,
     bucketKey,
     sidebarRepoHeaderIds,
-    sourceExecutionHostId: getRepoExecutionHostId(args.repo),
     pointerId: args.event.pointerId,
-    headerRects: measureProjectHeaderDragRects(container),
-    dropZones: measureProjectHeaderDropZones(container),
+    headerRects: measureProjectHeaderDragRects(container, bucketKey),
     handleEl,
     startX: args.event.clientX,
     startY: args.event.clientY,

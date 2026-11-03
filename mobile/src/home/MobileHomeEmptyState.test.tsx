@@ -1,3 +1,4 @@
+import { findAllByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement, type ComponentProps } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -41,6 +42,7 @@ const accountComputer: HostCatalogEntry = {
   credentialStatus: 'ready',
   accessSources: ['account-claimed'],
   endpoint: 'wss://test.invalid',
+  publicKeyB64: 'test-key',
   lastConnected: 0,
   profile: {
     id: 'account-computer',
@@ -55,9 +57,9 @@ let renderer: ReactTestRenderer | null = null
 let method: 'scan' | 'account'
 let computers: HostCatalogEntry[]
 let connectionStates: Record<string, ConnectionState>
-let onPairDesktop: ReturnType<typeof vi.fn>,
-  onSelectComputer: ReturnType<typeof vi.fn>,
-  onOpenComputer: ReturnType<typeof vi.fn>
+let onPairDesktop: ReturnType<typeof vi.fn<() => void>>,
+  onSelectComputer: ReturnType<typeof vi.fn<() => void>>,
+  onOpenComputer: ReturnType<typeof vi.fn<(host: HostCatalogEntry) => void>>
 function props(): ComponentProps<typeof MobileHomeEmptyState> {
   return {
     bottomInset: 0,
@@ -82,15 +84,13 @@ function mount() {
   })
 }
 function labels() {
-  return renderer!.root
-    .findAllByType('Text')
+  return findAllByHostType(renderer!.root, 'Text')
     .map((node) => node.children.join(''))
     .join('\n')
 }
 function press(label: string) {
   act(() =>
-    renderer!.root
-      .findAllByType('Pressable')
+    findAllByHostType(renderer!.root, 'Pressable')
       .find((node) => node.props.accessibilityLabel === label)!
       .props.onPress()
   )
@@ -164,9 +164,9 @@ it.each([
   computers = [accountComputer]
   connectionStates = { [accountComputer.id]: state }
   mount()
-  const row = renderer!.root
-    .findAllByType('Pressable')
-    .find((node) => node.props.accessibilityLabel?.startsWith('连接开发电脑'))!
+  const row = findAllByHostType(renderer!.root, 'Pressable').find((node) =>
+    node.props.accessibilityLabel?.startsWith('连接开发电脑')
+  )!
   expect(row.props.accessibilityLabel).toBe(`连接开发电脑，${status}`)
   expect(row.props.accessibilityState).toEqual({ busy, disabled: false })
 })
@@ -176,9 +176,9 @@ it('announces offline status and keeps the computer row disabled', () => {
   method = 'account'
   computers = [{ ...accountComputer, credentialStatus: 'cloud-offline', profile: null }]
   mount()
-  const row = renderer!.root
-    .findAllByType('Pressable')
-    .find((node) => node.props.accessibilityLabel?.startsWith('连接开发电脑'))!
+  const row = findAllByHostType(renderer!.root, 'Pressable').find((node) =>
+    node.props.accessibilityLabel?.startsWith('连接开发电脑')
+  )!
   expect(row.props.accessibilityLabel).toBe('连接开发电脑，离线')
   expect(row.props.accessibilityState).toEqual({ busy: false, disabled: true })
   expect(row.props.disabled).toBe(true)

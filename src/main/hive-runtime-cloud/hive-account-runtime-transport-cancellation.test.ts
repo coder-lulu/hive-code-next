@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { HiveAccountRuntimeTransport } from './hive-account-runtime-transport'
 import { HiveAccountRelayPool } from '../../shared/hive-account-relay-pool'
 import { EMPTY_HIVE_ACCOUNT_RUNTIME_DIRECTORY } from '../../shared/hive-runtime-cloud'
-import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
+import { RemoteRuntimeClientError } from '../../shared/remote-runtime/remote-runtime-client-error'
 import type { RuntimeEnvironmentAccountClaim } from '../../shared/runtime-environments'
 
 const claim: RuntimeEnvironmentAccountClaim = {

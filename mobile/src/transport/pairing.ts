@@ -1,15 +1,8 @@
-import { hivecodeProductConfig } from '../generated/product-config'
 import { PairingOfferSchema, type PairingOffer } from './types'
+import { normalizePairingBase64 } from '../../../src/shared/mobile-pairing-base64'
+import { PAIRING_INPUT_MAX_CHARACTERS } from '../../../src/shared/mobile-pairing-protocol-limits'
 
-const SUPPORTED_PAIRING_SCHEMES = new Set<string>([
-  hivecodeProductConfig.schemes.primary,
-  ...hivecodeProductConfig.schemes.aliases
-])
-
-// Why: this file mirrors src/shared/pairing.ts (which is covered by CI
-// vitest) but uses atob/btoa because Metro/Hermes don't ship Node's
-// Buffer. Keep the parsing semantics in sync — when one changes, update
-// the other.
+// Keep parsing aligned with src/shared/pairing.ts; use mobile base64 APIs instead of Node Buffer.
 
 export function decodePairingUrl(url: string): PairingOffer | null {
   try {
@@ -23,17 +16,18 @@ export function decodePairingUrl(url: string): PairingOffer | null {
   }
 }
 
-// Why: system camera apps hand us the raw custom-scheme URL. Keeping
-// extraction here makes QR scan, paste, and external deep-link flows
-// accept the same URL shapes.
+// Share custom-scheme extraction across camera, paste and external deep-link pairing.
 export function extractPairingCodeFromUrl(url: string): string | null {
-  const trimmed = url.trim()
-  const match = /^([a-z][a-z0-9+.-]*):\/\/([^/?#]*)([^?#]*)?/i.exec(trimmed)
-  if (!match || !SUPPORTED_PAIRING_SCHEMES.has(match[1]?.toLowerCase() ?? '')) {
+  if (url.length > PAIRING_INPUT_MAX_CHARACTERS) {
     return null
   }
-  const host = match[2]?.toLowerCase()
-  const pathname = match[3] ?? ''
+  const trimmed = url.trim()
+  const match = /^orca:\/\/([^/?#]*)([^?#]*)?/i.exec(trimmed)
+  if (!match) {
+    return null
+  }
+  const host = match[1]?.toLowerCase()
+  const pathname = match[2] ?? ''
   if (host !== 'pair' || (pathname !== '' && pathname !== '/')) {
     return null
   }
@@ -55,16 +49,16 @@ export function extractPairingCodeFromUrl(url: string): string | null {
   return null
 }
 
-// Why: accept either a supported custom-scheme URL or the bare base64
-// string so the paste-pair flow can take whichever the user actually
-// copied from desktop.
 export function parsePairingCode(input: string): PairingOffer | null {
+  if (input.length > PAIRING_INPUT_MAX_CHARACTERS) {
+    return null
+  }
   const trimmed = input.trim()
   if (!trimmed) {
     return null
   }
   try {
-    if (hasSupportedPairingScheme(trimmed)) {
+    if (/^orca:\/\//i.test(trimmed)) {
       return decodePairingUrl(trimmed)
     }
     return decodePairingBase64(trimmed)
@@ -73,23 +67,8 @@ export function parsePairingCode(input: string): PairingOffer | null {
   }
 }
 
-function hasSupportedPairingScheme(value: string): boolean {
-  const match = /^([a-z][a-z0-9+.-]*):\/\//i.exec(value)
-  return match ? SUPPORTED_PAIRING_SCHEMES.has(match[1]?.toLowerCase() ?? '') : false
-}
-
 function decodePairingBase64(base64url: string): PairingOffer {
-  // Why: desktop intentionally strips base64 padding from QR payloads. Some
-  // mobile JS runtimes reject unpadded atob input, so restore it before decode.
-  const base64 = padBase64(base64url.replace(/-/g, '+').replace(/_/g, '/'))
-  const json = atob(base64)
+  // Restore desktop-stripped QR padding for runtimes that reject unpadded atob input.
+  const json = atob(normalizePairingBase64(base64url))
   return PairingOfferSchema.parse(JSON.parse(json))
-}
-
-function padBase64(base64: string): string {
-  const remainder = base64.length % 4
-  if (remainder === 0) {
-    return base64
-  }
-  return `${base64}${'='.repeat(4 - remainder)}`
 }

@@ -1,4 +1,5 @@
 import { applyProductBranding, APP_DISPLAY_NAME } from '../../../../shared/brand'
+import { isAgentSessionCreateAdmissionRefusal } from '../../../../shared/agent-session-definitive-refusal'
 // Nothing before `attach` commits a session, so every failure in that span definitively created
 // nothing. Thrown, it reaches a remote client as a generic transport error, indistinguishable from
 // an answer that was lost on the way back — and a client that cannot tell those apart either
@@ -80,11 +81,9 @@ export async function resolveUncommittedStructuredCreate<TPrepared>(
   } catch (error) {
     const refusal = precommitRefusal(error)
     return {
-      refusal:
-        refusal.code === 'agent_session_identity_required' &&
-        refusal.details?.reason === 'transcriptNotFound'
-          ? { ...refusal, createAttemptRefusedBeforeCommit: true }
-          : refusal
+      refusal: isAgentSessionCreateAdmissionRefusal(refusal)
+        ? { ...refusal, createAttemptRefusedBeforeCommit: true }
+        : refusal
     }
   }
 }

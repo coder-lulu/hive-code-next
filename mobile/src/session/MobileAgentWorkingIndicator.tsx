@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { useEffect, useRef } from 'react'
 import { Animated, StyleSheet, Text, View } from 'react-native'
 import type { MobileTheme } from '../theme/mobile-theme'
@@ -6,6 +7,8 @@ import { useMobileThemeStyles } from '../theme/mobile-theme-provider'
 /** Animated three-dot "agent is working" row, shown while the active agent is
  *  still producing a reply. Pure presentation — visibility is the caller's call. */
 export function MobileAgentWorkingIndicator(): React.JSX.Element {
+  const t = useMobileTranslation()
+
   const styles = useMobileThemeStyles(createStyles)
   const dots = useRef([
     { id: 'first', opacity: new Animated.Value(0.3) },
@@ -30,13 +33,16 @@ export function MobileAgentWorkingIndicator(): React.JSX.Element {
   return (
     <View
       accessible
-      accessibilityLabel="Agent 正在工作"
+      accessibilityLabel={t(
+        'auto.mobile.src.session.MobileAgentWorkingIndicator.b0646e52e5',
+        'Agent is working'
+      )}
       accessibilityLiveRegion="polite"
       accessibilityRole="text"
       style={styles.row}
     >
       <Text maxFontSizeMultiplier={1.3} style={styles.label}>
-        Agent 正在工作
+        {t('auto.mobile.src.session.MobileAgentWorkingIndicator.b0646e52e5', 'Agent is working')}
       </Text>
       <View style={styles.dots}>
         {dots.map((dot) => (

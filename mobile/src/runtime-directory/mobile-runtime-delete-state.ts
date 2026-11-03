@@ -1,3 +1,4 @@
+import { translate } from '../i18n/mobile-i18n'
 import { resolveHiveRuntimeDisplayName } from '../../../src/shared/hive-runtime-display-name'
 import { MobileApiError } from '../auth/mobile-sms-client'
 import type { AccountRuntimeDirectoryEntry } from './account-runtime-directory-types'
@@ -30,7 +31,10 @@ export function runtimeDeleteFailureState(
     return {
       ...clearProof,
       uncertain: true,
-      error: '删除结果暂时未知，请先核对删除结果，勿重复提交。'
+      error: translate(
+        'auto.mobile.src.runtime.directory.mobile.runtime.delete.state.fbe1e40ae8',
+        'The deletion result is unknown. Check it before continuing and do not submit again.'
+      )
     }
   }
   const apiError = failure instanceof MobileApiError ? failure : null

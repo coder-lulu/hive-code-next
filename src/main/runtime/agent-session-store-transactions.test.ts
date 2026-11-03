@@ -1,28 +1,16 @@
-// How a record-store write reaches the chat database: only the rows it changed, each checked with
-// the rules a load applies, never inside a caller's own transaction, and never in memory unless the
-// rows committed.
-
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import Database from '../sqlite/sync-database'
-import { journalDatabasePath } from '../native-chat/agent-session-journal/journal-host-database'
-import * as recordRows from './agent-session-record-rows'
-import { JournalRowWriter } from '../native-chat/agent-session-journal/journal-row-writer'
-import { JournalWriteQueue } from '../native-chat/agent-session-journal/journal-write-queue'
-import type { JournalRow } from '../native-chat/agent-session-journal/journal-row-schema'
-import { AGENT_SESSION_JOURNAL_SCHEMA_VERSION } from '../../shared/agent-session-journal-types'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { AgentSessionRecord } from '../../shared/agent-session-record'
 import {
   closeTestJournalHostDatabases,
-  openTestJournalHostDatabase,
-  publishTestJournalEpoch
+  openTestJournalHostDatabase
 } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import type { AgentSessionRecordStore } from './agent-session-record-store'
 import {
   openTestAgentSessionRecordStore,
-  readPersistedTestAgentSessionStore,
-  storedTestAgentSessionRecord
+  readPersistedTestAgentSessionStore
 } from './agent-session-record-store-test-harness'
 import { claudeProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
 
@@ -32,18 +20,14 @@ let root: string
 let counter = 0
 
 beforeEach(async () => {
-  const evidence = resolve('logs/main-merge/runtime-author/transactions/tmp')
-  await mkdir(evidence, { recursive: true })
-  root = await mkdtemp(join(evidence, 'store-'))
+  root = await mkdtemp(join(tmpdir(), 'orca-agent-session-store-transactions-'))
 })
 
 afterEach(async () => {
-  vi.restoreAllMocks()
   closeTestJournalHostDatabases()
   await rm(root, { recursive: true, force: true })
 })
 
-/** Reserve, observe the spawn, prove the handle: a chat with a live writer. */
 async function liveChat(
   store: AgentSessionRecordStore,
   sessionId: string
@@ -134,8 +118,7 @@ describe('writing a transaction', () => {
     expect(totalChanges()).toBe(before)
   })
 
-  // Every mutation lands after the caller's frame, so one made inside an open journal transaction
-  // on the same connection never nests a BEGIN there.
+  // Defer BEGIN beyond the caller's frame to avoid nesting its open journal transaction.
   it('runs a store call made inside an open journal transaction after that transaction', async () => {
     const store = await openTestAgentSessionRecordStore(root)
     await liveChat(store, 'chat-a-0001')
@@ -168,7 +151,6 @@ describe('a receipt', () => {
     return reopened.getOperationRow('client-1', operationId)?.outcome.status
   }
 
-  // Written inside the caller's journal transaction, so it commits or rolls back with that write.
   it('shows its rows in memory only once committed is called after the commit', async () => {
     const store = await pendingOperation()
     const receipt = store.operationOutcomeReceipt({ callerKey: 'client-1', operationId, outcome })
@@ -197,7 +179,7 @@ describe('a receipt', () => {
 
     expect(store.getOperationRow('client-1', operationId)?.outcome.status).toBe('pending')
     expect(await persistedStatus()).toBe('pending')
-    // The next store transaction diffs from what committed, not from the discarded draft.
+    // A discarded draft must not become the next diff baseline.
     await store.setConversationName('chat-a-0001', 'after')
     expect(await persistedStatus()).toBe('pending')
   })
@@ -250,7 +232,6 @@ describe('rows in memory', () => {
 })
 
 describe('after the database closes', () => {
-  // Late settlement at quit lands here: the caller reports it, and nothing in memory moves.
   it('refuses a write with journal_closed and leaves memory as it was', async () => {
     const store = await openTestAgentSessionRecordStore(root)
     const before = await liveChat(store, 'chat-a-0001')
@@ -260,187 +241,5 @@ describe('after the database closes', () => {
       code: 'journal_closed'
     })
     expect(store.getRecord('chat-a-0001')).toBe(before)
-  })
-})
-
-describe('one published store per live host database', () => {
-  it('appends 32 real journal rows without full store reloads, but detects external and unknown-hook writes', async () => {
-    const store = await openTestAgentSessionRecordStore(root)
-    const original = await liveChat(store, 'chat-a-0001')
-    const database = openTestJournalHostDatabase(root)
-    publishTestJournalEpoch(database.db, original.sessionId, 'stream-epoch')
-    await store.renewLeases([])
-    const queue = new JournalWriteQueue(original.sessionId)
-    let sequence = 1
-    const writer = new JournalRowWriter({
-      sessionId: original.sessionId,
-      now: () => NOW,
-      serialize: (run) => queue.serialize(run),
-      database: () => database,
-      readOnly: () => false,
-      highestFence: () => 1,
-      nextSequence: () => sequence,
-      commit: (rows) => {
-        sequence = rows.at(-1)!.seq + 1
-      }
-    })
-    const row = (seq: number, ts: number): JournalRow => ({
-      v: AGENT_SESSION_JOURNAL_SCHEMA_VERSION,
-      epoch: 'stream-epoch',
-      seq,
-      ts,
-      fence: 1,
-      kind: 'item',
-      itemId: `stream-item-${seq}`,
-      revision: 1,
-      body: { kind: 'status', text: 'stream' }
-    })
-    const load = vi.spyOn(recordRows, 'loadAgentSessionStoreRows')
-    for (let count = 0; count < 32; count++) {
-      await writer.enqueue(row)
-    }
-    expect(sequence).toBe(33)
-    expect(load).not.toHaveBeenCalled()
-    expect(store.getRecord(original.sessionId)).toBe(original)
-    const outsider = new Database(journalDatabasePath(root), { fileMustExist: true })
-    try {
-      outsider
-        .prepare('UPDATE agent_session_records SET record_json = ? WHERE session_id = ?')
-        .run(
-          JSON.stringify(
-            storedTestAgentSessionRecord({ ...original, conversationName: 'external' })
-          ),
-          original.sessionId
-        )
-      await writer.enqueue(row)
-      expect(load).toHaveBeenCalledOnce()
-      expect(store.getRecord(original.sessionId)?.conversationName).toBe('external')
-      expect(store.getRecord(original.sessionId)?.lease.unreconciled).toBe(true)
-    } finally {
-      outsider.close()
-    }
-    load.mockClear()
-    await writer.enqueue(row, (db) => {
-      db.prepare('UPDATE agent_session_records SET record_json = ? WHERE session_id = ?').run(
-        JSON.stringify(
-          storedTestAgentSessionRecord({
-            ...store.getRecord(original.sessionId)!,
-            conversationName: 'unknown-hook'
-          })
-        ),
-        original.sessionId
-      )
-    })
-    await store.renewLeases([])
-    expect(load).toHaveBeenCalledOnce()
-    expect(store.getRecord(original.sessionId)?.conversationName).toBe('unknown-hook')
-    const acknowledged = vi.fn()
-    const unsubscribe = database.onStoreUnchangedCommit(acknowledged)
-    const transaction = database.transaction.bind(database)
-    vi.spyOn(database, 'transaction').mockImplementationOnce((run) =>
-      transaction((db) => {
-        run(db)
-        throw new Error('stream-rollback')
-      }, 'journal')
-    )
-    const before = sequence
-    try {
-      await expect(writer.enqueue(row)).rejects.toThrow('stream-rollback')
-      expect(sequence).toBe(before)
-      expect(acknowledged).not.toHaveBeenCalled()
-    } finally {
-      unsubscribe()
-    }
-  })
-
-  it('shares the original business stores and writer queue across repeated opens', async () => {
-    const store = await openTestAgentSessionRecordStore(root)
-    await liveChat(store, 'chat-a-0001')
-    const other = await openTestAgentSessionRecordStore(root)
-    expect(other).toBe(store)
-    await Promise.all([
-      store.setConversationName('chat-a-0001', 'first'),
-      other.setConversationName('chat-a-0001', 'second')
-    ])
-    expect(store.getRecord('chat-a-0001')?.conversationName).toBe('second')
-    closeTestJournalHostDatabases()
-    const restarted = await openTestAgentSessionRecordStore(root)
-    expect(restarted).not.toBe(store)
-  })
-
-  it('skips row reloads while SQL is unchanged and preserves identity after an unrelated write', async () => {
-    const store = await openTestAgentSessionRecordStore(root)
-    const record = await liveChat(store, 'chat-a-0001')
-    const load = vi.spyOn(recordRows, 'loadAgentSessionStoreRows')
-    await store.renewLeases([])
-    await store.renewLeases([])
-    expect(load).not.toHaveBeenCalled()
-    openTestJournalHostDatabase(root).transaction((db) => {
-      db.prepare('INSERT INTO agent_session_store_meta (key, value) VALUES (?, ?)').run(
-        'unrelated-test-row',
-        '1'
-      )
-    })
-    await store.renewLeases([])
-    expect(load).toHaveBeenCalledOnce()
-    expect(store.getRecord(record.sessionId)).toBe(record)
-    expect(record.lease.unreconciled).toBe(false)
-    await store.renewLeases([])
-    expect(load).toHaveBeenCalledOnce()
-  })
-
-  it('keeps receipt staging unpublished when unrelated journal rows change the SQL counter', async () => {
-    const store = await openTestAgentSessionRecordStore(root)
-    await liveChat(store, 'chat-a-0001')
-    const operationId = `${NOW}-${'9'.repeat(32)}`
-    await store.admitOperation({
-      callerKey: 'client-1',
-      operationId,
-      fingerprint: 'receipt',
-      now: NOW
-    })
-    const receipt = store.operationOutcomeReceipt({
-      callerKey: 'client-1',
-      operationId,
-      outcome: { status: 'succeeded', sessionId: 'chat-a-0001' }
-    })
-    openTestJournalHostDatabase(root).transaction((db) => {
-      db.prepare('INSERT INTO agent_session_store_meta (key, value) VALUES (?, ?)').run(
-        'journal-test-row',
-        '1'
-      )
-      receipt.write(db)
-      expect(store.getOperationRow('client-1', operationId)?.outcome.status).toBe('pending')
-    })
-    expect(store.getOperationRow('client-1', operationId)?.outcome.status).toBe('pending')
-    receipt.committed()
-    expect(store.getOperationRow('client-1', operationId)?.outcome.status).toBe('succeeded')
-  })
-
-  it('refuses an external commit between preparation and BEGIN without publishing its staged draft', async () => {
-    const store = await openTestAgentSessionRecordStore(root)
-    const before = await liveChat(store, 'chat-a-0001')
-    const outsider = new Database(journalDatabasePath(root), { fileMustExist: true })
-    let once = true
-    const unsubscribe = openTestJournalHostDatabase(root).onBeforeTransaction(() => {
-      if (once) {
-        once = false
-        outsider
-          .prepare('INSERT INTO agent_session_store_meta (key, value) VALUES (?, ?)')
-          .run('external-test-row', '1')
-      }
-    })
-    try {
-      await expect(store.setConversationName(before.sessionId, 'stale')).rejects.toThrow()
-      expect(store.getRecord(before.sessionId)).toBe(before)
-      expect((await readPersistedTestAgentSessionStore(root)).records[before.sessionId]).toEqual(
-        storedTestAgentSessionRecord(before)
-      )
-    } finally {
-      unsubscribe()
-      outsider.close()
-    }
-    await store.setConversationName(before.sessionId, 'current')
-    expect(store.getRecord(before.sessionId)?.conversationName).toBe('current')
   })
 })

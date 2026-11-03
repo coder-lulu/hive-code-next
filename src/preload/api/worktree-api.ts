@@ -1,3 +1,4 @@
+import type { GitHubLinkBase } from '../../shared/worktree/github-link-base'
 import type {
   ForgetRemovedWorktreesForExecutionHostArgs,
   ForgetRemovedWorktreesForExecutionHostResult,
@@ -10,6 +11,8 @@ import type {
 } from '../../shared/detected-worktree-provider-contract'
 import type { NestedWorktreeRemovalApproval } from '../../shared/worktree/nested-removal'
 import type { ExecutionHostId } from '../../shared/execution-host'
+import type { WorkspaceSleepRequest, WorkspaceSleepOutcome } from '../../shared/workspace-sleep'
+type RestoredPane = { worktreeId: string; tabId: string; leafId: string }
 import type { RetiredNameRegistry } from '../../shared/worktree/retired-name-registry'
 import type {
   FolderWorkspacePathStatus,
@@ -24,6 +27,7 @@ import type {
   AdoptProvisionedRootArgs,
   CreateWorktreeArgs,
   CreateWorktreeResult,
+  CreateWorktreeProgressEvent,
   ForceDeleteWorktreeBranchResult,
   RemoveWorktreeResult,
   SparsePreset
@@ -41,7 +45,7 @@ import type {
 } from '../../shared/worktree/types'
 
 export type WorktreeApi = {
-  list: (args: { repoId: string }) => Promise<Worktree[]>
+  list?: (args: { repoId: string }) => Promise<Worktree[]>
   /** Generated names already spent in this repo, including deleted workspaces. Name suggestions
    *  exclude these so a recreated workspace never lands on a prior occupant's path. Compacted: a
    *  fully spent tier is reported as the watermark rather than as its 552 names. */
@@ -60,14 +64,17 @@ export type WorktreeApi = {
     args: ForgetRemovedWorktreesForExecutionHostArgs
   ) => Promise<ForgetRemovedWorktreesForExecutionHostResult>
   cancelListDetected?: (args: { providerRequestId: ProviderRequestId }) => Promise<void>
-  listAll: () => Promise<Worktree[]>
+  scanStartingWslDistro?: (args: { repoId: string }) => Promise<void>
+  sleep: (request: WorkspaceSleepRequest) => Promise<WorkspaceSleepOutcome[]>
+  sleepReopened: (worktreeId: string) => Promise<void>
+  resumeSleptPane: (pane: RestoredPane, automatic?: boolean) => Promise<boolean>
+  retireStrandedSleepRecord: (args: { worktreeId: string; paneKey: string }) => Promise<void>
+  listAll?: () => Promise<Worktree[]>
   create: (args: CreateWorktreeArgs) => Promise<CreateWorktreeResult>
   adoptProvisionedRoot: (args: AdoptProvisionedRootArgs) => Promise<CreateWorktreeResult>
   /** Two-phase progress for a background `create`, correlated by `creationId`. The remote/runtime
    *  create path emits nothing, so the surface falls back to an indeterminate spinner. */
-  onCreateProgress: (
-    callback: (data: { creationId?: string; phase: 'fetching' | 'creating' }) => void
-  ) => () => void
+  onCreateProgress: (callback: (data: CreateWorktreeProgressEvent) => void) => () => void
   prefetchCreateBase: (args: { repoId: string; baseBranch?: string }) => Promise<void>
   resolvePrBase: (args: {
     repoId: string
@@ -75,6 +82,7 @@ export type WorktreeApi = {
     headRefName?: string
     baseRefName?: string
     isCrossRepository?: boolean
+    wakeWslDistro?: boolean
   }) => Promise<GitHubPrStartPoint | { error: string }>
   /** GitLab parallel of resolvePrBase. For same-project MRs returns
    *  `<remote>/<source_branch>`; for fork MRs fetches
@@ -85,6 +93,7 @@ export type WorktreeApi = {
     sourceBranch?: string
     targetBranch?: string
     isCrossRepository?: boolean
+    wakeWslDistro?: boolean
   }) => Promise<
     { baseBranch: string; compareBaseRef?: string; pushTarget?: GitPushTarget } | { error: string }
   >
@@ -123,6 +132,7 @@ export type WorktreeApi = {
     worktreeId: string
     executionHostId?: ExecutionHostId
     updates: Partial<WorktreeMeta>
+    githubLinkBase?: GitHubLinkBase
   }) => Promise<Worktree | null>
   listLineage: () => Promise<{
     lineage: Record<string, WorktreeLineage>
@@ -133,7 +143,7 @@ export type WorktreeApi = {
     parentWorktreeId?: string
     noParent?: boolean
   }) => Promise<WorktreeLineage | null>
-  persistSortOrder: (args: { orderedIds: string[] }) => Promise<void>
+  persistSortOrder: (args: { orderedIds: string[]; hostIds?: string[] }) => Promise<void>
   /** Full CLI output of the last branch auto-rename generation failure, held
    *  in main memory only — null after a restart or once the failure clears. */
   getBranchRenameFailureOutput: (args: { worktreeId: string }) => Promise<string | null>

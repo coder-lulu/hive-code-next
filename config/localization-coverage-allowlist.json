@@ -16,6 +16,20 @@
   {
     "filePath": "src/renderer/src/components/settings/appearance-search.ts",
     "kind": "object-property:keywords",
+    "text": "Dil",
+    "dynamic": false,
+    "count": 1
+  },
+  {
+    "filePath": "src/renderer/src/components/settings/appearance-search.ts",
+    "kind": "object-property:keywords",
+    "text": "Sprache",
+    "dynamic": false,
+    "count": 1
+  },
+  {
+    "filePath": "src/renderer/src/components/settings/appearance-search.ts",
+    "kind": "object-property:keywords",
     "text": "언어",
     "dynamic": false,
     "count": 1
@@ -63,117 +77,6 @@
     "count": 1
   },
   {
-    "area": "renderer/settings",
-    "filePath": "src/renderer/src/components/settings/HiveAccountSignInConfirmDialog.tsx",
-    "start": 5212,
-    "end": 5221,
-    "line": 153,
-    "column": 25,
-    "kind": "jsx-text",
-    "text": "HiveCloud",
-    "dynamic": false,
-    "reason": "Product brand name",
-    "count": 1
-  },
-  {
-    "filePath": "src/renderer/src/components/sessions/SessionContent.tsx",
-    "kind": "object-property:error",
-    "text": "disconnected",
-    "dynamic": false,
-    "count": 1
-  },
-  {
-    "filePath": "src/renderer/src/components/sessions/SessionContent.tsx",
-    "kind": "object-property:error",
-    "text": "unavailable",
-    "dynamic": false,
-    "count": 1
-  },
-  {
-    "filePath": "src/renderer/src/lib/session-navigation.ts",
-    "kind": "object-property:error",
-    "text": "ambiguous",
-    "dynamic": false,
-    "count": 8
-  },
-  {
-    "filePath": "src/renderer/src/lib/session-navigation.ts",
-    "kind": "object-property:error",
-    "text": "unavailable",
-    "dynamic": false,
-    "count": 9
-  },
-  {
-    "filePath": "src/renderer/src/components/settings/accounts-pane-credentials-overview.tsx",
-    "kind": "jsx-expression",
-    "text": "MiniMax",
-    "dynamic": false,
-    "count": 1
-  },
-  {
-    "filePath": "src/renderer/src/components/settings/accounts-pane-credentials-overview.tsx",
-    "kind": "jsx-expression",
-    "text": "OpenCode Go",
-    "dynamic": false,
-    "count": 1
-  },
-  {
-    "filePath": "src/renderer/src/components/settings/accounts-pane-credentials-overview.tsx",
-    "kind": "jsx-text",
-    "text": "Gemini",
-    "dynamic": false,
-    "count": 1
-  },
-  {
-    "filePath": "src/renderer/src/components/settings/accounts-pane-overview.tsx",
-    "kind": "object-property:label",
-    "text": "WSL",
-    "dynamic": false,
-    "count": 1
-  },
-  {
-    "filePath": "src/renderer/src/components/settings/accounts-pane-overview.tsx",
-    "kind": "jsx-expression",
-    "text": "Codex",
-    "dynamic": false,
-    "count": 1
-  },
-  {
-    "filePath": "src/renderer/src/components/settings/accounts-pane-overview.tsx",
-    "kind": "jsx-expression",
-    "text": "Claude",
-    "dynamic": false,
-    "count": 1
-  },
-  {
-    "filePath": "src/renderer/src/components/settings/accounts-search.ts",
-    "kind": "object-property:keywords",
-    "text": "Claude Accounts",
-    "dynamic": false,
-    "count": 1
-  },
-  {
-    "filePath": "src/renderer/src/components/settings/accounts-search.ts",
-    "kind": "object-property:keywords",
-    "text": "Codex Accounts",
-    "dynamic": false,
-    "count": 1
-  },
-  {
-    "filePath": "src/renderer/src/components/settings/TerminalPane.tsx",
-    "kind": "object-property:title",
-    "text": "Default shell",
-    "dynamic": false,
-    "count": 1
-  },
-  {
-    "filePath": "src/renderer/src/components/settings/TerminalPane.tsx",
-    "kind": "object-property:description",
-    "text": "Shell used for new terminal panes",
-    "dynamic": false,
-    "count": 1
-  },
-  {
     "filePath": "src/renderer/src/components/settings/terminal-pane-appearance-search.ts",
     "kind": "object-property:keywords",
     "text": "Ghostty",
@@ -188,31 +91,98 @@
     "count": 1
   },
   {
-    "filePath": "src/renderer/src/components/stats/UsageOverviewPane.tsx",
+    "filePath": "src/renderer/src/components/onboarding/OnboardingLanguageSwitcher.tsx",
     "kind": "jsx-text",
-    "text": "Claude",
+    "text": "Switch language",
     "dynamic": false,
     "count": 1
   },
   {
-    "filePath": "src/renderer/src/components/stats/UsageOverviewPane.tsx",
+    "filePath": "src/renderer/src/component-fixtures/component-fixture-explorer.tsx",
     "kind": "jsx-text",
-    "text": "Codex",
+    "text": "Component fixtures",
     "dynamic": false,
     "count": 1
   },
   {
-    "filePath": "src/renderer/src/components/stats/UsageOverviewPane.tsx",
+    "filePath": "src/renderer/src/component-fixtures/component-fixture-explorer.tsx",
     "kind": "jsx-text",
-    "text": "OpenCode",
+    "text": "fixtures · files named *.fixture.tsx under src/renderer/src",
     "dynamic": false,
     "count": 1
   },
   {
-    "filePath": "src/renderer/src/components/stats/UsageOverviewPane.tsx",
+    "filePath": "src/renderer/src/components/settings/ChatFontFamilySetting.tsx",
     "kind": "jsx-text",
-    "text": "Muse",
+    "text": "fontFamily",
     "dynamic": false,
     "count": 1
+  },
+  {
+    "filePath": "src/renderer/src/lib/worktree-palette-evidence.ts",
+    "kind": "object-property:accessibilityLabel",
+    "text": "Workspace comment",
+    "dynamic": false,
+    "count": 1
+  },
+  {
+    "filePath": "src/renderer/src/lib/worktree-palette-evidence.ts",
+    "kind": "object-property:accessibilityLabel",
+    "text": "Created by automation",
+    "dynamic": false,
+    "count": 1
+  },
+  {
+    "filePath": "src/renderer/src/lib/worktree-palette-evidence.ts",
+    "kind": "object-property:accessibilityLabel",
+    "text": "Linked task",
+    "dynamic": false,
+    "count": 2
+  },
+  {
+    "filePath": "src/renderer/src/lib/worktree-palette-evidence.ts",
+    "kind": "object-property:accessibilityLabel",
+    "text": "Linked issue",
+    "dynamic": false,
+    "count": 1
+  },
+  {
+    "filePath": "src/renderer/src/lib/worktree-palette-evidence.ts",
+    "kind": "object-property:accessibilityLabel",
+    "text": "Listening port",
+    "dynamic": false,
+    "count": 1
+  },
+  {
+    "filePath": "src/renderer/src/components/sessions/SessionContent.tsx",
+    "kind": "object-property:error",
+    "text": "disconnected",
+    "dynamic": false,
+    "count": 1,
+    "reason": "Internal availability discriminant; SessionContent renders the localized components.sessions.openDisconnected message."
+  },
+  {
+    "filePath": "src/renderer/src/components/sessions/SessionContent.tsx",
+    "kind": "object-property:error",
+    "text": "unavailable",
+    "dynamic": false,
+    "count": 1,
+    "reason": "Internal availability discriminant; SessionContent renders the localized components.sessions.openUnavailable message."
+  },
+  {
+    "filePath": "src/renderer/src/lib/session-navigation.ts",
+    "kind": "object-property:error",
+    "text": "ambiguous",
+    "dynamic": false,
+    "count": 8,
+    "reason": "Typed navigation refusal discriminant, never display copy; ambiguous ownership must remain a stable refusal across locales."
+  },
+  {
+    "filePath": "src/renderer/src/lib/session-navigation.ts",
+    "kind": "object-property:error",
+    "text": "unavailable",
+    "dynamic": false,
+    "count": 9,
+    "reason": "Typed navigation refusal discriminant, never display copy; callers select localized session-availability messages."
   }
 ]

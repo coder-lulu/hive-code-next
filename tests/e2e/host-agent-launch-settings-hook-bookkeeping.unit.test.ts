@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { createElement } from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   deferred,
@@ -17,7 +17,7 @@ vi.mock('../../src/main/telemetry/client', () => ({ track: vi.fn() }))
 vi.mock('../../src/main/telemetry/cohort-classifier', () => ({
   getCohortAtEmit: () => ({ nth_repo_added: 2 })
 }))
-vi.mock('../../src/main/ssh/ssh-config-parser', () => ({
+vi.mock('../../src/main/ssh/config/ssh-config-parser', () => ({
   loadUserSshConfig: () => ({ hosts: [] }),
   sshConfigHostsToTargets: () => []
 }))
@@ -26,7 +26,10 @@ vi.mock('../../src/main/agent-hooks/managed-agent-hook-controls', () => ({
 }))
 vi.mock('../../src/renderer/src/components/settings/agent-launch-settings-transport', () => ({
   readHostAgentLaunchSettings: transport.read,
-  mutateHostAgentLaunchSettings: transport.mutate
+  mutateHostAgentLaunchSettings: transport.mutate,
+  hostSupportsOwnChatPermissions: async () => true,
+  hostSupportsAutoPermissions: async () => true,
+  hostSupportsNativeChatPermissions: async () => true
 }))
 vi.mock('@/hooks/useDetectedAgents', () => ({
   useDetectedAgents: () => ({
@@ -58,19 +61,24 @@ describe('host form and committed-settings contract', () => {
       await finish.promise
     })
     render(
-      createElement(TooltipProvider, {
-        // oxlint-disable-next-line react/no-children-prop -- createElement in this .ts fixture must satisfy the required children prop.
-        children: createElement(HostAgentLaunchSettings, {
+      createElement(
+        TooltipProvider,
+        null,
+        createElement(HostAgentLaunchSettings, {
           environmentId: 'ssh-host',
           pairingRevision: 17,
           hostName: 'SSH host',
           renderPermissions: () => createElement('span')
         })
-      })
+      )
     )
     await screen.findByDisplayValue('--host-marker')
     const label = getAgentCatalog().find((agent) => agent.id === 'claude')?.label
-    fireEvent.click(screen.getByRole('switch', { name: `${label} availability` }))
+    fireEvent.click(
+      within(screen.getByRole('radiogroup', { name: `${label} availability` })).getByRole('radio', {
+        name: 'Disabled'
+      })
+    )
     try {
       await started.promise
       expect(readState().settings.disabledTuiAgents).toContain('claude')

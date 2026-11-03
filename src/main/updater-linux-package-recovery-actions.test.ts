@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { applyProductBranding } from '../shared/brand'
 import type { UpdateStatus } from '../shared/update-status-types'
 import type * as UpdaterModule from './updater'
 import { loadUpdaterModule, warmUpdaterModule } from './updater-test-module-loader'
+import { updaterMainWindow } from './updater-test-main-window'
 
 const {
   appMock,
@@ -13,7 +13,6 @@ const {
   resolveLinuxPackageInstallInstructionsMock,
   resolveLinuxPackageRevealTargetMock,
   showItemInFolderMock,
-  fetchNewerReleaseTagsMock,
   resetHandlers
 } = vi.hoisted(() => {
   const updaterHandlers = new Map<string, ((...args: unknown[]) => void)[]>()
@@ -54,7 +53,6 @@ const {
     resolveLinuxPackageInstallInstructionsMock: vi.fn(),
     resolveLinuxPackageRevealTargetMock: vi.fn(),
     showItemInFolderMock: vi.fn(),
-    fetchNewerReleaseTagsMock: vi.fn(),
     resetHandlers: () => updaterHandlers.clear()
   }
 })
@@ -68,27 +66,8 @@ vi.mock('electron', () => ({
   net: { fetch: vi.fn() }
 }))
 
-vi.mock('./product/product-updater-network-boundary', () => ({
-  installProductUpdaterNetworkBoundary: vi.fn()
-}))
-vi.mock('../shared/product-update-source', () => ({
-  resolveProductUpdateSource: () => ({
-    channel: 'stable',
-    feedUrl: 'https://github.com/stablyai/orca/releases/latest/download',
-    provider: 'github',
-    github: {
-      repo: 'stablyai/orca',
-      atomFeedUrl: 'https://github.com/stablyai/orca/releases.atom',
-      releasesDownloadBase: 'https://github.com/stablyai/orca/releases/download',
-      releasesApiUrl: 'https://api.github.com/repos/stablyai/orca/releases'
-    }
-  }),
-  resolveProductUpdateFeedUrl: (source: { feedUrl: string }) => source.feedUrl
-}))
-
 vi.mock('electron-updater', () => ({ autoUpdater: autoUpdaterMock }))
 vi.mock('./electron-updater-loader', () => ({ loadElectronAutoUpdater: () => autoUpdaterMock }))
-vi.mock('@electron-toolkit/utils', () => ({ is: { dev: false } }))
 vi.mock('./ipc/pty/kill-all', () => ({ killAllPty: vi.fn() }))
 vi.mock('./updater-changelog', () => ({ fetchChangelog: vi.fn().mockResolvedValue(null) }))
 vi.mock('./updater-nudge', () => ({
@@ -96,7 +75,7 @@ vi.mock('./updater-nudge', () => ({
   shouldApplyNudge: vi.fn().mockReturnValue(false)
 }))
 vi.mock('./updater-prerelease-feed', () => ({
-  fetchNewerReleaseTagsWithReadiness: fetchNewerReleaseTagsMock,
+  fetchNewerReleaseTagsWithReadiness: vi.fn().mockResolvedValue({ tags: [], state: 'no-newer' }),
   getReleaseDownloadUrl: vi.fn(() => 'https://example.invalid/download')
 }))
 vi.mock('./update-install-exit-watchdog', () => ({
@@ -128,7 +107,8 @@ const ARTIFACT = {
 }
 const MANUAL_INSTALL_STATUS = {
   state: 'error',
-  message: applyProductBranding('Quit Orca before running the system package install command.'),
+  message: 'Quit Orca before running the system package install command.',
+  messageCode: 'linuxPackageManualInstall',
   recovery: {
     kind: 'linux-package-install',
     packageType: 'deb',
@@ -164,7 +144,6 @@ describe('linux package recovery actions', () => {
       .mockReset()
       .mockResolvedValue({ ok: true, path: ARTIFACT.path })
     showItemInFolderMock.mockReset()
-    fetchNewerReleaseTagsMock.mockReset()
   })
 
   const startUpdater = async (): Promise<{
@@ -173,7 +152,7 @@ describe('linux package recovery actions', () => {
   }> => {
     const send = vi.fn()
     const updater = await loadUpdaterModule()
-    updater.setupAutoUpdater({ webContents: { send } } as never, {
+    updater.setupAutoUpdater(updaterMainWindow(send), {
       getLastUpdateCheckAt: () => Date.now()
     })
     return { send, updater }
@@ -183,7 +162,6 @@ describe('linux package recovery actions', () => {
     updater: typeof UpdaterModule,
     version = '1.0.61'
   ): Promise<void> => {
-    fetchNewerReleaseTagsMock.mockResolvedValue({ tags: [`v${version}`], state: 'ready' })
     autoUpdaterMock.checkForUpdates.mockImplementationOnce(() => {
       autoUpdaterMock.emit('checking-for-update')
       queueMicrotask(() => autoUpdaterMock.emit('update-available', { version }))
@@ -318,7 +296,6 @@ describe('linux package recovery actions', () => {
       { reason: 'hash-mismatch', packageType: 'deb', version: '1.0.61' },
       expect.objectContaining({ level: 'warn' })
     )
-    // The replacement status has no recovery, so a second attempt cannot reach the artifact again.
     await expect(updater.showLinuxPackage()).rejects.toThrow(
       'No package install recovery is available.'
     )
@@ -345,7 +322,7 @@ describe('linux package recovery actions', () => {
       resolveLinuxPackageInstallInstructionsMock.mockResolvedValue({ ok: false, reason })
       const statusesBefore = errorStatuses(send).length
 
-      // Why: the renderer demotes copy on a rejection, so a missing package manager must not reject.
+      // Renderer copy actions are demoted on rejection; represent missing package managers as a result.
       await expect(updater.getLinuxPackageInstallInstructions()).resolves.toEqual({
         ok: false,
         reason,
@@ -359,7 +336,6 @@ describe('linux package recovery actions', () => {
         { reason, packageType: 'deb', version: '1.0.61' },
         expect.objectContaining({ level: 'warn' })
       )
-      // Show Package must remain reachable as the promoted action.
       await expect(updater.showLinuxPackage()).resolves.toBeUndefined()
     }
   )
@@ -376,7 +352,6 @@ describe('linux package recovery actions', () => {
       'could not read the downloaded package'
     )
 
-    // Why: a read error is not evidence the artifact is bad, so retrying must stay possible.
     expect(clearTrackedLinuxPackageArtifactMock).not.toHaveBeenCalled()
     expect(errorStatuses(send)).toHaveLength(statusesBefore)
     await expect(updater.showLinuxPackage()).resolves.toBeUndefined()
@@ -393,7 +368,7 @@ describe('linux package recovery actions', () => {
     )
 
     const pending = updater.getLinuxPackageInstallInstructions()
-    // A 160 MB hash outlives the cycle it started in; a newer download takes over meanwhile.
+    // Hashing can outlive its download cycle; replace the recovery while validation is pending.
     getTrackedLinuxPackageArtifactMock.mockReturnValue({ ...ARTIFACT })
     await activateRecovery(updater)
     settleValidation({ ok: false, reason: 'hash-mismatch' })

@@ -1,7 +1,4 @@
-// First-launch telemetry notice shown only to pre-telemetry users (existedBeforeTelemetryRelease && optedIn === null),
-// who installed under a "no telemetry" contract; new users are covered by install-time disclosure.
-// Got it / ✕ silently opt in; "Turn off" explicitly opts out. See telemetry-plan.md §First-launch experience.
-
+// Resolves a pending telemetry preference through the main-owned consent API.
 import { useState } from 'react'
 import { X } from 'lucide-react'
 

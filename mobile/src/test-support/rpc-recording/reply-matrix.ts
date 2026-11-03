@@ -3,20 +3,8 @@ import type { RecordingScenario, Rejection, ScenarioStep } from './recording-sce
 
 export type ReplyPartition = { id: string; reply?: unknown; reject?: Rejection }
 
-/**
- * Only shapes a host can send. `successResponse` always sets `result`, so an absent key means the
- * handler returned undefined and there is no explicit-undefined shape on a JSON wire; `null` is a
- * real result (`linear.getIssue` on a missing issue, and the b2 seed). The GitHub project
- * mutations carry an inner `{ok, error}` envelope whose error is a string or an object. Everything
- * else a client sees is the dispatcher refusing, not knowing the method, or the transport failing.
- *
- * Refusal and rejection each appear twice, once with a message and once without. A message is what
- * separates the two failure paths a migrated call site has to keep apart: a refusal with none falls
- * back to the screen's copy, a transport drop with none surfaces its empty message verbatim. With
- * only the message-carrying shapes both paths produce the same text, and collapsing them is
- * invisible — which is why every source-control family had a hand-written `*-empty-message`
- * scenario. The partition carries that instead of each migrator remembering to write one.
- */
+// Drive only wire-representable shapes; JSON cannot carry explicit undefined.
+// Include message-free refusals/rejections because their different fallback copy exposes collapsed failure paths.
 export function replyPartitions(normal: unknown): ReplyPartition[] {
   return [
     { id: 'normal', reply: { ok: true, result: normal } },
@@ -48,21 +36,8 @@ export function replyPartitions(normal: unknown): ReplyPartition[] {
   ]
 }
 
-/**
- * The partitions that apply at a frame: nine of the eleven.
- *
- * A frame is a whole host response handed to the real stream registry, and the two transport
- * rejections are the shapes a *request promise* fails with — a subscription holds no promise, so
- * there is nothing at a frame for them to reject. Everything else a host can put on a stream id is
- * here, including the unary envelopes: the dispatcher sends exactly those once a streaming handler
- * returns, and each drives a real branch of the registry rather than a shape invented for symmetry.
- *
- * Every success partition is stamped `streaming: true`, because that flag is what routes a response
- * to the open stream rather than to a retired request id. Without it `normal` would be a different
- * shape from the frame it replays, and a success control that is not one. A base frame that scripts
- * a non-streaming unary closer is therefore unsupported here: no scenario writes one, and its matrix
- * would need the flag varied per partition rather than stamped.
- */
+// Frames have no request promise, so transport rejection partitions do not apply.
+// Stamp success frames streaming:true to reach the registry; non-streaming unary closers need separate flag coverage.
 function frameReplyPartitions(normal: unknown): ReplyPartition[] {
   return replyPartitions(normal).flatMap((partition) => {
     const envelope = successEnvelope(partition.reply)
@@ -72,19 +47,47 @@ function frameReplyPartitions(normal: unknown): ReplyPartition[] {
   })
 }
 
-/** A success envelope, spreadable: only one carries `streaming`, a refusal has no result to stream. */
 function successEnvelope(reply: unknown): Record<string, unknown> | null {
   return reply !== null && typeof reply === 'object' && 'ok' in reply && reply.ok === true
     ? { ...reply }
     : null
 }
 
-import {
-  matrixSites,
-  replyMatrixSites,
-  replyMatrixGoldenId
-} from '../../../../config/scripts/upstream-recording-inputs.mjs'
-export { matrixSites, replyMatrixSites, replyMatrixGoldenId }
+type MatrixSite = { id: string; index: number; reply: unknown }
+
+// Matrix every reply, including prerequisites, so new families cannot lose coverage through hand-selected sites.
+// Name stream frames by subscribe payload and occurrence to distinguish ready/events/end.
+export function matrixSites(base: RecordingScenario): MatrixSite[] {
+  const frames = new Map<string, number>()
+  return base.steps.flatMap((step, index) => {
+    if ('complete' in step) {
+      return [{ id: step.complete, index, reply: step.reply }]
+    }
+    if ('frame' in step) {
+      const occurrence = (frames.get(step.frame) ?? 0) + 1
+      frames.set(step.frame, occurrence)
+      return [{ id: `${step.frame}@${occurrence}`, index, reply: step.reply }]
+    }
+    return []
+  })
+}
+
+export function replyMatrixSites(base: RecordingScenario): string[] {
+  const sites = matrixSites(base).map((site) => site.id)
+  if (!sites.length) {
+    throw new Error(`No scripted reply to drive a matrix over: ${base.id}`)
+  }
+  const repeated = sites.filter((name, index) => sites.indexOf(name) !== index)
+  if (repeated.length) {
+    // A repeated name would make the divergence ambiguous; the manifest binds concurrent requests.
+    throw new Error(`Matrix sites must be unique: ${base.id} repeats ${repeated.join(', ')}`)
+  }
+  return sites
+}
+
+export function replyMatrixGoldenId(family: string, request: string): string {
+  return `matrix-${family}-${request}`.toLowerCase().replaceAll('#', '-').replaceAll('@', '-')
+}
 
 export function driveReplyMatrix(
   base: RecordingScenario,
@@ -107,8 +110,7 @@ export function driveReplyMatrix(
         id: `${base.id}.${partition.id}`,
         steps: base.steps.map((step, index): ScenarioStep => {
           if (index > divergence) {
-            // The diverged reply may have ended the chain, so downstream replies are answered only
-            // if the operation asked. The sender list records which.
+            // After divergence, answer later requests only if sent; frames remain deliverable through the registry.
             return 'complete' in step || 'bind' in step ? { ...step, optional: true } : step
           }
           if (index !== divergence) {

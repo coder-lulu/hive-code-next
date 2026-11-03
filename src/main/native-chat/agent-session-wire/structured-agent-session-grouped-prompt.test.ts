@@ -64,6 +64,7 @@ function adapter(): StructuredAgentSessionAdapter {
     }
   })
   return {
+    open: vi.fn(async () => ({ reportedOptions: {} })),
     acquire,
     releaseAcquisition: vi.fn(async () => true),
     dispatch,
@@ -122,6 +123,7 @@ beforeEach(async () => {
   resetHostTestOperationIds()
   ordinal = 0
   acquire = vi.fn(async ({ fence }) => ({
+    acquisitionGeneration: globalThis.crypto.randomUUID(),
     process: {
       hostId: 'local',
       pid: 4242,

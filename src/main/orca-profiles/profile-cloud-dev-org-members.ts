@@ -9,10 +9,7 @@ import type {
   OrcaProfileOrgInviteRevokeArgs
 } from '../../shared/orca-profiles'
 
-// Why: dev-auth mode has no server, so the whole teammate UI is exercised
-// against this in-memory per-org roster. It mirrors the shape the real client
-// returns (self as owner, one signed-in teammate, one never-signed-in teammate,
-// one pending invite) and the mutation endpoints' status semantics.
+// With no dev-auth server, this roster mirrors real membership states and mutation results.
 type DevOrgRoster = {
   members: OrcaOrgMember[]
   pendingInvites: OrcaOrgPendingInvite[]
@@ -29,8 +26,8 @@ function cleanEnvString(value: string | undefined, fallback: string): string {
 function devSelf(): OrcaOrgMember {
   return {
     userId: cleanEnvString(process.env.ORCA_CLOUD_DEV_USER_ID, 'dev-user'),
-    email: cleanEnvString(process.env.ORCA_CLOUD_DEV_EMAIL, 'dev@hivecode.local'),
-    displayName: cleanEnvString(process.env.ORCA_CLOUD_DEV_DISPLAY_NAME, 'HiveCode Dev'),
+    email: cleanEnvString(process.env.ORCA_CLOUD_DEV_EMAIL, 'dev@orca.local'),
+    displayName: cleanEnvString(process.env.ORCA_CLOUD_DEV_DISPLAY_NAME, 'Orca Dev'),
     role: 'owner'
   }
 }
@@ -41,19 +38,14 @@ function seedDevRoster(): DevOrgRoster {
       devSelf(),
       {
         userId: 'dev-teammate-1',
-        email: 'teammate@hivecode.local',
+        email: 'teammate@orca.local',
         displayName: 'Dev Teammate',
         role: 'admin'
       },
-      // Why: userId null exercises the "hasn't signed in to Orca yet" disabled row.
-      {
-        userId: null,
-        email: 'invited-member@hivecode.local',
-        displayName: undefined,
-        role: 'member'
-      }
+      // Null user IDs exercise members who have not signed in yet.
+      { userId: null, email: 'invited-member@orca.local', displayName: undefined, role: 'member' }
     ],
-    pendingInvites: [{ email: 'pending@hivecode.local', role: 'member', createdAt: Date.now() }]
+    pendingInvites: [{ email: 'pending@orca.local', role: 'member', createdAt: Date.now() }]
   }
 }
 

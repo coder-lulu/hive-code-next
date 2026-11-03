@@ -5,7 +5,7 @@ import { isProvenProcessExit } from '../../../../shared/terminal-exit-cause'
 import { RetainedPaneHost } from '../tab-group/RetainedPaneHost'
 import type { ActivityTerminalPortalTarget } from '../activity/activity-terminal-portal'
 import TerminalPane from './TerminalPane'
-import { SESSION_DETAIL_ANCHOR_NAME } from '../sessions/session-detail-anchor'
+import type { HiddenTerminalPrewarm } from './terminal-pane-types'
 import { closeTerminalTab } from '../terminal/terminal-tab-actions'
 import { shouldDeferParkedPtyExitTabClose } from './terminal-parked-tab-watchers'
 
@@ -19,6 +19,10 @@ type TerminalOverlaySlotProps = {
   isWorktreeActive: boolean
   isVisible: boolean
   isActive: boolean
+  /** Hover prewarm of a hidden reveal target. */
+  hiddenPrewarm?: HiddenTerminalPrewarm | null
+  /** Visible on the unfocused side of a split. */
+  dimmed?: boolean
   activityTerminalPortal: ActivityTerminalPortalTarget | null
   onFocusOwningGroup: ((groupId: string) => void) | undefined
   consumeSuppressedPtyExit: (ptyId: string) => boolean
@@ -34,19 +38,15 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
   startupCwd,
   groupId,
   isWorktreeActive,
-  isVisible: isGroupVisible,
+  isVisible,
   isActive,
+  hiddenPrewarm = null,
+  dimmed = false,
   activityTerminalPortal,
   onFocusOwningGroup,
   consumeSuppressedPtyExit,
   captureEmptiedReaction
 }: TerminalOverlaySlotProps): React.JSX.Element {
-  const isSessionDetail = activityTerminalPortal?.slotId.startsWith('session-detail') === true
-  const isVisible = isGroupVisible || isSessionDetail
-  const sessionAnchorName = isSessionDetail
-    ? activityTerminalPortal?.target.style.getPropertyValue('anchor-name') ||
-      SESSION_DETAIL_ANCHOR_NAME
-    : undefined
   const [shouldMeasureHiddenStartup, setShouldMeasureHiddenStartup] = useState(
     () => useAppStore.getState().pendingStartupByTabId[terminalTabId] !== undefined
   )
@@ -56,24 +56,21 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
     }
   }, [isVisible, shouldMeasureHiddenStartup])
 
+  // Drop with the reveal in one render, or a later lease release re-runs resume and steals focus.
+  const prewarm = isVisible || activityTerminalPortal !== null ? null : hiddenPrewarm
   const terminalPane = (
     <TerminalPane
       key={`${terminalTabId}-${terminalGeneration ?? 0}`}
       tabId={terminalTabId}
       worktreeId={worktreeId}
-      onReady={isSessionDetail ? activityTerminalPortal?.onReady : undefined}
       cwd={startupCwd ?? worktreePath}
-      isActive={
-        isSessionDetail
-          ? activityTerminalPortal?.active === true
-          : isActive || activityTerminalPortal?.active === true
-      }
-      // Why: split-group changes reparent TabGroupPanel subtrees. Keeping the
-      // TerminalPane mounted here preserves alt-screen TUI state while this
-      // flag still lets hidden tabs throttle rendering.
+      isActive={isActive || activityTerminalPortal?.active === true}
+      // Retain TerminalPane outside reparented group subtrees to preserve TUI state; visibility still throttles hidden rendering.
       isVisible={isVisible || activityTerminalPortal !== null}
       isWorktreeActive={isWorktreeActive || activityTerminalPortal !== null}
-      isolatedPaneKey={activityTerminalPortal?.paneKey || null}
+      isolatedPaneKey={activityTerminalPortal?.paneKey ?? null}
+      measureWhileHidden={prewarm !== null}
+      warmRendererWhileHidden={prewarm === 'warm'}
       onPtyExit={(ptyId, exitCode) => {
         if (consumeSuppressedPtyExit(ptyId)) {
           return
@@ -83,9 +80,7 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
           useAppStore.getState().markUnverifiedPtyLoss(terminalTabId)
           return
         }
-        // Why: a parked multi-leaf tab has no PaneManager to promote split
-        // siblings, so closing the tab here would kill them; the reveal
-        // remount handles dead PTYs per leaf instead.
+        // Parked multi-leaf tabs have no PaneManager; defer dead-leaf handling until reveal rather than close live siblings.
         if (shouldDeferParkedPtyExitTabClose(terminalTabId, ptyId)) {
           return
         }
@@ -96,15 +91,13 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
         })
       }}
       onCloseTab={() => {
-        // Why: route through closeTerminalTab (not the raw store closeTab) so a
-        // pinned tab hits the confirmation guard. The overlay's direct
-        // store.closeTab was the path that closed pinned terminals silently.
+        // Use the guarded close path so pinned terminals still require confirmation.
         closeTerminalTab(terminalTabId, { onClosed: captureEmptiedReaction() })
       }}
     />
   )
 
-  if (activityTerminalPortal && !isSessionDetail) {
+  if (activityTerminalPortal) {
     return createPortal(
       terminalPane,
       activityTerminalPortal.target,
@@ -112,21 +105,17 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
     )
   }
 
-  return createPortal(
+  return (
     <RetainedPaneHost
-      groupId={isSessionDetail ? undefined : groupId}
-      anchorName={sessionAnchorName}
-      anchorTarget={isSessionDetail ? activityTerminalPortal?.target : undefined}
-      onFocus={isSessionDetail ? activityTerminalPortal?.onFocus : undefined}
-      data-session-terminal={isSessionDetail ? terminalTabId : undefined}
+      groupId={groupId}
       isVisible={isVisible}
-      measureWhileHidden={shouldMeasureHiddenStartup}
+      measureWhileHidden={shouldMeasureHiddenStartup || prewarm !== null}
       fitTerminal
+      dimmed={dimmed}
       data-terminal-overlay-tab-id={terminalTabId}
       onFocusOwningGroup={onFocusOwningGroup}
     >
       {terminalPane}
-    </RetainedPaneHost>,
-    document.body
+    </RetainedPaneHost>
   )
 })

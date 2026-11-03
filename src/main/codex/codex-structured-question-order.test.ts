@@ -34,7 +34,7 @@ import {
 import {
   projectStructuredQuestionMessages,
   structuredQuestionTranscript
-} from '../../renderer/src/components/native-chat/structured-agent-question-projection'
+} from '../../shared/structured-agent-question-projection'
 import {
   closeTestJournalHostDatabases,
   openTestJournalHostDatabase
@@ -76,6 +76,7 @@ beforeEach(async () => {
     acquire: vi.fn<StructuredAgentSessionAdapter['acquire']>(async ({ fence, events }) => {
       sink = events ?? null
       return {
+        acquisitionGeneration: `acquisition-${fence}`,
         process: {
           hostId: 'local',
           pid: 4242,
@@ -91,6 +92,7 @@ beforeEach(async () => {
         }
       }
     }),
+    open: vi.fn(async () => ({ reportedOptions: {} })),
     releaseAcquisition: vi.fn(async () => true),
     dispatch: vi.fn(),
     cancelTurn: vi.fn(async () => ({ cancelled: true })),

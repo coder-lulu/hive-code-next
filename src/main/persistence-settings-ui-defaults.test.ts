@@ -5,7 +5,7 @@ import {
   withPlatform,
   writeDataFile,
   readDataFile
-} from './persistence-test-harness'
+} from './persistence/persistence-test-harness'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { rmSync, mkdtempSync } from 'node:fs'
 import { join, win32 } from 'node:path'
@@ -86,8 +86,21 @@ describe('Store', () => {
     expect(settings.terminalFastScrollSensitivity).toBe(5)
     expect(settings.terminalTuiScrollSensitivity).toBe(1)
     expect(settings.localAccountRuntime).toBe('auto')
-    expect(settings.localAccountRuntimeDefaultedToAutoForAllUsers).toBe(true)
-    expect(settings.terminalTuiScrollSensitivityDefaultedToOne).toBe(true)
+    for (const key of [
+      'localAccountRuntimeDefaultedToAutoForAllUsers',
+      'terminalTuiScrollSensitivityDefaultedToOne',
+      'experimentalActivity',
+      'experimentalActivityDefaultedOffForAllUsers',
+      'floatingTerminalDefaultedForAllUsers'
+    ]) {
+      expect(Object.hasOwn(settings, key), key).toBe(false)
+    }
+    expect(settings.sourceControlAi).toMatchObject({
+      enabled: true,
+      instructionsByOperation: { commitMessage: '', pullRequest: '', branchName: '' }
+    })
+    expect(Object.hasOwn(settings, 'commitMessageAi')).toBe(false)
+    expect(Object.hasOwn(settings, 'launchActionDefaults')).toBe(false)
     expect(settings.terminalUseSeparateLightTheme).toBe(true)
     expect(settings.rightSidebarOpenByDefault).toBe(true)
     expect(settings.showTasksButton).toBe(true)
@@ -96,12 +109,9 @@ describe('Store', () => {
     expect(settings.openInApplications).toEqual([
       { id: 'vscode', label: 'VS Code', command: 'code' }
     ])
-    expect(settings.experimentalActivity).toBe(false)
-    expect(settings.experimentalActivityDefaultedOffForAllUsers).toBe(true)
     expect(settings.experimentalTerminalAttention).toBe(false)
     expect(settings.experimentalNewWorktreeCardStyle).toBe(false)
     expect(settings.floatingTerminalEnabled).toBe(true)
-    expect(settings.floatingTerminalDefaultedForAllUsers).toBe(true)
     expect(settings.notifications.customSoundPath).toBeNull()
     expect(settings.notifications.customSoundVolume).toBe(100)
     expect(settings.notifications.suppressWhenFocused).toBe(true)

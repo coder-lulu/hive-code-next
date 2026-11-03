@@ -3,9 +3,8 @@ import { LOCAL_EXECUTION_HOST_ID, type ExecutionHostId } from '../execution-host
 import type { WorkspaceSessionState } from '../workspace-session-state-types'
 import type { SessionProjectAssignment } from '../session-project-assignment'
 import { loadWorkspaceLayout } from './workspace-layout-load'
-import { checkWorkspaceLayoutModelRules } from './workspace-layout-model-rules'
-import { checkWorkspaceLayoutRules } from './workspace-layout-rules'
 import { saveWorkspaceLayout } from './workspace-layout-save'
+import { editorFileKey } from './workspace-layout-editor-tab-file'
 import {
   localDesktopSession,
   WORKSPACE_LAYOUT_PROFILES
@@ -52,7 +51,7 @@ describe('workspace layout Loader and Serializer', () => {
       assignedAt: 123
     }
     row.projectAssignment = assignment
-    row.pinnedSetupRuntimeEnvironmentId = 'transient-setup-owner'
+    Reflect.set(row, 'pinnedSetupRuntimeEnvironmentId', 'transient-setup-owner')
     entry.projectAssignment = assignment
     entry.structuredSessionId = 'adopted-session'
     const { saved } = roundTrip(LOCAL_EXECUTION_HOST_ID, stored)
@@ -65,7 +64,7 @@ describe('workspace layout Loader and Serializer', () => {
     expect(restored.projectAssignment).toEqual(assignment)
     expect(restoredEntry.projectAssignment).toEqual(assignment)
     expect(restoredEntry.structuredSessionId).toBe('adopted-session')
-    expect(restored.pinnedSetupRuntimeEnvironmentId).toBeUndefined()
+    expect(restored).not.toHaveProperty('pinnedSetupRuntimeEnvironmentId')
   })
 
   it.each(PROFILES)(
@@ -78,23 +77,6 @@ describe('workspace layout Loader and Serializer', () => {
       expect(onDisk(saved)).toEqual(onDisk(stored))
       // The Loader never edits the Store's object.
       expect(stored).toEqual(before)
-    }
-  )
-
-  it.each(PROFILES)('%s: a second round trip changes nothing', (_name, hostId, build) => {
-    const once = roundTrip(hostId, build()).saved
-    const twice = roundTrip(hostId, once)
-    expect(twice.loaded.changes).toEqual([])
-    expect(onDisk(twice.saved)).toEqual(onDisk(once))
-  })
-
-  it.each(PROFILES)(
-    '%s: the model obeys the structural rules the stored partition obeys',
-    (_name, hostId, build) => {
-      const stored = build()
-      const { loaded } = roundTrip(hostId, stored)
-      expect(checkWorkspaceLayoutRules([{ hostId, session: stored }])).toEqual([])
-      expect(checkWorkspaceLayoutModelRules([loaded.layout])).toEqual([])
     }
   )
 
@@ -121,11 +103,11 @@ describe('workspace layout Loader and Serializer', () => {
       ['agent-session-1', 'agent-session'],
       ['tab-unbound', 'terminal']
     ])
-    // tab-agent's terminal id is term-agent: its pane's data is keyed by leaf alone, and the
-    // round trip above saved its pane records under the terminal id.
+    // Pane records use the terminal entity ID term-agent rather than tab-agent; in-memory data is keyed by leaf.
     expect(workspace.leaves?.[leaf(3)]).toMatchObject({
       incarnationId: 'inc-3',
-      sleeping: { agent: 'claude' }
+      // The fixture's record is a quit capture: a running agent's resume record, not a sleep.
+      resume: { agent: 'claude' }
     })
     expect(workspace.groups.map((group) => group.tabOrder)).toEqual([
       ['tab-shell', 'tab-agent', 'editor:src/app.ts'],
@@ -135,8 +117,9 @@ describe('workspace layout Loader and Serializer', () => {
       activeTabId: 'tab-agent',
       recentTabIds: ['tab-shell', 'tab-agent']
     })
+    // Keyed as editorFileKey keys it: a layout-owner build keys by owned file id.
     expect(loaded.desktopView.editorDrafts['repo-1::/Users/dev/orca']).toEqual({
-      '/Users/dev/orca/src/app.ts': {
+      [editorFileKey({ filePath: '/Users/dev/orca/src/app.ts' })]: {
         dirtyDraftContent: 'export {}\n',
         lastKnownDiskSignature: 'sig-1'
       }

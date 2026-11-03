@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AppState } from '@/store/types'
 import type {
   PendingWorktreeCreation,
   WorktreeCreationRequest
@@ -40,9 +39,7 @@ const store = {
   setActivePendingWorktreeCreation: vi.fn(),
   setActiveView: vi.fn(),
   setSidebarOpen: vi.fn(),
-  createWorktree: vi.fn<(...args: Parameters<AppState['createWorktree']>) => Promise<unknown>>(
-    () => new Promise(() => {})
-  ),
+  createWorktree: vi.fn(() => new Promise(() => {})),
   setupProjectExistingFolder: vi.fn(),
   refreshRuntimeEnvironmentStatus: vi.fn(),
   seedNativeChatLaunchDraft: vi.fn(),
@@ -73,10 +70,6 @@ vi.mock('@/lib/workspace-activation-terminal-focus', () => ({
   queueWorkspaceActivationTerminalFocus: vi.fn()
 }))
 
-vi.mock('@/lib/worktree-creation-background-mount', () => ({
-  mountCreatedWorktreeStartupTabsInBackground: vi.fn()
-}))
-
 vi.mock('@/lib/new-workspace', () => ({
   ensureAgentStartupInTerminal: vi.fn()
 }))
@@ -96,12 +89,11 @@ import { toast } from 'sonner'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
 import { ensureWorktreeHasInitialTerminal } from '@/lib/worktree-initial-terminal-seeding'
 import { queueWorkspaceActivationTerminalFocus } from '@/lib/workspace-activation-terminal-focus'
-import { mountCreatedWorktreeStartupTabsInBackground } from '@/lib/worktree-creation-background-mount'
-import { ensureAgentStartupInTerminal } from '@/lib/new-workspace'
 import {
   beginBackgroundWorktreePreparation,
   continueBackgroundWorktreeCreation,
-  retryBackgroundWorktreeCreation
+  retryBackgroundWorktreeCreation,
+  runBackgroundWorktreeCreation
 } from './worktree-creation-flow'
 
 beforeEach(() => {
@@ -149,6 +141,265 @@ async function flushAsyncWorktreeCreation(): Promise<void> {
   await Promise.resolve()
   await Promise.resolve()
 }
+
+describe('runBackgroundWorktreeCreation', () => {
+  beforeEach(() => {
+    store.settings.activeRuntimeEnvironmentId = null
+    store.repos = [{ id: 'repo-runtime', connectionId: null }]
+    store.pendingWorktreeCreations = {}
+    store.activePendingCreationId = null
+    store.beginPendingWorktreeCreation.mockClear()
+    store.updatePendingWorktreeCreation.mockClear()
+    store.removePendingWorktreeCreation.mockClear()
+    store.setActiveView.mockClear()
+    store.setSidebarOpen.mockClear()
+    store.createWorktree.mockReset().mockImplementation(() => new Promise(() => {}))
+    store.setupProjectExistingFolder.mockReset()
+    store.refreshRuntimeEnvironmentStatus.mockReset()
+    prepareEphemeralVmWorkspaceTargetMock.mockReset()
+    globalThis.window = {
+      api: {
+        ephemeralVm: {
+          attachWorkspace: vi.fn(),
+          cleanup: vi.fn(),
+          onProvisionEvent: vi.fn(() => vi.fn())
+        }
+      }
+    } as never
+  })
+
+  it('uses the captured repo-owner progress mode instead of focused runtime state', () => {
+    store.settings.activeRuntimeEnvironmentId = null
+    store.beginPendingWorktreeCreation.mockClear()
+
+    runBackgroundWorktreeCreation(makeRequest({ worktreeCreateProgressMode: 'indeterminate' }))
+
+    expect(store.beginPendingWorktreeCreation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        creationId: 'creation-1',
+        indeterminate: true,
+        request: expect.objectContaining({
+          worktreeCreateProgressMode: 'indeterminate'
+        })
+      })
+    )
+  })
+
+  it('falls back to focused runtime state for legacy captured requests', () => {
+    store.settings.activeRuntimeEnvironmentId = 'focused-runtime'
+    store.beginPendingWorktreeCreation.mockClear()
+
+    runBackgroundWorktreeCreation(makeRequest())
+
+    expect(store.beginPendingWorktreeCreation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        indeterminate: true,
+        request: expect.not.objectContaining({
+          worktreeCreateProgressMode: expect.any(String)
+        })
+      })
+    )
+  })
+
+  it('shows a VM provisioning phase and creates the worktree on the prepared runtime repo', async () => {
+    store.repos = [
+      {
+        id: 'repo-1',
+        connectionId: null,
+        gitRemoteIdentity: {
+          canonicalKey: 'github.com/stablyai/orca',
+          remoteName: 'origin',
+          remoteUrl: 'git@github.com:stablyai/orca.git'
+        }
+      } as never
+    ]
+    prepareEphemeralVmWorkspaceTargetMock.mockResolvedValue({
+      ok: true,
+      runtimeId: 'runtime-1',
+      environmentId: 'env-1',
+      stderr: '',
+      warnings: [],
+      setup: {
+        project: { id: 'project-1' },
+        setup: {
+          id: 'setup-runtime',
+          projectId: 'project-1',
+          hostId: 'runtime:env-1'
+        },
+        repo: { id: 'repo-runtime', path: '/workspace/repo' }
+      }
+    })
+    store.createWorktree.mockResolvedValue({
+      worktree: { id: 'repo-runtime::/workspace/repo/worktree', repoId: 'repo-runtime' }
+    })
+
+    runBackgroundWorktreeCreation(
+      makeRequest({
+        ephemeralVmRecipe: {
+          sourceRepoId: 'repo-1',
+          recipeId: 'cloud-sandbox',
+          projectId: 'project-1'
+        },
+        baseBranch: 'Jinwoo-H/setup-vercel-sandbox',
+        worktreeCreateProgressMode: 'indeterminate'
+      })
+    )
+
+    expect(store.beginPendingWorktreeCreation).toHaveBeenCalledWith(
+      expect.objectContaining({ phase: 'provisioning-vm' })
+    )
+    await vi.waitFor(() => expect(store.createWorktree).toHaveBeenCalled())
+    expect(prepareEphemeralVmWorkspaceTargetMock).toHaveBeenCalledWith({
+      repoId: 'repo-1',
+      recipeId: 'cloud-sandbox',
+      projectId: 'github:stablyai/orca',
+      workspaceName: 'feature',
+      provisionId: 'creation-1',
+      setupExistingFolder: store.setupProjectExistingFolder
+    })
+    const createCall = store.createWorktree.mock.calls[0] as unknown[]
+    expect(createCall[0]).toBe('repo-runtime')
+    expect(createCall[1]).toBe('feature')
+    expect(createCall[2]).toBeUndefined()
+    expect(createCall).toContain('creation-1')
+    expect(window.api.ephemeralVm.attachWorkspace).toHaveBeenCalledWith({
+      runtimeId: 'runtime-1',
+      workspaceId: 'repo-runtime::/workspace/repo/worktree'
+    })
+    expect(store.refreshRuntimeEnvironmentStatus).toHaveBeenCalledWith('env-1')
+    expect(store.removePendingWorktreeCreation).toHaveBeenCalledWith('creation-1', {
+      cleanupVm: false
+    })
+  })
+
+  it('preserves provider-backed VM start points after provisioning', async () => {
+    store.repos = [{ id: 'repo-1', connectionId: null }] as never
+    prepareEphemeralVmWorkspaceTargetMock.mockResolvedValue({
+      ok: true,
+      runtimeId: 'runtime-1',
+      environmentId: 'env-1',
+      stderr: '',
+      warnings: [],
+      setup: {
+        project: { id: 'project-1' },
+        setup: {
+          id: 'setup-runtime',
+          projectId: 'project-1',
+          hostId: 'runtime:env-1'
+        },
+        repo: { id: 'repo-runtime', path: '/workspace/repo' }
+      }
+    })
+    store.createWorktree.mockResolvedValue({
+      worktree: { id: 'repo-runtime::/workspace/repo/worktree', repoId: 'repo-runtime' }
+    })
+
+    runBackgroundWorktreeCreation(
+      makeRequest({
+        ephemeralVmRecipe: {
+          sourceRepoId: 'repo-1',
+          recipeId: 'cloud-sandbox',
+          projectId: 'github:stablyai/orca'
+        },
+        baseBranch: 'abc123',
+        compareBaseRef: 'refs/remotes/origin/main',
+        linkedPR: 42
+      })
+    )
+
+    await vi.waitFor(() => expect(store.createWorktree).toHaveBeenCalled())
+    const createCall = store.createWorktree.mock.calls[0] as unknown[]
+    expect(createCall[0]).toBe('repo-runtime')
+    expect(createCall[2]).toBe('abc123')
+    expect(createCall[24]).toBe('refs/remotes/origin/main')
+  })
+
+  it('appends stderr provisioning events for the active VM recipe create', async () => {
+    let provisionEventCallback:
+      | ((event: { provisionId: string; stream: 'stdout' | 'stderr'; chunk: string }) => void)
+      | null = null
+    const unsubscribe = vi.fn()
+    window.api.ephemeralVm.onProvisionEvent = vi.fn((callback) => {
+      provisionEventCallback = callback
+      return unsubscribe
+    })
+    prepareEphemeralVmWorkspaceTargetMock.mockImplementation(async () => {
+      provisionEventCallback?.({
+        provisionId: 'creation-1',
+        stream: 'stderr',
+        chunk: 'creating sandbox\n'
+      })
+      provisionEventCallback?.({
+        provisionId: 'other-create',
+        stream: 'stderr',
+        chunk: 'ignore me\n'
+      })
+      provisionEventCallback?.({
+        provisionId: 'creation-1',
+        stream: 'stdout',
+        chunk: '{"pairingCode":"secret"}'
+      })
+      return {
+        ok: true,
+        runtimeId: 'runtime-1',
+        environmentId: 'env-1',
+        stderr: '',
+        warnings: [
+          {
+            id: 'recipe.result.endpoint.public_ws',
+            message: 'Recipe pairing endpoint uses insecure public ws:// transport.',
+            remediation: 'Use wss://.'
+          }
+        ],
+        setup: {
+          project: { id: 'project-1' },
+          setup: {
+            id: 'setup-runtime',
+            projectId: 'project-1',
+            hostId: 'runtime:env-1'
+          },
+          repo: { id: 'repo-runtime', path: '/workspace/repo' }
+        }
+      }
+    })
+    store.createWorktree.mockResolvedValue({
+      worktree: { id: 'repo-runtime::/workspace/repo/worktree', repoId: 'repo-runtime' }
+    })
+
+    runBackgroundWorktreeCreation(
+      makeRequest({
+        ephemeralVmRecipe: {
+          sourceRepoId: 'repo-1',
+          recipeId: 'cloud-sandbox',
+          projectId: 'project-1'
+        },
+        worktreeCreateProgressMode: 'indeterminate'
+      })
+    )
+
+    await vi.waitFor(() => expect(store.createWorktree).toHaveBeenCalled())
+    expect(window.api.ephemeralVm.onProvisionEvent).toHaveBeenCalled()
+    expect(unsubscribe).toHaveBeenCalled()
+    expect(store.updatePendingWorktreeCreation).toHaveBeenCalledWith(
+      'creation-1',
+      expect.objectContaining({ provisioningLog: 'creating sandbox\n' })
+    )
+    expect(store.updatePendingWorktreeCreation).toHaveBeenCalledWith(
+      'creation-1',
+      expect.objectContaining({
+        provisioningLog: expect.stringContaining(
+          'Warning: Recipe pairing endpoint uses insecure public ws:// transport.'
+        )
+      })
+    )
+    expect(JSON.stringify(store.updatePendingWorktreeCreation.mock.calls)).not.toContain(
+      'pairingCode'
+    )
+    expect(JSON.stringify(store.updatePendingWorktreeCreation.mock.calls)).not.toContain(
+      'ignore me'
+    )
+  })
+})
 
 describe('staged background worktree creation', () => {
   it('shows a pending preparing row before async preflight finishes', () => {
@@ -286,7 +537,7 @@ describe('staged background worktree creation', () => {
       undefined,
       undefined,
       undefined,
-      { activateCreatedTabs: false, backendStartupTerminalSpawned: true }
+      expect.objectContaining({ activateCreatedTabs: false, backendStartupTerminalSpawned: true })
     )
     expect(queueWorkspaceActivationTerminalFocus).not.toHaveBeenCalled()
     expect(store.removePendingWorktreeCreation).toHaveBeenCalledWith('creation-1', {
@@ -294,101 +545,7 @@ describe('staged background worktree creation', () => {
     })
   })
 
-  it('hands the authoritative backend pane to delayed prompt delivery', async () => {
-    const leafId = '11111111-1111-4111-8111-111111111111'
-    store.createWorktree.mockResolvedValueOnce({
-      worktree: { id: 'wt-1', repoId: 'repo-1' },
-      startupTerminal: {
-        tabId: 'agent-tab',
-        paneKey: `agent-tab:${leafId}`,
-        spawned: true
-      }
-    })
-    const startupPlan = {
-      agent: 'goose' as const,
-      launchCommand: 'goose',
-      expectedProcess: 'goose',
-      followupPrompt: 'implement the task',
-      launchConfig: { agentCommand: 'goose', agentArgs: '', agentEnv: {} },
-      launchToken: 'launch-token-1',
-      agentPermissionMode: 'manual' as const,
-      sessionOptions: { model: 'gpt-5.4', effort: 'high' }
-    }
-
-    continueBackgroundWorktreeCreation(
-      'creation-1',
-      makeRequest({
-        agent: 'goose',
-        startup: {
-          command: 'goose',
-          launchAgent: 'goose',
-          launchToken: 'launch-token-1',
-          agentPermissionMode: 'manual'
-        },
-        startupPlan
-      })
-    )
-
-    await flushAsyncWorktreeCreation()
-    expect(store.createWorktree.mock.calls[0]?.[25]).toEqual(
-      expect.objectContaining({
-        requiresAgentLaunchPermissionCapability: true,
-        startupLaunchPreferences: { model: 'gpt-5.4', effort: 'high' }
-      })
-    )
-    expect(ensureAgentStartupInTerminal).toHaveBeenCalledWith({
-      worktreeId: 'wt-1',
-      primaryTabId: 'agent-tab',
-      startupPaneKey: `agent-tab:${leafId}`,
-      startup: startupPlan
-    })
-  })
-
-  it('mounts a backend-owned startup in the background after the user switches workspaces', async () => {
-    let resolveCreate!: (result: {
-      worktree: { id: string; repoId: string }
-      startupTerminal: { tabId: string; spawned: true }
-    }) => void
-    store.createWorktree.mockReturnValueOnce(
-      new Promise((resolve) => {
-        resolveCreate = resolve
-      })
-    )
-
-    const started = continueBackgroundWorktreeCreation('creation-1', makeRequest(), {
-      revealCreationSurface: false
-    })
-
-    expect(started).toBe(true)
-    await vi.waitFor(() => expect(store.createWorktree).toHaveBeenCalledTimes(1))
-    // Why: selecting a real workspace clears only the pending surface pointer;
-    // completion should still finish the task-launch handoff once it is ready.
-    store.activePendingCreationId = null
-    resolveCreate({
-      worktree: { id: 'wt-1', repoId: 'repo-1' },
-      startupTerminal: { tabId: 'agent-tab', spawned: true }
-    })
-    await vi.waitFor(() => expect(store.removePendingWorktreeCreation).toHaveBeenCalled())
-
-    expect(activateAndRevealWorktree).not.toHaveBeenCalled()
-    expect(ensureWorktreeHasInitialTerminal).toHaveBeenCalledExactlyOnceWith(
-      store,
-      'wt-1',
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      { activateCreatedTabs: false, backendStartupTerminalSpawned: true }
-    )
-    expect(mountCreatedWorktreeStartupTabsInBackground).toHaveBeenCalledExactlyOnceWith('wt-1')
-    expect(store.removePendingWorktreeCreation).toHaveBeenCalledWith('creation-1', {
-      cleanupVm: false
-    })
-  })
-
-  // Why: one-click "Start workspace from issue" commonly backgrounds, so the
-  // user-moved-on path is the common delivery for the repo's issue command; it
-  // must thread through as the 5th positional arg, not be dropped to undefined.
+  // Background issue launches must retain the fifth positional issueCommand; this is the common one-click path.
   it('threads the request issue command into the background terminal seed', async () => {
     store.activeView = 'tasks'
     store.createWorktree.mockResolvedValueOnce({
@@ -405,9 +562,7 @@ describe('staged background worktree creation', () => {
     )
 
     expect(started).toBe(true)
-    // Why: vi.waitFor instead of a fixed microtask flush — the await count in
-    // executeWorktreeCreation grows over time (e.g. VM preflight), and a fixed
-    // flush silently starves this assertion in merged builds.
+    // Wait on the condition; fixed microtask counts drift as async preflight grows and silently starve assertions.
     await vi.waitFor(() =>
       expect(ensureWorktreeHasInitialTerminal).toHaveBeenCalledWith(
         store,
@@ -416,7 +571,7 @@ describe('staged background worktree creation', () => {
         undefined,
         { command: 'gh issue view 42' },
         undefined,
-        { activateCreatedTabs: false }
+        { activateCreatedTabs: false, worktreeCreationId: 'creation-1' }
       )
     )
   })
@@ -512,7 +667,7 @@ describe('staged background worktree creation', () => {
         setup,
         undefined,
         undefined,
-        { activateCreatedTabs: false, callerProvidesSurface: true }
+        expect.objectContaining({ activateCreatedTabs: false, callerProvidesSurface: true })
       )
     )
   })
@@ -552,8 +707,7 @@ describe('staged background worktree creation', () => {
   })
 
   it('seeds the backend-spawned agent tab, not the worktree default terminal tab', async () => {
-    // Repo default tabs ("dev server", "logs", …) make activation's primaryTabId
-    // a tab that runs no agent; main's startup terminal is the agent's own tab.
+    // Default tabs can be dev/log shells; backend startup terminal, not activation primaryTabId, identifies the agent.
     store.activeView = 'terminal'
     store.activePendingCreationId = 'creation-1'
     store.tabsByWorktree = { 'wt-1': [{ id: 'dev-server' }, { id: 'agent-tab' }] }

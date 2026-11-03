@@ -8,7 +8,6 @@ import { getExperimentalPaneSearchEntries, getExperimentalSearchEntry } from './
 import { HiddenExperimentalGroup } from './HiddenExperimentalGroup'
 import { NumberField, SettingsSwitch } from './SettingsFormControls'
 import { translate } from '@/i18n/i18n'
-import { NativeChatExperimentalSetting } from './NativeChatExperimentalSetting'
 import {
   MAX_AGENT_HIBERNATION_IDLE_MS,
   MIN_AGENT_HIBERNATION_IDLE_MS,
@@ -34,9 +33,6 @@ export function ExperimentalPane({
 }: ExperimentalPaneProps): React.JSX.Element {
   const searchQuery = useAppStore((s) => s.settingsSearchQuery)
   const showPet = matchesSettingsSearch(searchQuery, [getExperimentalSearchEntry().pet])
-  const showNativeChat = matchesSettingsSearch(searchQuery, [
-    getExperimentalSearchEntry().nativeChat
-  ])
   const showTerminalAttention = matchesSettingsSearch(searchQuery, [
     getExperimentalSearchEntry().terminalAttention
   ])
@@ -89,11 +85,6 @@ export function ExperimentalPane({
           </div>
         </SearchableSetting>
       ) : null}
-
-      {showNativeChat ? (
-        <NativeChatExperimentalSetting settings={settings} updateSettings={updateSettings} />
-      ) : null}
-
       {showTerminalAttention ? (
         <SearchableSetting
           title={translate(
@@ -137,7 +128,6 @@ export function ExperimentalPane({
           </div>
         </SearchableSetting>
       ) : null}
-
       {showAgentHibernation ? (
         <SearchableSetting
           title={translate(
@@ -211,7 +201,6 @@ export function ExperimentalPane({
           ) : null}
         </SearchableSetting>
       ) : null}
-
       {showNewWorktreeCardStyle ? (
         <SearchableSetting
           title={translate(
@@ -237,7 +226,7 @@ export function ExperimentalPane({
               <p className="text-xs text-muted-foreground">
                 {translate(
                   'auto.components.settings.ExperimentalPane.newWorktreeCardStyle.copy',
-                  'Previews updated worktree-card layout and metadata behavior, including hover/context-menu ownership and status presentation.'
+                  'Preview updated worktree-card layout, metadata placement, card-display menu options, and status presentation.'
                 )}
               </p>
             </div>
@@ -256,7 +245,6 @@ export function ExperimentalPane({
           </div>
         </SearchableSetting>
       ) : null}
-
       {hiddenExperimentalUnlocked ? <HiddenExperimentalGroup /> : null}
     </div>
   )

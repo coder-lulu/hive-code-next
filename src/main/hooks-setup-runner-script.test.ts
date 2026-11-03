@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { APP_DISPLAY_NAME } from '../shared/brand'
 import { makeHookTestRepo } from './hooks-test-fixtures'
 
-// Mock fs used by the runner-script writers
 vi.mock('fs', () => ({
   readFileSync: vi.fn(),
   existsSync: vi.fn(),
@@ -22,7 +21,6 @@ vi.mock('child_process', () => ({
   exec: vi.fn(),
   execFile: vi.fn(),
   execFileSync: vi.fn(),
-  // runner.ts imports spawn from child_process transitively.
   spawn: vi.fn()
 }))
 
@@ -123,7 +121,7 @@ describe('createSetupRunnerScript', () => {
 
       expect(gitExecFileSyncMock).toHaveBeenCalledWith(
         ['rev-parse', '--git-path', 'orca/setup-runner.sh'],
-        { cwd: 'C:\\repo-worktree' }
+        { cwd: 'C:\\repo-worktree', hostGit: true }
       )
       expect(writeFileSyncMock).toHaveBeenCalledWith(
         'C:\\repo\\.git\\orca\\setup-runner.sh',
@@ -141,8 +139,7 @@ describe('createSetupRunnerScript', () => {
   })
 
   it('keeps batch setup scripts on cmd.exe when the terminal is Git Bash', async () => {
-    // Regression (#6967): a Git Bash terminal preference used to hand pre-existing
-    // batch setup scripts to bash, where `copy`/`xcopy`/`if errorlevel` do not exist.
+    // Batch scripts must retain cmd semantics even when the pane uses Git Bash (#6967).
     gitExecFileSyncMock.mockReset()
     gitExecFileSyncMock.mockReturnValue('C:\\repo\\.git\\orca\\setup-runner.cmd\n')
     const fs = await import('node:fs')
@@ -163,7 +160,7 @@ describe('createSetupRunnerScript', () => {
 
       expect(gitExecFileSyncMock).toHaveBeenCalledWith(
         ['rev-parse', '--git-path', 'orca/setup-runner.cmd'],
-        { cwd: 'C:\\repo-worktree' }
+        { cwd: 'C:\\repo-worktree', hostGit: true }
       )
       expect(writeFileSyncMock).toHaveBeenCalledWith(
         'C:\\repo\\.git\\orca\\setup-runner.cmd',
@@ -172,8 +169,7 @@ describe('createSetupRunnerScript', () => {
       )
       expect(result).toMatchObject({
         runnerScriptPath: 'C:\\repo\\.git\\orca\\setup-runner.cmd',
-        // Why: `shell` is the pane that types the launch command — still Git Bash here. The
-        // runner's own .cmd extension is what says the file is batch.
+        // shell describes the pane; the .cmd extension selects the runner’s interpreter.
         shell: { family: 'posix' }
       })
     } finally {
@@ -182,8 +178,7 @@ describe('createSetupRunnerScript', () => {
   })
 
   it('hands a Git Bash pane a launch command MSYS cannot rewrite for a cmd runner', async () => {
-    // Regression (#6896): `cmd.exe /c "C:\...\setup-runner.cmd"` typed into Git Bash has its
-    // `/c` switch rewritten into a drive path, so cmd opens interactively and setup never runs.
+    // MSYS rewrites cmd.exe /c into a drive path, leaving setup stuck at an interactive prompt (#6896).
     gitExecFileSyncMock.mockReset()
     gitExecFileSyncMock.mockReturnValue('C:\\repo\\.git\\orca\\setup-runner.cmd\n')
     const originalPlatform = process.platform
@@ -203,7 +198,6 @@ describe('createSetupRunnerScript', () => {
       const command = buildSetupRunnerCommand(result.runnerScriptPath, 'windows', result.shell)
 
       expect(command).not.toContain('cmd.exe /c')
-      // Why: the batch runner must never be handed to bash either.
       expect(command).not.toContain('bash ')
       expect(command).toContain('powershell.exe')
     } finally {
@@ -212,8 +206,7 @@ describe('createSetupRunnerScript', () => {
   })
 
   it('replays interpreter flags declared on the shebang line', async () => {
-    // Regression: the runner is launched as `bash <path>`, so `-euo pipefail` on the script's
-    // own `#!` line never reaches the interpreter unless the runner re-applies it.
+    // bash <path> ignores the script’s shebang options unless the runner reapplies them.
     gitExecFileSyncMock.mockReset()
     gitExecFileSyncMock.mockReturnValue('C:\\repo\\.git\\orca\\setup-runner.sh\n')
     const fs = await import('node:fs')
@@ -263,7 +256,7 @@ describe('createSetupRunnerScript', () => {
 
       expect(gitExecFileSyncMock).toHaveBeenCalledWith(
         ['rev-parse', '--git-path', 'orca/setup-runner.cmd'],
-        { cwd: 'C:\\repo-worktree' }
+        { cwd: 'C:\\repo-worktree', hostGit: true }
       )
       expect(writeFileSyncMock).toHaveBeenCalledWith(
         'C:\\repo\\.git\\orca\\setup-runner.cmd',
@@ -298,7 +291,7 @@ describe('createSetupRunnerScript', () => {
 
       expect(gitExecFileSyncMock).toHaveBeenCalledWith(
         ['rev-parse', '--git-path', 'orca/setup-runner.sh'],
-        { cwd: '/test/worktree' }
+        { cwd: '/test/worktree', hostGit: true }
       )
       expect(writeFileSyncMock).toHaveBeenCalledWith(
         '/test/repo/.git/orca/setup-runner.sh',
@@ -473,8 +466,7 @@ describe('resolveSetupRunnerShell', () => {
     const { resolveSetupRunnerShell } = await import('./worktree-runner-script')
     const { resolveWindowsGitBashShellPath } = await import('./git-bash')
 
-    // Regression: a stale configured path used to commit setup to a .sh runner the
-    // PTY could never spawn, hanging wait-for-setup until the 2h timeout.
+    // Reject stale shells before setup waits on a runner the PTY cannot spawn.
     expect(
       resolveSetupRunnerShell(
         { terminalWindowsShell: 'C:\\Program Files\\Git\\bin\\bash.exe' },

@@ -14,7 +14,8 @@ import type { AppState } from '@/store/types'
 import { selectRuntimeAwareSshStatus } from '@/store/slices/runtime-environment-ssh-selectors'
 import { activateTabAndFocusPane } from './activate-tab-and-focus-pane'
 import { isFloatingTerminalWorkspaceId } from './floating-terminal'
-import { activateStructuredAgentSessionTab } from './structured-agent-session-tab-activation'
+import { activateStructuredAgentSessionTab } from './agent-session/structured-agent-session-tab-activation'
+import { structuredAgentSessionTargetForHost } from '@/runtime/structured-agent-session-owner'
 import { activateTemporarySessionInMain } from './temporary-session-navigation'
 import { activateAndRevealWorkspace } from './worktree-activation'
 import { resolveExactWorktreeRoute } from './worktree-owner-route'
@@ -229,11 +230,13 @@ export async function activateSessionInWorkspace(
     if (isFloatingTerminalWorkspaceId(target.bucketKey)) {
       return { ok: true }
     }
-    return activateStructuredAgentSessionTab({
-      worktreeId: target.workspaceId,
-      tabId: refreshed.tab.id,
-      executionHostId: target.executionHostId
-    })
+    const sessionTarget = structuredAgentSessionTargetForHost(target.executionHostId)
+    return sessionTarget &&
+      activateStructuredAgentSessionTab({
+        worktreeId: target.workspaceId,
+        tabId: refreshed.tab.id,
+        target: sessionTarget
+      })
       ? { ok: true }
       : { ok: false, reason: 'unavailable' }
   }

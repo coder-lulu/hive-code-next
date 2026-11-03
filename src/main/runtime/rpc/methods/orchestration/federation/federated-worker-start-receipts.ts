@@ -1,21 +1,6 @@
 import { PRIMARY_CLI_COMMAND } from '../../../../../../shared/brand'
 import type { OrchestrationWorkerLaunchReceipt } from '../worker/worker-launch-preferences'
 
-export type RemoteStartReceipt = {
-  dispatchId: string
-  state: string
-  runtimeEpoch: string
-  worktreeId?: string
-  terminalHandle?: string
-  setup?: { state: string }
-  launch?: OrchestrationWorkerLaunchReceipt
-  effects?: unknown[]
-  residualResources?: unknown[]
-  prompt?: unknown
-  failedStage?: string
-  lastError?: string
-}
-
 export function isKnownRemoteStartFailure(code: string): boolean {
   return [
     'invalid_argument',

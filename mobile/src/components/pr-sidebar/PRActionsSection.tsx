@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../../i18n/use-mobile-translation'
 import { useCallback, useState } from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { GitMerge, Link2Off } from 'lucide-react-native'
@@ -6,12 +7,14 @@ import type { GitHubPRMergeMethod, PRInfo } from '../../../../src/shared/github/
 import type { RpcClient } from '../../transport/rpc-client'
 import type { MobilePrActions } from '../../session/use-mobile-pr-actions'
 import { unlinkMobilePr } from '../../source-control/mobile-pr-link'
+import type { GitHubLinkBase } from '../../../../src/shared/worktree/github-link-base'
 import { ConfirmModal } from '../ConfirmModal'
 import { canShowMobilePRAutoMergeControl } from './pr-auto-merge-availability'
 import { resolveMobilePrMergeMethod, resolvePrActionAvailability } from './pr-actions-state'
 import { createPrActionsStyles } from './pr-actions-styles'
 
 type Props = {
+  githubLinkBase: GitHubLinkBase | null
   pr: PRInfo
   actions: MobilePrActions
   client: RpcClient | null
@@ -26,7 +29,16 @@ type Confirm =
 
 // Merge primary; Close/Reopen + Unlink share one secondary row. No section title —
 // button labels are self-explanatory and a header wasted a full row on mobile.
-export function PRActionsSection({ pr, actions, client, worktreeId, onUnlinked }: Props) {
+export function PRActionsSection({
+  pr,
+  actions,
+  client,
+  worktreeId,
+  githubLinkBase,
+  onUnlinked
+}: Props) {
+  const t = useMobileTranslation()
+
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createPrActionsStyles)
   const [confirm, setConfirm] = useState<Confirm | null>(null)
@@ -60,7 +72,7 @@ export function PRActionsSection({ pr, actions, client, worktreeId, onUnlinked }
     setUnlinking(true)
     setUnlinkError(null)
     try {
-      const outcome = await unlinkMobilePr(client, worktreeId)
+      const outcome = await unlinkMobilePr(client, worktreeId, pr.number, githubLinkBase)
       if (outcome.ok) {
         onUnlinked()
       } else {
@@ -71,26 +83,47 @@ export function PRActionsSection({ pr, actions, client, worktreeId, onUnlinked }
     } finally {
       setUnlinking(false)
     }
-  }, [client, onUnlinked, unlinking, worktreeId])
+  }, [client, githubLinkBase, onUnlinked, pr.number, unlinking, worktreeId])
 
   const confirmCopy = (): { title: string; message: string; confirmLabel: string } => {
     if (confirm?.kind === 'merge') {
       return {
-        title: '合并拉取请求？',
-        message: `这会将 #${pr.number} 合并到目标分支。`,
+        title: t(
+          'auto.mobile.src.components.pr.sidebar.PRActionsSection.3859e72a1b',
+          'Merge pull request?'
+        ),
+        message: t(
+          'auto.mobile.src.components.pr.sidebar.PRActionsSection.0272332d31',
+          'This will merge #{{value0}} into the target branch.',
+          { value0: pr.number }
+        ),
         confirmLabel: '合并'
       }
     }
     if (confirm?.kind === 'state' && confirm.state === 'closed') {
       return {
-        title: '关闭拉取请求？',
-        message: `#${pr.number} 将被关闭且不会合并。`,
+        title: t(
+          'auto.mobile.src.components.pr.sidebar.PRActionsSection.37e70bd3e7',
+          'Close pull request?'
+        ),
+        message: t(
+          'auto.mobile.src.components.pr.sidebar.PRActionsSection.5658233062',
+          '#{{value0}} will be closed without merging.',
+          { value0: pr.number }
+        ),
         confirmLabel: '关闭'
       }
     }
     return {
-      title: '重新打开拉取请求？',
-      message: `#${pr.number} 将重新打开。`,
+      title: t(
+        'auto.mobile.src.components.pr.sidebar.PRActionsSection.fc844409f0',
+        'Reopen pull request?'
+      ),
+      message: t(
+        'auto.mobile.src.components.pr.sidebar.PRActionsSection.f41a1dc00b',
+        '#{{value0}} will be reopened.',
+        { value0: pr.number }
+      ),
       confirmLabel: '重新打开'
     }
   }
@@ -125,20 +158,33 @@ export function PRActionsSection({ pr, actions, client, worktreeId, onUnlinked }
           }}
           disabled={mergeBusy}
           accessibilityRole="button"
-          accessibilityLabel="合并拉取请求"
+          accessibilityLabel={t(
+            'auto.mobile.src.components.pr.sidebar.PRActionsSection.13774d4e6e',
+            'Merge pull request'
+          )}
         >
           {mergeBusy ? (
             <ActivityIndicator color={theme.color.text.inverse} />
           ) : (
             <GitMerge size={16} color={theme.color.text.inverse} strokeWidth={2.2} />
           )}
-          <Text style={[styles.actionButtonText, styles.actionButtonTextMerge]}>合并拉取请求</Text>
+          <Text style={[styles.actionButtonText, styles.actionButtonTextMerge]}>
+            {t(
+              'auto.mobile.src.components.pr.sidebar.PRActionsSection.13774d4e6e',
+              'Merge pull request'
+            )}
+          </Text>
         </Pressable>
       ) : null}
 
       {showAutoMerge ? (
         <View style={styles.toggleRow}>
-          <Text style={styles.toggleLabel}>就绪后自动合并</Text>
+          <Text style={styles.toggleLabel}>
+            {t(
+              'auto.mobile.src.components.pr.sidebar.PRActionsSection.744ac0d1de',
+              'Automatically merge when ready'
+            )}
+          </Text>
           <Pressable
             style={[styles.togglePill, autoMerge && styles.togglePillOn]}
             onPress={() => {
@@ -148,13 +194,18 @@ export function PRActionsSection({ pr, actions, client, worktreeId, onUnlinked }
             disabled={autoMergeBusy}
             accessibilityRole="switch"
             accessibilityState={{ checked: autoMerge }}
-            accessibilityLabel="切换自动合并"
+            accessibilityLabel={t(
+              'pullRequest.prActionsSection.autoMergeAccessibilityLabel',
+              'Toggle auto-merge'
+            )}
           >
             {autoMergeBusy ? (
               <ActivityIndicator color={theme.color.text.secondary} />
             ) : (
               <Text style={[styles.togglePillText, autoMerge && styles.togglePillTextOn]}>
-                {autoMerge ? '开启' : '关闭'}
+                {autoMerge
+                  ? t('settings.nativeChatSettingsScreen.on', 'On')
+                  : t('settings.nativeChatSettingsScreen.off', 'Off')}
               </Text>
             )}
           </Pressable>
@@ -176,7 +227,17 @@ export function PRActionsSection({ pr, actions, client, worktreeId, onUnlinked }
               }}
               disabled={stateBusy}
               accessibilityRole="button"
-              accessibilityLabel={avail.canClose ? '关闭拉取请求' : '重新打开拉取请求'}
+              accessibilityLabel={
+                avail.canClose
+                  ? t(
+                      'auto.mobile.src.components.pr.sidebar.PRActionsSection.d3178a0634',
+                      'Close pull request'
+                    )
+                  : t(
+                      'auto.mobile.src.components.pr.sidebar.PRActionsSection.bf6523841f',
+                      'Reopen pull request'
+                    )
+              }
             >
               {stateBusy ? <ActivityIndicator color={theme.color.text.secondary} /> : null}
               <Text
@@ -185,7 +246,12 @@ export function PRActionsSection({ pr, actions, client, worktreeId, onUnlinked }
                   avail.canClose && styles.actionButtonDestructiveText
                 ]}
               >
-                {avail.canClose ? '关闭' : '重新打开'}
+                {avail.canClose
+                  ? t('settings.nativeChatSettingsScreen.off', 'Off')
+                  : t(
+                      'auto.mobile.src.components.pr.sidebar.PRActionsSection.3a450459f0',
+                      'Reopen'
+                    )}
               </Text>
             </Pressable>
           ) : null}
@@ -199,14 +265,19 @@ export function PRActionsSection({ pr, actions, client, worktreeId, onUnlinked }
               onPress={() => void unlink()}
               disabled={unlinkBusy}
               accessibilityRole="button"
-              accessibilityLabel="取消关联拉取请求"
+              accessibilityLabel={t(
+                'auto.mobile.src.components.pr.sidebar.PRActionsSection.f90930772d',
+                'Unlink pull request'
+              )}
             >
               {unlinking ? (
                 <ActivityIndicator color={theme.color.text.secondary} />
               ) : (
                 <Link2Off size={16} color={theme.color.text.secondary} strokeWidth={2.2} />
               )}
-              <Text style={styles.actionButtonText}>取消关联</Text>
+              <Text style={styles.actionButtonText}>
+                {t('pullRequest.prActionsSection.unlinkButton', 'Unlink')}
+              </Text>
             </Pressable>
           ) : null}
         </View>

@@ -26,7 +26,7 @@ import {
 } from '../agent-session-journal/journal-host-database-test-support'
 import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
 import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
-import { NO_STRUCTURED_AGENTS } from './structured-agent-session-adapter-router-test-support'
+import { claudeAndCodexAgents } from './structured-agent-session-adapter-router-test-support'
 
 const CALLER = { callerKey: 'client-1' }
 const DEFAULT_MODEL = 'gpt-default'
@@ -63,6 +63,7 @@ function adapter(): StructuredAgentSessionAdapter {
     activeModel = options?.model ?? DEFAULT_MODEL
     activeEffort = options?.effort ?? null
     return {
+      acquisitionGeneration: globalThis.crypto.randomUUID(),
       process: {
         hostId: 'local',
         pid: 4200 + acquire.mock.calls.length,
@@ -83,6 +84,9 @@ function adapter(): StructuredAgentSessionAdapter {
     return closeSessionExit
   })
   return {
+    open: vi.fn(async () => ({
+      reportedOptions: { model: activeModel, ...(activeEffort ? { effort: activeEffort } : {}) }
+    })),
     supportsLocation: () => true,
     acquire,
     dispatch: vi.fn<StructuredAgentSessionAdapter['dispatch']>(async () => {
@@ -130,7 +134,7 @@ beforeEach(async () => {
   store = await openTestAgentSessionRecordStore(root)
   router = adapter()
   host = new StructuredAgentSessionHost({
-    agents: NO_STRUCTURED_AGENTS,
+    agents: claudeAndCodexAgents(),
     logger: createStructuredAgentSessionLogger(),
     store,
     adapter: router,
@@ -170,12 +174,15 @@ describe('structured session options and close', () => {
     )
     const events: AgentSessionStatusEvent[] = []
     host.subscribeStatus({ id: 'session-list', emit: (event) => events.push(event) })
-    expect(events).toEqual([
-      {
-        type: 'snapshot',
-        sessions: [expect.objectContaining({ status: 'idle', model: DEFAULT_MODEL })]
-      }
-    ])
+    expect(events).toEqual(
+      expect.arrayContaining([
+        {
+          type: 'snapshot',
+          sessions: [expect.objectContaining({ status: 'idle', model: DEFAULT_MODEL })]
+        }
+      ])
+    )
+    const observed = events.length
     const fields = { key: 'model', value: PICKED_MODEL }
 
     await host.setOption(CALLER, {
@@ -183,7 +190,7 @@ describe('structured session options and close', () => {
       ...fields
     })
 
-    expect(events.slice(1)).toEqual([
+    expect(events.slice(observed)).toEqual([
       {
         type: 'status',
         session: expect.objectContaining({ sessionId: SESSION, model: PICKED_MODEL })
@@ -223,7 +230,7 @@ describe('structured session options and close', () => {
 
     await host.close(SESSION, 'evict')
 
-    expect(closeNativeSession).toHaveBeenCalledWith(SESSION)
+    expect(closeNativeSession).toHaveBeenCalledWith(SESSION, undefined)
     expect(store.getRecord(SESSION)?.lease).toMatchObject({
       claimStatus: 'released',
       ownerProcess: null,

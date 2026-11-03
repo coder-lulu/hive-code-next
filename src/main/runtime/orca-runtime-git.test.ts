@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GlobalSettings } from '../../shared/global-settings-types'
+import { createGlobalSettingsFixture } from '../../shared/global-settings-test-fixture'
+import { getDefaultSourceControlAiSettings } from '../../shared/source-control-ai'
 import type * as GitStatusModule from '../git/status'
 import type * as CommitMessageTextGenerationModule from '../text-generation/commit-message-text-generation'
 import type * as PullRequestContextModule from '../text-generation/pull-request-context'
@@ -10,7 +12,8 @@ import {
   SSH_HOST_NOT_SERVED_MESSAGE,
   SshHostNotServedError
 } from '../providers/ssh-host-not-served-error'
-import { RuntimeGitCommands, type ResolvedRuntimeGitWorktree } from './orca-runtime-git'
+import { RuntimeGitCommands } from './orca-runtime-git'
+import type { ResolvedRuntimeGitWorktree } from './runtime-git-command-target'
 
 const mocks = vi.hoisted(() => ({
   checkoutBranch: vi.fn(),
@@ -243,10 +246,14 @@ describe('RuntimeGitCommands', () => {
     const commands = new RuntimeGitCommands({
       resolveRuntimeGitTarget: async () => localTarget(worktreePath),
       getRuntimeSettings: () =>
-        ({
-          commitMessageAi: { enabled: true, agentId: 'codex' },
+        createGlobalSettingsFixture({
+          sourceControlAi: {
+            ...getDefaultSourceControlAiSettings(),
+            enabled: true,
+            agentId: 'codex'
+          },
           agentCmdOverrides: {}
-        }) as GlobalSettings,
+        }),
       getCommitMessageAgentEnvironment: () => ({
         prepareForCodexLaunch: () => '/managed/codex-home'
       })
@@ -259,7 +266,7 @@ describe('RuntimeGitCommands', () => {
 
     expect(mocks.resolveCommitMessageSettings).toHaveBeenCalledWith(
       expect.objectContaining({
-        commitMessageAi: { enabled: true, agentId: 'codex' }
+        sourceControlAi: expect.objectContaining({ enabled: true, agentId: 'codex' })
       }),
       'local',
       'commitMessage',
@@ -299,10 +306,14 @@ describe('RuntimeGitCommands', () => {
         localGitOptions: { wslDistro: 'Ubuntu' }
       }),
       getRuntimeSettings: () =>
-        ({
-          commitMessageAi: { enabled: true, agentId: 'codex' },
+        createGlobalSettingsFixture({
+          sourceControlAi: {
+            ...getDefaultSourceControlAiSettings(),
+            enabled: true,
+            agentId: 'codex'
+          },
           agentCmdOverrides: {}
-        }) as GlobalSettings,
+        }),
       getCommitMessageAgentEnvironment: () => ({
         prepareForCodexLaunch
       })
@@ -354,16 +365,15 @@ describe('RuntimeGitCommands', () => {
     })
     const commands = new RuntimeGitCommands({
       resolveRuntimeGitTarget: async () => localTarget(worktreePath),
-      getRuntimeSettings: () =>
-        ({
-          sourceControlAi: {
-            commitMessage: {
-              enabled: true,
-              agentId: 'cursor',
-              customPrompt: 'Saved default that should not win.'
-            }
-          }
-        }) as unknown as GlobalSettings
+      getRuntimeSettings: () => ({
+        ...createGlobalSettingsFixture({ workspaceDir: worktreePath }),
+        sourceControlAi: {
+          ...getDefaultSourceControlAiSettings(),
+          enabled: true,
+          agentId: 'cursor',
+          instructionsByOperation: { commitMessage: 'Saved default that should not win.' }
+        }
+      })
     })
 
     await expect(
@@ -527,8 +537,9 @@ describe('RuntimeGitCommands', () => {
         executionHostId: 'ssh:conn-1'
       }),
       getRuntimeSettings: () =>
-        ({
-          commitMessageAi: {
+        createGlobalSettingsFixture({
+          sourceControlAi: {
+            ...getDefaultSourceControlAiSettings(),
             enabled: true,
             agentId: 'cursor',
             selectedModelByAgentByHost: { 'ssh:conn-1': { cursor: 'remote-model' } }

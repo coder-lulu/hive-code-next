@@ -2,7 +2,7 @@ import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import MobileOnboardingScreen from '../../app/mobile-onboarding'
-import { lightTheme, type MobileTheme } from '../theme/mobile-theme'
+import { findAllByHostType, findByHostType } from '../test-support/react-test-renderer-host-nodes'
 
 const mocks = vi.hoisted(() => ({
   params: { hostId: 'paired-host', steps: 'session-view,notifications' },
@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   animatedTiming: vi.fn(),
   ensureNotificationPermissions: vi.fn(),
   saveDefaultSessionView: vi.fn(),
-  savePushNotificationsEnabled: vi.fn()
+  setRemotePushEnabled: vi.fn()
 }))
 
 vi.mock('react-native', () => ({
@@ -25,7 +25,7 @@ vi.mock('react-native', () => ({
       constructor(public current: number) {}
     },
     View: 'AnimatedView',
-    // Lazy like a real Animated node, so translateX tracks later timing updates.
+    // Keep Animated values lazy so later timing updates reach translateX.
     multiply: (value: { current: number }, factor: number) => ({ value, factor }),
     timing: mocks.animatedTiming
   },
@@ -47,18 +47,14 @@ vi.mock('expo-router', () => ({
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }))
 vi.mock('../components/OrcaLogo', () => ({ OrcaLogo: 'OrcaLogo' }))
 vi.mock('./MobileOnboardingPage', () => ({ MobileOnboardingPage: 'MobileOnboardingPage' }))
-vi.mock('../theme/mobile-theme-provider', () => ({
-  useMobileTheme: () => lightTheme,
-  useMobileThemeStyles: (factory: (theme: MobileTheme) => unknown) => factory(lightTheme)
-}))
 vi.mock('../notifications/mobile-notifications', () => ({
   ensureNotificationPermissions: mocks.ensureNotificationPermissions
 }))
 vi.mock('../storage/session-view-preferences', () => ({
   saveDefaultSessionView: mocks.saveDefaultSessionView
 }))
-vi.mock('../storage/preferences', () => ({
-  savePushNotificationsEnabled: mocks.savePushNotificationsEnabled
+vi.mock('../notifications/push-registration', () => ({
+  setRemotePushEnabled: mocks.setRemotePushEnabled
 }))
 
 describe('MobileOnboardingScreen', () => {
@@ -79,7 +75,7 @@ describe('MobileOnboardingScreen', () => {
       }))
     mocks.ensureNotificationPermissions.mockReset().mockResolvedValue(true)
     mocks.saveDefaultSessionView.mockReset().mockResolvedValue(undefined)
-    mocks.savePushNotificationsEnabled.mockReset().mockResolvedValue(undefined)
+    mocks.setRemotePushEnabled.mockReset().mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -107,7 +103,7 @@ describe('MobileOnboardingScreen', () => {
   }
 
   function trackStyle() {
-    return renderer!.root.findByType('AnimatedView').props.style[1]
+    return findByHostType(renderer!.root, 'AnimatedView').props.style[1]
   }
 
   function trackWidth(): number {
@@ -116,12 +112,11 @@ describe('MobileOnboardingScreen', () => {
 
   function translateX(): number {
     const { value, factor } = trackStyle().transform[0].translateX
-    // + 0 normalises -0 on the first slide.
     return value.current * factor + 0
   }
 
   function pages() {
-    return renderer!.root.findAllByType('MobileOnboardingPage')
+    return findAllByHostType(renderer!.root, 'MobileOnboardingPage')
   }
 
   it('advances from session view to notifications before opening the paired host', async () => {
@@ -135,7 +130,7 @@ describe('MobileOnboardingScreen', () => {
 
     await act(async () => pages()[1].props.onNotificationChoice('skip'))
     expect(mocks.ensureNotificationPermissions).not.toHaveBeenCalled()
-    expect(mocks.savePushNotificationsEnabled).toHaveBeenCalledWith(false)
+    expect(mocks.setRemotePushEnabled).toHaveBeenCalledWith(false)
     expect(mocks.replace).toHaveBeenCalledWith('/h/paired-host')
   })
 
@@ -146,21 +141,21 @@ describe('MobileOnboardingScreen', () => {
       mocks.ensureNotificationPermissions.mockResolvedValue(granted)
       await renderScreen()
       await act(async () => pages()[0].props.onNotificationChoice('enable'))
-      expect(mocks.savePushNotificationsEnabled).toHaveBeenCalledExactlyOnceWith(granted)
+      expect(mocks.setRemotePushEnabled).toHaveBeenCalledExactlyOnceWith(granted)
       expect(mocks.replace).toHaveBeenCalledWith('/h/paired-host')
     }
   )
 
   it('keeps notification consent retryable when its local write fails', async () => {
     mocks.params = { hostId: 'paired-host', steps: 'notifications' }
-    mocks.savePushNotificationsEnabled.mockRejectedValueOnce(new Error('disk full'))
+    mocks.setRemotePushEnabled.mockRejectedValueOnce(new Error('disk full'))
     await renderScreen()
     await act(async () => pages()[0].props.onNotificationChoice('enable'))
-    expect(pages()[0].props.error).toBe('未能更新通知设置，请重试。')
+    expect(pages()[0].props.error).toBe('Notification settings could not be updated. Try again.')
     expect(mocks.replace).not.toHaveBeenCalled()
     await act(async () => pages()[0].props.onNotificationChoice('enable'))
-    expect(mocks.savePushNotificationsEnabled).toHaveBeenCalledTimes(2)
-    expect(mocks.savePushNotificationsEnabled).toHaveBeenLastCalledWith(true)
+    expect(mocks.setRemotePushEnabled).toHaveBeenCalledTimes(2)
+    expect(mocks.setRemotePushEnabled).toHaveBeenLastCalledWith(true)
     expect(mocks.replace).toHaveBeenCalledWith('/h/paired-host')
   })
 
@@ -172,17 +167,6 @@ describe('MobileOnboardingScreen', () => {
     expect(mocks.replace).toHaveBeenCalledWith('/h/paired-host')
   })
 
-  it('requests notification permission and persists the granted result', async () => {
-    mocks.params = { hostId: 'paired-host', steps: 'notifications' }
-    await renderScreen()
-
-    await act(async () => pages()[0].props.onNotificationChoice('enable'))
-
-    expect(mocks.ensureNotificationPermissions).toHaveBeenCalledOnce()
-    expect(mocks.savePushNotificationsEnabled).toHaveBeenCalledWith(true)
-    expect(mocks.replace).toHaveBeenCalledWith('/h/paired-host')
-  })
-
   it('keeps the current step retryable when persistence fails', async () => {
     mocks.params = { hostId: 'paired-host', steps: 'session-view' }
     mocks.saveDefaultSessionView
@@ -191,27 +175,11 @@ describe('MobileOnboardingScreen', () => {
     await renderScreen()
 
     await act(async () => pages()[0].props.onSessionChoice('chat'))
-    expect(pages()[0].props.error).toBe('未能保存你的选择，请重试。')
+    expect(pages()[0].props.error).toBe('Your choice could not be saved. Try again.')
 
     await act(async () => pages()[0].props.onSessionChoice('chat'))
     expect(mocks.saveDefaultSessionView).toHaveBeenCalledTimes(2)
     expect(mocks.replace).toHaveBeenCalledWith('/h/paired-host')
-  })
-
-  it('keeps notification permission errors retryable', async () => {
-    mocks.params = { hostId: 'paired-host', steps: 'notifications' }
-    mocks.ensureNotificationPermissions.mockRejectedValueOnce(new Error('permission unavailable'))
-    await renderScreen()
-
-    await act(async () => pages()[0].props.onNotificationChoice('enable'))
-
-    expect(pages()[0].props).toMatchObject({
-      active: true,
-      busyChoice: null,
-      error: '未能更新通知设置，请重试。'
-    })
-    expect(mocks.savePushNotificationsEnabled).not.toHaveBeenCalled()
-    expect(mocks.replace).not.toHaveBeenCalled()
   })
 
   it('resets carousel state when the route supplies a new onboarding plan', async () => {
@@ -239,18 +207,6 @@ describe('MobileOnboardingScreen', () => {
     )
   })
 
-  it('announces Chinese progress and uses the semantic canvas', async () => {
-    await renderScreen()
-    const progress = renderer!.root.findByProps({ accessibilityRole: 'progressbar' })
-    const safeArea = renderer!.root.findByType('SafeAreaView')
-
-    expect(progress.props).toMatchObject({
-      accessibilityLabel: '引导进度',
-      accessibilityValue: { text: '第 1 步，共 2 步' }
-    })
-    expect(safeArea.props.style.backgroundColor).toBe(lightTheme.color.bg.canvas)
-  })
-
   it('keeps the next decision available if the cosmetic transition is interrupted', async () => {
     mocks.animatedTiming.mockReturnValue({
       start: (callback: (result: { finished: boolean }) => void) => callback({ finished: false })
@@ -263,7 +219,6 @@ describe('MobileOnboardingScreen', () => {
   })
 
   it('sizes slides from the modal viewport rather than the wider window', async () => {
-    // iPad presents the modal as a centred sheet narrower than the window.
     mocks.windowWidth = 1024
     await renderScreen(540)
 

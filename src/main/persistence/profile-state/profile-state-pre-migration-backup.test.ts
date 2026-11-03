@@ -67,7 +67,6 @@ describe('the backup taken before the first boot-time rewrite of saved data', ()
     ).resolves.toBe('ready')
 
     expect(readGeneration(backupPath)).toBe(1)
-    // Self-contained: no temporary files or SQLite sidecars are left beside it.
     expect(readdirSync(directory).filter((name) => name.includes('pre-migration'))).toEqual([
       basename(backupPath)
     ])
@@ -100,7 +99,6 @@ describe('the backup taken before the first boot-time rewrite of saved data', ()
     expect(existsSync(backupPath)).toBe(false)
     expect(readdirSync(directory).some((name) => name.includes('pre-migration'))).toBe(false)
 
-    // A later boot with room takes the copy then.
     await expect(
       ensureProfileStatePreMigrationBackup(databasePath, PROFILE, writeProfileStateBackup)
     ).resolves.toBe('ready')

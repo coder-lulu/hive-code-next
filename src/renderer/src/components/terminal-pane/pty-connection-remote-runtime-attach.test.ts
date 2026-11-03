@@ -231,7 +231,7 @@ describe('connectPanePty', () => {
     } as StoreState
 
     const pane = createPane(2)
-    pane.terminal.write.mockImplementation((_data: string, callback?: () => void) => callback?.())
+    pane.terminal.write.mockImplementation((_data, callback) => callback?.())
     const manager = createManager(2)
     const deps = createDeps()
 
@@ -298,7 +298,7 @@ describe('connectPanePty', () => {
     )
   })
 
-  it('cold-spawns slept remote runtime PTYs instead of reattaching the preserved handle', async () => {
+  it('cold-spawns a saved Codex session without replaying its old permission flags or PTY', async () => {
     const { connectPanePty } = await import('./pty-connection')
     enableActiveRuntimeEnvironment('env-1')
     const restoredPtyId = 'remote:env-1@@terminal-1'
@@ -343,6 +343,11 @@ describe('connectPanePty', () => {
           worktreeId: 'wt-1',
           agent: 'codex',
           providerSession: { key: 'session_id', id: 'codex-session-1' },
+          launchConfig: {
+            agentCommand: "codex '--dangerously-bypass-approvals-and-sandbox'",
+            agentArgs: '--dangerously-bypass-approvals-and-sandbox',
+            agentEnv: {}
+          },
           prompt: 'finish the task',
           state: 'working',
           capturedAt: 1,
@@ -352,7 +357,7 @@ describe('connectPanePty', () => {
     } as StoreState
 
     const pane = createPane(1)
-    pane.terminal.write.mockImplementation((_data: string, callback?: () => void) => callback?.())
+    pane.terminal.write.mockImplementation((_data, callback) => callback?.())
     const manager = createManager(1)
     const deps = createDeps({
       restoredLeafId: LEAF_1,
@@ -368,11 +373,11 @@ describe('connectPanePty', () => {
     expect(transport.connect).toHaveBeenCalledTimes(1)
     expect(transport.connect).toHaveBeenCalledWith(
       expect.objectContaining({
-        command: "codex '--dangerously-bypass-approvals-and-sandbox' 'resume' 'codex-session-1'",
+        command: "codex 'resume' 'codex-session-1'",
         launchAgent: 'codex',
         launchConfig: {
-          agentCommand: "codex '--dangerously-bypass-approvals-and-sandbox'",
-          agentArgs: '--dangerously-bypass-approvals-and-sandbox',
+          agentCommand: 'codex',
+          agentArgs: '',
           agentEnv: {}
         },
         launchToken: expect.stringMatching(new RegExp(`^${UUID_RE}$`)),
@@ -538,9 +543,10 @@ describe('connectPanePty', () => {
     expect(createIpcPtyTransport).toHaveBeenCalled()
   })
 
-  it('uses the focused runtime only for ownerless mixed-version publications', async () => {
+  it('keeps unstamped local catalog rows local despite a focused remote runtime', async () => {
     const { connectPanePty } = await import('./pty-connection')
     const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+    const { createIpcPtyTransport } = await import('./pty-transport')
     const transport = createMockTransport()
     transportFactoryQueue.push(transport)
     mockStoreState = {
@@ -555,7 +561,8 @@ describe('connectPanePty', () => {
 
     connectPanePty(createPane(1) as never, createManager(1) as never, createDeps() as never)
 
-    expect(createRemoteRuntimePtyTransport).toHaveBeenCalledWith('legacy-hub', expect.any(Object))
+    expect(createRemoteRuntimePtyTransport).not.toHaveBeenCalled()
+    expect(createIpcPtyTransport).toHaveBeenCalled()
   })
 
   it('runs an inline setup terminal locally instead of failing its host closed', async () => {
@@ -740,11 +747,9 @@ describe('connectPanePty', () => {
       } as StoreState
       if (owner === 'missing') {
         mockStoreState.worktreesByRepo = {
-          repo1: [{ id: 'wt-1', repoId: 'repo1', path: '/srv/wt-1', hostId: 'ssh:hub-private' }]
+          repo1: [{ id: 'wt-1', repoId: 'repo1', path: '/srv/wt-1' }]
         }
-        mockStoreState.repos = [
-          { id: 'repo1', connectionId: 'hub-private', executionHostId: 'ssh:hub-private' }
-        ] as StoreState['repos']
+        mockStoreState.repos = []
       } else if (owner === 'ambiguous') {
         mockStoreState.worktreesByRepo.repo1.push({
           id: 'wt-1',

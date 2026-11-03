@@ -2,12 +2,11 @@ import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react-native'
 import type { MobileSessionTab } from './mobile-session-route-types'
 import { ActionSheetModal, type ActionSheetAction } from '../components/ActionSheetModal'
 import { getMobileSessionTabTitle } from './mobile-terminal-tab-agent'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 
 type BrowserTab = Extract<MobileSessionTab, { type: 'browser' }>
 export type MobileBrowserNavigationMethod = 'browser.back' | 'browser.forward' | 'browser.reload'
 
-/** Keeps browser-tab navigation actions out of the session route while preserving
- *  the target captured at the moment each drawer action is pressed. */
 export function MobileBrowserTabActionSheet(props: {
   target: BrowserTab | null
   onClose: () => void
@@ -15,18 +14,24 @@ export function MobileBrowserTabActionSheet(props: {
   onCloseTab: (target: BrowserTab) => void
   /** Rendered after Close — receives the open tab's id so the session route's
    *  bulk-close builder can resolve the anchor itself. */
-  bulkCloseActions?: (anchorTabId: string | undefined, dismiss: () => void) => ActionSheetAction[]
+  bulkCloseActions?: (anchorTabId: string | undefined) => ActionSheetAction[]
 }): React.JSX.Element {
+  const t = useMobileTranslation()
   const { target, onClose, onNavigate, onCloseTab, bulkCloseActions } = props
   return (
     <ActionSheetModal
       visible={target != null}
-      title={getBrowserActionSheetTitle(target)}
+      title={
+        target
+          ? getMobileSessionTabTitle(target)
+          : t('session.browserTabActionSheet.title', 'Browser')
+      }
       actions={[
         ...(target?.canGoBack
           ? [
               {
-                label: '后退',
+                id: 'back',
+                label: t('common.back', 'Back'),
                 icon: ChevronLeft,
                 onPress: () => {
                   const current = target
@@ -41,7 +46,8 @@ export function MobileBrowserTabActionSheet(props: {
         ...(target?.canGoForward
           ? [
               {
-                label: '前进',
+                id: 'forward',
+                label: t('session.browserTabActionSheet.forward', 'Forward'),
                 icon: ChevronRight,
                 onPress: () => {
                   const current = target
@@ -54,7 +60,8 @@ export function MobileBrowserTabActionSheet(props: {
             ]
           : []),
         {
-          label: '重新加载',
+          id: 'reload',
+          label: t('session.browserTabActionSheet.reload', 'Reload'),
           icon: RefreshCw,
           onPress: () => {
             const current = target
@@ -65,7 +72,8 @@ export function MobileBrowserTabActionSheet(props: {
           }
         },
         {
-          label: '关闭',
+          id: 'close',
+          label: t('common.close', 'Close'),
           destructive: true,
           onPress: () => {
             const current = target
@@ -75,20 +83,9 @@ export function MobileBrowserTabActionSheet(props: {
             }
           }
         },
-        ...(bulkCloseActions?.(target?.id, onClose) ?? [])
+        ...(bulkCloseActions?.(target?.id) ?? [])
       ]}
       onClose={onClose}
     />
   )
-}
-
-function getBrowserActionSheetTitle(target: BrowserTab | null): string {
-  if (!target) {
-    return '浏览器'
-  }
-  const resolvedTitle = getMobileSessionTabTitle(target)
-  if (target.title.trim() === resolvedTitle) {
-    return resolvedTitle
-  }
-  return resolvedTitle === 'New Browser' ? '新建浏览器' : '浏览器'
 }

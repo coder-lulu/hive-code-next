@@ -1,8 +1,18 @@
-import type { GlobalSettings } from './global-settings-types'
-import { resolvedTuiAgentArgsBypassPermissions } from './tui-agent-launch-defaults'
+import { resolveAgentPermission, type AgentPermissionSettings } from './tui-agent-permission-choice'
+import { isTuiAgent } from './tui-agent-config'
+import {
+  agentChatPermissionModes,
+  type AgentChatPermissionModeSupport
+} from './agent-chat-permission-support'
 
 /** A chat's own permission choice. Saved in chat records and settings: never rename a value. */
+export type AgentChatPermissionChoice = 'own' | AgentChatPermissionMode
+
 export type AgentChatPermissionMode = 'ask' | 'accept-edits' | 'auto' | 'full-access'
+
+export function isAgentChatPermissionChoice(value: unknown): value is AgentChatPermissionChoice {
+  return value === 'own' || isAgentChatPermissionMode(value)
+}
 
 /** Picker order: least to most access. */
 export const AGENT_CHAT_PERMISSION_MODES = [
@@ -12,44 +22,66 @@ export const AGENT_CHAT_PERMISSION_MODES = [
   'full-access'
 ] as const satisfies readonly AgentChatPermissionMode[]
 
-/** The chat option a mode is saved and written under. */
+/** Desktop/mobile resolve these lucide names through their own icon packages. */
+export const AGENT_CHAT_PERMISSION_MODE_ICON_NAMES = {
+  ask: 'Hand',
+  'accept-edits': 'FilePenLine',
+  auto: 'ShieldCheck',
+  'full-access': 'ShieldAlert'
+} as const satisfies Record<AgentChatPermissionMode, string>
+
+export type AgentChatPermissionModeIconName =
+  (typeof AGENT_CHAT_PERMISSION_MODE_ICON_NAMES)[AgentChatPermissionMode]
+
 export const AGENT_CHAT_PERMISSION_MODE_OPTION_ID = 'permissionMode'
 
 export function isAgentChatPermissionMode(value: unknown): value is AgentChatPermissionMode {
   return AGENT_CHAT_PERMISSION_MODES.some((mode) => mode === value)
 }
 
-/** The modes one agent's chats offer. */
-export type AgentChatPermissionModeSupport = {
-  modes: readonly AgentChatPermissionMode[]
-  /** `auto` runs only on a model the agent's listing says supports it. */
-  autoNeedsModelSupport?: true
-}
-
-const CLAUDE_CHAT_PERMISSION_MODES: AgentChatPermissionModeSupport = {
-  modes: AGENT_CHAT_PERMISSION_MODES,
-  autoNeedsModelSupport: true
-}
-
-const CODEX_CHAT_PERMISSION_MODES: AgentChatPermissionModeSupport = {
-  modes: ['ask', 'auto', 'full-access']
-}
-
-/** The one table of which agents' chats offer which modes; null keeps following Agent Permissions. */
-export function agentChatPermissionModes(agent: string): AgentChatPermissionModeSupport | null {
-  return agent === 'claude'
-    ? CLAUDE_CHAT_PERMISSION_MODES
-    : agent === 'codex'
-      ? CODEX_CHAT_PERMISSION_MODES
-      : null
-}
+export {
+  agentChatPermissionModes,
+  type AgentChatPermissionModeSupport
+} from './agent-chat-permission-support'
 
 /** The saved choice if this agent offers it; anything else asks, never grants more access. */
 export function savedChatPermissionMode(
   support: AgentChatPermissionModeSupport,
+  intent: AgentChatPermissionMode
+): AgentChatPermissionMode
+
+export function savedChatPermissionMode(
+  support: AgentChatPermissionModeSupport,
   intent: unknown
-): AgentChatPermissionMode {
+): AgentChatPermissionChoice
+
+export function savedChatPermissionMode(
+  support: AgentChatPermissionModeSupport,
+  intent: unknown
+): AgentChatPermissionChoice {
+  if (intent === 'own') {
+    return 'own'
+  }
   return support.modes.find((mode) => mode === intent) ?? 'ask'
+}
+
+export function newChatPermissionMode(
+  agent: string,
+  setting: unknown
+): AgentChatPermissionChoice | null {
+  const support = agentChatPermissionModes(agent)
+  return support ? savedChatPermissionMode(support, setting) : null
+}
+export type NewChatPermissionSettings = AgentPermissionSettings
+
+export function newChatPermissionModeForSettings(
+  agent: string,
+  settings: NewChatPermissionSettings | null | undefined
+): AgentChatPermissionChoice | null {
+  const support = agentChatPermissionModes(agent)
+  return support && isTuiAgent(agent)
+    ? savedChatPermissionMode(support, resolveAgentPermission(agent, settings).choice)
+    : null
 }
 
 /** The one rule for whether the chat's model runs `auto`: its listed row, or the listed CLI default
@@ -81,7 +113,7 @@ export function effectiveChatPermissionMode(
   support: AgentChatPermissionModeSupport,
   intent: unknown,
   autoSupported: boolean
-): AgentChatPermissionMode {
+): AgentChatPermissionChoice {
   const mode = savedChatPermissionMode(support, intent)
   return mode === 'auto' && support.autoNeedsModelSupport && !autoSupported ? 'ask' : mode
 }
@@ -93,29 +125,4 @@ export function offeredChatPermissionModes(
   return support.autoNeedsModelSupport && !autoSupported
     ? support.modes.filter((mode) => mode !== 'auto')
     : support.modes
-}
-
-/** The host's new-chat default as an agent's chat starts with it; null for an agent with none. */
-export function newChatPermissionMode(
-  agent: string,
-  setting: unknown
-): AgentChatPermissionMode | null {
-  const support = agentChatPermissionModes(agent)
-  return support ? savedChatPermissionMode(support, setting) : null
-}
-
-/** Seeded once when absent, then stored; an unknown value asks. */
-export function loadedChatPermissionSetting(
-  saved: unknown,
-  terminal: Partial<Pick<GlobalSettings, 'agentDefaultArgs' | 'terminalWindowsShell'>>,
-  platform: NodeJS.Platform
-): AgentChatPermissionMode {
-  if (saved !== undefined) {
-    return isAgentChatPermissionMode(saved) ? saved : 'ask'
-  }
-  // What chats ran before they had modes: Claude's and Codex's own arguments, not the all-agent
-  // Yolo/Manual summary, which shows custom arguments on any agent as Yolo even after Manual.
-  const bypasses = (agent: 'claude' | 'codex'): boolean =>
-    resolvedTuiAgentArgsBypassPermissions(agent, terminal, platform)
-  return bypasses('claude') && bypasses('codex') ? 'full-access' : 'ask'
 }

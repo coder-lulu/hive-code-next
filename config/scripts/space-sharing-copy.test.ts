@@ -14,8 +14,6 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  LINUX_REFLINK_ARGS,
-  MACOS_CLONE_ARGS,
   copyPrivateTree,
   hardlinkTree,
   makeTreeReadOnly,
@@ -28,12 +26,13 @@ import {
 const roots: string[] = []
 
 describe('asynchronous immutable sharing', () => {
-  it('preserves read-only source files on the execution host', async () => {
+  it('preserves read-only source and relative symlinks on the execution host', async () => {
     const { root, source } = makeTree()
     await makeTreeReadOnlyAsync(source)
     const destination = path.join(root, 'async-copy')
     await shareTreeAsync(source, destination)
     expect(readFileSync(path.join(destination, 'nested', 'file'), 'utf8')).toBe('contents')
+    expect(readlinkSync(path.join(destination, 'relative-link'))).toBe(path.join('nested', 'file'))
     expect(statSync(path.join(destination, 'nested', 'file')).mode & 0o222).toBe(0)
   })
 
@@ -52,9 +51,10 @@ describe('asynchronous immutable sharing', () => {
     expect(statSync(path.join(destination, 'nested', 'file')).ino).toBe(
       statSync(path.join(source, 'nested', 'file')).ino
     )
+    expect(readlinkSync(path.join(destination, 'relative-link'))).toBe(path.join('nested', 'file'))
   })
 
-  it('keeps the event loop available while a sharing process is pending', async () => {
+  it('waits for the asynchronous sharing mechanism to finish', async () => {
     const { root, source } = makeTree()
     let finish!: () => void
     const pending = new Promise<void>((resolve) => {
@@ -89,29 +89,17 @@ function makeTree(): { root: string; source: string } {
   const source = path.join(root, 'source')
   mkdirSync(path.join(source, 'nested'), { recursive: true })
   writeFileSync(path.join(source, 'nested', 'file'), 'contents')
+  symlinkSync(path.join('nested', 'file'), path.join(source, 'relative-link'))
   return { root, source }
 }
 
 describe('shareTree', () => {
-  // Mechanism selection is asserted with stubs, because the real mechanisms only exist on the host
-  // that owns them: /bin/cp -c is macOS-only and `cp --reflink` is GNU-only.
-  it('prefers the strongest isolation each platform offers', () => {
-    const stub = () =>
-      vi.fn((_source: string, target: string) => mkdirSync(target, { recursive: true }))
-    const stubs = { clone: stub(), reflink: stub(), hardlink: stub() }
-    const { root, source } = makeTree()
-    expect(shareTree(source, path.join(root, 'a'), { platform: 'darwin', ...stubs })).toBe('clone')
-    expect(shareTree(source, path.join(root, 'b'), { platform: 'linux', ...stubs })).toBe('reflink')
-    expect(shareTree(source, path.join(root, 'c'), { platform: 'win32', ...stubs })).toBe(
-      'hardlink'
-    )
-  })
-
-  it('shares file contents using a mechanism supported by the host', () => {
+  it('keeps relative symlinks unresolved on whatever this host supports', () => {
     const { root, source } = makeTree()
     const destination = path.join(root, 'shared')
     expect(shareTree(source, destination)).toBeTruthy()
     expect(readFileSync(path.join(destination, 'nested', 'file'), 'utf8')).toBe('contents')
+    expect(readlinkSync(path.join(destination, 'relative-link'))).toBe(path.join('nested', 'file'))
   })
 
   it('falls from reflink to hardlink on Linux, where ext4 has no reflinks', () => {
@@ -151,20 +139,60 @@ describe('shareTree', () => {
     )
   })
 
-  it('fails loudly instead of degrading, on both copy-out mechanisms', () => {
-    expect(MACOS_CLONE_ARGS).toContain('-P')
-    expect(LINUX_REFLINK_ARGS).toContain('--reflink=always')
+  it('uses strict native-copy arguments and handles their failures', async () => {
+    const nativeCopy = vi.fn(() => {
+      throw new Error('native storage sharing unavailable')
+    })
+    vi.doMock('node:child_process', () => ({ execFileSync: nativeCopy }))
+    vi.resetModules()
+    try {
+      const { shareTree: shareWithNativeCopy } = await import('./space-sharing-copy.mjs')
+      const { root, source } = makeTree()
+      const cloneDestination = path.join(root, 'clone')
+      expect(() => shareWithNativeCopy(source, cloneDestination, { platform: 'darwin' })).toThrow(
+        /Could not share storage/
+      )
+      expect(existsSync(cloneDestination)).toBe(false)
+      expect(nativeCopy).toHaveBeenNthCalledWith(
+        1,
+        '/bin/cp',
+        ['-c', '-R', '-P', source, cloneDestination],
+        { stdio: 'ignore' }
+      )
+
+      const reflinkDestination = path.join(root, 'reflink')
+      expect(shareWithNativeCopy(source, reflinkDestination, { platform: 'linux' })).toBe(
+        'hardlink'
+      )
+      expect(nativeCopy).toHaveBeenNthCalledWith(
+        2,
+        'cp',
+        ['--reflink=always', '-a', source, reflinkDestination],
+        { stdio: 'ignore' }
+      )
+      expect(statSync(path.join(reflinkDestination, 'nested', 'file')).ino).toBe(
+        statSync(path.join(source, 'nested', 'file')).ino
+      )
+      expect(readFileSync(path.join(reflinkDestination, 'nested', 'file'), 'utf8')).toBe('contents')
+      expect(readlinkSync(path.join(reflinkDestination, 'relative-link'))).toBe(
+        path.join('nested', 'file')
+      )
+    } finally {
+      vi.doUnmock('node:child_process')
+      vi.resetModules()
+    }
   })
 })
 
 describe('hardlinkTree', () => {
-  it('shares inodes for files', () => {
+  it('shares inodes for files but recreates symlinks as their own entries', () => {
     const { root, source } = makeTree()
     const destination = path.join(root, 'linked')
     hardlinkTree(source, destination)
     expect(statSync(path.join(destination, 'nested', 'file')).ino).toBe(
       statSync(path.join(source, 'nested', 'file')).ino
     )
+    expect(readlinkSync(path.join(destination, 'relative-link'))).toBe(path.join('nested', 'file'))
   })
 
   it('propagates a write through the shared inode, which is why callers must protect it', () => {
@@ -181,9 +209,7 @@ describe('makeTreeReadOnly', () => {
     const { source } = makeTree()
     makeTreeReadOnly(source)
     expect(statSync(path.join(source, 'nested', 'file')).mode & 0o222).toBe(0)
-    // Asserted as behavior, not mode bits: Windows maps chmod onto the read-only attribute alone,
-    // so a directory there never reports 0o755. What has to hold everywhere is that the install
-    // transaction can still rename dist aside and remove it.
+    // Assert rename/remove behavior, not mode bits: Windows chmod maps only read-only attribute and directories never report 0755.
     expect(() => rmSync(path.join(source, 'nested'), { recursive: true })).not.toThrow()
   })
 
@@ -212,9 +238,9 @@ describe('makeTreeReadOnly', () => {
       const { source } = makeTree()
       const executable = path.join(source, 'electron')
       writeFileSync(executable, 'binary', { mode: 0o755 })
+      chmodSync(executable, 0o755)
       makeTreeReadOnly(source)
-      // Verified on real ext4: 0o555. Windows has no execute bit -- the read-only attribute does
-      // not gate execution there, confirmed by running a read-only hardlinked .exe on NTFS.
+      // ext4 reports 0555; Windows read-only attribute does not prevent hardlinked executable from running on NTFS.
       expect(statSync(executable).mode & 0o111).toBe(0o111)
     }
   )
@@ -248,8 +274,7 @@ describe('copyPrivateTree', () => {
       const destination = path.join(root, 'private')
       makeTreeReadOnly(source)
       copyPrivateTree(source, destination)
-      // The regression this guards: the shared Electron dist is read-only, clonefile/reflink/cpSync
-      // all carry that across, and `pn dev` then died patching the copied bundle's Info.plist.
+      // Private copy inherits shared-cache read-only modes; restore owner write or dev Info.plist patch fails.
       expect(() => writeFileSync(path.join(destination, 'nested', 'file'), 'patched')).not.toThrow()
       expect(readFileSync(path.join(source, 'nested', 'file'), 'utf8')).toBe('contents')
     }
@@ -277,17 +302,7 @@ describe('copyPrivateTree', () => {
     })
     expect(hardlink).not.toHaveBeenCalled()
     expect(readFileSync(path.join(destination, 'nested', 'file'), 'utf8')).toBe('contents')
-  })
-
-  it('reports the private mechanism it used', () => {
-    const { root, source } = makeTree()
-    const clone = vi.fn((_source: string, target: string) => mkdirSync(target, { recursive: true }))
-    expect(
-      copyPrivateTree(source, path.join(root, 'private'), { platform: 'darwin', clone })
-    ).toEqual({
-      mechanism: 'clone',
-      copyError: null
-    })
+    expect(readlinkSync(path.join(destination, 'relative-link'))).toBe(path.join('nested', 'file'))
   })
 
   it('falls back to a byte copy when the private mechanism fails', () => {
@@ -301,31 +316,4 @@ describe('copyPrivateTree', () => {
     expect(result.copyError).toBeInstanceOf(Error)
     expect(readFileSync(path.join(destination, 'nested', 'file'), 'utf8')).toBe('contents')
   })
-})
-
-describe('relative symlinks', () => {
-  for (const [name, copy] of [
-    ['shareTree', shareTree],
-    ['hardlinkTree', hardlinkTree],
-    ['copyPrivateTree', copyPrivateTree],
-    ['shareTreeAsync', shareTreeAsync]
-  ] as const) {
-    it(`${name} preserves a relative link without resolving it`, async (context) => {
-      const { root, source } = makeTree()
-      const linkTarget = path.join('nested', 'file')
-      try {
-        symlinkSync(linkTarget, path.join(source, 'relative-link'))
-      } catch (error) {
-        // Ordinary Windows tokens can hardlink files but may lack file-symlink privileges.
-        if (process.platform === 'win32' && (error as NodeJS.ErrnoException).code === 'EPERM') {
-          context.skip('The Windows token cannot create a file symlink')
-        }
-        throw error
-      }
-      const destination = path.join(root, 'shared')
-      await copy(source, destination)
-      expect(readlinkSync(path.join(destination, 'relative-link'))).toBe(linkTarget)
-      expect(readFileSync(path.join(destination, 'relative-link'), 'utf8')).toBe('contents')
-    })
-  }
 })

@@ -7,18 +7,12 @@ const SIBLING_PATH = '\\\\wsl.localhost\\Debian\\home\\ada\\.claude\\projects\\p
 
 const mocks = vi.hoisted(() => ({ open: vi.fn(), readdir: vi.fn() }))
 
-// readdir too: every claude parse counts sibling subagent transcripts, and an
-// unmocked one would reach the host UNC path and stall under fake timers.
-vi.mock('node:fs/promises', async (importOriginal) => {
-  const { regularTranscriptStats, withRegularTranscriptStat } =
-    await import('../native-chat/safe-transcript-handle.test-fixture')
-  return {
-    ...(await importOriginal<typeof NodeFsPromisesModule>()),
-    open: async (path: string) => withRegularTranscriptStat(await mocks.open(path)),
-    lstat: async () => regularTranscriptStats,
-    readdir: mocks.readdir
-  }
-})
+// Claude also counts sibling subagents; mock readdir to avoid real UNC access under fake timers.
+vi.mock('node:fs/promises', async (importOriginal) => ({
+  ...(await importOriginal<typeof NodeFsPromisesModule>()),
+  open: mocks.open,
+  readdir: mocks.readdir
+}))
 
 import {
   parseAgentSessionFileCached,
@@ -33,8 +27,7 @@ import {
 
 type ReadResult = { bytesRead: number; buffer: Buffer }
 
-// A stalled task keeps the gate's single scan slot until the call settles, so
-// every case releases its stall before the next one runs.
+// Settle stalled calls between cases to release their scan permits.
 let releaseStall: (() => void) | undefined
 
 function stalls(): Promise<ReadResult> {
@@ -84,8 +77,7 @@ function candidate(path: string, bytes: Buffer, mtimeMs: number): SessionFileCan
   }
 }
 
-// A result that lands past the deadline never lifts the route quarantine, so
-// recovery waits out the back-off window the same way production does.
+// Late results cannot clear quarantine; advance through backoff before retrying.
 async function releaseAndSettle(): Promise<void> {
   releaseStall?.()
   releaseStall = undefined
@@ -93,8 +85,6 @@ async function releaseAndSettle(): Promise<void> {
 }
 
 beforeEach(() => {
-  // blockedRoutes is persistent gate state: a prior stall must not quarantine
-  // this test's route.
   resetWslTranscriptFsGateForTests()
   resetSessionParseCacheForTests()
   mocks.open.mockReset()
@@ -113,10 +103,7 @@ afterEach(async () => {
 describe('AI Vault session parse with a stalled WSL transcript body read', () => {
   it('refuses the stalled candidate and still parses a sibling on a healthy distro', async () => {
     mocks.open.mockResolvedValue({ read: vi.fn(stalls), close: vi.fn(async () => {}) })
-    // Rejecting (not resolving null) is what lets `parseSessionCandidate`
-    // report it as an issue instead of silently dropping the session. The
-    // assertion is attached before the clock moves so the rejection is never
-    // momentarily unhandled.
+    // Attach before advancing time: rejection must reach scan issue reporting without becoming unhandled.
     const refusal = expect(
       parseAgentSessionFileCached(candidate(STALLED_PATH, body(2), 1), 'linux')
     ).rejects.toBeInstanceOf(WslTranscriptFsError)

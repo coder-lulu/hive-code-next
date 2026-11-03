@@ -2,7 +2,6 @@
 import '@testing-library/jest-dom/vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import type * as I18nModule from '@/i18n/i18n'
 import { unavailableSessionSearchStatus } from '../../../../shared/ai-vault-search-client'
 import type { AiVaultSearchStatus } from '../../../../shared/ai-vault-search-types'
 import type { PublicKnownRuntimeEnvironment } from '../../../../shared/runtime-environments'
@@ -23,8 +22,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/hooks/use-window-stream-visibility', () => ({
   useWindowStreamVisible: () => mocks.visible
 }))
-vi.mock('@/i18n/i18n', async () => ({
-  ...(await vi.importActual<typeof I18nModule>('@/i18n/i18n')),
+vi.mock('@/i18n/i18n', () => ({
+  getIntlLocale: () => 'en',
   translate: (_key: string, fallback: string, args?: Record<string, unknown>) =>
     fallback.replace(/{{(\w+)}}/g, (_, key: string) => String(args?.[key]))
 }))
@@ -44,10 +43,6 @@ const runningIndex: AiVaultSearchStatus = {
   messagesIndexed: 1_400_000,
   lastSweepCompletedAt: 1
 }
-const indexedStatus = `${(4_880).toLocaleString('en')} sessions · ${(1_400_000).toLocaleString(
-  'en',
-  { notation: 'compact', maximumFractionDigits: 1 }
-)} messages searchable`
 const environment: PublicKnownRuntimeEnvironment = {
   id: 'env-1',
   name: 'build-box',
@@ -145,7 +140,7 @@ it('reports a reachable server by its live index status and version', async () =
   serverRow(connectedDetails())
   await act(async () => {})
   expect(mocks.status).toHaveBeenCalledWith('runtime:env-1')
-  expect(screen.getByRole('status')).toHaveTextContent(indexedStatus)
+  expect(screen.getByRole('status')).toHaveTextContent('4,880 sessions · 1.4M messages searchable')
   expect(screen.getByText('Orca v1.4.202')).toBeInTheDocument()
   expect(serverSwitch()).toHaveAttribute('aria-checked', 'true')
 })
@@ -226,7 +221,7 @@ it('turns a server on straight from its switch, with nothing to confirm', async 
   })
   expect(confirm).not.toHaveBeenCalled()
   expect(mocks.setEnabled).toHaveBeenCalledWith('runtime:env-1', true)
-  expect(screen.getByRole('status')).toHaveTextContent(indexedStatus)
+  expect(screen.getByRole('status')).toHaveTextContent('4,880 sessions · 1.4M messages searchable')
 })
 
 it('turns a server off straight from its switch', async () => {

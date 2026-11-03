@@ -1,12 +1,8 @@
-/* eslint-disable max-lines -- Pointer drag lifecycle, autoscroll, and commit state must remain coordinated. */
-
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import {
-  computeProjectHeaderBucketDropPreview,
-  measureProjectHeaderDragRects,
-  measureProjectHeaderDropZones,
-  type ProjectHeaderBucketDropPreview
+  computeProjectHeaderDropPreview,
+  measureProjectHeaderDragRects
 } from './project-header-drop'
 import { commitProjectHeaderDragDrop } from './project-header-drag-commit'
 import {
@@ -19,29 +15,26 @@ import {
 } from './project-header-drag-contract'
 import { createProjectHeaderDragSession } from './project-header-drag-start'
 import { getWorktreeSidebarDragAutoscroll } from './worktree-sidebar-drag-autoscroll'
-import type { Repo } from '../../../../shared/repo-types'
 import { hasPointerBeenReleased } from './header-drag-pointer-release'
 import { swallowNextClickOnDragHandle } from './header-drag-click-swallow'
+import type { Repo } from '../../../../shared/repo-types'
 
-// Why pointer events instead of HTML5 DnD: rows are absolutely-positioned by
-// react-virtual and unmount/remount as scroll changes, so DnD enter/leave fire
-// against stale targets. With pointer events we cache the active set of repo
-// header positions and compute the drop index from the live pointer Y.
+// Virtualized rows can unmount during drag; pointer events and cached header geometry avoid stale drop targets.
 
 export function useRepoHeaderDrag({
   orderedRepoIds,
   sidebarRepoHeaderIdsByBucket,
   repoById,
+  getLiveRepos,
   usesProjectGroupOrdering,
-  canMoveAcrossProjectGroups,
-  projectGroupHostIdByGroupId,
   onCommitRepoOrder,
   onCommitProjectGroupOrder,
   getScrollContainer
 }: UseRepoHeaderDragArgs): RepoHeaderDragController {
   const [state, setState] = useState<RepoDragState>(INITIAL_REPO_DRAG_STATE)
   const [sessionArmed, setSessionArmed] = useState(false)
-  const latestDropRef = useRef<ProjectHeaderBucketDropPreview | null>(null)
+  const latestDropIndexRef = useRef<number | null>(null)
+  latestDropIndexRef.current = state.dropIndex
   const orderedIdsRef = useRef(orderedRepoIds)
   orderedIdsRef.current = orderedRepoIds
   const sidebarRepoHeaderIdsByBucketRef = useRef(sidebarRepoHeaderIdsByBucket)
@@ -50,12 +43,10 @@ export function useRepoHeaderDrag({
   repoByIdRef.current = repoById
   const usesProjectGroupOrderingRef = useRef(usesProjectGroupOrdering)
   usesProjectGroupOrderingRef.current = usesProjectGroupOrdering
-  const canMoveAcrossProjectGroupsRef = useRef(canMoveAcrossProjectGroups)
-  canMoveAcrossProjectGroupsRef.current = canMoveAcrossProjectGroups
-  const projectGroupHostIdByGroupIdRef = useRef(projectGroupHostIdByGroupId)
-  projectGroupHostIdByGroupIdRef.current = projectGroupHostIdByGroupId
   const onCommitRepoOrderRef = useRef(onCommitRepoOrder)
   onCommitRepoOrderRef.current = onCommitRepoOrder
+  // Read once: callers pass a stable store reader.
+  const getLiveReposRef = useRef(getLiveRepos)
   const onCommitProjectGroupOrderRef = useRef(onCommitProjectGroupOrder)
   onCommitProjectGroupOrderRef.current = onCommitProjectGroupOrder
   const getContainerRef = useRef(getScrollContainer)
@@ -72,45 +63,46 @@ export function useRepoHeaderDrag({
     if (!container || !session) {
       return []
     }
-    const rects = measureProjectHeaderDragRects(container)
+    const rects = measureProjectHeaderDragRects(container, session.bucketKey)
     session.headerRects = rects
-    session.dropZones = measureProjectHeaderDropZones(container)
     return rects
   }, [])
 
-  const computeDrop = useCallback((pointerY: number): ProjectHeaderBucketDropPreview | null => {
-    const session = dragSessionRef.current
-    const container = getContainerRef.current()
-    if (!session || !container) {
-      return null
-    }
-    return computeProjectHeaderBucketDropPreview({
-      pointerY,
-      containerTop: container.getBoundingClientRect().top,
-      scrollTop: container.scrollTop,
-      rects: session.headerRects,
-      dropZones: session.dropZones,
-      sidebarRepoHeaderIdsByBucket: sidebarRepoHeaderIdsByBucketRef.current,
-      sourceBucketKey: session.bucketKey,
-      sourceExecutionHostId: session.sourceExecutionHostId,
-      projectGroupHostIdByGroupId: projectGroupHostIdByGroupIdRef.current,
-      contentBottom: container.scrollHeight
-    })
-  }, [])
+  const computeDrop = useCallback(
+    (pointerY: number): { dropIndex: number; dropIndicatorY: number } | null => {
+      const session = dragSessionRef.current
+      const container = getContainerRef.current()
+      if (!session || !container) {
+        return null
+      }
+      return computeProjectHeaderDropPreview({
+        pointerY,
+        containerTop: container.getBoundingClientRect().top,
+        scrollTop: container.scrollTop,
+        rects: session.headerRects,
+        sidebarRepoHeaderIds: session.sidebarRepoHeaderIds,
+        contentBottom: container.scrollHeight
+      })
+    },
+    []
+  )
 
-  const applyDrop = useCallback((repoId: string, drop: ProjectHeaderBucketDropPreview | null) => {
-    latestDropRef.current = drop
-    const nextState: RepoDragState = drop
-      ? { draggingRepoId: repoId, ...drop }
-      : { draggingRepoId: repoId, dropIndex: null, dropIndicatorY: null }
-    setState((prev) =>
-      prev.draggingRepoId === nextState.draggingRepoId &&
-      prev.dropIndex === nextState.dropIndex &&
-      prev.dropIndicatorY === nextState.dropIndicatorY
-        ? prev
-        : nextState
-    )
-  }, [])
+  const applyDrop = useCallback(
+    (repoId: string, drop: { dropIndex: number; dropIndicatorY: number } | null) => {
+      latestDropIndexRef.current = drop?.dropIndex ?? null
+      const nextState: RepoDragState = drop
+        ? { draggingRepoId: repoId, ...drop }
+        : { draggingRepoId: repoId, dropIndex: null, dropIndicatorY: null }
+      setState((prev) =>
+        prev.draggingRepoId === nextState.draggingRepoId &&
+        prev.dropIndex === nextState.dropIndex &&
+        prev.dropIndicatorY === nextState.dropIndicatorY
+          ? prev
+          : nextState
+      )
+    },
+    []
+  )
 
   const cancelAutoscroll = useCallback(() => {
     if (autoscrollFrameIdRef.current !== null) {
@@ -125,7 +117,6 @@ export function useRepoHeaderDrag({
       cancelAutoscroll()
       const session = dragSessionRef.current
       if (!session) {
-        latestDropRef.current = null
         setState(INITIAL_REPO_DRAG_STATE)
         setSessionArmed(false)
         return
@@ -133,29 +124,29 @@ export function useRepoHeaderDrag({
       try {
         session.handleEl.releasePointerCapture(session.pointerId)
       } catch {
-        // capture may already be released (pointercancel, element unmounted)
+        // Pointer cancellation or unmount may already have released capture.
       }
       if (session.promoted) {
         clickSwallowTimeoutRef.current = swallowNextClickOnDragHandle(session.handleEl)
       }
-      const drop = commit && session.promoted ? latestDropRef.current : null
-      latestDropRef.current = null
+      const sidebarDropIndex =
+        commit && session.promoted && latestDropIndexRef.current !== null
+          ? latestDropIndexRef.current
+          : null
       dragSessionRef.current = null
       setState(INITIAL_REPO_DRAG_STATE)
       setSessionArmed(false)
-      if (!drop) {
+      if (sidebarDropIndex === null) {
         return
       }
 
       commitProjectHeaderDragDrop({
         session,
-        sidebarDropIndex: drop.dropIndex,
-        targetBucketKey: drop.bucketKey,
-        targetSidebarRepoHeaderIds: drop.sidebarRepoHeaderIds,
+        sidebarDropIndex,
         orderedRepoIds: orderedIdsRef.current,
         repoById: repoByIdRef.current,
+        liveRepos: getLiveReposRef.current(),
         usesProjectGroupOrdering: usesProjectGroupOrderingRef.current,
-        projectGroupHostIdByGroupId: projectGroupHostIdByGroupIdRef.current,
         onCommitRepoOrder: onCommitRepoOrderRef.current,
         onCommitProjectGroupOrder: onCommitProjectGroupOrderRef.current
       })
@@ -188,7 +179,7 @@ export function useRepoHeaderDrag({
         refreshHeaderRects()
       }
 
-      applyDrop(session.repoId, computeDrop(session.latestPointerY))
+      applyDrop(session.repo.id, computeDrop(session.latestPointerY))
 
       autoscrollFrameIdRef.current = window.requestAnimationFrame(runAutoscrollFrame)
     },
@@ -227,20 +218,17 @@ export function useRepoHeaderDrag({
           return
         }
         session.promoted = true
-        // Why: setPointerCapture can throw if the element is detached. Check
-        // isConnected first to avoid the throw; the global pointer listeners
-        // still fire, so dragging keeps working even if capture fails.
+        // Virtualization may detach headers; global listeners keep dragging alive without capture.
         if (session.handleEl.isConnected) {
           try {
             session.handleEl.setPointerCapture(session.pointerId)
-          } catch {
-            // Ignore capture failure; global listeners will handle the drag.
-          }
+          } catch {}
         }
-        setState({ draggingRepoId: session.repoId, dropIndex: null, dropIndicatorY: null })
+        refreshHeaderRects()
+        setState({ draggingRepoId: session.repo.id, dropIndex: null, dropIndicatorY: null })
       }
       refreshHeaderRects()
-      applyDrop(session.repoId, computeDrop(e.clientY))
+      applyDrop(session.repo.id, computeDrop(e.clientY))
       ensureAutoscroll()
     }
     const onPointerUp = (e: PointerEvent): void => {
@@ -307,12 +295,10 @@ export function useRepoHeaderDrag({
   }, [state.draggingRepoId])
 
   const onHandlePointerDown = useCallback((event: React.PointerEvent<HTMLElement>, repo: Repo) => {
-    latestDropRef.current = null
     const session = createProjectHeaderDragSession({
       event,
       repo,
       sidebarRepoHeaderIdsByBucket: sidebarRepoHeaderIdsByBucketRef.current,
-      canMoveAcrossProjectGroups: canMoveAcrossProjectGroupsRef.current,
       getScrollContainer: getContainerRef.current
     })
     if (!session) {

@@ -12,7 +12,6 @@ const run = {
   event: 'pull_request',
   path: '.github/workflows/pr.yml',
   status: 'in_progress',
-  pull_requests: [{ number: 123 }],
   created_at: '2026-10-05T23:59:00Z'
 }
 
@@ -32,14 +31,12 @@ function execute(options = {}) {
     }
   })
   const getPr = vi.fn(async () => ({
-    data: options.current ?? current
+    data: options.nextCurrent ?? options.current ?? current
   }))
-  if (options.reopened) {
-    getPr.mockResolvedValueOnce({ data: current })
+  if (options.reopened || options.nextCurrent) {
+    getPr.mockResolvedValueOnce({ data: options.reopened ? current : options.current })
   }
-  const getRun = vi.fn(async ({ run_id }) => ({
-    data: { ...run, ...(options.runs?.[run_id] ?? options.run) }
-  }))
+  const getRun = vi.fn(async () => ({ data: { ...run, ...options.run } }))
   const cancel = vi.fn(async () => {
     if (options.cancelError) {
       throw options.cancelError
@@ -48,7 +45,7 @@ function execute(options = {}) {
   const result = runInNewContext(`(async () => { ${step.with.script} })()`, {
     context: {
       repo: { owner: 'owner', repo: 'repo' },
-      payload: { pull_request: options.closed ?? closed }
+      payload: { action: options.action ?? 'closed', pull_request: options.closed ?? closed }
     },
     github: {
       request,
@@ -63,8 +60,10 @@ function execute(options = {}) {
 }
 
 it('uses trusted inline code and only enters cancellation on an unmerged close', () => {
-  expect(workflow.on).toEqual({ pull_request_target: { types: ['closed'] } })
-  expect(step.if).toBe('github.event.pull_request.merged == false')
+  expect(workflow.on).toEqual({ pull_request_target: { types: ['closed', 'synchronize'] } })
+  expect(step.if).toBe(
+    "github.event.action == 'synchronize' || github.event.pull_request.merged == false"
+  )
   expect(step.uses).toBe('actions/github-script@v8')
   expect(
     workflow.jobs.clean.steps.some((entry) => entry.uses?.startsWith('actions/checkout'))
@@ -74,14 +73,7 @@ it('uses trusted inline code and only enters cancellation on an unmerged close',
 it('looks up exact PR groups without branch or head-SHA inference', async () => {
   const { result, request, cancel } = execute()
   await result
-  expect(request.mock.calls.map(([, args]) => args.concurrency_group_name)).toEqual([
-    'pr-checks-123',
-    'node-server-123',
-    'ssh-windows-hosts-123',
-    'ssh-hostile-hosts-123',
-    'mobile-123',
-    'computer-e2e-123'
-  ])
+  expect(request.mock.calls[0][1].concurrency_group_name).toBe('pr-checks-123')
   expect(
     request.mock.calls.every(
       ([route, args]) =>
@@ -149,28 +141,59 @@ it('surfaces lookup and cancellation permission failures', async () => {
 
 it('validates the event identity before looking up any work', async () => {
   const { result, request, getPr } = execute({ closed: { ...closed, number: '123' } })
-  await expect(result).rejects.toThrow('Missing closed PR identity')
+  await expect(result).rejects.toThrow('Missing PR identity')
   expect(request).not.toHaveBeenCalled()
   expect(getPr).not.toHaveBeenCalled()
 })
 
-it.each([undefined, null, [], [{ number: 124 }], [{ number: '123' }], [null]])(
-  'retains a run without authenticated association to the exact closed PR: %j',
-  async (pull_requests) => {
-    const { result, cancel } = execute({ run: { pull_requests } })
+const head = 'a'.repeat(40)
+const pushed = { number: 123, head: { sha: head } }
+const open = { ...pushed, state: 'open' }
+
+it('cancels an older commit even when a path filter prevents a replacement run', async () => {
+  const { result, cancel } = execute({
+    action: 'synchronize',
+    closed: pushed,
+    current: open,
+    run: { head_sha: 'b'.repeat(40) }
+  })
+  await result
+  expect(cancel).toHaveBeenCalledOnce()
+})
+
+it.each([head, undefined, 'invalid'])(
+  'preserves the current or unidentifiable commit: %s',
+  async (sha) => {
+    const { result, cancel } = execute({
+      action: 'synchronize',
+      closed: pushed,
+      current: open,
+      run: { head_sha: sha }
+    })
     await result
     expect(cancel).not.toHaveBeenCalled()
   }
 )
 
-it('does not let a forged concurrency group authorize cancellation of another PR', async () => {
-  const { result, cancel } = execute({
-    members: [{ run_id: 41 }, { run_id: 42 }],
-    runs: {
-      41: { id: 41, pull_requests: [{ number: 124 }] },
-      42: { id: 42, pull_requests: [{ number: 123 }] }
-    }
+it('ignores a delayed push event after another push', async () => {
+  const { result, request, cancel } = execute({
+    action: 'synchronize',
+    closed: pushed,
+    current: { ...open, head: { sha: 'c'.repeat(40) } }
   })
   await result
-  expect(cancel.mock.calls).toEqual([[{ owner: 'owner', repo: 'repo', run_id: 42 }]])
+  expect(request).not.toHaveBeenCalled()
+  expect(cancel).not.toHaveBeenCalled()
+})
+
+it('rechecks the current head before cancelling when another push arrives during lookup', async () => {
+  const { result, cancel } = execute({
+    action: 'synchronize',
+    closed: pushed,
+    current: open,
+    nextCurrent: { ...open, head: { sha: 'b'.repeat(40) } },
+    run: { head_sha: 'b'.repeat(40) }
+  })
+  await result
+  expect(cancel).not.toHaveBeenCalled()
 })

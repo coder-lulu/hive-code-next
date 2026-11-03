@@ -24,6 +24,61 @@ function settings(): GlobalSettings {
 }
 
 describe('sourceControlActionRecipeMatchesTarget', () => {
+  it('does not match a forged retired launch default as a saved current recipe', () => {
+    const currentSettings = settings()
+    const forgedSettings = {
+      ...currentSettings,
+      sourceControlAi: {
+        ...currentSettings.sourceControlAi!,
+        actions: {},
+        launchActionDefaults: {
+          resolveConflicts: { agentId: 'codex', agentArgs: '--model sonnet' }
+        }
+      }
+    }
+    expect(
+      sourceControlActionRecipeMatchesTarget({
+        actionId: 'resolveConflicts',
+        target: { type: 'global' },
+        recipe: {
+          agentId: 'codex',
+          commandInputTemplate: '{basePrompt}',
+          agentArgs: '--model sonnet'
+        },
+        settings: forgedSettings
+      })
+    ).toBe(false)
+  })
+
+  it('requires the current custom provider command to match as well as its recipe', () => {
+    const currentSettings = settings()
+    const recipe = {
+      agentId: 'custom',
+      commandInputTemplate: '{basePrompt}',
+      agentArgs: '--quiet'
+    } as const
+    currentSettings.sourceControlAi = {
+      ...currentSettings.sourceControlAi!,
+      customAgentCommand: 'custom-writer --prompt {prompt}',
+      actions: { commitMessage: recipe }
+    }
+    const input = {
+      actionId: 'commitMessage',
+      target: { type: 'global' },
+      recipe,
+      settings: currentSettings
+    } as const
+    expect(
+      sourceControlActionRecipeMatchesTarget({ ...input, customAgentCommand: 'other-writer' })
+    ).toBe(false)
+    expect(
+      sourceControlActionRecipeMatchesTarget({
+        ...input,
+        customAgentCommand: 'custom-writer --prompt {prompt}'
+      })
+    ).toBe(true)
+  })
+
   it('returns true when the launch recipe matches the global saved recipe', () => {
     expect(
       sourceControlActionRecipeMatchesTarget({
@@ -72,7 +127,8 @@ describe('sourceControlActionRecipeMatchesTarget', () => {
             actionOverrides: {
               fixCommitFailure: {
                 agentId: 'claude',
-                commandInputTemplate: '{basePrompt}\n\nrepo only'
+                commandInputTemplate: '{basePrompt}\n\nrepo only',
+                agentArgs: ''
               }
             }
           }

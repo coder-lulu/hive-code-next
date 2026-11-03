@@ -16,7 +16,7 @@ import {
 } from './skill-freshness-inventory'
 import { describeObservedSkillFile, skillPackageDigest } from './skill-package-identity'
 import { MAXIMUM_PLUGIN_SCAN_ENTRIES } from './skill-plugin-cache-scan'
-import { getSkillFreshnessDisplayStatus } from '../../renderer/src/lib/skill-freshness-display-status'
+import { isSkillCopyNeedingAttention } from '../../shared/skill-freshness'
 
 const temporaryDirectories: string[] = []
 
@@ -247,9 +247,8 @@ describe('read-only skill freshness inventory', () => {
     })
     // Why: ahead of the bundle means there is nothing this build can update to.
     expect(inventory.eligibleUpdateNames).toEqual([])
-    // The user-visible verdict, across both halves of the fix: the row must read
-    // up to date, not amber "may be modified… remove it" over the CLI's own install.
-    expect(getSkillFreshnessDisplayStatus(inventory, 'orca-cli')).toBe('up-to-date')
+    // Recognized newer content must not be classified as a copy requiring repair.
+    expect(inventory.installations.some(isSkillCopyNeedingAttention)).toBe(false)
   })
 
   it.runIf(process.platform !== 'win32')(
@@ -274,7 +273,7 @@ describe('read-only skill freshness inventory', () => {
         status: 'current',
         providers: ['agent-skills', 'claude']
       })
-      expect(getSkillFreshnessDisplayStatus(inventory, 'orca-cli')).toBe('up-to-date')
+      expect(inventory.installations.some(isSkillCopyNeedingAttention)).toBe(false)
     }
   )
 
@@ -300,7 +299,7 @@ describe('read-only skill freshness inventory', () => {
 
     expect(inventory.installations.map((entry) => entry.status)).toEqual(['current'])
     // The whole point: no amber, and nothing offered to "fix" a copy that is already right.
-    expect(getSkillFreshnessDisplayStatus(inventory, 'orca-cli')).toBe('up-to-date')
+    expect(inventory.installations.some(isSkillCopyNeedingAttention)).toBe(false)
     expect(inventory.eligibleUpdateNames).toEqual([])
   })
 
@@ -342,7 +341,7 @@ describe('read-only skill freshness inventory', () => {
       topology: 'canonical-copy',
       status: 'newer-known'
     })
-    expect(getSkillFreshnessDisplayStatus(inventory, 'orca-cli')).toBe('up-to-date')
+    expect(inventory.installations.some(isSkillCopyNeedingAttention)).toBe(false)
   })
 
   it('trusts the updater lock for upstream bytes beside an agent CLI sidecar (#12694)', async () => {
@@ -373,7 +372,7 @@ describe('read-only skill freshness inventory', () => {
       topology: 'canonical-copy',
       status: 'newer-known'
     })
-    expect(getSkillFreshnessDisplayStatus(inventory, 'orca-cli')).toBe('up-to-date')
+    expect(inventory.installations.some(isSkillCopyNeedingAttention)).toBe(false)
   })
 
   it('still trusts the lock when the upstream revision added a file (#11220 guard)', async () => {
@@ -404,7 +403,7 @@ describe('read-only skill freshness inventory', () => {
       topology: 'canonical-copy',
       status: 'newer-known'
     })
-    expect(getSkillFreshnessDisplayStatus(inventory, 'orca-cli')).toBe('up-to-date')
+    expect(inventory.installations.some(isSkillCopyNeedingAttention)).toBe(false)
   })
 
   it('still withholds an unwinnable update when a sidecar sits beside the stale copy', async () => {
@@ -455,7 +454,7 @@ describe('read-only skill freshness inventory', () => {
       topology: 'canonical-copy',
       status: 'unrecognized'
     })
-    expect(getSkillFreshnessDisplayStatus(inventory, 'orca-cli')).toBe('needs-attention')
+    expect(inventory.installations.some(isSkillCopyNeedingAttention)).toBe(true)
   })
 
   it('does not let the lock vouch for a same-name copy outside the placements it wrote', async () => {
@@ -479,7 +478,7 @@ describe('read-only skill freshness inventory', () => {
         expect.objectContaining({ topology: 'independent-copy', status: 'unrecognized' })
       ])
     )
-    expect(getSkillFreshnessDisplayStatus(inventory, 'orca-cli')).toBe('needs-attention')
+    expect(inventory.installations.some(isSkillCopyNeedingAttention)).toBe(true)
   })
 
   it('retains full-file identity without projecting unused metadata', async () => {

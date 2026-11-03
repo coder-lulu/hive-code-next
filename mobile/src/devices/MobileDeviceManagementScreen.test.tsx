@@ -1,3 +1,4 @@
+import { findByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -98,44 +99,44 @@ const mount = () =>
 describe('secondary device management integration', () => {
   it('opens real scan/login/claim routes with a single account-aware add menu', () => {
     mount()
-    act(() => renderer!.root.findByType('Screen').props.onAdd())
-    expect(renderer!.root.findByType('AddMenu').props.visible).toBe(true)
-    act(() => renderer!.root.findByType('AddMenu').props.onPair())
+    act(() => findByHostType(renderer!.root, 'Screen').props.onAdd())
+    expect(findByHostType(renderer!.root, 'AddMenu').props.visible).toBe(true)
+    act(() => findByHostType(renderer!.root, 'AddMenu').props.onPair())
     expect(fixture.context.data.router.push).toHaveBeenCalledWith('/pair-scan')
-    act(() => renderer!.root.findByType('AddMenu').props.onAccount())
+    act(() => findByHostType(renderer!.root, 'AddMenu').props.onAccount())
     expect(fixture.context.data.router.push).toHaveBeenCalledWith('/login')
     fixture.session = { authorityId: 'cloud', account: { accountId: 'a' } }
     act(() => renderer!.update(createElement(MobileDeviceManagementScreen)))
-    act(() => renderer!.root.findByType('AddMenu').props.onAccount())
+    act(() => findByHostType(renderer!.root, 'AddMenu').props.onAccount())
     expect(fixture.context.data.router.push).toHaveBeenCalledWith('/claim-computer')
   })
   it('opens host-scoped diagnostics and help and returns using Stack navigation', () => {
     mount()
 
-    act(() => renderer!.root.findByType('Screen').props.onDetails(deviceCatalog[1]))
+    act(() => findByHostType(renderer!.root, 'Screen').props.onDetails(deviceCatalog[1]))
     expect(fixture.context.data.router.push).toHaveBeenCalledWith({
       pathname: '/connection-log',
       params: { hostId: 'device-1' }
     })
-    act(() => renderer!.root.findByType('Toolbar').props.onBack())
+    act(() => findByHostType(renderer!.root, 'Toolbar').props.onBack())
     expect(fixture.context.data.router.back).toHaveBeenCalledOnce()
-    act(() => renderer!.root.findByType('Screen').props.onHelp())
-    expect(renderer!.root.findByType('Help').props.visible).toBe(true)
+    act(() => findByHostType(renderer!.root, 'Screen').props.onHelp())
+    expect(findByHostType(renderer!.root, 'Help').props.visible).toBe(true)
   })
   it('refreshes only the account directory and local catalog without exposing execution shortcuts', async () => {
     mount()
-    await act(async () => renderer!.root.findByType('Toolbar').props.onRefresh())
+    await act(async () => findByHostType(renderer!.root, 'Toolbar').props.onRefresh())
     expect(fixture.directory.refresh).toHaveBeenCalledOnce()
     expect(fixture.context.data.reloadHostCatalog).toHaveBeenCalledOnce()
-    expect(renderer!.root.findByType('Screen').props.onUse).toBeUndefined()
+    expect(findByHostType(renderer!.root, 'Screen').props.onUse).toBeUndefined()
     expect(fixture.context.selectRuntime).not.toHaveBeenCalled()
   })
   it('keeps local pairing management and limits account-device menus to connection operations', () => {
     mount()
-    act(() => renderer!.root.findByType('Screen').props.onActions(deviceCatalog[0]))
+    act(() => findByHostType(renderer!.root, 'Screen').props.onActions(deviceCatalog[0]))
     expect(fixture.context.openHostActions).toHaveBeenCalledWith(deviceCatalog[0])
-    act(() => renderer!.root.findByType('Screen').props.onActions(deviceCatalog[2]))
-    const menu = renderer!.root.findByType('Menu')
+    act(() => findByHostType(renderer!.root, 'Screen').props.onActions(deviceCatalog[2]))
+    const menu = findByHostType(renderer!.root, 'Menu')
     expect(menu.props.actions.map((action: { label: string }) => action.label)).toEqual([
       '重试连接',
       '断开连接',
@@ -152,7 +153,9 @@ describe('secondary device management integration', () => {
       }
       fixture.context.data.hostPairingRejected = { 'device-0': failure === 'pairing-rejected' }
       mount()
-      await act(async () => renderer!.root.findByType('Screen').props.onRetry(deviceCatalog[0]))
+      await act(async () =>
+        findByHostType(renderer!.root, 'Screen').props.onRetry(deviceCatalog[0])
+      )
       expect(fixture.context.data.router.push).toHaveBeenCalledExactlyOnceWith('/pair-scan')
       expect(fixture.forceReconnect).not.toHaveBeenCalled()
     }
@@ -160,9 +163,9 @@ describe('secondary device management integration', () => {
   it('does not run delayed account menu actions or account navigation after switching accounts', async () => {
     fixture.session = { authorityId: 'cloud', account: { accountId: 'a' } }
     mount()
-    act(() => renderer!.root.findByType('Screen').props.onActions(deviceCatalog[2]))
-    const previousActions = renderer!.root.findByType('Menu').props.actions
-    const previousAccountNavigation = renderer!.root.findByType('AddMenu').props.onAccount
+    act(() => findByHostType(renderer!.root, 'Screen').props.onActions(deviceCatalog[2]))
+    const previousActions = findByHostType(renderer!.root, 'Menu').props.actions
+    const previousAccountNavigation = findByHostType(renderer!.root, 'AddMenu').props.onAccount
     fixture.session = { authorityId: 'cloud', account: { accountId: 'b' } }
     act(() => renderer!.update(createElement(MobileDeviceManagementScreen)))
     await act(async () => {
@@ -175,8 +178,8 @@ describe('secondary device management integration', () => {
   })
   it('re-resolves credentials when a deferred retry runs after a directory update', async () => {
     mount()
-    act(() => renderer!.root.findByType('Screen').props.onActions(deviceCatalog[2]))
-    const previousRetry = renderer!.root.findByType('Menu').props.actions[0].onPress
+    act(() => findByHostType(renderer!.root, 'Screen').props.onActions(deviceCatalog[2]))
+    const previousRetry = findByHostType(renderer!.root, 'Menu').props.actions[0].onPress
     fixture.context.data.sortedHostCatalog = deviceCatalog.map((host) =>
       host.id === 'device-2'
         ? { ...host, name: 'Updated server', credentialStatus: 'cloud-offline', profile: null }
@@ -187,18 +190,18 @@ describe('secondary device management integration', () => {
     expect(fixture.forceReconnect).not.toHaveBeenCalled()
     expect(fixture.directory.refresh).toHaveBeenCalledOnce()
     expect(fixture.context.data.reloadHostCatalog).toHaveBeenCalledOnce()
-    expect(renderer!.root.findByType('Menu').props.title).toBe('Updated server')
+    expect(findByHostType(renderer!.root, 'Menu').props.title).toBe('Updated server')
   })
   it('drops deferred actions for an account device removed from the current catalog', async () => {
     mount()
-    act(() => renderer!.root.findByType('Screen').props.onActions(deviceCatalog[2]))
-    const previousActions = renderer!.root.findByType('Menu').props.actions
+    act(() => findByHostType(renderer!.root, 'Screen').props.onActions(deviceCatalog[2]))
+    const previousActions = findByHostType(renderer!.root, 'Menu').props.actions
     fixture.context.data.sortedHostCatalog = deviceCatalog.slice(0, 2)
     act(() => renderer!.update(createElement(MobileDeviceManagementScreen)))
     await act(async () =>
       previousActions.forEach((action: { onPress: () => void }) => action.onPress())
     )
-    expect(renderer!.root.findByType('Menu').props.visible).toBe(false)
+    expect(findByHostType(renderer!.root, 'Menu').props.visible).toBe(false)
     expect(fixture.forceReconnect).not.toHaveBeenCalled()
     expect(fixture.disconnect).not.toHaveBeenCalled()
     expect(fixture.context.data.router.push).not.toHaveBeenCalled()
@@ -206,7 +209,7 @@ describe('secondary device management integration', () => {
   it('returns to the primary screen when device management is opened directly', () => {
     mount()
     fixture.context.data.router.canGoBack = vi.fn().mockReturnValue(false)
-    act(() => renderer!.root.findByType('Toolbar').props.onBack())
+    act(() => findByHostType(renderer!.root, 'Toolbar').props.onBack())
     expect(fixture.context.data.router.replace).toHaveBeenCalledExactlyOnceWith('/')
   })
 })

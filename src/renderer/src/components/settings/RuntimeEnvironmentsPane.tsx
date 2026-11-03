@@ -1,56 +1,51 @@
+import { useRuntimeCloudAliasSettings } from './use-runtime-cloud-alias-settings'
+import { RuntimeCloudAliasesSection } from './runtime-cloud-aliases-section'
+import { RuntimeCloudDisplayNameDialog } from './RuntimeCloudDisplayNameDialog'
 import { useEffect, useRef, useState } from 'react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { PublicKnownRuntimeEnvironment } from '../../../../shared/runtime-environments'
 import { useAppStore } from '@/store'
+import { translate } from '@/i18n/i18n'
 import { SearchableSetting } from './SearchableSetting'
+import { EphemeralVmRuntimesSection } from './EphemeralVmRuntimesSection'
 import {
   getRuntimeEnvironmentsSearchEntry,
   getWebRuntimeEnvironmentsSearchEntry
 } from './runtime-environments-search'
-import {
-  getRuntimeEnvironmentRemovalPresentation,
-  isRuntimeEnvironmentRemovalBlocked
-} from './runtime-environment-host-details'
-import { RuntimeServersConnectSection } from './runtime-servers-connect-section'
-import { RuntimeActiveServerSection } from './runtime-active-server-section'
+import { isRuntimeEnvironmentRemovalBlocked } from './runtime-environment-host-details'
 import {
   RuntimeEnvironmentRemoveDialog,
   RuntimeEnvironmentSwitchDialog
 } from './runtime-environment-dialogs'
-import { RuntimeConnectionTroubleshooting } from './runtime-connection-troubleshooting'
-import { RuntimeCloudDisplayNameDialog } from './RuntimeCloudDisplayNameDialog'
-import { useRuntimeCloudAliasSettings } from './use-runtime-cloud-alias-settings'
-import { RuntimeCloudAliasesSection } from './runtime-cloud-aliases-section'
+import { RuntimeAddServerDialog } from './runtime-add-server-dialog'
+import { RuntimeDefaultHostRow } from './runtime-default-host-row'
+import { RuntimeInstallServerDialog } from './runtime-install-server-dialog'
+import { RuntimeServerList } from './runtime-server-list'
+import { useRuntimeServersPage } from './runtime-servers-page-context'
+import { WslHostsSection } from './WslHostsSection'
+import { useManagedServerCatalog } from './use-managed-server-catalog'
 import { useRuntimeEnvironmentCatalog } from './use-runtime-environment-catalog'
 import { useRuntimeEnvironmentConnectionActions } from './use-runtime-environment-connection-actions'
 import { useRuntimeEnvironmentMutationActions } from './use-runtime-environment-mutation-actions'
 import { LOCAL_RUNTIME_VALUE, NO_RUNTIME_VALUE } from './runtime-environment-selection'
 
 export {
-  canConnectRuntimeEnvironment,
   evaluateHostDetails,
   getActiveServerModeDescription,
   getHostDetailsDescription,
   getHostDetailsSummary,
   getHostModelCapabilitySummary,
   getRuntimeCapabilitiesSummary,
-  getRuntimeEnvironmentEndpointDisplay,
-  getRuntimeEnvironmentInitialDetails,
-  getRuntimeEnvironmentRemovalPresentation,
   getRuntimeServerConnectionState,
   isRuntimeServerTransportConnected,
-  isRuntimeEnvironmentRemovalBlocked,
-  resolveRuntimeCloudRenameEnvironment,
-  supportsLocalRuntimeEnvironmentRemoval
+  isRuntimeEnvironmentRemovalBlocked
 } from './runtime-environment-host-details'
-export type {
-  RuntimeEnvironmentRemovalPresentation,
-  RuntimeHostDetails
-} from './runtime-environment-host-details'
+export type { RuntimeHostDetails } from './runtime-environment-host-details'
 
 type RuntimeEnvironmentsPaneProps = {
   settings: GlobalSettings
   setActiveRuntimeEnvironmentPreference: (environmentId: string | null) => Promise<boolean>
+  canGeneratePairingUrl?: boolean
   allowLocalRuntime?: boolean
   addServerIntentSignal?: number
 }
@@ -58,21 +53,19 @@ type RuntimeEnvironmentsPaneProps = {
 export function RuntimeEnvironmentsPane({
   settings,
   setActiveRuntimeEnvironmentPreference,
+  canGeneratePairingUrl = true,
   allowLocalRuntime = true,
   addServerIntentSignal
 }: RuntimeEnvironmentsPaneProps): React.JSX.Element {
+  const { dialog, setDialog } = useRuntimeServersPage()
   const [pendingSwitchValue, setPendingSwitchValue] = useState<string | null>(null)
   const [pendingRemove, setPendingRemove] = useState<PublicKnownRuntimeEnvironment | null>(null)
-  const [addServerFormOpen, setAddServerFormOpen] = useState(false)
-  const [advancedOpen, setAdvancedOpen] = useState(false)
   const remoteServerUpdates = useAppStore((state) => state.remoteServerUpdates)
-  const remoteServerUpdatesChecking = useAppStore((state) => state.remoteServerUpdatesChecking)
   const remoteServerUpdatesRunning = useAppStore((state) => state.remoteServerUpdatesRunning)
   const refreshRemoteServerUpdates = useAppStore((state) => state.refreshRemoteServerUpdates)
   const setRemoteServerUpdateDialogOpen = useAppStore(
     (state) => state.setRemoteServerUpdateDialogOpen
   )
-  const refreshAccountRuntimeCloud = useAppStore((state) => state.refreshAccountRuntimeCloud)
   const consumedAddServerIntentSignalRef = useRef(0)
   const {
     environments,
@@ -82,16 +75,24 @@ export function RuntimeEnvironmentsPane({
     mountedRef,
     loadEnvironments
   } = useRuntimeEnvironmentCatalog()
-  const cloudAlias = useRuntimeCloudAliasSettings(settings, environments)
+  const cloudAliases = useRuntimeCloudAliasSettings(settings, environments)
+  const managedCatalog = useManagedServerCatalog(environments, () => void loadEnvironments())
 
   const getEnvironmentLabel = (value: string): string => {
     if (value === LOCAL_RUNTIME_VALUE) {
-      return cloudAlias.localEnvironment?.name ?? 'Local desktop'
+      return translate('auto.components.settings.serverList.thisComputer', 'This computer')
     }
     if (value === NO_RUNTIME_VALUE) {
-      return 'No Runtime connected'
+      return translate(
+        'auto.components.settings.RuntimeEnvironmentsPane.b07070ed3c',
+        'No server connected'
+      )
     }
-    return environments.find((environment) => environment.id === value)?.name ?? 'remote Runtime'
+    // The default may be WSL, which this listed-server subset omits.
+    return (
+      useAppStore.getState().runtimeEnvironments.find((environment) => environment.id === value)
+        ?.name ?? 'remote server'
+    )
   }
   const {
     connectingId,
@@ -124,11 +125,10 @@ export function RuntimeEnvironmentsPane({
     addEnvironment,
     removeEnvironment
   } = useRuntimeEnvironmentMutationActions({
-    environments,
     settings,
     allowLocalRuntime,
     mountedRef,
-    setAddServerFormOpen,
+    setAddServerFormOpen: (open) => setDialog(open ? 'add' : null),
     loadEnvironments,
     connectEnvironment
   })
@@ -145,8 +145,16 @@ export function RuntimeEnvironmentsPane({
       return
     }
     consumedAddServerIntentSignalRef.current = addServerIntentSignal
-    setAddServerFormOpen(true)
-  }, [addServerIntentSignal])
+    // Composer deep-links must open pairing rather than just the server list.
+    setDialog('add')
+  }, [addServerIntentSignal, setDialog])
+  const managedReload = managedCatalog.reload
+  useEffect(() => {
+    // Reload installs after changes to SSH hosts or unfinished moves on other mounted pages.
+    if (dialog === 'install') {
+      void managedReload().catch(() => {})
+    }
+  }, [dialog, managedReload])
 
   const activeValue =
     settings.activeRuntimeEnvironmentId ??
@@ -160,22 +168,14 @@ export function RuntimeEnvironmentsPane({
   const removingActiveServer = pendingRemove
     ? isRuntimeEnvironmentRemovalBlocked(settings.activeRuntimeEnvironmentId, pendingRemove.id)
     : false
-  const searchEntry = allowLocalRuntime
+  const searchEntry = canGeneratePairingUrl
     ? getRuntimeEnvironmentsSearchEntry()
     : getWebRuntimeEnvironmentsSearchEntry()
-
-  const openRemoveDialog = (environment: PublicKnownRuntimeEnvironment): void => {
-    if (
-      !getRuntimeEnvironmentRemovalPresentation(
-        environment,
-        isRuntimeEnvironmentRemovalBlocked(settings.activeRuntimeEnvironmentId, environment.id)
-      )
-    ) {
-      return
-    }
-    setRemoveError(null)
-    setPendingRemove(environment)
+  const reloadAll = (): void => {
+    void loadEnvironments()
+    void managedCatalog.reload().catch(() => {})
   }
+
   const confirmSwitch = (): void => {
     const value = pendingSwitchValue
     if (!value) {
@@ -186,6 +186,10 @@ export function RuntimeEnvironmentsPane({
         setPendingSwitchValue(null)
       }
     })
+  }
+  const requestSwitch = (value: string): void => {
+    setSwitchError(null)
+    setPendingSwitchValue(value)
   }
   const confirmRemove = (): void => {
     const environment = pendingRemove
@@ -198,77 +202,105 @@ export function RuntimeEnvironmentsPane({
       }
     })
   }
+
   return (
     <SearchableSetting
-      forceVisible
       title={searchEntry.title}
       description={searchEntry.description}
       keywords={searchEntry.keywords}
-      className="space-y-4 py-2"
+      className="max-w-none space-y-6"
     >
-      {allowLocalRuntime ? (
-        <RuntimeCloudAliasesSection
-          settings={settings}
-          localEnvironment={cloudAlias.localEnvironment}
-          environments={environments}
-          onRename={cloudAlias.open}
-        />
-      ) : null}
-      <RuntimeServersConnectSection
-        visible
+      <RuntimeDefaultHostRow
+        allowLocalRuntime={allowLocalRuntime}
+        activeValue={activeValue}
+        environments={environments}
+        isBusy={isBusy}
+        onValueChange={requestSwitch}
+      />
+
+      <RuntimeCloudAliasesSection
+        settings={settings}
+        environments={environments}
+        localEnvironment={cloudAliases.localEnvironment}
+        onRename={cloudAliases.open}
+      />
+      <RuntimeCloudDisplayNameDialog
+        environment={cloudAliases.environment}
+        onClose={cloudAliases.close}
+      />
+      <RuntimeServerList
+        canRenameCloud={cloudAliases.canRename}
+        onRenameCloud={cloudAliases.open}
         environments={environments}
         detailsByEnvironmentId={detailsByEnvironmentId}
         activeRuntimeEnvironmentId={settings.activeRuntimeEnvironmentId}
-        addServerFormOpen={addServerFormOpen}
-        name={name}
-        pairingCode={pairingCode}
-        addServerFailure={addServerFailure}
-        isBusy={isBusy}
         remoteServerUpdates={remoteServerUpdates}
-        remoteServerUpdatesChecking={remoteServerUpdatesChecking}
         remoteServerUpdatesRunning={remoteServerUpdatesRunning}
         connectingId={connectingId}
         switchingValue={switchingValue}
         disconnectingId={disconnectingId}
         removingId={removingId}
-        onOpenAddServerForm={() => setAddServerFormOpen(true)}
-        onCloseAddServerForm={closeAddServerForm}
+        isBusy={isBusy}
+        managedCatalog={managedCatalog}
+        onOpenUpdate={() => setRemoteServerUpdateDialogOpen(true)}
+        onConnect={(environment) => void connectEnvironment(environment)}
+        onDisconnect={(environment) => void disconnectEnvironment(environment)}
+        onRemove={(environment) => {
+          setRemoveError(null)
+          setPendingRemove(environment)
+        }}
+        onMakeDefault={(environment) => requestSwitch(environment.id)}
+        onCheckForUpdates={(options) => {
+          setRemoteServerUpdateDialogOpen(true)
+          void refreshRemoteServerUpdates(options)
+        }}
+        onRecheck={() => void loadEnvironments()}
+        rechecking={isLoading}
+        onChanged={reloadAll}
+      />
+
+      {managedCatalog.loadFailed ? (
+        <p className="text-xs text-destructive">
+          {translate(
+            'auto.components.settings.managedServers.loadFailed',
+            'Orca couldn’t load SSH hosts and unfinished moves. Reopen Settings to try again.'
+          )}
+        </p>
+      ) : null}
+
+      {/* Why gated on the managed API: WSL hosts, like managed servers, need the desktop. */}
+      {managedCatalog.api ? <WslHostsSection onChanged={reloadAll} /> : null}
+
+      <EphemeralVmRuntimesSection />
+
+      <RuntimeAddServerDialog
+        open={dialog === 'add'}
+        name={name}
+        accessLink={pairingCode}
+        busy={isBusy}
+        failure={addServerFailure}
         onNameChange={setName}
-        onPairingCodeChange={(value) => {
+        onAccessLinkChange={(value) => {
           setPairingCode(value)
           setAddServerFailure(null)
         }}
-        onAddEnvironment={(allowLoopback) => void addEnvironment(allowLoopback)}
-        onOpenUpdateDialog={() => setRemoteServerUpdateDialogOpen(true)}
-        refreshRemoteServerUpdates={refreshRemoteServerUpdates}
-        onConnect={(environment) => void connectEnvironment(environment)}
-        onDisconnect={(environment) => void disconnectEnvironment(environment)}
-        onRemove={openRemoveDialog}
-        canRenameCloud={cloudAlias.canRename}
-        onRenameCloud={cloudAlias.open}
+        onClose={closeAddServerForm}
+        onSubmit={(allowLoopback) => void addEnvironment(allowLoopback)}
       />
 
-      <RuntimeActiveServerSection
-        visible
-        advancedOpen={advancedOpen}
-        allowLocalRuntime={allowLocalRuntime}
-        localRuntimeValue={LOCAL_RUNTIME_VALUE}
-        localDisplayName={cloudAlias.localEnvironment?.name}
-        noRuntimeValue={NO_RUNTIME_VALUE}
-        activeValue={activeValue}
-        environments={environments}
-        detailsByEnvironmentId={detailsByEnvironmentId}
-        isBusy={isBusy}
-        isLoading={isLoading}
-        onToggleAdvanced={() => setAdvancedOpen((current) => !current)}
-        onValueChange={(value) => {
-          setSwitchError(null)
-          setPendingSwitchValue(value)
-        }}
-        onRefresh={() => void refreshAccountRuntimeCloud().then(() => loadEnvironments())}
-      />
-
-      <RuntimeConnectionTroubleshooting />
+      {managedCatalog.api ? (
+        <RuntimeInstallServerDialog
+          open={dialog === 'install'}
+          api={managedCatalog.api}
+          emptyTargets={managedCatalog.emptyTargets}
+          loadFailed={managedCatalog.loadFailed}
+          onOpenChange={(open) => setDialog(open ? 'install' : null)}
+          onDeployed={async () => {
+            void loadEnvironments()
+            await managedCatalog.reload()
+          }}
+        />
+      ) : null}
 
       <RuntimeEnvironmentSwitchDialog
         pendingSwitchValue={pendingSwitchValue}
@@ -304,11 +336,6 @@ export function RuntimeEnvironmentsPane({
           setPendingRemove(null)
         }}
         onConfirm={confirmRemove}
-      />
-
-      <RuntimeCloudDisplayNameDialog
-        environment={cloudAlias.environment}
-        onClose={cloudAlias.close}
       />
     </SearchableSetting>
   )

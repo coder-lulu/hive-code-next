@@ -1,3 +1,10 @@
+import type { MobileRelayHostCatalog } from '../mobile-desktop-relay/mobile-relay-host-catalog'
+import type { OrcadFeatureRequirement } from './orcad-feature-readiness'
+import type {
+  RegisterDeviceKeyParams,
+  RegisterDeviceKeyResult
+} from '../../../shared/device-key-registration-contract'
+import type { OrcadPeerDesktopsResult } from '../../../shared/orcad-peer-desktops-contract'
 // Why: single boundary between raw RPC frames and OrcaRuntimeService; keeps schema, handler, and result type on one object.
 import { ZodError, type ZodType } from 'zod'
 import type { TerminalStreamFrame } from '../../../shared/terminal-stream-protocol'
@@ -58,10 +65,16 @@ export type LegacyCoordinatorAuthorityProof = Readonly<{
 }>
 
 export type RpcContext = {
+  mobileRelayHosts?: Pick<MobileRelayHostCatalog, 'list' | 'worktrees'>
   authorizeRequest?: (method: string) => boolean
   runtime: OrcaRuntimeService
   hiveRuntimeCloud?: HiveRuntimeCloudControl
   // Why: lets long-poll handlers release immediately on client disconnect instead of running down timeoutMs. See design doc §3.1.
+  deviceSelf?: { registerDeviceKey(params: RegisterDeviceKeyParams): RegisterDeviceKeyResult }
+  peerDesktops?: {
+    list(callerClientInstanceId?: string): OrcadPeerDesktopsResult
+    declare(clientInstanceId: string): void
+  }
   signal?: AbortSignal
   // Why: per-WebSocket key so the server reaps a closing socket's subscriptions without touching sibling sockets sharing the deviceToken.
   connectionId?: string
@@ -135,6 +148,7 @@ export type RpcTypedMethod<TName extends string, TSchema extends ZodType | null,
   readonly name: TName
   // Why: required so a new method cannot ship without deciding which callers may reach it.
   readonly permission: RpcMethodPermission
+  readonly requires?: OrcadFeatureRequirement<RpcParsedParams<TSchema>>
   readonly params: TSchema
   readonly handler: (params: RpcParsedParams<TSchema>, ctx: RpcContext) => TResult
 }
@@ -149,6 +163,7 @@ export function defineMethod<TName extends string, TSchema extends ZodType | nul
 export type RpcTypedStreamingMethod<TName extends string, TSchema extends ZodType | null> = {
   readonly name: TName
   readonly permission: RpcMethodPermission
+  readonly requires?: OrcadFeatureRequirement<RpcParsedParams<TSchema>>
   readonly params: TSchema
   readonly stream: true
   readonly handler: (
@@ -167,6 +182,7 @@ export function defineStreamingMethod<TName extends string, TSchema extends ZodT
 type RpcMethodWithParams<P> = {
   readonly name: string
   readonly permission: RpcMethodPermission
+  readonly requires?: OrcadFeatureRequirement<P>
   readonly params: ZodType | null
   readonly handler: (params: P, ctx: RpcContext) => unknown
 }
@@ -174,6 +190,7 @@ type RpcMethodWithParams<P> = {
 type RpcStreamingMethodWithParams<P> = {
   readonly name: string
   readonly permission: RpcMethodPermission
+  readonly requires?: OrcadFeatureRequirement<P>
   readonly params: ZodType | null
   readonly stream: true
   readonly handler: (params: P, ctx: RpcContext, emit: (result: unknown) => void) => Promise<void>

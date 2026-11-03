@@ -2,11 +2,11 @@ import {
   getPreferredPairingOffer,
   type KnownRuntimeEnvironment
 } from '../../shared/runtime-environments'
-import { sendRemoteRuntimeRequest } from '../../shared/remote-runtime-client'
+import { sendRemoteRuntimeRequest } from '../../shared/remote-runtime/remote-runtime-client'
 import { verifyRemotePairingRuntimeStatus } from '../../shared/remote-pairing-verification'
 import { ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES } from '../../shared/electron-remote-runtime-client-capabilities'
 import type { RuntimeStatus } from '../../shared/runtime-types'
-import type { PairingOffer } from '../../shared/pairing'
+import { pairedRuntimeConnectionFromOffer, type PairedRuntimeConnection } from '../../shared/paired-runtime-connection'
 
 export const RUNTIME_IDENTITY_MISMATCH_MESSAGE =
   'The endpoint does not match this paired runtime identity.'
@@ -16,10 +16,10 @@ export function verifyRuntimeEnvironmentIdentity(
   options: { endpoint?: string; signal?: AbortSignal } = {}
 ) {
   return verifyRuntimePairingIdentity(
-    {
+    pairedRuntimeConnectionFromOffer({
       ...getPreferredPairingOffer(environment),
       ...(options.endpoint ? { endpoint: options.endpoint } : {})
-    },
+    }),
     environment,
     options.signal
   )
@@ -27,7 +27,7 @@ export function verifyRuntimeEnvironmentIdentity(
 
 /** Proves the runtime at `connection` holds its keys and is the expected runtime. */
 export async function verifyRuntimePairingIdentity(
-  connection: PairingOffer,
+  connection: PairedRuntimeConnection,
   expected: Pick<KnownRuntimeEnvironment, 'runtimeId' | 'pairedDeviceId'>,
   signal?: AbortSignal
 ) {

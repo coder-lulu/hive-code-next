@@ -32,7 +32,10 @@ describe('dropAgentResumeArgvFromCommand', () => {
           agent: 'codex',
           providerSession: CODEX_SESSION
         })
-      ).toEqual({ status: 'dropped', command: 'codex' })
+      ).toEqual({
+        status: 'dropped',
+        command: platform === 'win32' ? 'codex' : "codex '-c' 'disable_paste_burst=true'"
+      })
     }
   })
 
@@ -51,7 +54,10 @@ describe('dropAgentResumeArgvFromCommand', () => {
         agent: 'codex',
         providerSession: CODEX_SESSION
       })
-    ).toEqual({ status: 'dropped', command: "codex '-c' 'tui.resume_cwd=current'" })
+    ).toEqual({
+      status: 'dropped',
+      command: "codex '-c' 'disable_paste_burst=true' '-c' 'tui.resume_cwd=current'"
+    })
   })
 
   it('keeps the user CLI args that precede the resume argv', () => {
@@ -61,7 +67,7 @@ describe('dropAgentResumeArgvFromCommand', () => {
         agent: 'codex',
         providerSession: CODEX_SESSION
       })
-    ).toEqual({ status: 'dropped', command: "codex '--search'" })
+    ).toEqual({ status: 'dropped', command: "codex '-c' 'disable_paste_burst=true' '--search'" })
   })
 
   it('drops an unquoted resume argv from a legacy persisted command', () => {
@@ -168,5 +174,24 @@ describe('dropAgentResumeArgvFromCommand', () => {
         providerSession: CODEX_SESSION
       })
     ).toEqual({ status: 'dropped', command: 'claude' })
+  })
+})
+
+describe('upstream startup regression coverage', () => {
+  it('resumes an agent from the folder it ran in when the pane starts elsewhere (#16960)', () => {
+    const resume = (cwd: string, launchCwd: string) =>
+      buildAgentResumeStartupPlan({
+        agent: 'claude',
+        providerSession: { key: 'session_id', id: 's1', cwd },
+        cmdOverrides: {},
+        platform: 'darwin',
+        launchCwd
+      })?.launchCommand
+
+    expect(resume('/repo/pkg', '/repo')).toBe("cd '/repo/pkg' && claude '--resume' 's1'")
+    expect(resume('/repo/', '/repo')).toBe("claude '--resume' 's1'")
+    expect(resume('/home/me/repo', '\\\\wsl.localhost\\Ubuntu\\home\\me\\repo')).toBe(
+      "claude '--resume' 's1'"
+    )
   })
 })

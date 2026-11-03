@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../src/i18n/use-mobile-translation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert } from 'react-native'
 import { useRouter } from 'expo-router'
@@ -16,6 +17,8 @@ import {
 } from '../src/auth/mobile-provider-auth'
 
 export default function LoginScreen() {
+  const t = useMobileTranslation()
+
   const router = useRouter()
   const { signIn } = useMobileAuthSession()
   const [agreed, setAgreed] = useState(false)
@@ -55,13 +58,16 @@ export default function LoginScreen() {
           await beginMobileProviderLogin(provider, agreed)
         }
       } catch (failure) {
-        Alert.alert('登录失败', mobileProviderLoginErrorMessage(failure))
+        Alert.alert(
+          t('auto.mobile.app.login.0b935e4985', 'Sign-in failed'),
+          mobileProviderLoginErrorMessage(failure)
+        )
       } finally {
         actionInFlightRef.current = false
         setBusyActionKey(null)
       }
     },
-    [agreed, configuration.providers]
+    [agreed, configuration.providers, t]
   )
 
   return (
@@ -84,7 +90,13 @@ export default function LoginScreen() {
           onAction={(action) => void handleAction(action)}
           onAgreementChange={setAgreed}
           onAgreementRequired={() =>
-            Alert.alert('请先同意协议', '请阅读并同意《服务协议》和《隐私政策》后继续。')
+            Alert.alert(
+              t('auto.mobile.app.login.e7ac76c2d8', 'Accept the agreements first'),
+              t(
+                'auto.mobile.app.login.2748998f29',
+                'Read and accept the Terms of Service and Privacy Policy to continue.'
+              )
+            )
           }
           onClose={() => router.back()}
           onOpenPrivacy={() => router.push({ pathname: '/legal', params: { document: 'privacy' } })}

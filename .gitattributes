@@ -1,10 +1,6 @@
-# A shebang plus CRLF makes vite's SSR transform emit a literal `#!` mid-module,
-# so any suite importing the script dies at load with a SyntaxError. Pin the whole
-# directory rather than the scripts that happen to have a test today.
+# CRLF shebangs break Vite's SSR transform.
 /config/scripts/**/*.mjs text eol=lf
-/mobile/scripts/**/*.mjs text eol=lf
 /skill-guides/*.md text eol=lf
-/skill-guides/**/references/*.md text eol=lf
 /skill-stubs/*.md text eol=lf
 /skill-stubs/_shared/*.md text eol=lf
 /skills/*/SKILL.md text eol=lf
@@ -17,71 +13,33 @@
 *.html text eol=lf
 # Bundled plugin trees are byte-hashed; CRLF checkout would break the pinned hash.
 /resources/plugins/** text eol=lf
-# Relay assets are copied verbatim into the bundle and hashed byte-for-byte into
-# .version, which names the immutable remote install dir. A CRLF checkout makes a
-# Windows-built client disagree with a mac/Linux-built one on the same release,
-# so one host ends up with two relay trees (#17886 review).
-# Pin the bytes so a patch reads and diffs identically on every host. It is NOT
-# what makes the hash right: pnpm hashes a patch LF-normalized, so a CRLF checkout
-# cannot change it. Believing otherwise put a hand-computed raw digest in the
-# lockfile twice and broke every install (#17886).
-# These files are stored LF, which is not always the encoding they were written
-# against -- @vscode/windows-process-tree ships CRLF sources -- so any code that
-# runs `git apply` on one must force `-c core.autocrlf=input` rather than trust
-# the host's setting. See config/scripts/windows-process-tree-gyp-rebuild.mjs.
+# Keep patch diffs stable; pnpm hashes them with LF normalization.
+# CRLF upstream sources still need git -c core.autocrlf=input apply (windows-process-tree-gyp-rebuild.mjs).
 /config/patches/*.patch -text
-/config/hiverelay-contract/** text eol=lf
-/config/hiverelay-contract-source.json text eol=lf
-/config/hiverelay-contract-report.json text eol=lf
+# CRLF patches fail pnpm parsing on Windows.
 /mobile/patches/*.patch -text
-/pnpm-lock.yaml text eol=lf
-# The xterm bundle hunks also make a diff nobody can read; review the hand-written
-# source patch under xterm-src/ instead. The sibling patches stay diffable.
+# Review xterm-src/ instead of generated bundle hunks.
 /config/patches/@xterm__xterm@*.patch -diff
 /config/patches/xterm-src/*.patch text eol=lf
-# Generated wrapper fixtures: collapse them in the PR diff so they stop drowning
-# the reviewable change, and pin LF because they are compared byte-for-byte.
-# Not -diff: the shell diff is the review surface when a wrapper does change.
+# pnpm parses these unified diffs during Windows installs; keep checkout bytes stable.
+/mobile/patches/*.patch -text
+# Collapse generated wrappers but keep diffs available; tests compare LF bytes.
 /src/main/__fixtures__/shell-wrapper-snapshots/*.txt linguist-generated=true text eol=lf
-# Linux package hooks and CLI launchers are executed directly by the kernel.
-# Pin LF even when the repository is prepared on Windows.
-/resources/linux/**/*.sh text eol=lf
-/resources/linux/bin/* text eol=lf
-# Captured agent PTY transcripts. -text, not `text eol=lf` like the wrapper snapshots above:
-# these carry real CR and CRLF bytes as the terminal emitted them, and line-ending
-# normalisation on a Windows checkout would rewrite the evidence the fixture exists to be.
+# PTY transcripts must retain captured CR and CRLF bytes.
 /src/main/runtime/__fixtures__/*.txt -text
 /src/main/daemon/__fixtures__/pty-transcripts/*.txt -text
 /src/renderer/src/components/terminal-pane/terminal-link-transcripts/*.txt -text whitespace=cr-at-eol
-# Generated runtime English subset: compared byte-for-byte by
-# verify:localization-runtime-catalog, so a CRLF checkout would fail the gate.
+# verify:localization-runtime-catalog compares LF bytes.
 /src/renderer/src/i18n/en-runtime-required.json linguist-generated=true text eol=lf
-# Generated method->params catalog: compared byte-for-byte by
-# verify:rpc-params-catalog, so a CRLF checkout would fail the gate.
+# verify:rpc-params-catalog compares LF bytes.
 /src/shared/rpc-contract/rpc-params-catalog.generated.ts linguist-generated=true text eol=lf
-# Native patch fixtures are verified byte-for-byte on every host.
-config/scripts/__fixtures__/node-pty-1.1.0-unix-pty.cc text eol=lf
-config/scripts/check-runtime-electron-ratchet.mjs text eol=lf
-config/scripts/reclaim-dev-electron-bundles.mjs text eol=lf
-
-# Mobile web bundle source. Every text byte here is hashed into an asset digest and
-# from there into buildId, so a CRLF checkout produces a different bundle id for the
-# same commit. The PNG is -text because it must not be touched.
-/src/mobile-web/index.html text eol=lf
-/src/mobile-web/src/*.ts text eol=lf
-/src/mobile-web/src/*.css text eol=lf
-/src/mobile-web/src/*.png -text
-# Mobile RPC recording goldens: replay requires the file text to equal what rpc:record writes
-# (LF), so a CRLF checkout would fail every golden.
+# RPC recording goldens must match rpc:record's LF output.
 /mobile/rpc-foundation/goldens/*.json text eol=lf
-/mobile/rpc-foundation/hive/goldens/*.json text eol=lf
-# Mobile web page source. Every text byte here is hashed into an asset digest and from
-# there into buildId, so a CRLF Windows checkout would ship a different bundle id for
-# identical source (91af2897 vs 9d78435e, measured on the bundle this replaced).
+# Mobile build IDs hash source bytes; checkout line endings must match across hosts.
 /mobile/src/** text eol=lf
 /mobile/app/** text eol=lf
 /mobile/web-entry/** text eol=lf
-# Exempt binary assets from the blanket mobile text pin.
+# Preserve binary assets under the text-pinned mobile directories.
 /mobile/src/**/*.png -text
 /mobile/src/**/*.jpg -text
 /mobile/src/**/*.jpeg -text
@@ -119,10 +77,3 @@ config/scripts/reclaim-dev-electron-bundles.mjs text eol=lf
 /resources/skills/*.json linguist-generated=true text eol=lf
 # Vitest writes snapshots with LF, so checkout bytes must match on every host.
 **/__snapshots__/*.snap text eol=lf
-
-# Keep mobile formatter inputs LF on every checkout host.
-/mobile/**/*.json text eol=lf
-/mobile/**/*.js text eol=lf
-/mobile/**/*.md text eol=lf
-/mobile/**/*.yaml text eol=lf
-/mobile/**/*.mts text eol=lf

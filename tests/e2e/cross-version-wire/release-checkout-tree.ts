@@ -15,11 +15,8 @@ const CHECKOUT_MAX_OUTPUT_BYTES = 1024 * 1024
 const CHECKOUT_SOURCE_WORKERS = 8
 let processRunner: Promise<typeof ProcessRunner> | undefined
 
-// Why: the wire endpoints only need the runtime RPC host, the renderer client, and
-// the shared codec, plus a release's relay that an app update leaves running. Skipping cli keeps a cold CI
-// extraction a few seconds.
-// The phone's `worktree ps` row reader is one self-contained file, so it rides along alone.
-// Workspace packages the release declares are added per release (releaseWorkspaceArchivePaths).
+// Extract runtime, renderer, codecs and the phone row reader; omit CLI to bound cold-CI extraction.
+// Add source workspace packages from each release’s own policy.
 const ARCHIVE_PATHS = [
   'src/main',
   'src/shared',
@@ -35,7 +32,22 @@ const TEST_SOURCE_SUFFIXES = ['test', 'bench', 'spec'].flatMap((kind) =>
 const ARCHIVE_TEST_EXCLUDES = TEST_SOURCE_SUFFIXES.map((suffix) => `:(glob,exclude)**/*${suffix}`)
 const TAR_TEST_EXCLUDES = TEST_SOURCE_SUFFIXES.map((suffix) => `--exclude=*${suffix}`)
 // Why optional: a release may have either or both, and `git archive` refuses a missing pathspec.
-const OPTIONAL_ARCHIVE_PATHS = ['src/relay', 'src/wsl-guest']
+const OPTIONAL_ARCHIVE_PATHS = [
+  'src/relay',
+  'src/wsl-guest',
+  // Released phone read operations and their runtime decoding dependencies.
+  'mobile/src/agent-history/agent-history-reply-schema.ts',
+  'mobile/src/agent-history/mobile-agent-history-operations.ts',
+  'mobile/src/session/mobile-session-read-operations.ts',
+  'mobile/src/session/session-read-reply-schema.ts',
+  'mobile/src/transport/mobile-runtime-client-capabilities.ts',
+  'mobile/src/transport/request-single-flight.ts',
+  'mobile/src/transport/rpc-acceptance-policies.ts',
+  'mobile/src/transport/rpc-incompatible-reply-error.ts',
+  'mobile/src/transport/rpc-operation-reply.ts',
+  'mobile/src/transport/rpc-operation-result-reader.ts',
+  'mobile/src/transport/rpc-operation.ts'
+]
 
 const WORKSPACE_POLICY = 'pnpm-workspace.yaml'
 
@@ -48,7 +60,7 @@ const BARE_SPECIFIER =
 
 type WorkspaceSourceResolver = ReturnType<typeof createWorkspaceSourceResolver>
 
-// Every module extension an orca-source export may target, so package JS is rewritten too.
+// Include package JS too: orca-source exports may target any supported module extension.
 function isRewritableSource(name: string): boolean {
   return /\.(ts|tsx|mts|cts|js|mjs|cjs)$/.test(name)
 }
@@ -201,7 +213,6 @@ async function runCheckoutProcess(
   throw new Error(`${program} ${args[0] ?? ''} ${detail}`)
 }
 
-/** Static directory prefix of a workspace glob, e.g. `src/packages` for `src/packages/*`. */
 function workspacePatternRoot(pattern: string): string {
   const segments: string[] = []
   for (const segment of pattern.replace(/\/$/, '').split('/')) {
@@ -234,7 +245,6 @@ async function listReleasePaths(
     .filter(Boolean)
 }
 
-/** The release's workspace policy and declared package directories; none before workspaces. */
 async function releaseWorkspaceArchivePaths(
   repoRoot: string,
   commit: string,

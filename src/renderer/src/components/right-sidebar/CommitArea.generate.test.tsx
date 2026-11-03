@@ -8,7 +8,7 @@ import {
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { resolvePrimaryAction, type PrimaryActionInputs } from './source-control-primary-action'
 import { resolveDropdownItems } from './source-control-dropdown-items'
-import type { DropdownActionKind } from './source-control-dropdown-item-types'
+import type { DropdownActionKind } from '../../../../shared/source-control-dropdown-item-types'
 import { getDefaultSettings } from '../../../../shared/constants'
 import { CUSTOM_AGENT_ID } from '../../../../shared/commit-message-agent-spec'
 import { resolveSourceControlAiForOperation } from '../../../../shared/source-control-ai'
@@ -275,9 +275,12 @@ describe('commit-message generation defaults', () => {
         actionId: 'pullRequest',
         settings: {
           ...settings,
-          commitMessageAi: {
-            ...settings.commitMessageAi!,
-            agentId: 'codex'
+          sourceControlAi: {
+            ...settings.sourceControlAi!,
+            actions: {
+              ...settings.sourceControlAi!.actions,
+              commitMessage: { agentId: 'codex' }
+            }
           }
         },
         repo: null

@@ -11,28 +11,15 @@ import {
   resolveSiblingRetainedTabAgent,
   resolveSiblingTabAgent
 } from './tab-agent'
-import { resolveExplicitTerminalTitleAgentType } from '../../../shared/terminal-title-agent-type'
 import {
+  hasObservedTabAgentSignal,
   resolveLaunchedAgentExitEvidence,
   resolveTabAgentFromSignals
-} from './tab-agent-from-signals'
+} from '../../../shared/tab-agent-from-signals'
 import type { TerminalTab } from '../../../shared/terminal-tab-types'
 import type { TerminalAgent } from '../../../shared/terminal-agent'
 
-/**
- * Resolve which coding-harness agent a terminal tab is running, for its tab-bar
- * icon. A pane's IDENTITY (separate from activity state), from the same
- * already-computed state as the sidebar rows — no foreground probing.
- * Identity-first precedence:
- *
- * 1. Live focused hook — ground truth while the agent works; never title-overridden.
- * 2. Process identity — recognized foreground process (local only); re-owned within its title-identity group so OMP's nested `pi` (shell → omp → pi) can't flip the icon.
- * 3. Title — only a reuse override or legacy standalone identity; native OpenCode titles cannot displace durable ownership.
- * 4. Idle focused identity — the pane's completed hook or sidebar-retained completion; suppressed locally once OSC 133;D proves exit.
- * 5. Sleeping session identity — current provider-session ownership.
- * 6. launchAgent — bootstrap before any hook/process signal; cleared once exit evidence shows it left.
- * 7. Sibling-pane identity (live, then completed/retained) — split-tab fallback.
- */
+/** Resolve pane identity, separate from activity, without foreground probes: live focused hook → process (normalized to owner group) → reuse/hookless title → completed/retained focused identity → sleeping session → launch → sibling fallback. Native OpenCode titles cannot displace durable ownership; local OSC 133;D suppresses exited idle identity. */
 export function useTabAgent(tab: TerminalTab): TerminalAgent | null {
   const focusedHookAgent = useAppStore((s) =>
     resolveFocusedTabAgent(s.agentStatusByPaneKey, s.terminalLayoutsByTabId[tab.id], tab.id)
@@ -126,18 +113,17 @@ export function useTabAgent(tab: TerminalTab): TerminalAgent | null {
       hasObservedAgentSignalRef.current = false
       setHasObservedAgentSignal(false)
     }
-    const explicitTitleAgent = resolveExplicitTerminalTitleAgentType(tab.title)
-    // Why: only a title naming the launched agent arms its exit clearing — sibling/other-agent evidence must not.
-    const fallbackAgentSignal = tab.launchAgent
-      ? explicitTitleAgent === tab.launchAgent
-      : Boolean(explicitTitleAgent || siblingHookAgent)
-    // Why: a recognized foreground process arms exit clearing even for agents with no hook or title integration.
-    // Why the ref gate: this effect re-runs on every title frame, and re-dispatching an
-    // already-true flag costs SortableTab a second commit each time — and names its fiber
-    // in #185 stacks driven elsewhere (see shared/react-update-depth-attribution.ts).
+    // Ref-gate already-observed signals: title frames rerun this effect, and redundant dispatches add SortableTab commits implicated in #185 (react-update-depth-attribution.ts).
     if (
       !hasObservedAgentSignalRef.current &&
-      (focusedHookAgent || completedHookEvidence || processAgent || fallbackAgentSignal)
+      hasObservedTabAgentSignal({
+        title: tab.title,
+        launchAgent: tab.launchAgent,
+        hookAgent: focusedHookAgent,
+        siblingHookAgent,
+        hasCompletedHook: completedHookEvidence,
+        processAgent
+      })
     ) {
       hasObservedAgentSignalRef.current = true
       setHasObservedAgentSignal(true)
@@ -154,13 +140,11 @@ export function useTabAgent(tab: TerminalTab): TerminalAgent | null {
   ])
 
   useEffect(() => {
-    // Remote launch metadata belongs to the host; a completed turn is not a process exit.
-    if (!tab.launchAgent || hasRemoteRuntimePty) {
+    if (!tab.launchAgent) {
       return
     }
     // Why: AND ref with state — the ref is generation-safe this commit while state can lag one render behind a respawn.
     const launchedAgentExited = resolveLaunchedAgentExitEvidence({
-      launchAgent: tab.launchAgent,
       title: tab.title,
       defaultTitle: tab.defaultTitle,
       isRemote: isRemoteLike,
@@ -180,7 +164,6 @@ export function useTabAgent(tab: TerminalTab): TerminalAgent | null {
     focusedHookAgent,
     siblingHookAgent,
     hasObservedAgentSignal,
-    hasRemoteRuntimePty,
     isRemoteLike,
     processAgent,
     processShellForeground,

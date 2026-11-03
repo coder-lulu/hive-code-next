@@ -1,38 +1,24 @@
-// Build-time diagnostic upload routing. Kept outside ipc/diagnostics.ts so
-// crash reporting can attach logs through the same pinned endpoint rules.
-
 import { getProductExternalServiceEndpoints } from '../product/product-external-service-endpoints'
 
-type ProductDiagnosticsEndpoint = {
-  diagnostics: string | null
-}
-
-function normalizeProductDiagnosticsEndpoint(endpoint: string | null): string | null {
-  if (!endpoint || endpoint.trim().length === 0) {
-    return null
-  }
-  let parsed: URL
-  try {
-    parsed = new URL(endpoint.trim())
-  } catch {
-    return null
-  }
-  if (
-    parsed.protocol !== 'https:' ||
-    parsed.username.length > 0 ||
-    parsed.password.length > 0 ||
-    parsed.search.length > 0 ||
-    parsed.hash.length > 0
-  ) {
-    return null
-  }
-  return parsed.toString()
-}
+type ProductDiagnosticsEndpoint = { diagnostics: string | null }
 
 export function resolveDiagnosticBuildTokenEndpoint(
   config: ProductDiagnosticsEndpoint = getProductExternalServiceEndpoints()
 ): string | null {
-  return normalizeProductDiagnosticsEndpoint(config.diagnostics)
+  const endpoint = config.diagnostics
+  if (!endpoint || !endpoint.trim()) return null
+  try {
+    const parsed = new URL(endpoint.trim())
+    return parsed.protocol === 'https:' &&
+      !parsed.username &&
+      !parsed.password &&
+      !parsed.search &&
+      !parsed.hash
+      ? parsed.toString()
+      : null
+  } catch {
+    return null
+  }
 }
 
 export function resolveDiagnosticBuildIdentity(): 'stable' | 'rc' | null {

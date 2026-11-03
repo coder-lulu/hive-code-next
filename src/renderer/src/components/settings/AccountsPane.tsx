@@ -1,5 +1,4 @@
 import { useAccountsPaneOwner } from './use-accounts-pane-owner'
-import type { SecretAtRestProtection } from '../../../../shared/secret-at-rest-protection'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useAppStore } from '../../store'
@@ -35,7 +34,8 @@ import {
   createClaudeAccountActionRunner,
   createCodexAccountActionRunner
 } from './accounts-pane-account-actions'
-import { createMiniMaxCredentialActions } from './accounts-pane-minimax-actions'
+import { useUsageHostSettings } from './use-usage-host-settings'
+import { ZcodePlanAccountsSection } from './ZcodePlanAccountsSection'
 import { renderAccountsRemovalDialogs } from './accounts-pane-removal-dialogs'
 import { renderAccountsRemoteScopeNotice } from './accounts-pane-remote-scope-notice'
 import { AccountsPaneOverview } from './accounts-pane-overview'
@@ -62,16 +62,6 @@ export function AccountsPane({
   const fetchSettings = useAppStore((s) => s.fetchSettings)
   const runtimeEnvironments = useAppStore((s) => s.runtimeEnvironments)
   const recordedOpenCodeSettingEditsRef = useRef(new Set<'cookie' | 'workspaceId' | 'apiKey'>())
-  const [miniMaxCookieDraft, setMiniMaxCookieDraft] = useState('')
-  const [miniMaxApiKeyDraft, setMiniMaxApiKeyDraft] = useState('')
-  const [miniMaxApiKeyConfigured, setMiniMaxApiKeyConfigured] = useState(false)
-  const [miniMaxApiKeyProtection, setMiniMaxApiKeyProtection] =
-    useState<SecretAtRestProtection | null>(null)
-  const [miniMaxConfigured, setMiniMaxConfigured] = useState(false)
-  const [miniMaxCookieProtection, setMiniMaxCookieProtection] =
-    useState<SecretAtRestProtection | null>(null)
-  const [miniMaxCredentialBusy, setMiniMaxCredentialBusy] = useState(false)
-  const [miniMaxCredentialLoadState, setMiniMaxCredentialLoadState] = useState<LoadState>('loading')
   const [accountsReloadKey, setAccountsReloadKey] = useState(0)
   const localAccountRuntime = getSelectedAccountRuntime(
     settings,
@@ -92,6 +82,12 @@ export function AccountsPane({
     ? (runtimeEnvironments.find((environment) => environment.id === activeRuntimeEnvironmentId)
         ?.name ?? null)
     : null
+  const usageHostSettings = useUsageHostSettings(
+    accountOwner,
+    remoteServerName,
+    settings,
+    updateSettings
+  )
   const remoteServerLabel = isRemoteAccountScope
     ? getRemoteAccountRuntimeLabel(remoteServerName)
     : null
@@ -205,7 +201,8 @@ export function AccountsPane({
   )
   const codexConfigSyncWarning = getCodexConfigSyncWarning(codexConfigSync)
   const accountRuntimeUnavailable =
-    accountRuntime.runtime === 'wsl' && !wslAvailable && !wslCapabilitiesLoading
+    !hostScope.available ||
+    (accountRuntime.runtime === 'wsl' && !wslAvailable && !wslCapabilitiesLoading)
 
   const recordOpenCodeSettingEdit = (field: 'cookie' | 'workspaceId' | 'apiKey'): void => {
     if (recordedOpenCodeSettingEditsRef.current.has(field)) {
@@ -214,48 +211,18 @@ export function AccountsPane({
     recordedOpenCodeSettingEditsRef.current.add(field)
     recordFeatureInteraction('usage-tracking')
   }
-  const refreshMiniMaxCredentialStatus = async (): Promise<void> => {
-    setMiniMaxCredentialLoadState('loading')
-    try {
-      const status = await window.api.minimaxCredentials.getStatus()
-      setMiniMaxConfigured(status.cookieConfigured)
-      setMiniMaxApiKeyConfigured(status.apiKeyConfigured)
-      setMiniMaxCookieProtection(status.cookieProtection)
-      setMiniMaxApiKeyProtection(status.apiKeyProtection)
-      setMiniMaxCredentialLoadState('loaded')
-    } catch (error) {
-      console.error('Failed to load MiniMax credential status:', error)
-      setMiniMaxCredentialLoadState('error')
-    }
-  }
-  const { saveMiniMaxCookie, clearMiniMaxCookie, saveMiniMaxApiKey, clearMiniMaxApiKey } =
-    createMiniMaxCredentialActions({
-      miniMaxCookieDraft,
-      setMiniMaxCookieDraft,
-      miniMaxApiKeyDraft,
-      setMiniMaxApiKeyDraft,
-      setMiniMaxApiKeyConfigured,
-      setMiniMaxApiKeyProtection,
-      setMiniMaxConfigured,
-      setMiniMaxCookieProtection,
-      setMiniMaxCredentialBusy,
-      recordFeatureInteraction
-    })
-
-  useEffect(() => {
-    void refreshMiniMaxCredentialStatus()
-  }, [])
-
   useEffect(() => {
     // Why: remote snapshots stream usage refreshes after the synchronous ready
     // message, so the watcher stays open for the pane's lifetime; the local
     // path resolves once and the close() is a no-op.
     let active = true
+    let snapshotReceived = false
     const watcher = watchProviderAccounts(accountOwner, {
       onSnapshot: (snapshot) => {
         if (!active) {
           return
         }
+        snapshotReceived = true
         setAccountsSnapshotOwnerKey(providerAccountOwnerKey)
         // Why: a failed provider's half is a substituted empty roster, not
         // authoritative data; keep prior state and leave the loaded gate shut.
@@ -274,15 +241,14 @@ export function AccountsPane({
           setClaudeAccountsLoadState('error')
         }
       },
-      onError: (error, failedProvider) => {
+      onError: (error) => {
         if (!active) {
           return
         }
         setAccountsSnapshotOwnerKey(providerAccountOwnerKey)
-        if (!failedProvider || failedProvider === 'codex') {
+        // Local partial failures are already scoped by snapshot.failedProviders.
+        if (!snapshotReceived || isRemoteAccountScope) {
           setCodexAccountsLoadState('error')
-        }
-        if (!failedProvider || failedProvider === 'claude') {
           setClaudeAccountsLoadState('error')
         }
         toast.error(
@@ -298,12 +264,19 @@ export function AccountsPane({
       active = false
       watcher.close()
     }
-  }, [accountOwner, activeRuntimeEnvironmentId, accountsReloadKey, providerAccountOwnerKey])
+  }, [
+    accountOwner,
+    activeRuntimeEnvironmentId,
+    accountsReloadKey,
+    providerAccountOwnerKey,
+    isRemoteAccountScope
+  ])
 
   const runCodexAccountAction = createCodexAccountActionRunner({
     settings,
     accountOwner,
-    isCurrentAccountOwner,
+    isCurrentAccountOwner: () =>
+      isCurrentAccountOwner() && currentAccountScopeKeyRef.current === accountScopeKey,
     accountRuntime,
     isRemoteAccountScope,
     codexAccounts: scopedCodexAccounts,
@@ -311,7 +284,6 @@ export function AccountsPane({
       setCodexAccounts(next)
       setCodexDataOwnerKey(providerAccountOwnerKey)
     },
-    isCurrentScope: () => currentAccountScopeKeyRef.current === accountScopeKey,
     setCodexAccountsLoaded: (loaded) =>
       setCodexAccountsLoadState(
         typeof loaded === 'function'
@@ -327,8 +299,9 @@ export function AccountsPane({
     recordFeatureInteraction
   })
   const runClaudeAccountAction = createClaudeAccountActionRunner({
-    settings,
-    isCurrentAccountOwner,
+    accountOwner,
+    isCurrentAccountOwner: () =>
+      isCurrentAccountOwner() && currentAccountScopeKeyRef.current === accountScopeKey,
     accountRuntime,
     isRemoteAccountScope,
     claudeAccounts: scopedClaudeAccounts,
@@ -336,7 +309,6 @@ export function AccountsPane({
       setClaudeAccounts(next)
       setClaudeDataOwnerKey(providerAccountOwnerKey)
     },
-    isCurrentScope: () => currentAccountScopeKeyRef.current === accountScopeKey,
     setClaudeAction,
     fetchSettings,
     recordFeatureInteraction
@@ -388,22 +360,8 @@ export function AccountsPane({
     setRemoveCodexTarget,
     runCodexAccountAction,
     recordOpenCodeSettingEdit,
-    miniMaxRateLimits,
-    miniMaxApiKeyDraft,
-    setMiniMaxApiKeyDraft,
-    miniMaxApiKeyConfigured,
-    miniMaxApiKeyProtection,
-    saveMiniMaxApiKey,
-    clearMiniMaxApiKey,
-    miniMaxCookieDraft,
-    setMiniMaxCookieDraft,
-    miniMaxConfigured,
-    miniMaxCookieProtection,
-    miniMaxCredentialBusy,
-    miniMaxCredentialLoadState,
-    refreshMiniMaxCredentialStatus,
-    saveMiniMaxCookie,
-    clearMiniMaxCookie
+    miniMaxRateLimits: isRemoteAccountScope ? null : miniMaxRateLimits,
+    usageHostSettings
   }
   return (
     <div className="accounts-pane">
@@ -419,6 +377,11 @@ export function AccountsPane({
           setClaudeAccountsLoadState('loading')
           setAccountsReloadKey((key) => key + 1)
         }}
+      />
+      <ZcodePlanAccountsSection
+        key={`${accountScopeKey}:zcode`}
+        host={{ owner: accountOwner, label: remoteServerName }}
+        usageSettings={usageHostSettings}
       />
     </div>
   )

@@ -16,9 +16,6 @@ export function isUpdateCardVisible({
   autoDismissed?: boolean
   collapsed?: boolean
 }): boolean {
-  if (status.mandatory === true) {
-    return true
-  }
   const isUserInitiated = 'userInitiated' in status && Boolean(status.userInitiated)
 
   if (status.state === 'checking' && !isUserInitiated) {
@@ -27,7 +24,7 @@ export function isUpdateCardVisible({
   if (status.state === 'not-available' && (!isUserInitiated || autoDismissed)) {
     return false
   }
-  if (status.state === 'idle' || status.state === 'disabled') {
+  if (status.state === 'idle') {
     return false
   }
   if (cachedVersion && dismissedVersion === cachedVersion && !updateUserInitiatedCycle) {
@@ -44,23 +41,29 @@ export function isUpdateCardVisible({
 export function getUpdateCardAriaLabel(status: UpdateStatus): string {
   switch (status.state) {
     case 'idle':
-      return 'Update status'
-    case 'disabled':
-      return 'Updates disabled'
+      return translate('auto.components.UpdateCard.aria.statusIdle', 'Update status')
     case 'checking':
-      return 'Checking for updates'
+      return translate('auto.components.UpdateCard.aria.statusChecking', 'Checking for updates')
     case 'not-available':
-      return "You're on the latest version"
+      return translate(
+        'auto.components.UpdateCard.aria.statusLatest',
+        "You're on the latest version"
+      )
     case 'available':
-      return 'Update available'
+      return translate('auto.components.UpdateCard.aria.statusAvailable', 'Update available')
     case 'downloading':
-      return 'Downloading update'
+      return translate('auto.components.UpdateCard.aria.statusDownloading', 'Downloading update')
     case 'downloaded':
-      return 'Update ready to install'
+      return translate(
+        'auto.components.UpdateCard.aria.statusDownloaded',
+        'Update ready to install'
+      )
     case 'error':
       return status.installBlock
         ? translate('updates.installBlock.waitingLabel', 'Update waiting')
-        : 'Update error'
+        : translate('auto.components.UpdateCard.aria.statusError', 'Update error')
+    default:
+      return translate('auto.components.UpdateCard.aria.status', 'Update status')
   }
 }
 

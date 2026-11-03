@@ -23,13 +23,13 @@ const { contentProbe, contextualTourMock } = vi.hoisted(() => ({
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), warning: vi.fn() } }))
 
 vi.mock('@/components/ui/sheet', () => ({
-  SheetHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  SheetTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
-  SheetDescription: ({ children }: { children: React.ReactNode }) => <p>{children}</p>,
-  // Why: keep children mounted while closed so this measures Orca's gate, not Radix's portal.
+  // Keep the sheet mounted while closed to measure Orca’s gate independently of Radix.
   Sheet: ({ children, open }: { children: React.ReactNode; open?: boolean }) => (
     <div data-sheet-open={open ? 'true' : 'false'}>{children}</div>
   ),
+  SheetHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  SheetTitle: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  SheetDescription: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   SheetContent: ({
     children,
     'data-workspace-board-drag-preview': dragPreview

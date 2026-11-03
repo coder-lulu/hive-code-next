@@ -1,49 +1,54 @@
 // @vitest-environment happy-dom
+
 import { act, renderHook } from '@testing-library/react'
-import { expect, it, vi } from 'vitest'
+import { afterEach, expect, it } from 'vitest'
+import { structuredAgentSessionSendBody } from '../../../../shared/structured-agent-session-send-mutation'
+import {
+  clearNativeChatComposerDraftsForTests,
+  structuredAgentSessionDraftScopeKey
+} from './native-chat-composer-draft-store'
+import { readNativeChatDraftCache } from './native-chat-draft-cache'
+import { handBackStructuredAgentSessionMessage } from './structured-agent-session-message-hand-back'
 import { useNativeChatDraft } from './use-native-chat-draft'
-import { appendNativeChatDraftCache, readNativeChatDraftCache } from './native-chat-draft-cache'
 
-it('uses externally owned drafts without copying private text into the native pane cache', () => {
-  const onChange = vi.fn()
-  const { result, rerender } = renderHook(
-    ({ text }) => useNativeChatDraft('owned-draft', () => false, { text, onChange }),
-    { initialProps: { text: 'initial' } }
-  )
-  expect(result.current.draft).toBe('initial')
-  act(() => result.current.setDraft((previous) => `${previous} edited`))
-  expect(onChange).toHaveBeenCalledWith('initial edited')
-  expect(readNativeChatDraftCache('owned-draft')).toBe('')
-  rerender({ text: '' })
-  expect(result.current.draft).toBe('')
+afterEach(() => clearNativeChatComposerDraftsForTests())
+
+const scopeKey = structuredAgentSessionDraftScopeKey('session-1')
+const body = structuredAgentSessionSendBody('look at this', [
+  { path: '/local/a.png', previewUri: '/local/a.png' }
+])
+
+function renderDraft(): {
+  composing: { current: boolean }
+  result: { current: ReturnType<typeof useNativeChatDraft> }
+} {
+  const composing = { current: false }
+  const { result } = renderHook(() => useNativeChatDraft(scopeKey, () => composing.current))
+  return { composing, result }
+}
+
+it('shows a message returned during a composition once the composition updates', () => {
+  const { composing, result } = renderDraft()
+  act(() => result.current.setDraft('typed'))
+  composing.current = true
+  act(() => {
+    handBackStructuredAgentSessionMessage('session-1', 'm1', body)
+  })
+  expect(result.current.draft).toBe('typed')
+  act(() => result.current.setDraft((shown) => `${shown}가`))
+  expect(readNativeChatDraftCache(scopeKey)).toBe('typed가\n\nlook at this')
 })
 
-it('holds restored text until IME settles without caching the owned draft', () => {
-  const onChange = vi.fn()
-  const isComposing = () => true
-  const { result, rerender } = renderHook(
-    ({ text }) => useNativeChatDraft('owned-ime-draft', isComposing, { text, onChange }),
-    { initialProps: { text: 'private input' } }
-  )
-  act(() => appendNativeChatDraftCache('owned-ime-draft', 'restored prompt'))
-  expect(onChange).not.toHaveBeenCalled()
-  act(() => result.current.setDraft('private IME input'))
-  expect(onChange).toHaveBeenLastCalledWith('private IME input')
-  rerender({ text: 'private IME input' })
-  act(() => result.current.flushDraftAppends())
-  expect(onChange).toHaveBeenLastCalledWith('private IME input\n\nrestored prompt')
-  expect(readNativeChatDraftCache('owned-ime-draft')).toBe('restored prompt')
-})
-
-it('appends to the latest owned draft through its owner callback', () => {
-  const onChange = vi.fn()
-  const notComposing = () => false
-  const { rerender } = renderHook(
-    ({ text }) => useNativeChatDraft('owned-append-draft', notComposing, { text, onChange }),
-    { initialProps: { text: 'previous private input' } }
-  )
-  rerender({ text: 'current private input' })
-  act(() => appendNativeChatDraftCache('owned-append-draft', 'restored prompt'))
-  expect(onChange).toHaveBeenLastCalledWith('current private input\n\nrestored prompt')
-  expect(readNativeChatDraftCache('owned-append-draft')).toBe('restored prompt')
+it('does not add a message again when its return is retried during a composition', () => {
+  const { composing, result } = renderDraft()
+  act(() => {
+    handBackStructuredAgentSessionMessage('session-1', 'm1', body)
+  })
+  act(() => result.current.setDraft((shown) => `${shown} and more`))
+  composing.current = true
+  act(() => {
+    handBackStructuredAgentSessionMessage('session-1', 'm1', body)
+  })
+  act(() => result.current.setDraft((shown) => `${shown}가`))
+  expect(readNativeChatDraftCache(scopeKey)).toBe('look at this and more가')
 })

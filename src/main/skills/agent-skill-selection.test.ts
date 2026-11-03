@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import type { DiscoveredSkill } from '../../shared/skills'
 import {
   AGENT_SKILL_SELECTOR_AMBIGUOUS_CODE,
-  AGENT_SKILL_SELECTOR_NOT_FOUND_CODE
+  AGENT_SKILL_SELECTOR_NOT_FOUND_CODE,
+  AgentSkillSharingError
 } from '../../shared/agent-skill-sharing-contract'
 import { selectDiscoveredSkills } from './agent-skill-selection'
 
@@ -23,37 +24,6 @@ function skill(id: string, name: string): DiscoveredSkill {
 }
 
 describe('agent skill selection', () => {
-  it('keeps the first exact ID match ahead of an identically named skill', () => {
-    const first = skill('selector', 'first')
-    expect(
-      selectDiscoveredSkills(
-        [first, skill('selector', 'second'), skill('other', 'selector')],
-        ['selector']
-      )
-    ).toEqual([first])
-  })
-
-  it('bounds discovery reads when selecting a large batch by name', () => {
-    let reads = 0
-    const entries = Array.from({ length: 100 }, (_, index) => {
-      const entry = skill(`id-${index}`, `name-${index}`)
-      return {
-        ...entry,
-        get name() {
-          reads++
-          return entry.name
-        }
-      }
-    })
-    expect(
-      selectDiscoveredSkills(
-        entries,
-        entries.map((entry) => entry.name)
-      )
-    ).toHaveLength(100)
-    expect(reads).toBeLessThanOrEqual(entries.length * 6)
-  })
-
   it('accepts exact IDs and unambiguous names while deduplicating repeats', () => {
     expect(
       selectDiscoveredSkills(
@@ -65,22 +35,14 @@ describe('agent skill selection', () => {
 
   it('fails missing selectors with installed-list recovery', () => {
     expect(() => selectDiscoveredSkills([], ['missing'])).toThrow(
-      expect.objectContaining({
-        code: AGENT_SKILL_SELECTOR_NOT_FOUND_CODE,
-        message: expect.stringContaining('hive skills installed')
-      })
+      expect.objectContaining({ code: AGENT_SKILL_SELECTOR_NOT_FOUND_CODE })
     )
   })
 
   it('requires an ID when names are ambiguous', () => {
     expect(() =>
       selectDiscoveredSkills([skill('one', 'same'), skill('two', 'same')], ['same'])
-    ).toThrow(
-      expect.objectContaining({
-        code: AGENT_SKILL_SELECTOR_AMBIGUOUS_CODE,
-        message: expect.stringContaining('hive skills installed')
-      })
-    )
+    ).toThrow(expect.objectContaining({ code: AGENT_SKILL_SELECTOR_AMBIGUOUS_CODE }))
   })
 
   it('rejects two exact IDs whose bundle folder names would collide', () => {
@@ -88,4 +50,60 @@ describe('agent skill selection', () => {
       selectDiscoveredSkills([skill('one', 'same'), skill('two', 'same')], ['one', 'two'])
     ).toThrow(expect.objectContaining({ code: AGENT_SKILL_SELECTOR_AMBIGUOUS_CODE }))
   })
+})
+
+it('indexes a batch of selectors without rescanning discovery', () => {
+  let reads = 0
+  const skills = Array.from({ length: 1000 }, (_, index) => ({
+    ...skill(`id-${index}`, `name-${index}`),
+    get id() {
+      reads++
+      return `id-${index}`
+    }
+  }))
+  const selected = selectDiscoveredSkills(
+    skills,
+    skills.map((_, index) => `id-${index}`)
+  )
+  expect(selected).toHaveLength(1000)
+  expect(selected[999]).toBe(skills[999])
+  expect(reads).toBeLessThan(10000)
+})
+
+it('indexes only the requested selectors, not every discovered skill', () => {
+  let nameReads = 0
+  const skills = Array.from({ length: 1000 }, (_, index) => ({
+    ...skill(`id-${index}`, `name-${index}`),
+    get name() {
+      nameReads++
+      return `name-${index}`
+    }
+  }))
+  expect(selectDiscoveredSkills(skills, ['id-900'])).toEqual([skills[900]])
+  // Bound name reads to requested selectors; indexing every discovered name would cost three reads each.
+  expect(nameReads).toBeLessThanOrEqual(1_100)
+})
+
+// CLI ambiguity output must retain every match in discovery order.
+it('reports every ambiguous match in discovery order', () => {
+  let thrown: unknown
+  try {
+    selectDiscoveredSkills(
+      [skill('one', 'same'), skill('unrelated', 'other'), skill('two', 'same')],
+      ['same']
+    )
+  } catch (error) {
+    thrown = error
+  }
+  expect(thrown).toBeInstanceOf(AgentSkillSharingError)
+  const error = thrown as AgentSkillSharingError
+  expect(error.code).toBe(AGENT_SKILL_SELECTOR_AMBIGUOUS_CODE)
+  expect(error.data).toEqual({ selector: 'same', matchingIds: ['one', 'two'] })
+})
+
+it('retains first duplicate ID authority and exact ID precedence over names', () => {
+  const first = skill('id', 'first')
+  expect(
+    selectDiscoveredSkills([first, skill('id', 'second'), skill('other', 'id')], ['id'])
+  ).toEqual([first])
 })

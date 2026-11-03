@@ -60,13 +60,7 @@ describe('parseMarkdownBlocks', () => {
     ])
   })
 
-  it('uses a localized label when details has no summary', () => {
-    expect(parseMarkdownBlocks('<details>Hidden text.</details>')).toEqual([
-      { kind: 'details', summary: '详情', body: [{ kind: 'paragraph', text: 'Hidden text.' }] }
-    ])
-  })
-
-  it('keeps text around an HTML block in order and strips stray inline tags', () => {
+  it('keeps text around HTML blocks in order and leaves inline tags for inline parsing', () => {
     const blocks = parseMarkdownBlocks('Before.\n<blockquote>q</blockquote>\nAfter <kbd>X</kbd>.')
     expect(blocks).toEqual([
       { kind: 'paragraph', text: 'Before.' },
@@ -77,7 +71,7 @@ describe('parseMarkdownBlocks', () => {
 
   it('is total — never throws on empty, whitespace, or an unterminated fence', () => {
     expect(parseMarkdownBlocks('')).toEqual([])
-    expect(() => parseMarkdownBlocks('   \n\n  ')).not.toThrow()
+    expect(parseMarkdownBlocks('   \n\n  ')).toEqual([])
     const open = parseMarkdownBlocks('```\nunterminated')
     expect(open).toEqual([{ kind: 'code', text: 'unterminated', lang: '' }])
   })
@@ -177,10 +171,18 @@ describe('parseMarkdownBlocks tables', () => {
     expect(headerOnly).toEqual([
       { kind: 'table', headers: ['A', 'B'], align: ['left', 'left'], rows: [] }
     ])
-    // Ragged rows (fewer/more cells than headers) must not throw.
     const ragged = ['| A | B | C |', '| --- | --- | --- |', '| 1 |', '| 1 | 2 | 3 | 4 |']
-    expect(() => parseMarkdownBlocks(ragged.join('\n'))).not.toThrow()
-    expect(() => parseMarkdownBlocks('|||\n|:-:|')).not.toThrow()
+    expect(parseMarkdownBlocks(ragged.join('\n'))).toEqual([
+      {
+        kind: 'table',
+        headers: ['A', 'B', 'C'],
+        align: ['left', 'left', 'left'],
+        rows: [['1'], ['1', '2', '3', '4']]
+      }
+    ])
+    expect(parseMarkdownBlocks('|||\n|:-:|')).toEqual([
+      { kind: 'table', headers: ['', ''], align: ['center'], rows: [] }
+    ])
   })
 })
 

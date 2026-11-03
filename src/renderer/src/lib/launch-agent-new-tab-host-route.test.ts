@@ -82,6 +82,7 @@ describe('which new agent tabs start through the host', () => {
   it('an AI button whose prompt is pasted once ready, in a terminal this window makes', () => {
     expect(
       newTabPromptLaunchesThroughHost({
+        agent: 'claude',
         promptDelivery: 'submit-after-ready',
         pastesPrompt: true,
         isRemote: false
@@ -92,6 +93,7 @@ describe('which new agent tabs start through the host', () => {
   it('never a typed prompt, nor a launch the host could turn into a chat', () => {
     expect(
       newTabPromptLaunchesThroughHost({
+        agent: 'claude',
         promptDelivery: 'auto-submit',
         pastesPrompt: true,
         isRemote: false
@@ -99,6 +101,7 @@ describe('which new agent tabs start through the host', () => {
     ).toBe(false)
     expect(
       newTabPromptLaunchesThroughHost({
+        agent: 'claude',
         promptDelivery: 'draft',
         pastesPrompt: true,
         isRemote: false
@@ -107,6 +110,7 @@ describe('which new agent tabs start through the host', () => {
     // A workspace that runs over SSH: the pane's local spawn cannot start it.
     expect(
       newTabPromptLaunchesThroughHost({
+        agent: 'claude',
         promptDelivery: 'submit-after-ready',
         pastesPrompt: true,
         isRemote: true
@@ -115,6 +119,7 @@ describe('which new agent tabs start through the host', () => {
     host.windowMakesHostLaunchTab.mockReturnValue(false)
     expect(
       newTabPromptLaunchesThroughHost({
+        agent: 'claude',
         promptDelivery: 'submit-after-ready',
         pastesPrompt: true,
         isRemote: false

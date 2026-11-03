@@ -4,11 +4,7 @@ import type { RuntimeBrowserDriverController } from './runtime-browser-driver-co
 import type { RuntimeClientEventBus } from './runtime-client-event-bus'
 import type { RuntimeMessageWaiters } from './runtime-message-waiters'
 import type { RuntimeMobileDictationController } from './runtime-mobile-dictation-controller'
-import type {
-  MobileNotificationRemotePushResult,
-  MobileNotificationRemotePushSink,
-  RuntimeMobileNotificationController
-} from './runtime-mobile-notification-controller'
+import type { RuntimeMobileNotificationController } from './runtime-mobile-notification-controller'
 import type { RuntimeMobileSpeechCatalog } from './runtime-mobile-speech-catalog'
 import type { RuntimeNativeChatDraftResolutions } from './runtime-native-chat-draft-resolutions'
 import type { RuntimeSessionSearchSettingsController } from './runtime-session-search-settings'
@@ -18,6 +14,7 @@ export type RuntimeServiceCommandSurface = {
   listAiVaultSessions: RuntimeAiVaultCommands['list']
   resolveAiVaultSessionTitles: RuntimeAiVaultCommands['resolveTitles']
   prepareAiVaultSessionResume: RuntimeAiVaultCommands['prepare']
+  deleteAiVaultSession: RuntimeAiVaultCommands['delete']
   setSessionSearchEnabled: RuntimeSessionSearchSettingsController['setEnabled']
   onClientEvent: RuntimeClientEventBus['on']
   notifyNativeChatLaunchDraftResolved: RuntimeNativeChatDraftResolutions['notify']
@@ -35,8 +32,9 @@ export type RuntimeServiceCommandSurface = {
   onNotificationDispatched: RuntimeMobileNotificationController['onDispatched']
   getMobileNotificationListenerCount: RuntimeMobileNotificationController['getListenerCount']
   dispatchMobileNotification: RuntimeMobileNotificationController['dispatch']
-  setMobileNotificationRemotePushSink(sink: MobileNotificationRemotePushSink | null): void
-  testMobileNotificationRemotePush(): Promise<MobileNotificationRemotePushResult>
+  setMobileNotificationRemotePushSink: RuntimeMobileNotificationController['setRemotePushSink']
+  testMobileNotificationRemotePush: RuntimeMobileNotificationController['testRemotePush']
+  reportDesktopClientPresence: RuntimeMobileNotificationController['reportDesktopClientPresence']
   getMissedNotificationsSince: RuntimeMobileNotificationController['getMissedSince']
   configureNotificationDismissalStore: RuntimeMobileNotificationController['configureDismissalStore']
   closeNotificationDismissals: RuntimeMobileNotificationController['closeDismissals']
@@ -46,11 +44,17 @@ export type RuntimeServiceCommandSurface = {
   retireStructuredAttention: RuntimeMobileNotificationController['retireStructuredAttention']
   reconcileStructuredPromptAttention: RuntimeMobileNotificationController['reconcileStructuredPromptAttention']
   dispatchPluginNotification: RuntimeMobileNotificationController['dispatchPlugin']
+  setMobilePushRegistrar: RuntimeMobileNotificationController['setPushRegistrar']
+  testMobilePushDevice: RuntimeMobileNotificationController['testPushDevice']
+  registerMobilePushDevice: RuntimeMobileNotificationController['registerPushDevice']
+  unregisterMobilePushDevice: RuntimeMobileNotificationController['unregisterPushDevice']
   setAccountServices: RuntimeAccountController['setServices']
   getDataAccountsSnapshot: RuntimeAccountController['dataAccountsSnapshot']
   setCommitMessageAgentEnvironmentResolvers: RuntimeAccountController['setCommitMessageAgentEnvironment']
   getCommitMessageAgentEnvironmentResolvers: RuntimeAccountController['getCommitMessageAgentEnvironment']
   getAccountsSnapshot: RuntimeAccountController['getSnapshot']
+  getUsageRateLimits: RuntimeAccountController['usageRateLimits']
+  requireUsageRateLimits: RuntimeAccountController['requireUsageRateLimits']
   refreshAccountsForMobile: RuntimeAccountController['refreshForMobile']
   refreshAccountsForMobileSubscriber: RuntimeAccountController['refreshForMobileSubscriber']
   selectClaudeAccount: RuntimeAccountController['selectClaude']
@@ -61,6 +65,7 @@ export type RuntimeServiceCommandSurface = {
   beginClaudeSignIn: RuntimeAccountController['beginClaudeSignIn']
   finishClaudeSignIn: RuntimeAccountController['finishClaudeSignIn']
   cancelClaudeSignIn: RuntimeAccountController['cancelClaudeSignIn']
+  runHostAccountSignIn: RuntimeAccountController['runHostSignIn']
   removeCodexAccount: RuntimeAccountController['removeCodex']
   addCodexAccountFromHome: RuntimeAccountController['addCodexFromHome']
   addDataAccountFromHome: RuntimeAccountController['addDataFromHome']
@@ -73,11 +78,13 @@ export type RuntimeServiceCommandSurface = {
   downloadMobileSpeechModel: RuntimeMobileSpeechCatalog['download']
   deleteMobileSpeechModel: RuntimeMobileSpeechCatalog['delete']
   configureMobileDictation: RuntimeMobileSpeechCatalog['configure']
+  getOpenAiSpeechKeyStatus: RuntimeMobileSpeechCatalog['openAiKeyStatus']
+  setOpenAiSpeechKey: RuntimeMobileSpeechCatalog['setOpenAiKey']
+  clearOpenAiSpeechKey: RuntimeMobileSpeechCatalog['clearOpenAiKey']
   startMobileDictation: RuntimeMobileDictationController['start']
   feedMobileDictation: RuntimeMobileDictationController['feed']
   finishMobileDictation: RuntimeMobileDictationController['finish']
   cancelMobileDictation: RuntimeMobileDictationController['cancel']
-  cancelMobileDictationForConnection: RuntimeMobileDictationController['cancelForConnection']
   getAllBrowserDrivers: RuntimeBrowserDriverController['getAll']
   reclaimBrowserForDesktop: RuntimeBrowserDriverController['reclaimForDesktop']
   notifyMessageArrived(handle: string, messageType?: string): void
@@ -118,6 +125,7 @@ export function installRuntimeServiceCommandSurface(
     listAiVaultSessions: vault.list.bind(vault),
     resolveAiVaultSessionTitles: vault.resolveTitles.bind(vault),
     prepareAiVaultSessionResume: vault.prepare.bind(vault),
+    deleteAiVaultSession: vault.delete.bind(vault),
     setSessionSearchEnabled: sessionSearchSettings.setEnabled.bind(sessionSearchSettings),
     onClientEvent: events.on.bind(events),
     notifyNativeChatLaunchDraftResolved: drafts.notify.bind(drafts),
@@ -125,9 +133,9 @@ export function installRuntimeServiceCommandSurface(
     registerOwnedSubscriptionCleanup: subscriptions.registerOwned.bind(subscriptions),
     cleanupSubscription: subscriptions.cleanup.bind(subscriptions),
     retrySubscriptionCleanupAfter: subscriptions.retryAfter.bind(subscriptions),
+    cleanupSubscriptionAndWait: subscriptions.cleanupAndWait.bind(subscriptions),
     cleanupSubscriptionAndWaitIfOwnedByConnection:
       subscriptions.cleanupAndWaitIfOwnedByConnection.bind(subscriptions),
-    cleanupSubscriptionAndWait: subscriptions.cleanupAndWait.bind(subscriptions),
     cleanupSubscriptionsByPrefix: subscriptions.cleanupByPrefix.bind(subscriptions),
     cleanupSubscriptionsForConnection: subscriptions.cleanupForConnection.bind(subscriptions),
     cleanupSubscriptionIfOwnedByConnection:
@@ -139,6 +147,7 @@ export function installRuntimeServiceCommandSurface(
     dispatchMobileNotification: notifications.dispatch.bind(notifications),
     setMobileNotificationRemotePushSink: notifications.setRemotePushSink.bind(notifications),
     testMobileNotificationRemotePush: notifications.testRemotePush.bind(notifications),
+    reportDesktopClientPresence: notifications.reportDesktopClientPresence.bind(notifications),
     getMissedNotificationsSince: notifications.getMissedSince.bind(notifications),
     configureNotificationDismissalStore: notifications.configureDismissalStore.bind(notifications),
     closeNotificationDismissals: notifications.closeDismissals.bind(notifications),
@@ -149,6 +158,10 @@ export function installRuntimeServiceCommandSurface(
     reconcileStructuredPromptAttention:
       notifications.reconcileStructuredPromptAttention.bind(notifications),
     dispatchPluginNotification: notifications.dispatchPlugin.bind(notifications),
+    setMobilePushRegistrar: notifications.setPushRegistrar.bind(notifications),
+    testMobilePushDevice: notifications.testPushDevice.bind(notifications),
+    registerMobilePushDevice: notifications.registerPushDevice.bind(notifications),
+    unregisterMobilePushDevice: notifications.unregisterPushDevice.bind(notifications),
     setAccountServices: accounts.setServices.bind(accounts),
     getDataAccountsSnapshot: accounts.dataAccountsSnapshot.bind(accounts),
     setCommitMessageAgentEnvironmentResolvers:
@@ -156,6 +169,8 @@ export function installRuntimeServiceCommandSurface(
     getCommitMessageAgentEnvironmentResolvers:
       accounts.getCommitMessageAgentEnvironment.bind(accounts),
     getAccountsSnapshot: accounts.getSnapshot.bind(accounts),
+    getUsageRateLimits: accounts.usageRateLimits.bind(accounts),
+    requireUsageRateLimits: accounts.requireUsageRateLimits.bind(accounts),
     refreshAccountsForMobile: accounts.refreshForMobile.bind(accounts),
     refreshAccountsForMobileSubscriber: accounts.refreshForMobileSubscriber.bind(accounts),
     selectClaudeAccount: accounts.selectClaude.bind(accounts),
@@ -166,6 +181,7 @@ export function installRuntimeServiceCommandSurface(
     beginClaudeSignIn: accounts.beginClaudeSignIn.bind(accounts),
     finishClaudeSignIn: accounts.finishClaudeSignIn.bind(accounts),
     cancelClaudeSignIn: accounts.cancelClaudeSignIn.bind(accounts),
+    runHostAccountSignIn: accounts.runHostSignIn.bind(accounts),
     removeCodexAccount: accounts.removeCodex.bind(accounts),
     addCodexAccountFromHome: accounts.addCodexFromHome.bind(accounts),
     addDataAccountFromHome: accounts.addDataFromHome.bind(accounts),
@@ -178,11 +194,13 @@ export function installRuntimeServiceCommandSurface(
     downloadMobileSpeechModel: speech.download.bind(speech),
     deleteMobileSpeechModel: speech.delete.bind(speech),
     configureMobileDictation: speech.configure.bind(speech),
+    getOpenAiSpeechKeyStatus: speech.openAiKeyStatus.bind(speech),
+    setOpenAiSpeechKey: speech.setOpenAiKey.bind(speech),
+    clearOpenAiSpeechKey: speech.clearOpenAiKey.bind(speech),
     startMobileDictation: dictation.start.bind(dictation),
     feedMobileDictation: dictation.feed.bind(dictation),
     finishMobileDictation: dictation.finish.bind(dictation),
     cancelMobileDictation: dictation.cancel.bind(dictation),
-    cancelMobileDictationForConnection: dictation.cancelForConnection.bind(dictation),
     getAllBrowserDrivers: browsers.getAll.bind(browsers),
     reclaimBrowserForDesktop: browsers.reclaimForDesktop.bind(browsers),
     waitForMessage: waiters.wait.bind(waiters),

@@ -1,4 +1,5 @@
 import { CODEBUDDY_SESSION_OPTION_CATALOG } from './agent-session-option-catalog-codebuddy'
+import { OPENCODE_LAUNCH_OPTION_CATALOG } from './agent-session-option-catalog-opencode'
 import type { AgentType } from './agent-status-types'
 import { ANTIGRAVITY_SESSION_OPTION_CATALOG } from './agent-session-option-catalog-antigravity'
 import {
@@ -19,7 +20,7 @@ import type {
   CatalogModel,
   CatalogOption
 } from './agent-session-option-catalog-types'
-import type { SessionOptionValue } from './native-chat-session-options'
+import type { SessionOptionValue } from './native-chat/input/native-chat-session-options'
 
 export type {
   AgentSessionOptionCatalog,
@@ -46,6 +47,12 @@ const CATALOGS: AgentSessionOptionCatalogMap = {
 
 export function getAgentSessionOptionCatalog(agent: AgentType): AgentSessionOptionCatalog | null {
   return CATALOGS[agent] ?? null
+}
+
+export function getAgentSessionOptionLaunchCatalog(
+  agent: AgentType
+): AgentSessionOptionCatalog | null {
+  return agent === 'opencode' ? OPENCODE_LAUNCH_OPTION_CATALOG : getAgentSessionOptionCatalog(agent)
 }
 
 export function findCatalogModel(

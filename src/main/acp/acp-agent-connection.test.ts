@@ -1,3 +1,4 @@
+import { AcpLaunchGate } from './acp-launch-gate'
 import { PassThrough } from 'node:stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { PipedProcessSpawner } from '@orca/process-host/process-spec'
@@ -10,6 +11,7 @@ import {
   type AcpAgentConnection,
   type AcpAgentConnectionOptions
 } from './acp-agent-connection'
+import { AcpAuthRequiredError } from './acp-errors'
 import { AcpScriptedAgent, deferred, tick } from './acp-scripted-agent.test-support'
 
 const teardown = vi.hoisted(() =>
@@ -18,6 +20,10 @@ const teardown = vi.hoisted(() =>
 vi.mock('../provider-process/provider-process-teardown', () => ({
   terminateProviderProcessTree: teardown
 }))
+
+const actual = await vi.importActual<{
+  terminateProviderProcessTree: typeof terminateProviderProcessTree
+}>('../provider-process/provider-process-teardown')
 
 const opened: { connection: AcpAgentConnection; exit: () => void }[] = []
 const grace =
@@ -80,13 +86,17 @@ describe('ACP process-owning connection', () => {
       expect.objectContaining({
         cwd: start.cwd,
         env: expect.objectContaining({ ACP_ACCOUNT_HOME: '/host/account' }),
-        stdio: ['pipe', 'pipe', 'pipe']
+        stdio: ['pipe', 'pipe', 'pipe', ...(process.platform === 'win32' ? [] : ['ipc'])]
       })
     )
     expect(spawn.mock.calls[0][0].env).not.toHaveProperty('STRIPPED')
-    expect(await connection.start(start)).toMatchObject({ sessionId: 'session-1' })
+    expect(await connection.start(start)).toMatchObject({
+      sessionId: 'session-1'
+    })
     agent.on('session/prompt', (frame) => agent.reply(frame, { stopReason: 'end_turn' }))
-    expect(await connection.prompt([...prompt])).toEqual({ stopReason: 'end_turn' })
+    expect(await connection.prompt([...prompt])).toEqual({
+      stopReason: 'end_turn'
+    })
     connection.pauseReading()
     expect(child.stdout.isPaused()).toBe(true)
     connection.resumeReading()
@@ -96,7 +106,8 @@ describe('ACP process-owning connection', () => {
   })
 
   it('settles prompts and permission signals on proven exit with stdout still open', async () => {
-    const onExit = vi.fn()
+    const statusDuringExit: unknown[] = []
+    const onExit = vi.fn(() => statusDuringExit.push(connection.exitStatus))
     const onClose = vi.fn()
     const permission = deferred<AbortSignal>()
     const { connection, child, agent } = fixture({
@@ -127,10 +138,50 @@ describe('ACP process-owning connection', () => {
       expected: false,
       exit: { code: 7, signal: null, processless: false }
     })
+    expect(statusDuringExit).toEqual([{ code: 7, signal: null, processless: false }])
     const late = vi.fn()
     connection.onExit(late)
     expect(late).toHaveBeenCalledOnce()
     await expect(connection.close()).resolves.toBe(true)
+  })
+
+  it('ends a turn signed out at a sign-in prompt line and never retains its URL', async () => {
+    const said: string[] = []
+    const onExit = vi.fn((error: Error) => said.push(error.message))
+    const { connection, child } = fixture({
+      onExit,
+      onDiagnostic: (message) => said.push(message),
+      signIn: {
+        read: (line) =>
+          line.startsWith('Open the following link to authenticate') ? 'link' : undefined
+      }
+    })
+    await connection.start(start)
+    const turn = connection.prompt([...prompt]).catch((error: unknown) => error)
+    child.stderr.write(
+      `warming up\nOpen the following link to authenticate the ACP server: https://accounts.example/auth?state=${'x'.repeat(8192)}`
+    )
+    child.stderr.write('s3cret\n')
+    const error = await turn
+    expect(error).toBeInstanceOf(AcpAuthRequiredError)
+    await vi.waitFor(() => expect(onExit).toHaveBeenCalledOnce())
+    said.push(String(error), connection.stderrTail())
+    expect(connection.stderrTail()).toBe('warming up')
+    expect(said.join('\n')).not.toMatch(/s3cret|accounts\.example/)
+  })
+
+  it('drops an overlong stderr line it could not classify instead of keeping its prefix', async () => {
+    const { connection, child } = fixture({
+      signIn: {
+        read: (line) => (line.endsWith('authenticate') ? 'link' : undefined)
+      }
+    })
+    await connection.start(start)
+    const link = `https://accounts.example/auth?state=${'x'.repeat(33_000)}`
+    child.stderr.write(`warming up\nplease visit ${link}`)
+    child.stderr.write('s3cret\nready\n')
+    await vi.waitFor(() => expect(connection.stderrTail()).toContain('ready'))
+    expect(connection.stderrTail()).toBe('warming up\nready')
   })
 
   it('keeps cancel writable after stdout EOF and waits for process exit evidence', async () => {
@@ -244,7 +295,11 @@ describe('ACP process-owning connection', () => {
     connection.onExit(failing)
     connection.onExit(early)
     expect(() => child.emit('exit', 0, null)).not.toThrow()
-    expect(early).toHaveBeenCalledExactlyOnceWith({ code: 0, signal: null, processless: false })
+    expect(early).toHaveBeenCalledExactlyOnceWith({
+      code: 0,
+      signal: null,
+      processless: false
+    })
     expect(() => connection.onExit(failing)).not.toThrow()
     const late = vi.fn()
     connection.onExit(late)
@@ -295,3 +350,119 @@ describe('ACP process-owning connection', () => {
     expect(spawn).not.toHaveBeenCalled()
   })
 })
+
+it.each([true, false])(
+  'settles a typed session response synchronously before the following stdout sign-in line (valid=%s)',
+  async (valid) => {
+    const answers: boolean[] = []
+    const { connection, agent } = fixture({
+      signIn: {
+        read: (line) => (line.startsWith('SIGN IN') ? 'fixture-link' : undefined),
+        answered: (answer) => answers.push(answer)
+      }
+    })
+    agent.on('session/new', (frame) =>
+      agent.stdout.write(
+        `${JSON.stringify({ jsonrpc: '2.0', id: frame.id, result: valid ? { sessionId: 'accepted-session' } : {} })}\nSIGN IN fixture-link\n`
+      )
+    )
+    const result = await connection.start(start).catch((error: unknown) => error)
+    expect(answers).toEqual(valid ? [true, false] : [false])
+    if (valid) {
+      expect(result).toMatchObject({ sessionId: 'accepted-session' })
+    } else {
+      expect(result).toBeInstanceOf(Error)
+    }
+    expect(connection.closed).toBe(true)
+  }
+)
+
+it('closes a recognized stdout prompt over 16 MiB without inventing a signed-out answer', async () => {
+  const answered = vi.fn()
+  const { connection, agent } = fixture({
+    signIn: {
+      read: (line) => (line.startsWith('SIGN IN') ? 'prefix-only' : undefined),
+      answered
+    }
+  })
+  await connection.start(start)
+  expect(answered).toHaveBeenCalledExactlyOnceWith(true)
+  agent.stdout.write(`SIGN IN ${'x'.repeat(16 * 1024 * 1024)}\n`)
+  await vi.waitFor(() => expect(connection.closed).toBe(true))
+  expect(answered).toHaveBeenCalledTimes(1)
+})
+
+it.each([true, false])(
+  'runs setup through the retained launch gate with initial kill delivery=%s',
+  async (initialDelivery) => {
+    vi.useFakeTimers()
+    const { connection, child } = fixture({}, { exitOnEnd: false })
+    let permitted = initialDelivery
+    let writerGone = false
+    const deliver = () => {
+      if (!permitted || writerGone) {
+        throw Object.assign(new Error('writer group unavailable'), { code: 'ESRCH' })
+      }
+      writerGone = true
+    }
+    teardown.mockImplementation((held, deps) =>
+      actual.terminateProviderProcessTree(held, {
+        ...deps,
+        captureDescendants: async () => ({
+          rootPgid: null,
+          capturedAtMs: 1,
+          descendants: [
+            {
+              pid: child.pid! + 1,
+              ppid: child.pid!,
+              pgid: child.pid! + 1,
+              startedAt: 'Mon Jan 1 00:00:00 2026'
+            }
+          ]
+        }),
+        terminateDescendants: async () => 'unverifiable',
+        signalProcessGroup: deliver,
+        signalProcess: () => {},
+        terminateWindowsTree: async () => {
+          try {
+            deliver()
+            return true
+          } catch {
+            return false
+          }
+        }
+      })
+    )
+    const gate = new AcpLaunchGate('Antigravity')
+    gate.retain(connection)
+    const first = connection.close()
+    await vi.advanceTimersByTimeAsync(grace + 1000)
+    expect(await first).toBe(initialDelivery)
+    const work = vi.fn(async () => 'setup completed')
+    if (!initialDelivery) {
+      const denied = expect(gate.run(async () => {}, work)).rejects.toThrow('could not be stopped')
+      await vi.advanceTimersByTimeAsync(grace + 1000)
+      await denied
+      expect(work).not.toHaveBeenCalled()
+      permitted = true
+      const retry = gate.run(async () => {}, work)
+      await vi.advanceTimersByTimeAsync(grace + 1000)
+      await expect(retry).resolves.toBe('setup completed')
+    } else {
+      await expect(gate.run(async () => {}, work)).resolves.toBe('setup completed')
+    }
+    expect(work).toHaveBeenCalledOnce()
+    const attempts = initialDelivery ? 1 : 3
+    expect(teardown).toHaveBeenCalledTimes(attempts)
+    await expect(gate.run(async () => {}, work)).resolves.toBe('setup completed')
+    expect(work).toHaveBeenCalledTimes(2)
+    expect(teardown).toHaveBeenCalledTimes(attempts)
+    const next = gate.enter(undefined)
+    expect(next.signal.aborted).toBe(false)
+    next.leave()
+    expect(connection.lastCloseResult).toMatchObject({
+      root: 'live',
+      killDelivered: true
+    })
+  }
+)

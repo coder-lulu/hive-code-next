@@ -8,7 +8,6 @@ import { getDefaultSourceControlAiSettings } from './source-control-ai'
 import { DEFAULT_APP_ICON_ID } from './app-icon'
 import { DEFAULT_OPEN_IN_APPLICATIONS } from './open-in-applications'
 import { DEFAULT_DISABLED_TUI_AGENTS } from './tui-agent-selection'
-import { DEFAULT_TUI_AGENT_ARGS, DEFAULT_TUI_AGENT_ENV } from './tui-agent-launch-defaults'
 import { UI_LANGUAGE_SYSTEM } from './ui-language'
 import {
   DEFAULT_LEFT_SIDEBAR_TINT_COLOR,
@@ -22,7 +21,6 @@ export function buildDefaultSettings(args: {
   appFontFamily: string
   editorAutoSaveDelayMs: number
   primarySelectionMiddleClickPaste: boolean
-  primarySelectionDefaultedForLinux: boolean
   terminalFontFamily: string
   terminalInactivePaneOpacity: number
   terminalRightClickToPaste: boolean
@@ -30,6 +28,11 @@ export function buildDefaultSettings(args: {
   voice: VoiceSettings
 }): GlobalSettings {
   return {
+    agentPermissionDefault: 'own',
+    agentPermissionOverrides: {},
+    experimentalBrowserExtensions: true,
+    experimentalConnectors: true,
+    pluginUpdatePolicy: 'auto',
     workspaceDir: args.workspaceDir,
     worktreeVisibilityDefaults: { external: 'hide' },
     nestWorkspaces: true,
@@ -37,7 +40,6 @@ export function buildDefaultSettings(args: {
     refreshLocalBaseRefOnWorktreeCreate: false,
     localBaseRefSuggestionDismissed: false,
     autoRenameBranchFromWork: true,
-    autoRenameBranchFromWorkDefaultedOn: true,
     branchPrefix: 'git-username',
     branchPrefixCustom: '',
     jiraIssueKeyCasing: 'lowercase',
@@ -57,9 +59,6 @@ export function buildDefaultSettings(args: {
     richMarkdownSpellcheckEnabled: true,
     markdownReviewToolsEnabled: true,
     primarySelectionMiddleClickPaste: args.primarySelectionMiddleClickPaste,
-    primarySelectionMiddleClickPasteDefaultedForLinux: args.primarySelectionDefaultedForLinux,
-    primarySelectionMiddleClickPasteDefaultedForTerminalDefaults:
-      args.primarySelectionMiddleClickPaste,
     terminalFontSize: 14,
     terminalFontFamily: args.terminalFontFamily,
     terminalFontWeight: DEFAULT_TERMINAL_FONT_WEIGHT,
@@ -68,7 +67,6 @@ export function buildDefaultSettings(args: {
     terminalScrollSensitivity: 1.15,
     terminalFastScrollSensitivity: 5,
     terminalTuiScrollSensitivity: 1,
-    terminalTuiScrollSensitivityDefaultedToOne: true,
     // Why: "auto" uses WebGL when supported, falling back to DOM on renderer failure or software/unknown GPU.
     terminalGpuAcceleration: 'auto',
     // Why 'auto': enable ligatures only for known ligature fonts, never forced. Resolver in shared/terminal-ligatures.ts.
@@ -77,7 +75,6 @@ export function buildDefaultSettings(args: {
     // canvas layers once a pane receives an image; parser/decoder setup still has overhead.
     terminalInlineImages: true,
     terminalCursorStyle: 'block',
-    terminalCursorStyleDefaultedToBlock: true,
     terminalCursorBlink: true,
     terminalThemeDark: 'Ghostty Default Style Dark',
     terminalDividerColorDark: '#3f3f46',
@@ -91,12 +88,10 @@ export function buildDefaultSettings(args: {
     terminalDividerThicknessPx: 3,
     // Why: Windows paste-on-right-click matches native convention; macOS/Linux keep right-click for the context menu.
     terminalRightClickToPaste: args.terminalRightClickToPaste,
-    terminalRightClickToPasteDefaultedForPlatform: true,
     terminalWindowsShell: 'powershell.exe',
     terminalDefaultShell: '',
     terminalWindowsWslDistro: null,
     localAccountRuntime: 'auto',
-    localAccountRuntimeDefaultedToAutoForAllUsers: true,
     localAccountWslDistro: null,
     localWindowsRuntimeDefault: { kind: 'windows-host' },
     // Why: prefer modern PowerShell when installed, falling back to inbox Windows PowerShell.
@@ -115,11 +110,7 @@ export function buildDefaultSettings(args: {
     terminalCopyTrimsGutter: true,
     // Why: default on so Zellij/tmux/nvim copy works out of the box. Query
     // replies stay disabled and payload size is capped in the OSC 52 handler.
-    // This default only covers new profiles; existing ones persisted `false`
-    // and are flipped once by the stamp below (shared/osc52-clipboard-settings.ts,
-    // applied by both the Electron store and the web client's localStorage store).
     terminalAllowOsc52Clipboard: true,
-    terminalAllowOsc52ClipboardDefaultedOnForAllUsers: true,
     claudeAgentTeamsMode: 'off',
     setupScriptLaunchMode: 'new-tab',
     terminalScrollbackRows: DESKTOP_TERMINAL_SCROLLBACK_ROWS_DEFAULT,
@@ -133,15 +124,13 @@ export function buildDefaultSettings(args: {
     terminalLinkActionPopoverEnabled: true,
     terminalLinkClickBehavior: 'actions',
     terminalUrlMiddleClickBehavior: 'open',
-    experimentalNativeChat: false,
     nativeChatResumeWorkOnRestart: false,
+    nativeChatProviders: {},
     nativeChatQueueFollowUps: true,
     nativeChatInlineVisuals: true,
     nativeChatInheritShellEnvironment: true,
     nativeChatShellEnvironmentVariables: [],
     nativeChatSessionOptions: {},
-    // The shipped Claude and Codex arguments carry their bypass flags.
-    nativeChatPermissionMode: 'full-access',
     openInApplications: [...DEFAULT_OPEN_IN_APPLICATIONS],
     rightSidebarOpenByDefault: true,
     showGitIgnoredFiles: true,
@@ -152,22 +141,19 @@ export function buildDefaultSettings(args: {
     showTitlebarAppName: true,
     showTasksButton: true,
     showAutomationsButton: true,
-    artifactsEnabled: true,
     artifactSharingEnabled: false,
     agentSkillSharingEnabled: false,
     nestedWorkerMaxDepth: 1,
-    showArtifactsButton: false,
-    showSkillsButton: false,
+    showArtifactsButton: true,
+    showSkillsButton: true,
     showPinnedWorktreesInGroups: false,
     ctrlTabOrderMode: 'mru',
     // Why: Orca-first keeps core shortcuts working from a focused terminal; TUI-ownership users opt in.
     terminalShortcutPolicy: 'orca-first',
     floatingTerminalEnabled: true,
     browserClientHostedRemoteEnabled: true,
-    floatingTerminalDefaultedForAllUsers: true,
     floatingTerminalCwd: '~',
     floatingTerminalTrustedCwds: [],
-    floatingTerminalCwdMigratedToAppWorkspace: true,
     floatingTerminalTriggerLocation: 'floating-button',
     notifications: args.notifications,
     diffDefaultView: 'inline',
@@ -195,11 +181,10 @@ export function buildDefaultSettings(args: {
     terminalModelQueryAuthority: true,
     defaultTuiAgent: null,
     disabledTuiAgents: [...DEFAULT_DISABLED_TUI_AGENTS],
-    pluginSystemEnabled: false,
+    pluginSystemEnabled: true,
     disabledPlugins: [],
     pluginConsents: {},
     devPluginPaths: [],
-    claudeAgentTeamsDefaultDisabledMigrated: true,
     skipDeleteWorktreeConfirm: false,
     alwaysForceDeleteWorktrees: false,
     skipCloseTerminalWithRunningProcessConfirm: false,
@@ -209,7 +194,6 @@ export function buildDefaultSettings(args: {
     defaultTaskViewPreset: 'all',
     defaultTaskSource: 'github',
     visibleTaskProviders: [...TASK_PROVIDERS],
-    visibleTaskProvidersDefaultedForJira: true,
     defaultRepoSelection: null,
     defaultLinearTeamSelection: null,
     opencodeSessionCookie: '',
@@ -220,10 +204,9 @@ export function buildDefaultSettings(args: {
     zcodePlanSite: 'zai',
     geminiCliOAuthEnabled: false,
     agentCmdOverrides: {},
-    agentDefaultArgs: { ...DEFAULT_TUI_AGENT_ARGS },
-    agentDefaultEnv: { ...DEFAULT_TUI_AGENT_ENV },
+    agentDefaultArgs: {},
+    agentDefaultEnv: {},
     agentNpmRegistry: 'default',
-    agentYoloDefaultsMigrated: true,
     agentStatusHooksEnabled: true,
     agentWorkspaceTrustEnabled: true,
     codexTerminalServerIsolation: true,
@@ -234,7 +217,6 @@ export function buildDefaultSettings(args: {
     keepComputerAwakeWhileAgentsRun: false,
     // Why: 'auto' probes keyboard layout so non-US users can type Option chars like @/€/[ out of the box (issue #903). See src/renderer/src/lib/keyboard-layout/*.
     terminalMacOptionAsAlt: 'auto',
-    terminalMacOptionAsAltMigrated: false,
     terminalJISYenToBackslash: false,
     experimentalMobile: false,
     mobileEmulatorEnabled: true,
@@ -248,8 +230,6 @@ export function buildDefaultSettings(args: {
     machineName: '',
     // Why: off keeps the cosmetic overlay unmounted for users who never opt in.
     experimentalPet: false,
-    experimentalActivity: false,
-    experimentalActivityDefaultedOffForAllUsers: true,
     experimentalTerminalAttention: false,
     experimentalAgentHibernation: false,
     agentHibernationIdleMs: 30 * 60 * 1000,
@@ -265,18 +245,6 @@ export function buildDefaultSettings(args: {
       recent: [],
       lastViewByProject: {},
       activeProject: null
-    },
-    // Why: keep agent/model maps empty so first use follows the default agent's model, not a frozen stale choice.
-    commitMessageAi: {
-      enabled: true,
-      agentId: null,
-      selectedModelByAgent: {},
-      discoveredModelsByAgent: {},
-      selectedModelByAgentByHost: {},
-      discoveredModelsByAgentByHost: {},
-      selectedThinkingByModel: {},
-      customPrompt: '',
-      customAgentCommand: ''
     },
     sourceControlAi: getDefaultSourceControlAiSettings(),
     voice: args.voice

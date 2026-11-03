@@ -6,9 +6,9 @@ import { waitForActiveWorktree, waitForSessionReady } from './helpers/store'
 import { seedLineageScenario } from './worktree-lineage-state'
 import { worktreeRow } from './worktree-row-locators'
 
-// Optional screenshots accompany the behavioral assertions.
+// ORCA_CAPTURE_EVIDENCE=1 writes before/after screenshots to pr-evidence/; default CI runs behavioral assertions only.
 const CAPTURE_EVIDENCE = process.env.ORCA_CAPTURE_EVIDENCE === '1'
-const SHOT_DIR = resolve(process.cwd(), 'logs/e2e/worktree-lineage-agent-expansion')
+const SHOT_DIR = resolve(process.cwd(), 'pr-evidence')
 
 async function captureSidebar(page: Page, name: string): Promise<void> {
   if (!CAPTURE_EVIDENCE) {
@@ -18,7 +18,7 @@ async function captureSidebar(page: Page, name: string): Promise<void> {
   await sidebar(page).screenshot({ path: resolve(SHOT_DIR, name) })
 }
 
-// Seed two independent sessions alongside the child-workspaces disclosure.
+// Seed two parent agents for the compact summary alongside the child-workspace chip.
 async function seedTwoParentAgents(page: Page, worktreeId: string): Promise<void> {
   await page.evaluate((worktreeId) => {
     const store = window.__store
@@ -57,8 +57,8 @@ function sidebar(page: Page) {
   return page.locator('[data-worktree-sidebar]').first()
 }
 
-function sessionDisclosure(page: Page, parentId: string) {
-  return worktreeRow(page, parentId).getByRole('button', { name: 'Toggle sessions', exact: true })
+function compactSummary(page: Page, parentId: string) {
+  return worktreeRow(page, parentId).locator('button.compact-agent-summary-button').first()
 }
 
 function childWorkspacesChip(page: Page, parentId: string) {
@@ -75,7 +75,9 @@ test.describe('Worktree lineage agent-list expansion independence', () => {
     await waitForActiveWorktree(orcaPage)
   })
 
-  test('toggling child worktrees does not collapse expanded sessions', async ({ orcaPage }) => {
+  test('toggling child worktrees does not collapse the expanded agent summary', async ({
+    orcaPage
+  }) => {
     const { parentId, childId } = await seedLineageScenario(orcaPage)
     const parentRow = worktreeRow(orcaPage, parentId)
     const childRow = worktreeRow(orcaPage, childId)
@@ -85,40 +87,21 @@ test.describe('Worktree lineage agent-list expansion independence', () => {
 
     await seedTwoParentAgents(orcaPage, parentId)
 
-    const sessions = parentRow.locator('.project-tree-session-row')
-    await expect(sessionDisclosure(orcaPage, parentId)).toBeVisible({ timeout: 10_000 })
+    await expect(compactSummary(orcaPage, parentId)).toBeVisible({ timeout: 10_000 })
     await expect(childWorkspacesChip(orcaPage, parentId)).toBeVisible()
     await expect(childRow).toBeVisible()
-    await expect(sessionDisclosure(orcaPage, parentId)).toHaveAttribute('aria-expanded', 'true')
-    await expect(sessions).toHaveCount(2)
-    await sessionDisclosure(orcaPage, parentId).click()
-    await expect(sessionDisclosure(orcaPage, parentId)).toHaveAttribute('aria-expanded', 'false')
-    const expansion = parentRow.locator('.project-tree-sessions > .compact-agent-expansion-grid')
-    await expect(expansion).toHaveAttribute('aria-hidden', 'true')
-    await expect(expansion).toHaveAttribute('inert', '')
-    // Collapsed rows stay mounted for the grid animation, but must occupy no visible space.
-    await expect
-      .poll(() => expansion.evaluate((element) => element.getBoundingClientRect().height))
-      .toBe(0)
-    await expect(parentRow.locator('.project-tree-agent-summary')).toBeVisible()
+    await expect(compactSummary(orcaPage, parentId)).toHaveAttribute('aria-expanded', 'false')
     await captureSidebar(orcaPage, '1-before-both-collapsed.png')
 
-    await sessionDisclosure(orcaPage, parentId).click()
-    await expect(sessionDisclosure(orcaPage, parentId)).toHaveAttribute('aria-expanded', 'true')
-    await expect(expansion).toHaveAttribute('aria-hidden', 'false')
-    await expect(expansion).not.toHaveAttribute('inert', '')
-    await expect(sessions.nth(0)).toBeVisible()
-    await expect(sessions.nth(1)).toBeVisible()
+    await compactSummary(orcaPage, parentId).click()
+    await expect(compactSummary(orcaPage, parentId)).toHaveAttribute('aria-expanded', 'true')
     await captureSidebar(orcaPage, '2-agents-expanded.png')
 
-    // Collapse the child worktrees via the chip. This remounts the parent card.
+    // Collapse children to remount the parent card; require expanded agent summary to survive.
     await childWorkspacesChip(orcaPage, parentId).click()
     await expect(childRow).toBeHidden()
 
-    await expect(sessionDisclosure(orcaPage, parentId)).toHaveAttribute('aria-expanded', 'true')
-    await expect(sessions).toHaveCount(2)
-    await expect(sessions.nth(0)).toBeVisible()
-    await expect(sessions.nth(1)).toBeVisible()
+    await expect(compactSummary(orcaPage, parentId)).toHaveAttribute('aria-expanded', 'true')
     await captureSidebar(orcaPage, '3-after-children-toggle-agents-still-expanded.png')
   })
 })

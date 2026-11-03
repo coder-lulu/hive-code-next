@@ -1,3 +1,4 @@
+import { translate } from '@/i18n/i18n'
 import { getRepoIdFromWorktreeId } from '../../../shared/worktree/id'
 import { antigravityGenerationCompatibilityError } from './antigravity-generation-compatibility'
 import {
@@ -19,7 +20,7 @@ export async function generateRuntimeCommitMessage(
   overrides?: RuntimeGenerateCommitMessageOverrides
 ): Promise<RuntimeGenerateCommitMessageResult> {
   const target = context.target
-  if (target.kind === 'local' || !context.worktreeId) {
+  if (target.kind === 'local') {
     return window.api.git.generateCommitMessage({
       worktreePath: resolveLocalWorktreePath(context),
       // Why: the workspace suffix is part of the worktree metadata key.
@@ -32,6 +33,15 @@ export async function generateRuntimeCommitMessage(
       ...(overrides?.sourceControlAi ? { sourceControlAi: overrides.sourceControlAi } : {}),
       ...(overrides?.agentCmdOverrides ? { agentCmdOverrides: overrides.agentCmdOverrides } : {})
     }) as Promise<RuntimeGenerateCommitMessageResult>
+  }
+  if (!context.worktreeId?.trim()) {
+    return {
+      success: false,
+      error: translate(
+        'auto.runtime.runtime.git.generation.client.469ec3ee29',
+        'Remote Source Control AI requires a worktree id.'
+      )
+    }
   }
   const compatibilityError = await antigravityGenerationCompatibilityError(
     target.environmentId,
@@ -63,12 +73,21 @@ export async function discoverRuntimeCommitMessageModels(
   agentId: string
 ): Promise<RuntimeDiscoverCommitMessageModelsResult> {
   const target = context.target
-  if (target.kind === 'local' || !context.worktreeId) {
+  if (target.kind === 'local') {
     return window.api.git.discoverCommitMessageModels({
       agentId,
       worktreePath: resolveLocalWorktreePath(context),
       connectionId: context.connectionId
     }) as Promise<RuntimeDiscoverCommitMessageModelsResult>
+  }
+  if (!context.worktreeId?.trim()) {
+    return {
+      success: false,
+      error: translate(
+        'auto.runtime.runtime.git.generation.client.469ec3ee29',
+        'Remote Source Control AI requires a worktree id.'
+      )
+    }
   }
   return callRuntimeRpc<RuntimeDiscoverCommitMessageModelsResult>(
     target,
@@ -88,12 +107,15 @@ export async function cancelRuntimeGenerateCommitMessage(
   context: RuntimeGitContext
 ): Promise<void> {
   const target = context.target
-  if (target.kind === 'local' || !context.worktreeId) {
+  if (target.kind === 'local') {
     await window.api.git.cancelGenerateCommitMessage({
       worktreePath: resolveLocalWorktreePath(context),
       connectionId: context.connectionId
     })
     return
+  }
+  if (!context.worktreeId?.trim()) {
+    throw new Error('Remote Source Control AI requires a worktree id.')
   }
   await callRuntimeRpc(
     target,
@@ -109,7 +131,7 @@ export async function generateRuntimePullRequestFields(
   overrides?: RuntimeGeneratePullRequestFieldsOverrides
 ): Promise<RuntimeGeneratePullRequestFieldsResult> {
   const target = context.target
-  if (target.kind === 'local' || !context.worktreeId) {
+  if (target.kind === 'local') {
     return window.api.git.generatePullRequestFields({
       worktreePath: resolveLocalWorktreePath(context),
       // Why: the workspace suffix is part of the worktree metadata key.
@@ -123,6 +145,15 @@ export async function generateRuntimePullRequestFields(
       ...(overrides?.sourceControlAi ? { sourceControlAi: overrides.sourceControlAi } : {}),
       ...(overrides?.agentCmdOverrides ? { agentCmdOverrides: overrides.agentCmdOverrides } : {})
     }) as Promise<RuntimeGeneratePullRequestFieldsResult>
+  }
+  if (!context.worktreeId?.trim()) {
+    return {
+      success: false,
+      error: translate(
+        'auto.runtime.runtime.git.generation.client.469ec3ee29',
+        'Remote Source Control AI requires a worktree id.'
+      )
+    }
   }
   const compatibilityError = await antigravityGenerationCompatibilityError(
     target.environmentId,
@@ -154,12 +185,15 @@ export async function cancelRuntimeGeneratePullRequestFields(
   context: RuntimeGitContext
 ): Promise<void> {
   const target = context.target
-  if (target.kind === 'local' || !context.worktreeId) {
+  if (target.kind === 'local') {
     await window.api.git.cancelGeneratePullRequestFields({
       worktreePath: resolveLocalWorktreePath(context),
       connectionId: context.connectionId
     })
     return
+  }
+  if (!context.worktreeId?.trim()) {
+    throw new Error('Remote Source Control AI requires a worktree id.')
   }
   await callRuntimeRpc(
     target,

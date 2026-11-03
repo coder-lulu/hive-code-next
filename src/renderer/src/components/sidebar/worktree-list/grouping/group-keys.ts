@@ -19,7 +19,7 @@ import type { AppState } from '../../../../store/types'
 import {
   getGitHubPRCacheKey,
   getLegacyGitHubPRCacheKey
-} from '../../../../store/slices/github-cache-key'
+} from '../../../../../../shared/github/github-cache-key'
 import { translate } from '@/i18n/i18n'
 import { isGitHubPRSuppressed } from '../../../../../../shared/worktree/github-pr-suppression'
 

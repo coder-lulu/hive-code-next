@@ -1,6 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import type { MobileTheme } from '../theme/mobile-theme'
-import { useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
+import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import { themedStyleSheet } from '../theme/themed-styles'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 
 /** A failed load: the message with its Retry button centered under it as one group. */
 export function MobileLoadErrorState({
@@ -10,46 +12,51 @@ export function MobileLoadErrorState({
   message: string
   onRetry?: (() => void) | null
 }) {
-  const styles = useMobileThemeStyles(createStyles)
+  const t = useMobileTranslation()
+  useMobileColorScheme()
   return (
     <View style={styles.state}>
       <Text style={styles.errorText}>{message}</Text>
-      {onRetry ? (
-        <Pressable style={styles.retryButton} onPress={onRetry} accessibilityRole="button">
-          <Text style={styles.retryText}>重试</Text>
-        </Pressable>
-      ) : null}
+      {onRetry ? <MobileStateButton label={t('common.retry', 'Retry')} onPress={onRetry} /> : null}
     </View>
   )
 }
 
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    state: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: theme.spacing.space12,
-      padding: theme.spacing.space24
-    },
-    errorText: {
-      color: theme.color.status.dangerText,
-      ...theme.typography.body,
-      textAlign: 'center'
-    },
-    retryButton: {
-      minHeight: theme.size.minimumTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: theme.radii.control,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.color.border.subtle,
-      paddingHorizontal: theme.spacing.space16
-    },
-    retryText: {
-      color: theme.color.text.primary,
-      ...theme.typography.body,
-      fontWeight: '600'
-    }
-  })
+/** The bordered action a centered load state offers, such as Retry. */
+export function MobileStateButton({ label, onPress }: { label: string; onPress: () => void }) {
+  useMobileColorScheme()
+  return (
+    <Pressable style={styles.retryButton} onPress={onPress} accessibilityRole="button">
+      <Text style={styles.retryText}>{label}</Text>
+    </Pressable>
+  )
 }
+
+const styles = themedStyleSheet(() => ({
+  state: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+    padding: spacing.xl
+  },
+  errorText: {
+    color: colors.statusRed,
+    fontSize: typography.bodySize,
+    textAlign: 'center'
+  },
+  retryButton: {
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radii.button,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle,
+    paddingHorizontal: spacing.lg
+  },
+  retryText: {
+    color: colors.textPrimary,
+    fontSize: typography.bodySize,
+    fontWeight: '600'
+  }
+}))

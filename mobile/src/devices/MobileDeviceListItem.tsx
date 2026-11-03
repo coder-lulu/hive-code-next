@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { LoaderCircle, Monitor, MoreHorizontal, RefreshCw } from 'lucide-react-native'
 import { Text, View } from 'react-native'
 import { MobileIconButton } from '../components/ui/MobileIconButton'
@@ -20,6 +21,8 @@ export function MobileDeviceListItem(props: {
   onDetails: () => void
   onRetry: () => void
 }) {
+  const t = useMobileTranslation()
+
   const { device, theme } = props
   const styles = createMobileDevicesStyles(theme)
   const color =
@@ -75,7 +78,11 @@ export function MobileDeviceListItem(props: {
           </Text>
         </View>
         <MobileIconButton
-          accessibilityLabel={`${device.host.name} 的更多操作`}
+          accessibilityLabel={t(
+            'auto.mobile.src.devices.MobileDeviceListItem.078f833bad',
+            'More actions for {{value0}}',
+            { value0: device.host.name }
+          )}
           icon={MoreHorizontal}
           onPress={props.onActions}
         />
@@ -83,11 +90,25 @@ export function MobileDeviceListItem(props: {
       <View style={styles.footerRow}>
         <Text maxFontSizeMultiplier={1.3} style={styles.deviceHint}>
           {device.current
-            ? `连接方式：${props.path === 'relay' ? '安全中继' : props.path ? '直连' : '未确认'}`
+            ? t(
+                'auto.mobile.src.devices.MobileDeviceListItem.61ff17339e',
+                'Connection method: {{value0}}',
+                {
+                  value0:
+                    props.path === 'relay'
+                      ? t('connection.path.relay', 'Secure relay')
+                      : props.path
+                        ? t('connection.path.direct', 'Direct')
+                        : t('connection.path.unconfirmed', 'Unconfirmed')
+                }
+              )
             : device.connecting
               ? device.hint
               : device.connected
-                ? '连接已建立'
+                ? t(
+                    'auto.mobile.src.devices.MobileDeviceListItem.9fbfb8860e',
+                    'Connection established'
+                  )
                 : device.lastPresenceAt != null
                   ? mobileDeviceLastConnectedLabel(device.lastPresenceAt, props.now, 'presence')
                   : mobileDeviceLastConnectedLabel(device.lastConnectedAt, props.now)}
@@ -95,10 +116,10 @@ export function MobileDeviceListItem(props: {
         <PairingActionButton
           label={
             device.connecting || device.connected
-              ? '连接详情'
+              ? t('auto.mobile.src.devices.MobileDeviceListItem.8cce272ec0', 'Connection details')
               : device.requiresPairing
-                ? '重新配对'
-                : '重试'
+                ? t('auto.mobile.src.devices.MobileDeviceListItem.bb3409d859', 'Pair again')
+                : t('common.retry', 'Retry')
           }
           accessibilityLabel={`${device.connecting || device.connected ? '查看详情' : device.requiresPairing ? '重新配对' : '重试连接'}：${device.host.name}`}
           icon={!device.connecting && !device.connected ? RefreshCw : undefined}

@@ -1,14 +1,12 @@
 import type { TuiAgent } from './tui-agent'
 import {
   SOURCE_CONTROL_ACTION_IDS,
+  SOURCE_CONTROL_LAUNCH_ACTION_IDS,
   SOURCE_CONTROL_TEXT_ACTION_IDS,
   normalizeSourceControlActionRecipe,
   type SourceControlActionId
 } from './source-control-ai-actions'
-import {
-  commandTemplateFromOperationInstruction,
-  isLegacyBranchInstructionTemplate
-} from './source-control-ai-command-template'
+import { commandTemplateFromOperationInstruction } from './source-control-ai-command-template'
 import type {
   RepoSourceControlAiOverrides,
   SourceControlAiModelChoice
@@ -92,7 +90,7 @@ function normalizeModelChoice(value: unknown): SourceControlAiModelChoice | unde
 function normalizeKnownRecord<K extends string, T>(
   value: unknown,
   keys: readonly K[],
-  normalizeValue: (value: unknown) => T | undefined
+  normalizeValue: (value: unknown, key: K) => T | undefined
 ): Partial<Record<K, T>> | undefined {
   if (!isRecord(value)) {
     return undefined
@@ -102,7 +100,7 @@ function normalizeKnownRecord<K extends string, T>(
     if (!Object.hasOwn(value, key)) {
       continue
     }
-    const item = normalizeValue(value[key])
+    const item = normalizeValue(value[key], key)
     if (item !== undefined) {
       normalized[key] = item
     }
@@ -158,11 +156,16 @@ export function normalizeRepoSourceControlAiOverrides(
   const actionOverrides = normalizeKnownRecord<SourceControlActionId, RepoActionOverride>(
     value.actionOverrides,
     SOURCE_CONTROL_ACTION_IDS,
-    (item) => {
+    (item, key) => {
       if (!isRecord(item)) {
         return undefined
       }
-      const recipe: RepoActionOverride = { ...normalizeSourceControlActionRecipe(item) }
+      const recipe: RepoActionOverride = {
+        ...normalizeSourceControlActionRecipe(
+          item,
+          SOURCE_CONTROL_LAUNCH_ACTION_IDS.some((id) => id === key)
+        )
+      }
       if (item.commandInputTemplate === null) {
         recipe.commandInputTemplate = null
       }
@@ -172,15 +175,19 @@ export function normalizeRepoSourceControlAiOverrides(
       return Object.keys(recipe).length > 0 ? recipe : undefined
     }
   )
+  for (const [id, recipe] of Object.entries(actionOverrides ?? {})) {
+    if (
+      (recipe.argumentChoices || recipe.launchPreferences?.modelSelection) &&
+      !SOURCE_CONTROL_LAUNCH_ACTION_IDS.some((action) => action === id)
+    ) {
+      throw new Error('Action choices require a launch action')
+    }
+  }
   const migratedActionOverrides = { ...actionOverrides }
   for (const operation of SOURCE_CONTROL_TEXT_ACTION_IDS) {
     const instruction = instructionsByOperation?.[operation]
     const existingTemplate = migratedActionOverrides[operation]?.commandInputTemplate
-    if (
-      typeof instruction === 'string' &&
-      (existingTemplate === undefined ||
-        isLegacyBranchInstructionTemplate(operation, instruction, existingTemplate))
-    ) {
+    if (typeof instruction === 'string' && existingTemplate === undefined) {
       migratedActionOverrides[operation] = {
         ...migratedActionOverrides[operation],
         commandInputTemplate: commandTemplateFromOperationInstruction(operation, instruction)

@@ -56,7 +56,7 @@ vi.mock('../theme/mobile-theme-provider', async () => {
   }
 })
 
-vi.mock('./MobileNativeChatTurnStatus', () => ({ MobileNativeChatTurnActivity: 'TurnActivity' }))
+vi.mock('./native-chat/transcript/MobileNativeChatTurnStatus', () => ({ MobileNativeChatTurnActivity: 'TurnActivity' }))
 vi.mock('./MobileNativeChatMessage', () => ({ MobileNativeChatMessage: 'ChatMessage' }))
 vi.mock('./MobileNativeChatLiveLine', () => ({ MobileNativeChatLiveLine: 'LiveStatus' }))
 vi.mock('./MobileNativeChatAsk', () => ({ MobileNativeChatAsk: 'ChatAsk' }))
@@ -102,7 +102,7 @@ export function chatViewElement(overrides: Overrides): ReturnType<typeof createE
     getSendCompletionGeneration: () => 0,
     getComposerEditGeneration: () => 0,
     pending: [],
-    composerText: '',
+    draftKey: null,
     onComposerTextChange: vi.fn(),
     ...overrides
   })

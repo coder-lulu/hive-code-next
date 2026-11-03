@@ -1,3 +1,4 @@
+import { registerSocketDeviceKey } from './runtime-rpc-device-key-registration'
 import type { WebSocket } from 'ws'
 import { callerScopeOf, devicePrincipalOf } from '../device-principal'
 import type {
@@ -95,7 +96,10 @@ export class RuntimeRpcWebSocketDispatch extends RuntimeRpcAccountDispatch {
     // Why: an authenticated socket stays bound to the device and credential revision it proved;
     // a revoke or credential change refuses its next request even before the socket closes.
     const device = authenticatedSocket
-      ? this.deviceRegistry?.resolveAuthenticatedPrincipal(authenticatedSocket.device)
+      ? this.deviceRegistry?.resolveAuthenticatedPrincipal({
+          ...authenticatedSocket.device,
+          credentialRevision: authenticatedSocket.device.credentialRevision ?? 0
+        })
       : this.deviceRegistry?.validateToken(token ?? '')
     if (!device) {
       reply(JSON.stringify(this.buildError(request.id, 'unauthorized', 'Invalid device token')))
@@ -186,6 +190,30 @@ export class RuntimeRpcWebSocketDispatch extends RuntimeRpcAccountDispatch {
           authenticatedSocket && device.scope === 'mobile'
             ? (clientCapabilities) => {
                 authenticatedSocket.clientCapabilities = clientCapabilities
+              }
+            : undefined,
+        deviceSelf:
+          authenticatedSocket && this.deviceRegistry
+            ? {
+                registerDeviceKey: (params) =>
+                  registerSocketDeviceKey(this.deviceRegistry!, authenticatedSocket, params)
+              }
+            : undefined,
+        // Only an authenticated desktop socket can say which installation it is.
+        peerDesktops:
+          device.scope === 'runtime' && authenticatedSocket
+            ? {
+                list: (clientInstanceId) =>
+                  this.declaredDesktopClients.peers(
+                    { connectionId: authenticatedSocket.connectionId, clientInstanceId },
+                    (deviceId) => this.deviceRegistry?.getDevice(deviceId) ?? null
+                  ),
+                declare: (clientInstanceId) =>
+                  this.declaredDesktopClients.declare(
+                    authenticatedSocket.connectionId,
+                    device.deviceId,
+                    clientInstanceId
+                  )
               }
             : undefined,
         signal: abortRegistration?.signal,

@@ -269,6 +269,10 @@ test('a missing legacy worker cannot spawn a replacement during restart recovery
         return worker?.ptyId ?? null
       })
       .toBeTruthy()
+    const workerPtyId = worker?.ptyId
+    if (!workerPtyId) {
+      throw new Error('Codex worker PTY was not listed')
+    }
     const workerPaneKey = `${worker!.tabId}:${worker!.leafId}`
     await expect
       .poll(async () => {
@@ -302,9 +306,7 @@ test('a missing legacy worker cannot spawn a replacement during restart recovery
               transcriptPath: transcript
             },
             launchConfig: {
-              // Why not bare 'codex': resume prefers the captured command over
-              // agentCmdOverrides, so a bare name would resolve the machine's real
-              // Codex off PATH and unpin the adoption leg this spec exercises.
+              // Resume prefers the captured command over overrides; pin its path so bare codex cannot launch the user’s installation.
               agentCommand,
               agentArgs: '--dangerously-bypass-approvals-and-sandbox',
               agentEnv: {}
@@ -347,7 +349,7 @@ test('a missing legacy worker cannot spawn a replacement during restart recovery
       .poll(async () => {
         const listed = await secondClient.call<RuntimeTerminalListResult>('terminal.list')
         return listed.result.terminals.filter(
-          (terminal) => terminal.ptyId === worker!.ptyId || terminal.title === 'Codex Ready'
+          (terminal) => terminal.ptyId === workerPtyId || terminal.title === 'Codex Ready'
         )
       })
       .toEqual([])

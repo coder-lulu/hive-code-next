@@ -2,21 +2,21 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { APP_DISPLAY_NAME } from '../../shared/brand'
-import type { PluginManifest } from '../../shared/plugins/plugin-manifest'
+import type { PluginManifest } from '../../shared/plugins/manifest/plugin-manifest'
 import { getUserPluginsDir } from './plugin-discovery'
-import { checkoutPluginGitSource } from './plugin-git-repository'
+import { checkoutPluginGitSource } from './installation/plugin-git-repository'
 import {
   installPluginFromMarketplace,
   readPluginLockfile,
   rollbackInstalledPlugin,
   type PluginInstallResult
-} from './plugin-install'
-import { inspectPluginInstallTree } from './plugin-install-staging'
+} from './installation/plugin-install'
+import { inspectPluginInstallTree } from './installation/plugin-install-staging'
 import type {
   PluginMarketplaceListing,
   PluginMarketplaceService
-} from './plugin-marketplace-service'
-import { marketplaceSourceId } from './plugin-marketplace-store'
+} from './catalog/plugin-marketplace-service'
+import { marketplaceSourceId } from './catalog/plugin-marketplace-store'
 
 export type PluginMarketplaceInstallPreview = {
   marketplaceSourceId: string

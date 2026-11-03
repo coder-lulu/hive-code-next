@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useState } from 'react'
-import { View, Pressable, StyleSheet, Keyboard } from 'react-native'
+import { View, Pressable, StyleSheet, Platform, Keyboard } from 'react-native'
 import { useSafeAreaFrame, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'
 import Animated, {
@@ -11,19 +11,18 @@ import Animated, {
   interpolate,
   Extrapolation
 } from 'react-native-reanimated'
-import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { useBackClaim } from '../navigation/use-back-claim'
-// Why: mount-before-commit logic is anchor-agnostic, so the X-axis drawer reuses
-// the exact same gate as BottomDrawer rather than duplicating it.
+import { colors, spacing } from '../theme/mobile-theme'
+import { themedStyleSheet } from '../theme/themed-styles'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
+// Reuse BottomDrawer’s anchor-independent mount-before-commit gate.
 import { resolveBottomDrawerMounted } from './bottom-drawer-mount-state'
 import { resolveRightDrawerPanelWidth } from './right-drawer-panel-width'
-import { createRightDrawerStyles } from './right-drawer-styles'
 import { useResponsiveLayout } from '../layout/responsive-layout'
 
 const DISMISS_THRESHOLD = 80
 const SPRING_CONFIG = { damping: 28, stiffness: 400 }
-// Why: leftward drags (negative translateX) pull the panel past its docked edge;
-// damp them with a rubber-band factor so the drawer resists over-pulling inward.
+// Damp negative translateX so panel resists pulling inward past docked edge.
 const RUBBER_BAND_FACTOR = 0.25
 const SHOW_DURATION = 180
 const HIDE_DURATION = 150
@@ -40,14 +39,12 @@ export function RightDrawer({ visible, onClose, children, zIndex, widthPx }: Pro
   const [mounted, setMounted] = useState(visible)
   const resolvedMounted = resolveBottomDrawerMounted(visible, mounted)
 
-  // Why: opening drawers should mount before commit; waiting for a passive
-  // Effect adds a null render before the drawer can animate in.
+  // Mount opening drawer before commit; passive effect adds blank render before animation.
   if (resolvedMounted !== mounted) {
     setMounted(resolvedMounted)
   }
 
-  // Why: hidden drawers are rendered by parent screens even while closed; keep
-  // their Reanimated/Gesture setup out of hot paths until they are actually shown.
+  // Keep Reanimated/Gesture setup out of closed-drawer parent hot paths.
   if (!resolvedMounted) {
     return null
   }
@@ -77,8 +74,7 @@ function MountedRightDrawer({
   zIndex = 1000,
   widthPx
 }: MountedRightDrawerProps) {
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createRightDrawerStyles)
+  useMobileColorScheme()
   const translateX = useSharedValue(0)
   const progress = useSharedValue(0)
   const { width: screenWidth } = useSafeAreaFrame()
@@ -100,9 +96,7 @@ function MountedRightDrawer({
     }
   }, [onHidden, visible])
 
-  // The same seam every session sheet takes: the hardware key natively, and a claim on the shell's
-  // key inside the page. The review screen is this drawer's one caller and C4 serves that route
-  // from the page, so both halves are reachable.
+  // Use native hardware Back or page’s shell Back claim; review route reaches both platform seams.
   useBackClaim(
     visible
       ? () => {
@@ -117,8 +111,7 @@ function MountedRightDrawer({
   }, [onClose])
 
   const scrollGesture = Gesture.Native()
-  // Why: swipe-from-right (positive translationX) dismisses; the horizontal
-  // activeOffset lets the inner vertical ScrollView keep its gestures.
+  // Positive horizontal swipe dismisses; activeOffset leaves vertical ScrollView gestures intact.
   const panGesture = Gesture.Pan()
     .activeOffsetX([-8, 8])
     .simultaneousWithExternalGesture(scrollGesture)
@@ -170,12 +163,7 @@ function MountedRightDrawer({
     >
       <GestureHandlerRootView style={styles.root}>
         <Animated.View style={[styles.backdrop, backdropStyle]}>
-          <Pressable
-            accessibilityLabel="Close side panel"
-            accessibilityRole="button"
-            style={StyleSheet.absoluteFill}
-            onPress={dismiss}
-          />
+          <Pressable style={StyleSheet.absoluteFill} onPress={dismiss} />
         </Animated.View>
 
         <View style={styles.anchor} pointerEvents="box-none">
@@ -185,9 +173,9 @@ function MountedRightDrawer({
                 styles.drawer,
                 {
                   width: panelWidth,
-                  paddingTop: insets.top + theme.spacing.space12,
-                  paddingBottom: insets.bottom + theme.spacing.space16,
-                  paddingRight: insets.right + theme.spacing.space12
+                  paddingTop: insets.top + spacing.md,
+                  paddingBottom: insets.bottom + spacing.lg,
+                  paddingRight: insets.right
                 },
                 drawerStyle
               ]}
@@ -208,3 +196,40 @@ function MountedRightDrawer({
     </Animated.View>
   )
 }
+
+const styles = themedStyleSheet(() => ({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1000
+  },
+  root: {
+    flex: 1
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)'
+  },
+  anchor: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'flex-end'
+  },
+  drawer: {
+    height: '100%',
+    backgroundColor: colors.bgBase,
+    borderTopLeftRadius: 16,
+    borderBottomLeftRadius: 16,
+    paddingHorizontal: spacing.md,
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: colors.borderSubtle,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: -2, height: 0 },
+        shadowOpacity: 0.2,
+        shadowRadius: 10
+      },
+      android: { elevation: 8 }
+    })
+  }
+}))

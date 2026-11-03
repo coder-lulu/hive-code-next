@@ -104,22 +104,7 @@ afterEach(() => {
 })
 
 describe('ClientHostedBrowserTabRows selection', () => {
-  it.each(['Enter', ' '])('activates the focused row with %s', (key) => {
-    const container = renderRows('tab-a')
-    const row = rowElement(container)
-    expect(row.tabIndex).toBe(0)
-    act(() => row.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })))
-    expect(row.getAttribute('aria-pressed')).toBe('true')
-  })
-
-  it('does not activate the row when a close-button key event bubbles', () => {
-    const container = renderRows('tab-a')
-    const button = rowElement(container).querySelector('button')!
-    act(() => button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })))
-    expect(isRowActive(container)).toBe(false)
-  })
-
-  it('selects the row the user picked', () => {
+  it('underlines the row the user picked', () => {
     const container = renderRows('tab-a')
 
     clickRow(container)
@@ -127,12 +112,8 @@ describe('ClientHostedBrowserTabRows selection', () => {
     expect(isRowActive(container)).toBe(true)
   })
 
-  /**
-   * The other half of the strip paints itself from the group's `activeTabId`, which a keyboard
-   * switch or the command palette moves without ever touching this row. Holding the selection
-   * through that move is how the strip ends up showing two active tabs.
-   */
-  it('drops the selection once the group activates a real tab', () => {
+  /** Keyboard/palette activation changes group selection without touching this row; remove its underline to prevent two active tabs. */
+  it('drops the underline once the group activates a real tab', () => {
     const container = renderRows('tab-a')
     clickRow(container)
 
@@ -143,8 +124,7 @@ describe('ClientHostedBrowserTabRows selection', () => {
 })
 
 describe('ClientHostedBrowserTabRows close', () => {
-  // Why a toast and not just the console: this row is the only way to close a page this host does
-  // not render, and a refused close leaves it sitting there looking like the click missed.
+  // A refused remote close needs visible feedback because this row is the host’s only page control.
   it('tells the user when the close is refused', async () => {
     vi.mocked(closeClientHostedBrowserRow).mockRejectedValue(new Error('runtime rpc timed out'))
     const container = renderRows()

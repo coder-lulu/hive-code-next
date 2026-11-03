@@ -1,45 +1,41 @@
-import { useCallback, useMemo } from 'react'
+import { ORCA_LINEAR_SKILL_INSTALL_COMMAND } from '@/lib/agent-feature-install-commands'
+import { buildSkillCommandForRuntime } from './CliSkillRuntimeSetup'
 import {
-  AGENT_SKILL_CLI_PREREQUISITE_NOTICE,
-  ensureOrcaCliAvailableForAgentSkillTerminal
+  ensureOrcaCliAvailableForAgentSkillTerminal,
+  isOrcaCliAvailableOnPath
 } from '@/lib/agent-skill-cli-prerequisite'
 import {
-  LINEAR_AGENT_SKILL_NAMES,
-  ORCA_LINEAR_SKILL_INSTALL_COMMAND
-} from '@/lib/agent-feature-install-commands'
+  ensureWslCliAvailableForAgentSkillTerminal,
+  getWslCliDistroRequest
+} from './CliSkillRuntimeSetup'
+import { translate } from '@/i18n/i18n'
+import { useCallback, useMemo } from 'react'
+import { LINEAR_AGENT_SKILL_NAMES } from '@/lib/agent-feature-skill-names'
 import { getLinearAgentSkillUpdateTarget } from '@/lib/linear-agent-skill-update-command'
 import {
   GLOBAL_AGENT_SKILL_SOURCE_KINDS,
   useInstalledAgentSkillNames
 } from '@/hooks/useInstalledAgentSkills'
 import { useActiveProjectSkillRuntime } from '@/hooks/useActiveProjectSkillRuntime'
-import {
-  buildSkillCommandForRuntime,
-  ensureWslCliAvailableForAgentSkillTerminal,
-  getWslCliDistroRequest,
-  type LocalAgentRuntime
-} from './CliSkillRuntimeSetup'
 
-// Shared install/update wiring for Task Sources + Linear settings.
 export function useLinearAgentSkillSetup(): {
+  // Legacy-only installs update the legacy name.
+  updateSkillName: string
   installCommand: string
   updateCommand: string
   freshnessSkillName: string | undefined
   skillInstalled: boolean
   skillLoading: boolean
-  // Status surfaces (step badges, checklist pills) read this so a focus-triggered
-  // rescan does not flip a known result back to "checking".
+  // Keep known status through focus rescans instead of flashing Checking.
   skillChecking: boolean
   /** The scan could not vouch for "not installed", so no surface may claim it. */
   skillUnverifiable: boolean
   installDisabled: boolean
   error: string | null
-  terminalShellOverride: string | undefined
-  terminalRuntime: LocalAgentRuntime | undefined
   preInstallNotice: string
-  refreshSkill: () => Promise<boolean>
   getPrerequisiteStatus: () => Promise<Awaited<ReturnType<typeof window.api.cli.getInstallStatus>>>
   onBeforeOpenTerminal: () => Promise<void>
+  refreshSkill: () => Promise<boolean>
 } {
   const activeSkillRuntime = useActiveProjectSkillRuntime()
   const {
@@ -55,48 +51,51 @@ export function useLinearAgentSkillSetup(): {
     sourceKinds: GLOBAL_AGENT_SKILL_SOURCE_KINDS
   })
 
-  // Why: the built command also depends on the focused runtime environment, so
-  // memoizing it on the runtime alone can serve a stale Windows host command.
-  const installCommand = activeSkillRuntime.installDisabledReason
-    ? ORCA_LINEAR_SKILL_INSTALL_COMMAND
-    : buildSkillCommandForRuntime(
-        ORCA_LINEAR_SKILL_INSTALL_COMMAND,
-        activeSkillRuntime.agentRuntime
-      )
   const updateTarget = useMemo(
     () => getLinearAgentSkillUpdateTarget(linearSkills, skillInstalled),
     [linearSkills, skillInstalled]
   )
-  const updateCommand = activeSkillRuntime.installDisabledReason
-    ? updateTarget.command
-    : buildSkillCommandForRuntime(updateTarget.command, activeSkillRuntime.agentRuntime)
-
   // Freshness cannot verify WSL, so report presence there.
-  const freshnessSkillName = activeSkillRuntime.canUseLocalSkillFreshness
+  const freshnessSkillName = activeSkillRuntime.canUseSkillFreshness
     ? updateTarget.skillName
     : undefined
 
-  const getPrerequisiteStatus = useCallback(
-    () =>
-      activeSkillRuntime.agentRuntime?.runtime === 'wsl'
-        ? window.api.cli.getWslInstallStatus(
-            getWslCliDistroRequest(activeSkillRuntime.agentRuntime)
-          )
-        : window.api.cli.getInstallStatus(),
-    [activeSkillRuntime.agentRuntime]
-  )
-
+  const getPrerequisiteStatus = useCallback(async () => {
+    if (activeSkillRuntime.discoveryRuntimeTarget?.kind === 'environment') {
+      throw new Error('CLI registration must be verified on the selected host.')
+    }
+    return activeSkillRuntime.agentRuntime?.runtime === 'wsl'
+      ? window.api.cli.getWslInstallStatus(getWslCliDistroRequest(activeSkillRuntime.agentRuntime))
+      : window.api.cli.getInstallStatus()
+  }, [activeSkillRuntime.agentRuntime, activeSkillRuntime.discoveryRuntimeTarget])
   const onBeforeOpenTerminal = useCallback(async () => {
+    // Never register this computer's CLI for a different selected host.
+    await getPrerequisiteStatus()
     await (activeSkillRuntime.agentRuntime?.runtime === 'wsl'
       ? ensureWslCliAvailableForAgentSkillTerminal(activeSkillRuntime.agentRuntime)
       : ensureOrcaCliAvailableForAgentSkillTerminal())
-  }, [activeSkillRuntime.agentRuntime])
-
+    if (!isOrcaCliAvailableOnPath(await getPrerequisiteStatus())) {
+      throw new Error('CLI registration is unavailable.')
+    }
+  }, [activeSkillRuntime.agentRuntime, getPrerequisiteStatus])
   const installDisabled = Boolean(activeSkillRuntime.installDisabledReason)
 
   return {
-    installCommand,
-    updateCommand,
+    preInstallNotice: translate(
+      'auto.components.settings.linearSkill.cliPrerequisite',
+      'Register the CLI on the selected host before installing agent skills.'
+    ),
+    getPrerequisiteStatus,
+    onBeforeOpenTerminal,
+    updateSkillName: updateTarget.skillName,
+    installCommand: buildSkillCommandForRuntime(
+      ORCA_LINEAR_SKILL_INSTALL_COMMAND,
+      activeSkillRuntime.agentRuntime
+    ),
+    updateCommand: buildSkillCommandForRuntime(
+      updateTarget.command,
+      activeSkillRuntime.agentRuntime
+    ),
     freshnessSkillName,
     skillInstalled,
     skillLoading,
@@ -104,11 +103,6 @@ export function useLinearAgentSkillSetup(): {
     skillUnverifiable,
     installDisabled,
     error: activeSkillRuntime.installDisabledReason ?? skillError,
-    terminalShellOverride: activeSkillRuntime.terminalShellOverride,
-    terminalRuntime: activeSkillRuntime.agentRuntime,
-    preInstallNotice: AGENT_SKILL_CLI_PREREQUISITE_NOTICE,
-    refreshSkill,
-    getPrerequisiteStatus,
-    onBeforeOpenTerminal
+    refreshSkill
   }
 }

@@ -1,5 +1,4 @@
-// Ordered slices of one registry: `definitions.ts` concatenates core-1..4 in order and that order
-// is the palette order, so the boundaries follow line count, not theme — do not regroup thematically.
+// definitions.ts concatenates core-1..4 in palette order; slices follow line limits, so thematic regrouping would reorder commands.
 import type { KeybindingDefinition } from './types'
 import { platformBindings } from './definitions-support'
 
@@ -49,7 +48,9 @@ export const KEYBINDING_DEFINITION_CORE_1: readonly KeybindingDefinition[] = [
     group: 'Global',
     scope: 'global',
     searchKeywords: ['shortcut', 'global', 'worktree', 'previous', 'up'],
-    defaultBindings: platformBindings(['Mod+Shift+ArrowUp'])
+    defaultBindings: platformBindings(['Mod+Shift+ArrowUp']),
+    // Why: default Mod+Shift+Up is the field's select-to-start.
+    allowInTextField: 'non-default-chords'
   },
   {
     id: 'worktree.navigateDown',
@@ -57,7 +58,9 @@ export const KEYBINDING_DEFINITION_CORE_1: readonly KeybindingDefinition[] = [
     group: 'Global',
     scope: 'global',
     searchKeywords: ['shortcut', 'global', 'worktree', 'next', 'down'],
-    defaultBindings: platformBindings(['Mod+Shift+ArrowDown'])
+    defaultBindings: platformBindings(['Mod+Shift+ArrowDown']),
+    // Why: default Mod+Shift+Down is the field's select-to-end.
+    allowInTextField: 'non-default-chords'
   },
   {
     id: 'home.newTask',
@@ -65,7 +68,6 @@ export const KEYBINDING_DEFINITION_CORE_1: readonly KeybindingDefinition[] = [
     group: 'Global',
     scope: 'global',
     searchKeywords: ['shortcut', 'global', 'home', 'task', 'new', 'conversation'],
-    // Why: reserve Cmd/Ctrl+N for the primary new-task flow.
     defaultBindings: platformBindings(['Mod+N']),
     conflictGroup: 'menu'
   },
@@ -112,7 +114,7 @@ export const KEYBINDING_DEFINITION_CORE_1: readonly KeybindingDefinition[] = [
   },
   {
     id: 'workspace.openBoard',
-    title: 'Toggle Board',
+    title: 'Toggle Workspace Board',
     group: 'Global',
     scope: 'global',
     searchKeywords: [
@@ -132,7 +134,7 @@ export const KEYBINDING_DEFINITION_CORE_1: readonly KeybindingDefinition[] = [
   },
   {
     id: 'dashboard.toggle',
-    title: 'Toggle Agent View',
+    title: 'Toggle Agent Dashboard',
     group: 'Global',
     scope: 'global',
     searchKeywords: [
@@ -147,8 +149,7 @@ export const KEYBINDING_DEFINITION_CORE_1: readonly KeybindingDefinition[] = [
       'open',
       'close'
     ],
-    // Why: configurable but unbound by default, matching workspace.openBoard — an
-    // board view does not claim a global chord from terminal users.
+    // Experimental surfaces stay unbound rather than claim terminal users’ global chords, matching workspace.openBoard.
     defaultBindings: platformBindings([]),
     allowInTerminal: true
   },
@@ -187,6 +188,15 @@ export const KEYBINDING_DEFINITION_CORE_1: readonly KeybindingDefinition[] = [
     scope: 'global',
     searchKeywords: ['shortcut', 'tasks', 'github issues', 'linear'],
     defaultBindings: platformBindings([])
+  },
+  {
+    id: 'view.plugins',
+    title: 'Open Plugins',
+    group: 'Global',
+    scope: 'global',
+    searchKeywords: ['shortcut', 'plugins', 'extensions', 'marketplace'],
+    // Why: mirrors VS Code's Extensions view chord.
+    defaultBindings: platformBindings(['Mod+Shift+X'])
   },
   {
     id: 'sidebar.left.toggle',

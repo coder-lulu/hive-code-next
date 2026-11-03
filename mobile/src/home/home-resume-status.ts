@@ -1,3 +1,4 @@
+import { translate } from '../i18n/mobile-i18n'
 import type { HomeResumeCard } from '../worktree/home-resume-card'
 
 export type HomeResumeTone = 'brand' | 'success' | 'warning' | 'neutral'
@@ -7,18 +8,30 @@ export function homeResumeStatus(card: HomeResumeCard): {
   readonly tone: HomeResumeTone
 } {
   if (!card.actionable) {
-    return { label: '不可验证', tone: 'neutral' }
+    return {
+      label: translate('auto.mobile.src.home.home.resume.status.385cc8cabd', 'Unverifiable'),
+      tone: 'neutral'
+    }
   }
   switch (card.worktree.status) {
     case 'working':
     case 'active':
-      return { label: '运行中', tone: 'brand' }
+      return { label: translate('chat.nativeChatToolLine.running', 'Running'), tone: 'brand' }
     case 'permission':
-      return { label: '等待确认', tone: 'warning' }
+      return {
+        label: translate(
+          'auto.mobile.src.home.home.resume.status.6dbece50d1',
+          'Waiting for confirmation'
+        ),
+        tone: 'warning'
+      }
     case 'done':
-      return { label: '已完成', tone: 'success' }
+      return { label: translate('chat.taskList.completed', 'Completed'), tone: 'success' }
     case 'inactive':
     case undefined:
-      return { label: '等待输入', tone: 'neutral' }
+      return {
+        label: translate('worktree.agentRowDisplay.waiting', 'Waiting for input'),
+        tone: 'neutral'
+      }
   }
 }

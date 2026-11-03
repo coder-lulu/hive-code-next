@@ -1,7 +1,9 @@
+import { closeMobileSocket } from './mobile-socket-close'
 import type { CloudManagedE2EEAuth } from './cloud-managed-e2ee-auth-validation'
 import { randomBytes } from 'node:crypto'
 import type { WebSocket } from 'ws'
 import type { DeviceEntry, DeviceRegistry } from '../device-registry'
+import { createMobileEphemeralDeviceSweep } from './mobile-ephemeral-device-sweep'
 import { isPendingTokenRow } from '../device-entry'
 import {
   INSECURE_WEB_ORIGIN_AUTH_CODE,
@@ -33,13 +35,11 @@ export type {
 } from './mobile-socket-wiring-types'
 
 function toAuthenticatedDevice(device: DeviceEntry): E2EEAuthenticatedDevice {
-  return {
-    ...devicePrincipalOf(device),
-    deviceToken: device.token
-  }
+  return { ...devicePrincipalOf(device), deviceToken: device.token }
 }
 
 export class MobileSocketWiring {
+  private readonly ephemeralSweep: ReturnType<typeof createMobileEphemeralDeviceSweep>
   private disposed = false
   private readonly deviceRegistry: DeviceRegistry
   private readonly e2eeKeypair: E2EEKeypair
@@ -75,6 +75,16 @@ export class MobileSocketWiring {
     this.onCloudClose = options.onCloudClose
     this.onCloudReady = options.onCloudReady
     this.allowInsecureWebPairing = options.allowInsecureWebPairing ?? (() => false)
+    this.ephemeralSweep = createMobileEphemeralDeviceSweep(
+      this.deviceRegistry,
+      (deviceId) =>
+        Array.from(this.authenticatedSockets.values()).some(
+          (socket) => socket.device.deviceId === deviceId
+        ),
+      (deviceId) => {
+        this.terminateDeviceConnections(deviceId)
+      }
+    )
   }
 
   attachTransport(
@@ -149,6 +159,25 @@ export class MobileSocketWiring {
             ? { transport: 'relay', relayHostId: metadata.relayHostId }
             : { transport: 'direct' },
         outboundMemoryBudget: this.outboundMemoryBudget,
+        resolveDeviceKey: (deviceId) => {
+          const found = this.deviceRegistry.lookupDeviceKey(deviceId)
+          if (found.kind !== 'found') {
+            return found
+          }
+          const device = found.device
+          if (
+            metadata.transport === 'relay' &&
+            metadata.relayDeviceId !== device.deviceId &&
+            metadata.relayDeviceId !== device.forkedFrom
+          ) {
+            return { kind: 'refused' }
+          }
+          return {
+            kind: 'found',
+            device: toAuthenticatedDevice(device),
+            devicePublicKeyB64: device.devicePublicKeyB64
+          }
+        },
         resolveAuthenticatedDevice: (token) => {
           const device = this.deviceRegistry.validateToken(token)
           if (!device) {
@@ -258,11 +287,16 @@ export class MobileSocketWiring {
     channel.handleRawMessage(message)
   }
 
+  sweepIdleEphemeralDevices(now: number): string[] {
+    return this.ephemeralSweep.sweep(now)
+  }
+
   dispose(): void {
     if (this.disposed) {
       return
     }
     this.disposed = true
+    this.ephemeralSweep.dispose()
     this.transports.clear()
     for (const ws of this.connectionIds.keys()) {
       try {
@@ -274,29 +308,14 @@ export class MobileSocketWiring {
   }
 
   private handleClose(ws: WebSocket): void {
-    if (!this.connectionIds.has(ws)) {
-      return
-    }
-    const socket = this.authenticatedSockets.get(ws) ?? null
-    const cloudSocket = this.authenticatedCloudSockets.get(ws) ?? null
-    this.authenticatedSockets.delete(ws)
-    this.authenticatedCloudSockets.delete(ws)
-    this.channels.get(ws)?.destroy()
-    this.channels.delete(ws)
-    this.connectionIds.delete(ws)
-    const hasOtherConnections =
-      socket !== null &&
-      Array.from(this.authenticatedSockets.values()).some(
-        (candidate) => candidate.device.deviceId === socket.device.deviceId
-      )
-    this.onClose(socket, hasOtherConnections)
-    if (cloudSocket) {
-      const hasOtherCloudConnections = Array.from(this.authenticatedCloudSockets.values()).some(
-        (candidate) =>
-          candidate.principal.managedWebSessionId === cloudSocket.principal.managedWebSessionId
-      )
-      this.onCloudClose?.(cloudSocket, hasOtherCloudConnections)
-    }
+    closeMobileSocket(ws, {
+      authenticatedSockets: this.authenticatedSockets,
+      authenticatedCloudSockets: this.authenticatedCloudSockets,
+      channels: this.channels,
+      connectionIds: this.connectionIds,
+      onClose: this.onClose,
+      onCloudClose: this.onCloudClose
+    })
   }
 }
 

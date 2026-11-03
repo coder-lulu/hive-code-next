@@ -1,3 +1,4 @@
+import { findAllByHostType } from './test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -32,6 +33,9 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 })
 }))
+vi.mock('./layout/side-safe-area', () => ({
+  SideSafeArea: ({ children }: { children: unknown }) => children
+}))
 
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ hostId: dependencies.hostId }),
@@ -55,7 +59,7 @@ vi.mock('./transport/host-store', () => ({
   updateHostNameAndEndpoint: dependencies.updateHostNameAndEndpoint
 }))
 
-vi.mock('./transport/client-context', () => ({
+vi.mock('./transport/host-client-hooks', () => ({
   usePrimeHosts: () => dependencies.primeHosts,
   useRefreshHostClient: () => dependencies.refreshHostClient
 }))
@@ -120,7 +124,7 @@ function setFieldValue(
   value: string
 ): void {
   const input = renderer.root
-    .findAllByType('TextInput')
+    .findAll((node) => String(node.type) === 'TextInput')
     .find((node) => node.props.accessibilityLabel === accessibilityLabel)
   if (!input) {
     throw new Error(`${accessibilityLabel} input not found`)
@@ -132,7 +136,7 @@ function setFieldValue(
 
 function findSaveButton(renderer: ReactTestRenderer) {
   const button = renderer.root
-    .findAllByType('Pressable')
+    .findAll((node) => String(node.type) === 'Pressable')
     .find((node) => node.props.accessibilityLabel === 'Save host')
   if (!button) {
     throw new Error('Save button not found')
@@ -150,16 +154,18 @@ async function pressSave(renderer: ReactTestRenderer): Promise<void> {
 }
 
 function findText(renderer: ReactTestRenderer, match: string): boolean {
-  return renderer.root.findAllByType('Text').some((node) => {
-    const children = node.props.children
-    if (typeof children === 'string') {
-      return children.includes(match)
-    }
-    if (Array.isArray(children)) {
-      return children.join('').includes(match)
-    }
-    return false
-  })
+  return renderer.root
+    .findAll((node) => String(node.type) === 'Text')
+    .some((node) => {
+      const children = node.props.children
+      if (typeof children === 'string') {
+        return children.includes(match)
+      }
+      if (Array.isArray(children)) {
+        return children.join('').includes(match)
+      }
+      return false
+    })
 }
 
 describe('edit host handleSave', () => {
@@ -209,9 +215,9 @@ describe('edit host handleSave', () => {
       { ...HOST_FIXTURE, runtimeRecordId: CLOUD_RUNTIME_FIXTURE.runtimeRecordId }
     ])
     const renderer = await renderEditHostRoute()
-    const nameInput = renderer.root
-      .findAllByType('TextInput')
-      .find((node) => node.props.accessibilityLabel === 'Name')
+    const nameInput = findAllByHostType(renderer.root, 'TextInput').find(
+      (node) => node.props.accessibilityLabel === 'Name'
+    )
 
     expect(nameInput?.props.value).toBe('Pending Desk')
     expect(dependencies.queueDisplayNameUpdate).not.toHaveBeenCalled()
@@ -254,9 +260,9 @@ describe('edit host handleSave', () => {
       await Promise.resolve()
     })
 
-    const nameInput = renderer.root
-      .findAllByType('TextInput')
-      .find((node) => node.props.accessibilityLabel === 'Name')
+    const nameInput = findAllByHostType(renderer.root, 'TextInput').find(
+      (node) => node.props.accessibilityLabel === 'Name'
+    )
     expect(nameInput?.props.value).toBe('Account B Desk')
     expect(dependencies.queueDisplayNameUpdate).not.toHaveBeenCalled()
 
@@ -296,7 +302,7 @@ describe('edit host handleSave', () => {
       { ...HOST_FIXTURE, runtimeRecordId: CLOUD_RUNTIME_FIXTURE.runtimeRecordId }
     ])
     const renderer = await renderEditHostRoute()
-    expect(renderer.root.findAllByType('TextInput')).toHaveLength(0)
+    expect(findAllByHostType(renderer.root, 'TextInput')).toHaveLength(0)
 
     dependencies.directoryStatus = 'ready'
     dependencies.directoryEntries = [CLOUD_RUNTIME_FIXTURE]
@@ -356,9 +362,9 @@ describe('edit host handleSave', () => {
     const renderer = await renderEditHostRoute()
 
     expect(
-      renderer.root
-        .findAllByType('TextInput')
-        .some((node) => node.props.accessibilityLabel === 'Address')
+      findAllByHostType(renderer.root, 'TextInput').some(
+        (node) => node.props.accessibilityLabel === 'Address'
+      )
     ).toBe(false)
     setFieldValue(renderer, 'Name', 'Phone Alias')
     await pressSave(renderer)
@@ -384,9 +390,9 @@ describe('edit host handleSave', () => {
       const renderer = await renderEditHostRoute()
       setFieldValue(renderer, 'Name', invalidName)
       expect(findText(renderer, '名称需为 1–128 个字符')).toBe(true)
-      const save = renderer.root
-        .findAllByType('Pressable')
-        .find((node) => node.props.accessibilityLabel === 'Save host')!
+      const save = findAllByHostType(renderer.root, 'Pressable').find(
+        (node) => node.props.accessibilityLabel === 'Save host'
+      )!
       expect(save.props.disabled).toBe(true)
       expect(dependencies.queueDisplayNameUpdate).not.toHaveBeenCalled()
       act(() => renderer.unmount())
@@ -399,9 +405,9 @@ describe('edit host handleSave', () => {
       { ...HOST_FIXTURE, runtimeRecordId: CLOUD_RUNTIME_FIXTURE.runtimeRecordId }
     ])
     const renderer = await renderEditHostRoute()
-    const clearButton = renderer.root
-      .findAllByType('Pressable')
-      .find((node) => node.props.accessibilityLabel === 'Clear HiveCloud name')
+    const clearButton = findAllByHostType(renderer.root, 'Pressable').find(
+      (node) => node.props.accessibilityLabel === 'Clear HiveCloud name'
+    )
     if (!clearButton) {
       throw new Error('Clear HiveCloud name button not found')
     }
@@ -418,9 +424,9 @@ describe('edit host handleSave', () => {
       expectedCloudDisplayNameVersion: 3
     })
     expect(dependencies.updateHostNameAndEndpoint).not.toHaveBeenCalled()
-    const nameInput = renderer.root
-      .findAllByType('TextInput')
-      .find((node) => node.props.accessibilityLabel === 'Name')
+    const nameInput = findAllByHostType(renderer.root, 'TextInput').find(
+      (node) => node.props.accessibilityLabel === 'Name'
+    )
     expect(nameInput?.props.value).toBe('Reported Desk')
     expect(dependencies.back).toHaveBeenCalledOnce()
     act(() => renderer.unmount())
@@ -431,9 +437,9 @@ describe('edit host handleSave', () => {
     dependencies.directoryEntries = [CLOUD_RUNTIME_FIXTURE]
     dependencies.loadHosts.mockResolvedValue([])
     const renderer = await renderEditHostRoute()
-    const clearButton = renderer.root
-      .findAllByType('Pressable')
-      .find((node) => node.props.accessibilityLabel === 'Clear HiveCloud name')
+    const clearButton = findAllByHostType(renderer.root, 'Pressable').find(
+      (node) => node.props.accessibilityLabel === 'Clear HiveCloud name'
+    )
     if (!clearButton) {
       throw new Error('Clear HiveCloud name button not found')
     }
@@ -442,9 +448,9 @@ describe('edit host handleSave', () => {
       await clearButton.props.onPress()
     })
 
-    const nameInput = renderer.root
-      .findAllByType('TextInput')
-      .find((node) => node.props.accessibilityLabel === 'Name')
+    const nameInput = findAllByHostType(renderer.root, 'TextInput').find(
+      (node) => node.props.accessibilityLabel === 'Name'
+    )
     expect(nameInput?.props.value).toBe('Reported Desk')
     expect(dependencies.updateHostNameAndEndpoint).not.toHaveBeenCalled()
     act(() => renderer.unmount())
@@ -457,9 +463,9 @@ describe('edit host handleSave', () => {
     ])
     dependencies.queueDisplayNameUpdate.mockRejectedValueOnce(new Error('storage unavailable'))
     const renderer = await renderEditHostRoute()
-    const clearButton = renderer.root
-      .findAllByType('Pressable')
-      .find((node) => node.props.accessibilityLabel === 'Clear HiveCloud name')
+    const clearButton = findAllByHostType(renderer.root, 'Pressable').find(
+      (node) => node.props.accessibilityLabel === 'Clear HiveCloud name'
+    )
     if (!clearButton) {
       throw new Error('Clear HiveCloud name button not found')
     }
@@ -480,23 +486,21 @@ describe('edit host handleSave', () => {
     expect(dependencies.updateHostNameAndEndpoint).not.toHaveBeenCalled()
     expect(dependencies.back).not.toHaveBeenCalled()
     expect(
-      renderer.root
-        .findAllByType('Text')
-        .some(
-          (node) =>
-            node.props.accessibilityRole === 'alert' &&
-            node.props.accessibilityLiveRegion === 'polite' &&
-            node.props.children === '无法排队清除 HiveCloud 名称。请稍后重试。'
-        )
+      findAllByHostType(renderer.root, 'Text').some(
+        (node) =>
+          node.props.accessibilityRole === 'alert' &&
+          node.props.accessibilityLiveRegion === 'polite' &&
+          node.props.children === '无法排队清除 HiveCloud 名称。请稍后重试。'
+      )
     ).toBe(true)
-    const nameInput = renderer.root
-      .findAllByType('TextInput')
-      .find((node) => node.props.accessibilityLabel === 'Name')
+    const nameInput = findAllByHostType(renderer.root, 'TextInput').find(
+      (node) => node.props.accessibilityLabel === 'Name'
+    )
     expect(nameInput?.props.value).toBe('Cloud Desk')
     expect(
-      renderer.root
-        .findAllByType('Pressable')
-        .find((node) => node.props.accessibilityLabel === 'Clear HiveCloud name')?.props.disabled
+      findAllByHostType(renderer.root, 'Pressable').find(
+        (node) => node.props.accessibilityLabel === 'Clear HiveCloud name'
+      )?.props.disabled
     ).toBe(false)
     act(() => renderer.unmount())
   })
@@ -512,6 +516,21 @@ describe('edit host handleSave', () => {
     expect(dependencies.refreshHostClient).toHaveBeenCalledWith('host-1')
     expect(dependencies.back).toHaveBeenCalledTimes(1)
 
+    act(() => renderer.unmount())
+  })
+
+  it('previews and saves the secure default port when switching a LAN host to WSS', async () => {
+    const renderer = await renderEditHostRoute()
+    setFieldValue(renderer, 'Address', 'wss://tunnel.example.com')
+
+    expect(findText(renderer, 'Connects to wss://tunnel.example.com:443')).toBe(true)
+    await pressSave(renderer)
+
+    expect(dependencies.updateHostNameAndEndpoint).toHaveBeenCalledWith('host-1', {
+      endpoint: 'wss://tunnel.example.com:443'
+    })
+    expect(dependencies.refreshHostClient).toHaveBeenCalledWith('host-1')
+    expect(dependencies.back).toHaveBeenCalledTimes(1)
     act(() => renderer.unmount())
   })
 
@@ -598,6 +617,28 @@ describe('edit host handleSave', () => {
 
     act(() => renderer.unmount())
   })
+  it('does not navigate again if the user leaves while the save is pending', async () => {
+    let resolveSave = () => {}
+    dependencies.updateHostNameAndEndpoint.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSave = resolve
+        })
+    )
+    const renderer = await renderEditHostRoute()
+    setFieldValue(renderer, 'Address', '192.168.1.20:6768')
+    await pressSave(renderer)
+    act(() => {
+      renderer.root.findByProps({ accessibilityLabel: 'Back' }).props.onPress()
+      renderer.unmount()
+    })
+    expect(dependencies.back).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      resolveSave()
+    })
+    expect(dependencies.back).toHaveBeenCalledTimes(1)
+    expect(dependencies.refreshHostClient).toHaveBeenCalledWith('host-1')
+  })
 })
 
 describe('edit host load() error states', () => {
@@ -623,7 +664,7 @@ describe('edit host load() error states', () => {
     const renderer = await renderEditHostRoute()
 
     expect(findText(renderer, 'Missing host.')).toBe(true)
-    expect(renderer.root.findAllByType('TextInput')).toHaveLength(0)
+    expect(renderer.root.findAll((node) => String(node.type) === 'TextInput')).toHaveLength(0)
 
     act(() => renderer.unmount())
   })
@@ -633,7 +674,7 @@ describe('edit host load() error states', () => {
     const renderer = await renderEditHostRoute()
 
     expect(findText(renderer, 'This host was removed from this phone.')).toBe(true)
-    expect(renderer.root.findAllByType('TextInput')).toHaveLength(0)
+    expect(renderer.root.findAll((node) => String(node.type) === 'TextInput')).toHaveLength(0)
 
     act(() => renderer.unmount())
   })
@@ -643,7 +684,7 @@ describe('edit host load() error states', () => {
     const renderer = await renderEditHostRoute()
 
     expect(findText(renderer, 'storage unreadable')).toBe(true)
-    expect(renderer.root.findAllByType('TextInput')).toHaveLength(0)
+    expect(renderer.root.findAll((node) => String(node.type) === 'TextInput')).toHaveLength(0)
 
     act(() => renderer.unmount())
   })

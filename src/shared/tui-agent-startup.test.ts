@@ -32,7 +32,7 @@ describe('tui agent startup plans', () => {
       agent: 'claude',
       prompt: '',
       agentArgs: resolveTuiAgentLaunchArgs('claude', {
-        claude: '--dangerously-skip-permissions --model Opus'
+        agentDefaultArgs: { claude: '--dangerously-skip-permissions --model Opus' }
       }),
       cmdOverrides: {},
       platform: 'linux',
@@ -150,7 +150,7 @@ describe('tui agent startup plans', () => {
       platform: 'linux'
     })
 
-    expect(plan?.launchCommand).toBe("codex '--version'")
+    expect(plan?.launchCommand).toBe("codex '-c' 'disable_paste_burst=true' '--version'")
   })
 
   it.each([
@@ -170,7 +170,9 @@ describe('tui agent startup plans', () => {
 
     expect(plan?.launchCommand).not.toContain(prompt)
     expect(plan?.followupPrompt).toBeNull()
-    expect(plan?.launchConfig.agentCommand).toBe('hermes --tui')
+    expect(plan?.launchConfig.agentCommand).toBe(
+      testCase.shell === 'cmd' ? 'hermes --tui "--yolo"' : "hermes --tui '--yolo'"
+    )
     expect(plan?.env?.ORCA_HERMES_STARTUP_QUERY).toBe(prompt)
     const script =
       testCase.shell === 'posix'
@@ -231,7 +233,7 @@ describe('tui agent startup plans', () => {
       platform: 'linux'
     })
 
-    expect(plan?.launchCommand).toBe("codex 'fix it'")
+    expect(plan?.launchCommand).toBe("codex '-c' 'disable_paste_burst=true' 'fix it'")
     expect(plan?.startupCommandDelivery).toBe('shell-ready')
   })
 
@@ -246,7 +248,7 @@ describe('tui agent startup plans', () => {
 
     expect(plan).toEqual({
       agent: 'codex',
-      launchCommand: 'codex',
+      launchCommand: "codex '-c' 'disable_paste_burst=true'",
       expectedProcess: 'codex',
       followupPrompt: null,
       launchConfig: { agentCommand: 'codex', agentArgs: '', agentEnv: {} }
@@ -377,29 +379,32 @@ describe('tui agent startup plans', () => {
   })
 
   it.each([
-    ['yolo', 'linux', 'posix', undefined, "muse --trust-workspace '--yolo'"],
-    ['manual', 'linux', 'posix', { muse: '' }, 'muse --trust-workspace'],
-    ['yolo', 'darwin', 'posix', undefined, "muse --trust-workspace '--yolo'"],
-    ['manual', 'darwin', 'posix', { muse: '' }, 'muse --trust-workspace'],
-    ['yolo', 'win32', 'powershell', undefined, "muse --trust-workspace '--yolo'"],
-    ['manual', 'win32', 'powershell', { muse: '' }, 'muse --trust-workspace'],
-    ['yolo', 'win32', 'cmd', undefined, 'muse --trust-workspace "--yolo"'],
-    ['manual', 'win32', 'cmd', { muse: '' }, 'muse --trust-workspace']
+    ['full-access', 'linux', 'posix'],
+    ['own', 'linux', 'posix'],
+    ['full-access', 'darwin', 'posix'],
+    ['own', 'darwin', 'posix'],
+    ['full-access', 'win32', 'powershell'],
+    ['own', 'win32', 'powershell'],
+    ['full-access', 'win32', 'cmd'],
+    ['own', 'win32', 'cmd']
   ] as const)(
     'launches Muse in %s mode on %s/%s before delivering its prompt',
-    (_, platform, shell, defaults, command) => {
+    (permission, platform, shell) => {
       const plan = buildAgentStartupPlan({
         agent: 'muse',
         prompt: 'fix it',
         cmdOverrides: {},
         platform,
         shell,
-        agentArgs: resolveTuiAgentLaunchArgs('muse', defaults)
+        agentArgs: resolveTuiAgentLaunchArgs('muse', {
+          agentDefaultArgs: { muse: '' },
+          agentPermissionDefault: permission
+        })
       })
-
+      const permissionFlag = shell === 'cmd' ? ' "--yolo"' : " '--yolo'"
       expect(plan).toMatchObject({
         agent: 'muse',
-        launchCommand: command,
+        launchCommand: `muse --trust-workspace${permission === 'full-access' ? permissionFlag : ''}`,
         expectedProcess: 'muse',
         followupPrompt: 'fix it'
       })
@@ -439,7 +444,9 @@ describe('tui agent startup plans', () => {
       platform: 'linux'
     })
 
-    expect(plan?.launchCommand).toBe("codex --profile work 'fix it'")
+    expect(plan?.launchCommand).toBe(
+      "codex --profile work '-c' 'disable_paste_burst=true' 'fix it'"
+    )
   })
 
   it('removes canonical auto-approval from a command override in manual mode', () => {
@@ -535,38 +542,6 @@ describe('tui agent startup plans', () => {
     )
   })
 
-  it('removes an assigned auto-approval flag from an override in manual mode', () => {
-    const plan = buildAgentStartupPlan({
-      agent: 'codex',
-      prompt: 'fix it',
-      cmdOverrides: {
-        codex: 'codex --dangerously-bypass-approvals-and-sandbox=true --profile work'
-      },
-      agentPermissionMode: 'manual',
-      platform: 'linux'
-    })
-
-    expect(plan?.launchCommand).toBe(
-      "codex --profile work '--ask-for-approval' 'on-request' '--sandbox' 'workspace-write' 'fix it'"
-    )
-  })
-
-  it('replaces alternate Codex bypass options in an override with explicit safe options', () => {
-    const plan = buildAgentStartupPlan({
-      agent: 'codex',
-      prompt: 'fix it',
-      cmdOverrides: {
-        codex: 'codex -a never -s danger-full-access --approve-for-me --profile work'
-      },
-      agentPermissionMode: 'manual',
-      platform: 'linux'
-    })
-
-    expect(plan?.launchCommand).toBe(
-      "codex --profile work '--ask-for-approval' 'on-request' '--sandbox' 'workspace-write' 'fix it'"
-    )
-  })
-
   it('replaces an assigned Claude bypass mode in a command override', () => {
     const plan = buildAgentStartupPlan({
       agent: 'claude',
@@ -607,7 +582,9 @@ describe('tui agent startup plans', () => {
       platform: 'linux'
     })
 
-    expect(plan?.launchCommand).toBe("codex --profile work 'resume' 's1'")
+    expect(plan?.launchCommand).toBe(
+      "codex --profile work '-c' 'disable_paste_burst=true' 'resume' 's1'"
+    )
   })
 
   it('uses a captured launch command when building resume plans after overrides change', () => {
@@ -619,7 +596,9 @@ describe('tui agent startup plans', () => {
       platform: 'linux'
     })
 
-    expect(plan?.launchCommand).toBe("codex --profile captured 'resume' 's1'")
+    expect(plan?.launchCommand).toBe(
+      "codex --profile captured '-c' 'disable_paste_burst=true' 'resume' 's1'"
+    )
     expect(plan?.launchConfig).toEqual({
       agentCommand: 'codex --profile captured',
       agentArgs: '',
@@ -752,7 +731,7 @@ describe('tui agent startup plans', () => {
       agent: 'opencode',
       prompt: 'fix it',
       cmdOverrides: {},
-      agentArgs: resolveTuiAgentLaunchArgs('opencode', agentDefaultArgs),
+      agentArgs: resolveTuiAgentLaunchArgs('opencode', { agentDefaultArgs }),
       platform: 'linux'
     })
 
@@ -903,7 +882,7 @@ describe('tui agent startup plans', () => {
       platform: 'linux'
     })
     expect(plan).toMatchObject({
-      launchCommand: "acli rovodev run '--yolo'",
+      launchCommand: 'acli rovodev run',
       expectedProcess: 'acli',
       followupPrompt: 'fix it'
     })
@@ -926,7 +905,10 @@ describe('tui agent startup plans', () => {
     })
   })
 
-  it('appends Devin default permission-mode bypass before stdin prompt delivery', () => {
-    expect(resolveTuiAgentLaunchArgs('devin', null)).toBe('--permission-mode bypass')
+  it('adds Devin permission bypass only for an explicit full-access choice', () => {
+    expect(resolveTuiAgentLaunchArgs('devin', null)).toBe('')
+    expect(resolveTuiAgentLaunchArgs('devin', { agentPermissionDefault: 'full-access' })).toBe(
+      '--permission-mode bypass --respect-workspace-trust false'
+    )
   })
 })

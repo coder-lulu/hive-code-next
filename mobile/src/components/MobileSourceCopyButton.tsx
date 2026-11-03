@@ -1,9 +1,12 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import { Alert, Platform, Pressable, StyleSheet, Text } from 'react-native'
+import { Alert, Platform, Pressable, Text } from 'react-native'
 import { Check, Copy } from 'lucide-react-native'
+import { translate } from '../i18n/mobile-i18n'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { useClipboardWriter } from '../platform/clipboard'
-import type { MobileTheme } from '../theme/mobile-theme'
-import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import { themedStyleSheet } from '../theme/themed-styles'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 
 type CopyFeedback = { status: 'copied'; text: string } | { status: 'failed' }
 
@@ -16,8 +19,8 @@ export function MobileSourceCopyButton({
   accessibilityLabel: string
   partial?: boolean
 }): React.JSX.Element {
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createStyles)
+  useMobileColorScheme()
+  const t = useMobileTranslation()
   const clipboard = useClipboardWriter()
   const [feedback, setFeedback] = useState<CopyFeedback | null>(null)
   const latestAttempt = useRef<{ sourceVersion: number } | null>(null)
@@ -76,8 +79,13 @@ export function MobileSourceCopyButton({
         showFeedback({ status: 'failed' }, attempt)
       } else {
         Alert.alert(
-          'Copy failed',
-          error instanceof Error ? error.message : 'The clipboard rejected the text.'
+          translate('components.sourceCopyButton.copyFailed', 'Copy failed'),
+          error instanceof Error
+            ? error.message
+            : translate(
+                'components.sourceCopyButton.clipboardRejected',
+                'The clipboard rejected the text.'
+              )
         )
       }
       return
@@ -90,52 +98,47 @@ export function MobileSourceCopyButton({
   const copied = feedback?.status === 'copied' && feedback.text === text
   const failed = feedback?.status === 'failed'
   const label = failed
-    ? 'Failed'
+    ? t('components.sourceCopyButton.failed', 'Failed')
     : copied
       ? partial
-        ? 'Copied loaded'
-        : 'Copied'
+        ? t('components.sourceCopyButton.copiedLoaded', 'Copied loaded')
+        : t('common.copied', 'Copied')
       : partial
-        ? 'Copy loaded'
-        : 'Copy'
+        ? t('components.sourceCopyButton.copyLoaded', 'Copy loaded')
+        : t('common.copy', 'Copy')
+  const failureLabel = t('components.sourceCopyButton.couldNotCopy', "Couldn't copy")
   const Icon = copied ? Check : Copy
-  const iconColor = failed
-    ? theme.color.status.dangerText
-    : copied
-      ? theme.color.status.success
-      : theme.color.text.tertiary
+  const iconColor = failed ? colors.statusRed : copied ? colors.statusGreen : colors.textMuted
   return (
     <Pressable
       style={({ pressed }) => [styles.button, partial && styles.partial, pressed && styles.pressed]}
       hitSlop={10}
       accessibilityRole="button"
-      accessibilityLabel={failed ? "Couldn't copy" : accessibilityLabel}
+      accessibilityLabel={failed ? failureLabel : accessibilityLabel}
       accessibilityLiveRegion={failed ? 'polite' : undefined}
-      accessibilityValue={{ text: failed ? "Couldn't copy" : copied ? label : undefined }}
-      aria-valuetext={failed ? "Couldn't copy" : copied ? label : undefined}
+      accessibilityValue={{ text: failed ? failureLabel : copied ? label : undefined }}
+      aria-valuetext={failed ? failureLabel : copied ? label : undefined}
       accessibilityState={{ disabled: text.length === 0 }}
       disabled={text.length === 0}
       onPress={() => void copy()}
     >
-      <Icon size={theme.size.iconSmall} color={iconColor} />
+      <Icon size={14} color={iconColor} />
       {partial ? <Text style={styles.label}>{label}</Text> : null}
     </Pressable>
   )
 }
 
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    button: {
-      minWidth: theme.size.minimumTouchTarget,
-      minHeight: theme.size.minimumTouchTarget,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: theme.spacing.space4,
-      borderRadius: theme.radii.control
-    },
-    partial: { paddingHorizontal: theme.spacing.space8 },
-    pressed: { backgroundColor: theme.color.bg.subtle },
-    label: { color: theme.color.text.tertiary, ...theme.typography.meta }
-  })
-}
+const styles = themedStyleSheet(() => ({
+  button: {
+    width: 24,
+    height: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    borderRadius: radii.button
+  },
+  partial: { width: 128, height: 32, paddingHorizontal: spacing.sm },
+  pressed: { backgroundColor: colors.bgRaised },
+  label: { color: colors.textMuted, fontSize: typography.metaSize }
+}))

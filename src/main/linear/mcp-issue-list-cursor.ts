@@ -1,5 +1,4 @@
-import { linearError } from './issue-context-errors'
-import { APP_DISPLAY_NAME } from '../../shared/brand'
+import { linearError } from './issue-context/errors'
 
 export const ISSUE_LIST_CURSOR_PREFIX = 'orca.linear.v1.'
 
@@ -29,8 +28,7 @@ export function decodeIssueListCursor(
       'cursor' in parsed &&
       typeof parsed.workspaceId === 'string' &&
       typeof parsed.cursor === 'string' &&
-      // A hand-crafted payload must not smuggle back the fan-out selector or an empty
-      // workspace, both of which would silently widen the read past the bound workspace.
+      // Reject selectors that would widen the cursor's bound workspace into an implicit or all-workspace read.
       parsed.workspaceId !== 'all' &&
       parsed.workspaceId.length > 0 &&
       parsed.cursor.length > 0
@@ -38,7 +36,7 @@ export function decodeIssueListCursor(
       return { workspaceId: parsed.workspaceId, cursor: parsed.cursor }
     }
   } catch {
-    // Prefix matched but payload is not ours; treat as an invalid issued cursor.
+    // Invalid issued cursors must not fall through as provider cursors.
   }
   return null
 }
@@ -69,7 +67,7 @@ export function resolveIssueListCursor(request: {
   }
   if (cursor.startsWith(ISSUE_LIST_CURSOR_PREFIX)) {
     throw cursorWorkspaceError(
-      `Cursor was issued by ${APP_DISPLAY_NAME} but is malformed or truncated.`,
+      'Cursor was issued by Orca but is malformed or truncated.',
       'Re-run list-issues without --cursor, then page with the nextCursor it returns.'
     )
   }

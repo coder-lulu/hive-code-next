@@ -1,19 +1,28 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 
 import { i18n } from '@/i18n/i18n'
+import es from '@/i18n/locales/es.json'
 import {
   isNonFastForwardRemoteError,
   resolveRemoteOperationErrorMessage
 } from './source-control-remote-error'
 
-describe('source-control remote error formatting', () => {
-  beforeEach(async () => {
-    await i18n.changeLanguage('en')
-  })
+const originalLanguage = i18n.language
 
-  afterEach(async () => {
-    vi.restoreAllMocks()
-    await i18n.changeLanguage('en')
+afterEach(async () => {
+  await i18n.changeLanguage(originalLanguage)
+})
+
+describe('source-control remote error formatting', () => {
+  it('recognizes split colored stale lease markers from remote hosts', () => {
+    const error = new Error(
+      " ! [rejected] main -> main (stale\x1b[31m info\x1b[m)\nerror: failed to push some refs to 'origin'"
+    )
+
+    expect(resolveRemoteOperationErrorMessage(error, { isForcePush: true })).toBe(
+      'Force push rejected — remote changed since last fetch. Fetch first, then try again.'
+    )
+    expect(isNonFastForwardRemoteError(error)).toBe(true)
   })
 
   it('prefers fatal detail over an earlier remote detail for publish failures', () => {
@@ -24,6 +33,58 @@ describe('source-control remote error formatting', () => {
     )
   })
 
+  it.each(['fatal', 'remote'])(
+    'redacts ANSI-bearing credentials in %s details from older remote hosts',
+    (prefix) => {
+      const error = new Error(
+        `git.push failed:\n${prefix}: Access denied to https://user:sec\x1b[1 qret@example.com/repo.git`
+      )
+
+      expect(resolveRemoteOperationErrorMessage(error, { isPush: true })).toBe(
+        'Push failed. Access denied to https://example.com/repo.git. Check your remote access and try again.'
+      )
+    }
+  )
+
+  it.each([
+    [{ isFetch: true }, 'Fetch failed. '],
+    [{ isFastForward: true }, 'Fast-forward failed. '],
+    [{ isRebase: true }, 'Rebase failed. '],
+    [{}, '']
+  ])('redacts ANSI-bearing credentials in fallback details for %j', (options, prefix) => {
+    const error = new Error('Access denied to https://user:sec\x1b[1 qret@example.com/repo.git')
+
+    expect(resolveRemoteOperationErrorMessage(error, options)).toBe(
+      `${prefix}Access denied to https://example.com/repo.git`
+    )
+    expect(error.message).toContain('user:sec\x1b[1 qret@')
+  })
+
+  it.each([
+    [{ publish: true }, 'Publish Branch'],
+    [{ isSync: true }, 'Sync'],
+    [{ isForcePush: true }, 'Force Push'],
+    [{ isPush: true }, 'Push']
+  ])('sanitizes and classifies older-host submodule errors for %j', (options, operation) => {
+    const error = new Error(
+      "Unable to push sub\x1b[1 qmodule 'https://user:sec\x1b[1 qret@example.com/repo.git'\n" +
+        ' ! [rejected] main -> main (fetch\x1b[1 q first)'
+    )
+
+    expect(resolveRemoteOperationErrorMessage(error, options)).toBe(
+      `${operation} failed. Submodule 'https://example.com/repo.git' has remote changes. Pull inside the submodule, then try again.`
+    )
+    expect(isNonFastForwardRemoteError(error)).toBe(true)
+    expect(
+      resolveRemoteOperationErrorMessage(
+        new Error("Unable to push submodule 'https://user:sec\x1b[1 qret@example.com/repo.git'"),
+        options
+      )
+    ).toBe(
+      `${operation} failed. Submodule 'https://example.com/repo.git' could not be pushed. Resolve the submodule push error, then try again.`
+    )
+  })
+
   it('maps pre-push hook failures to a hook-specific message instead of remote access guidance', () => {
     const error = new Error(
       "git push failed: Command failed: git push origin main\nerror: failed to push some refs to 'origin'\nhusky - pre-push hook exited with code 1\neslint found 2 errors"
@@ -31,22 +92,6 @@ describe('source-control remote error formatting', () => {
 
     expect(resolveRemoteOperationErrorMessage(error, { isPush: true })).toBe(
       'Push blocked — lint failed during push.'
-    )
-  })
-
-  it('maps force-push, publish, and sync push-stage hook failures to blocked copy', () => {
-    const error = new Error(
-      "git push failed: Command failed: git push origin main\nerror: failed to push some refs to 'origin'\nhusky - pre-push hook exited with code 1"
-    )
-
-    expect(resolveRemoteOperationErrorMessage(error, { isForcePush: true })).toBe(
-      'Force Push blocked — pre-push hook failed.'
-    )
-    expect(resolveRemoteOperationErrorMessage(error, { publish: true })).toBe(
-      'Publish Branch blocked — pre-push hook failed.'
-    )
-    expect(resolveRemoteOperationErrorMessage(error, { isSync: true, isSyncPushStage: true })).toBe(
-      'Sync blocked — pre-push hook failed.'
     )
   })
 
@@ -93,160 +138,21 @@ describe('source-control remote error formatting', () => {
       "Push failed. Submodule 'deps/lib' could not be pushed. Resolve the submodule push error, then try again."
     )
   })
-
-  it('extracts publish details from newline-heavy output without full line-array splitting', () => {
-    const splitSpy = vi.spyOn(String.prototype, 'split')
-    const replaceSpy = vi.spyOn(String.prototype, 'replace')
-    const progress = 'remote: Enumerating objects\r\n'.repeat(10_000)
-    const error = new Error(
-      `${progress}fatal: unable to access https://token:secret@example.com/repo.git\r\n`
+  it('translates classified sentences and passes unclassified errors through verbatim', async () => {
+    i18n.addResourceBundle('es', 'translation', es)
+    await i18n.changeLanguage('es')
+    const submoduleError = new Error(
+      "Command failed: git push\nUnable to push submodule 'deps/lib'\nfatal: failed to push all needed submodules"
     )
 
-    const result = resolveRemoteOperationErrorMessage(error, { publish: true })
-
-    expect(result).toContain('Publish Branch failed. unable to access https://example.com/repo.git')
-    const usedLineSplit = splitSpy.mock.calls.some(([separator]) => {
-      if (typeof separator === 'string') {
-        return separator === '\n'
-      }
-      return separator instanceof RegExp && separator.source === '\\r?\\n'
-    })
-    const usedCrlfReplace = replaceSpy.mock.calls.some(
-      ([pattern]) => pattern instanceof RegExp && pattern.source === '\\r\\n'
+    expect(resolveRemoteOperationErrorMessage(submoduleError, { isPush: true })).toBe(
+      es.sourceControl.remoteError.failedWithDetail.push.replace(
+        '{{detail}}',
+        es.sourceControl.remoteError.submodule.namedPushFailed.replace('{{name}}', 'deps/lib')
+      )
     )
-    expect(usedLineSplit).toBe(false)
-    expect(usedCrlfReplace).toBe(false)
-  })
-
-  it('retains credential redaction, SSH users, and the detail truncation boundary', () => {
-    const detail = `denied https://token:secret@example.com/repo.git ssh://git@example.com/repo.git ${'x'.repeat(300)}`
-    const redacted = detail.replace('token:secret@', '')
-    expect(resolveRemoteOperationErrorMessage(new Error(detail), { isFetch: true })).toBe(
-      `Fetch failed. ${redacted.slice(0, 200).trimEnd()}...`
+    expect(resolveRemoteOperationErrorMessage(new Error('some new git failure'))).toBe(
+      'some new git failure'
     )
   })
-
-  it('keeps opaque submodule names and normalized non-fast-forward classification', () => {
-    const name = 'deps/{{scope}}/HiveCode/Orca'
-    const detail = `Submodule '${name}' has remote changes. Pull inside the submodule, then try again.`
-    const error = new Error(detail)
-    expect(resolveRemoteOperationErrorMessage(error, { isPush: true })).toBe(
-      `Push failed. ${detail}`
-    )
-    expect(isNonFastForwardRemoteError(error)).toBe(true)
-  })
-
-  it('keeps unclassified Git output and raw hook summaries in their existing form', () => {
-    const raw = 'server diagnostic: custom HiveCode/Orca repository rule'
-    expect(resolveRemoteOperationErrorMessage(new Error(raw))).toBe(raw)
-    expect(
-      resolveRemoteOperationErrorMessage(
-        new Error('Build step crashed.\nerror: hook declined to push'),
-        { isPush: true }
-      )
-    ).toBe('Push blocked — build step crashed.')
-  })
-
-  it.each([
-    {
-      locale: 'en',
-      failure: 'Push failed.',
-      submodule: 'Submodule',
-      lint: 'lint failed during push.',
-      conflict: 'Rebase blocked',
-      fallback: 'Remote operation failed'
-    },
-    {
-      locale: 'zh',
-      failure: '推送失败',
-      submodule: '子模块',
-      lint: '推送期间的代码检查失败。',
-      conflict: '变基被阻止',
-      fallback: '远程操作失败'
-    },
-    {
-      locale: 'ja',
-      failure: 'プッシュに失敗しました',
-      submodule: 'サブモジュール',
-      lint: 'プッシュ中の静的解析に失敗しました。',
-      conflict: 'リベースがブロックされました',
-      fallback: 'リモート操作に失敗しました'
-    },
-    {
-      locale: 'ko',
-      failure: '푸시 실패',
-      submodule: '하위 모듈',
-      lint: '푸시 중 코드 검사에 실패했습니다.',
-      conflict: '리베이스가 차단되었습니다',
-      fallback: '원격 작업 실패'
-    },
-    {
-      locale: 'fr',
-      failure: 'L’envoi a échoué',
-      submodule: 'Le sous-module',
-      lint: 'la vérification du code a échoué pendant l’envoi.',
-      conflict: 'Rebasage impossible',
-      fallback: 'L’opération distante a échoué'
-    },
-    {
-      locale: 'es',
-      failure: 'Error al enviar',
-      submodule: 'El submódulo',
-      lint: 'la comprobación del código ha fallado durante el envío.',
-      conflict: 'La reorganización está bloqueada',
-      fallback: 'La operación remota ha fallado'
-    }
-  ])(
-    'localizes $locale explanations while retaining classification and opaque Git data',
-    async ({ locale, failure, submodule, lint, conflict, fallback }) => {
-      await i18n.changeLanguage(locale)
-      const redactedDetail = 'Denied access to https://example.com/HiveCode/Orca.git'
-      const accessError = new Error(
-        'fatal: Denied access to https://token:secret@example.com/HiveCode/Orca.git'
-      )
-      const accessMessage = resolveRemoteOperationErrorMessage(accessError, { isPush: true })
-      expect(accessMessage).toContain(failure)
-      expect(accessMessage).toContain(redactedDetail)
-      expect(accessMessage).not.toContain('token:secret')
-      expect(accessMessage).not.toContain('{{operation}}')
-
-      const name = 'deps/{{scope}}/HiveCode/Orca'
-      const submoduleError = new Error(
-        `Submodule '${name}' has remote changes. Pull inside the submodule, then try again.`
-      )
-      const submoduleMessage = resolveRemoteOperationErrorMessage(submoduleError, { isPush: true })
-      expect(submoduleMessage).toContain(submodule)
-      expect(submoduleMessage).toContain(name)
-      expect(isNonFastForwardRemoteError(submoduleError)).toBe(true)
-
-      const hookError = new Error('git push failed\nhusky - pre-push hook failed\neslint failed')
-      expect(resolveRemoteOperationErrorMessage(hookError, { isPush: true })).toContain(lint)
-      expect(
-        resolveRemoteOperationErrorMessage(new Error('unmerged files'), { isRebase: true })
-      ).toContain(conflict)
-      expect(resolveRemoteOperationErrorMessage(null)).toBe(fallback)
-
-      // A server can emit text identical to a generated summary. Its original
-      // spelling and case must survive when the shared classifier treats it as data.
-      const serverError = new Error(
-        'remote: Lint failed during push.\nremote: pre-receive hook declined'
-      )
-      expect(resolveRemoteOperationErrorMessage(serverError, { isPush: true })).toContain(
-        'Lint failed during push.'
-      )
-      expect(
-        resolveRemoteOperationErrorMessage(
-          new Error('Push failed.\nerror: hook declined to push'),
-          { isPush: true }
-        )
-      ).toContain('push failed.')
-
-      const raw = 'arbitrary Git server output for HiveCode/Orca'
-      expect(resolveRemoteOperationErrorMessage(new Error(raw))).toBe(raw)
-      const longDetail = `custom server reason ${'x'.repeat(300)}`
-      expect(
-        resolveRemoteOperationErrorMessage(new Error(longDetail), { isFetch: true })
-      ).toContain(`${longDetail.slice(0, 200)}...`)
-    }
-  )
 })

@@ -9,13 +9,16 @@ import {
   Image as ImageIcon
 } from 'lucide-react-native'
 import { triggerSelection } from '../platform/haptics'
-import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
+import { colors, spacing } from '../theme/mobile-theme'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 import { type FileExplorerRow, isMarkdownPath, type TreeNode } from './file-tree'
-import { createFileExplorerStyles } from './mobile-file-explorer-styles'
+import { fileExplorerStyles as styles } from './mobile-file-explorer-styles'
 import { canPreviewMobileFileRow } from './mobile-file-preview-navigation'
 
 type Props = {
   item: FileExplorerRow
+  maximumIndentation: number
   expanded: ReadonlySet<string>
   onPreviewFile: (relativePath: string, displayName: string) => void
   onRetryDirectory: (relativePath: string) => void
@@ -23,30 +26,30 @@ type Props = {
 }
 
 export function MobileFileExplorerRow(props: Props) {
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createFileExplorerStyles)
-  const { item, expanded, onPreviewFile, onRetryDirectory, onToggleDirectory } = props
+  const t = useMobileTranslation()
+  useMobileColorScheme()
+  const { item, maximumIndentation, expanded, onPreviewFile, onRetryDirectory, onToggleDirectory } =
+    props
+  const paddingLeft = spacing.lg + Math.min(item.depth * 18, maximumIndentation)
 
   if (item.kind === 'loading') {
     return (
-      <View
-        style={[styles.inlineStatusRow, { paddingLeft: theme.spacing.space16 + item.depth * 18 }]}
-      >
+      <View style={[styles.inlineStatusRow, { paddingLeft }]}>
         <View style={styles.chevronSpacer} />
-        <ActivityIndicator size="small" color={theme.color.text.secondary} />
-        <Text style={styles.inlineStatusText}>正在加载…</Text>
+        <ActivityIndicator size="small" color={colors.textSecondary} />
+        <Text style={styles.inlineStatusText}>
+          {t('files.fileExplorerRow.loading', 'Loading...')}
+        </Text>
       </View>
     )
   }
 
   if (item.kind === 'error') {
     return (
-      <View
-        style={[styles.inlineStatusRow, { paddingLeft: theme.spacing.space16 + item.depth * 18 }]}
-      >
+      <View style={[styles.inlineStatusRow, { paddingLeft }]}>
         <View style={styles.chevronSpacer} />
         <Text style={styles.inlineErrorText} numberOfLines={1}>
-          {item.message || '无法加载文件夹'}
+          {item.message || t('files.fileExplorerRow.loadFolderFailed', 'Unable to load folder')}
         </Text>
         <Pressable
           style={({ pressed }) => [styles.inlineRetryButton, pressed && styles.rowPressed]}
@@ -54,9 +57,11 @@ export function MobileFileExplorerRow(props: Props) {
             triggerSelection()
             onRetryDirectory(item.relativePath)
           }}
-          accessibilityLabel={`重试加载 ${item.relativePath}`}
+          accessibilityLabel={t('files.fileExplorerRow.retryLoading', 'Retry loading {{path}}', {
+            path: item.relativePath
+          })}
         >
-          <Text style={styles.inlineRetryText}>重试</Text>
+          <Text style={styles.inlineRetryText}>{t('common.retry', 'Retry')}</Text>
         </Pressable>
       </View>
     )
@@ -66,6 +71,7 @@ export function MobileFileExplorerRow(props: Props) {
     return (
       <TreeRow
         item={item}
+        paddingLeft={paddingLeft}
         expanded={expanded}
         onPreviewFile={onPreviewFile}
         onToggleDirectory={onToggleDirectory}
@@ -82,13 +88,14 @@ function isTreeNode(item: FileExplorerRow): item is TreeNode {
 
 function TreeRow(props: {
   item: TreeNode
+  paddingLeft: number
   expanded: ReadonlySet<string>
   onPreviewFile: (relativePath: string, displayName: string) => void
   onToggleDirectory: (relativePath: string) => void
 }) {
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createFileExplorerStyles)
-  const { item, expanded, onPreviewFile, onToggleDirectory } = props
+  const t = useMobileTranslation()
+  useMobileColorScheme()
+  const { item, paddingLeft, expanded, onPreviewFile, onToggleDirectory } = props
   const isDirectory = item.kind === 'directory'
   const isExpanded = expanded.has(item.relativePath)
   const previewable =
@@ -102,7 +109,7 @@ function TreeRow(props: {
     <Pressable
       style={({ pressed }) => [
         styles.row,
-        { paddingLeft: theme.spacing.space16 + item.depth * 18 },
+        { paddingLeft },
         pressed && !disabled && styles.rowPressed,
         disabled && styles.rowDisabled
       ]}
@@ -117,38 +124,41 @@ function TreeRow(props: {
       }}
       accessibilityLabel={
         isDirectory
-          ? `打开文件夹 ${item.name}`
+          ? t('files.fileExplorerRow.openFolder', 'Open folder {{name}}', { name: item.name })
           : disabled
-            ? `${item.name} 在移动端不可用`
-            : `预览文件 ${item.name}`
+            ? t('files.fileExplorerRow.fileUnavailable', '{{name}} unavailable on mobile', {
+                name: item.name
+              })
+            : t('files.fileExplorerRow.previewFile', 'Preview file {{name}}', { name: item.name })
       }
     >
       {isDirectory ? (
         isExpanded ? (
-          <ChevronDown size={16} color={theme.color.text.secondary} />
+          <ChevronDown size={16} color={colors.textSecondary} />
         ) : (
-          <ChevronRight size={16} color={theme.color.text.secondary} />
+          <ChevronRight size={16} color={colors.textSecondary} />
         )
       ) : (
         <View style={styles.chevronSpacer} />
       )}
       {isDirectory ? (
-        <Folder size={17} color={theme.color.text.secondary} />
+        <Folder size={17} color={colors.textSecondary} />
       ) : markdown ? (
-        <FileText
-          size={17}
-          color={disabled ? theme.color.text.tertiary : theme.color.text.secondary}
-        />
+        <FileText size={17} color={disabled ? colors.textMuted : colors.textSecondary} />
       ) : isImage ? (
-        <ImageIcon size={17} color={theme.color.text.secondary} />
+        <ImageIcon size={17} color={colors.textSecondary} />
       ) : (
-        <File size={17} color={disabled ? theme.color.text.tertiary : theme.color.text.secondary} />
+        <File size={17} color={disabled ? colors.textMuted : colors.textSecondary} />
       )}
       <View style={styles.rowTextBlock}>
         <Text style={[styles.rowTitle, disabled && styles.rowTitleDisabled]} numberOfLines={1}>
           {item.name}
         </Text>
-        {disabled ? <Text style={styles.rowMeta}>移动端暂不支持</Text> : null}
+        {disabled ? (
+          <Text style={styles.rowMeta}>
+            {t('files.fileExplorerRow.unavailable', 'Unavailable on mobile')}
+          </Text>
+        ) : null}
       </View>
     </Pressable>
   )

@@ -60,7 +60,11 @@ it.each([
   expect(sessionSearchReadDecision({ candidate, row, cursor, cutoffMs: null })).toBe('skip')
 
   const consumer = new SessionSearchIndexConsumer(store)
-  const append = consumer.beginRead({ candidate, mode: 'append', previousByteOffset: 4096 })
+  const append = consumer.beginRead({
+    candidate: syntheticCandidate({ filesystemIdentity: exact, sizeBytes: 8192 }),
+    mode: 'append',
+    previousByteOffset: 4096
+  })
   expect(append).not.toBeNull()
   append?.finish({ session: syntheticSession(), byteOffset: 8192, incomplete: false })
   expect(store.indexedFile(SYNTHETIC_TRANSCRIPT, identity)?.byteOffset).toBe(8192)
@@ -86,6 +90,32 @@ it.each([
       consumer.beginRead({ candidate: replaced, mode: 'append', previousByteOffset: 8192 })
     ).toBeNull()
   }
+  expect(errors).toEqual([])
+})
+
+it('checks transcript coverage and resumable prefixes without rounding adjacent identities', () => {
+  const exact = { dev: '1', ino: String(LARGE_ID) }
+  const candidate = syntheticCandidate({ filesystemIdentity: exact })
+  const write = store.beginWrite(candidate, 'replace', 0)
+  expect(
+    write?.commit({
+      session: syntheticSession(),
+      byteOffset: 4096,
+      incomplete: false,
+      prefixHash: 'prefix'
+    })
+  ).toBe(true)
+  expect(store.coversTranscript(candidate)).toBe(true)
+  const replaced = syntheticCandidate({
+    filesystemIdentity: { ...exact, ino: String(LARGE_ID + 1n) }
+  })
+  expect(store.coversTranscript(replaced)).toBe(false)
+  expect(
+    store.resumableCursor(syntheticCandidate({ filesystemIdentity: exact, sizeBytes: 8192 }))
+  ).toEqual({ byteOffset: 4096, prefixHash: 'prefix' })
+  expect(
+    store.resumableCursor(syntheticCandidate({ ...replaced.file, sizeBytes: 8192 }))
+  ).toBeNull()
   expect(errors).toEqual([])
 })
 

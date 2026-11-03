@@ -6,6 +6,8 @@ import type { OrcaDefaultTabTemplate } from '../orca-yaml-hook-types'
 import type { TuiAgent } from '../tui-agent'
 import type { AgentExplicitLaunchPermissionMode } from '../tui-agent-permissions'
 
+export type SetupScriptLaunchMode = 'split-vertical' | 'split-horizontal' | 'new-tab'
+
 export type WorktreeSetupLaunch = {
   runnerScriptPath: string
   envVars: Record<string, string>
@@ -30,12 +32,3 @@ export type WorktreeDefaultTabsLaunch = {
   tabs: OrcaDefaultTabTemplate[]
   runCommands: boolean
 }
-
-/** Where the repo setup script runs when a worktree is created.
- *  - 'new-tab': open a background tab titled "Setup" and leave focus on the first tab (default).
- *  - 'split-vertical': split the initial terminal pane with a vertical divider.
- *  - 'split-horizontal': split the initial terminal pane with a horizontal divider. */
-export type SetupScriptLaunchMode = 'split-vertical' | 'split-horizontal' | 'new-tab'
-
-/** Direction used when the setup script launch mode is a split. */
-export type SetupSplitDirection = 'vertical' | 'horizontal'

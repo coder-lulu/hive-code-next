@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native'
-import { Check } from 'lucide-react-native'
-import { useMobileTheme, useMobileThemeStyles } from '../../theme/mobile-theme-provider'
+import { ActivityIndicator, Pressable, Text, View } from 'react-native'
+import { Check, Search } from 'lucide-react-native'
+import { colors } from '../../theme/mobile-theme'
+import { useMobileColorScheme } from '../../theme/use-mobile-color-scheme'
+import { useMobileTranslation } from '../../i18n/use-mobile-translation'
 import type { GitHubAssignableUser } from '../../../../src/shared/github/pull-request-types'
 import type { RpcClient } from '../../transport/rpc-client'
 import { fetchAssignableUsers } from '../../session/github-pr-rpc'
 import { BottomDrawer } from '../BottomDrawer'
-import { createMobilePrSidebarStyles } from './mobile-pr-sidebar-styles'
-import { createReviewerPickerStyles } from './reviewer-picker-styles'
+import { TextField } from '../composer-input/TextField'
+import { mobilePrSidebarStyles as styles } from './mobile-pr-sidebar-styles'
 
 type Props = {
   visible: boolean
@@ -24,13 +26,10 @@ type Props = {
 type LoadState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'error'; message: string }
+  | { status: 'error'; message: string | null }
   | { status: 'loaded'; users: GitHubAssignableUser[] }
 
-// Searchable assignable-user list in a BottomDrawer. Mapped rows (not FlatList):
-// this drawer is opened from the PR ScrollView, and a VirtualizedList nested in
-// that ScrollView throws and can leave the Reviewers section blank.
-// Seeded reviewers + author sort first for quick un-request.
+// Use mapped rows: VirtualizedList nested in PR ScrollView throws and can blank section. Seed reviewers/author first for easy unrequest.
 export function ReviewerPickerDrawer({
   visible,
   onClose,
@@ -40,9 +39,8 @@ export function ReviewerPickerDrawer({
   isRequested,
   onToggle
 }: Props) {
-  const theme = useMobileTheme()
-  const shared = useMobileThemeStyles(createMobilePrSidebarStyles)
-  const styles = useMobileThemeStyles(createReviewerPickerStyles)
+  useMobileColorScheme()
+  const t = useMobileTranslation()
   const [load, setLoad] = useState<LoadState>({ status: 'idle' })
   const [query, setQuery] = useState('')
 
@@ -65,7 +63,7 @@ export function ReviewerPickerDrawer({
       })
       .catch(() => {
         if (!cancelled) {
-          setLoad({ status: 'error', message: '无法加载用户' })
+          setLoad({ status: 'error', message: null })
         }
       })
     return () => {
@@ -78,7 +76,6 @@ export function ReviewerPickerDrawer({
       return []
     }
     const seed = new Set(seededLogins.map((l) => l.toLowerCase()))
-    // Seeded reviewers sort first so the user can quickly un-request them.
     const sorted = [...load.users].sort((a, b) => {
       const aSeed = seed.has(a.login.toLowerCase()) ? 0 : 1
       const bSeed = seed.has(b.login.toLowerCase()) ? 0 : 1
@@ -95,48 +92,63 @@ export function ReviewerPickerDrawer({
 
   return (
     <BottomDrawer visible={visible} onClose={onClose} dragContentToDismiss={false}>
-      <Text style={styles.title}>审阅者</Text>
-      <TextInput
-        style={styles.search}
+      <Text style={styles.pickerTitle}>
+        {t('pullRequest.reviewerPickerDrawer.title', 'Reviewers')}
+      </Text>
+      <TextField
+        style={styles.pickerSearch}
+        leading={<Search size={16} color={colors.textMuted} />}
         value={query}
         onChangeText={setQuery}
-        placeholder="搜索用户"
-        placeholderTextColor={theme.color.text.tertiary}
+        placeholder={t('pullRequest.reviewerPickerDrawer.searchPeople', 'Search people')}
         autoCapitalize="none"
         autoCorrect={false}
       />
       {load.status === 'loading' ? (
-        <View style={styles.stateArea}>
-          <ActivityIndicator color={theme.color.text.secondary} />
+        <View style={styles.pickerStateArea}>
+          <ActivityIndicator color={colors.textSecondary} />
         </View>
       ) : load.status === 'error' ? (
-        <View style={styles.stateArea}>
-          <Text style={shared.emptyText}>{load.message}</Text>
+        <View style={styles.pickerStateArea}>
+          <Text style={styles.emptyText}>
+            {load.message ??
+              t('pullRequest.reviewerPickerDrawer.loadFailed', 'Failed to load people')}
+          </Text>
         </View>
       ) : ordered.length === 0 ? (
-        <View style={styles.stateArea}>
-          <Text style={shared.emptyText}>没有匹配的用户</Text>
+        <View style={styles.pickerStateArea}>
+          <Text style={styles.emptyText}>
+            {t('pullRequest.reviewerPickerDrawer.noMatches', 'No matching people')}
+          </Text>
         </View>
       ) : (
-        <View style={styles.list}>
+        <View style={styles.pickerList}>
           {ordered.map((item) => {
             const requested = isRequested(item.login)
             return (
               <Pressable
                 key={item.login}
-                style={styles.row}
+                style={styles.pickerRow}
                 onPress={() => onToggle(item.login)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: requested }}
-                accessibilityLabel={`${requested ? '移除' : '请求审阅'} ${item.login}`}
+                accessibilityLabel={
+                  requested
+                    ? t('pullRequest.reviewerPickerDrawer.removeReviewer', 'Remove {{login}}', {
+                        login: item.login
+                      })
+                    : t('pullRequest.reviewerPickerDrawer.requestReviewer', 'Request {{login}}', {
+                        login: item.login
+                      })
+                }
               >
-                <View style={shared.rowTrailing}>
+                <View style={styles.rowTrailing}>
                   {requested ? (
-                    <Check size={16} color={theme.color.text.primary} strokeWidth={2.4} />
+                    <Check size={16} color={colors.textPrimary} strokeWidth={2.4} />
                   ) : null}
                 </View>
-                <View style={styles.rowMain}>
-                  <Text style={shared.rowTitle} numberOfLines={1}>
+                <View style={styles.pickerRowMain}>
+                  <Text style={styles.rowTitle} numberOfLines={1}>
                     {item.name ? `${item.name} (${item.login})` : item.login}
                   </Text>
                 </View>

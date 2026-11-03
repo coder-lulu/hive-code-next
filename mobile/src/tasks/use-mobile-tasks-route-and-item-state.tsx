@@ -19,6 +19,8 @@ import {
   useState
 } from './mobile-tasks-dependencies'
 import { newTabRepoListRead } from '../session/mobile-session-read-operations'
+import { useHostProtocolGates } from '../components/host-protocol-gates-context'
+import { useTaskHostRepos } from './use-task-host-repos'
 import {
   type ActionableTaskItem,
   DEFAULT_LINEAR_DISPLAY_PROPERTIES,
@@ -47,13 +49,14 @@ import {
 } from './mobile-tasks-legacy-foundation'
 import { useMobileTasksItemState } from './use-mobile-tasks-item-state'
 import { useMobileJiraConnectionState } from './use-mobile-jira-connection-state'
-import type { JiraIssueFilter } from '../../../src/shared/jira-types'
+import type { JiraIssueFilter } from '../../../src/shared/jira/jira-types'
 
 export function useMobileTasksRouteAndItemState() {
   const { hostId, taskSource } = useLocalSearchParams<{ hostId: string; taskSource?: string }>()
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const { client, state: connState } = useHostClient(hostId)
+  const { client: desktopClient, state: connState } = useHostClient(hostId)
+  const { hostCapabilities } = useHostProtocolGates()
   const reconnectAttempts = useReconnectAttempt(hostId)
   const lastConnectedAt = useLastConnectedAt(hostId)
   const relayRecovery = useRelayRecoveryStatus(hostId)
@@ -61,18 +64,24 @@ export function useMobileTasksRouteAndItemState() {
   const loadGenerationRef = useRef(0)
   const taskResumeRef = useRef<TaskResumeState>({})
   const repoList = useHostRepoList<RepoSummary>(
-    client,
-    client && connState === 'connected'
+    desktopClient,
+    desktopClient && connState === 'connected'
       ? async () => {
-          const reply = await newTabRepoListRead.request(client)
+          const reply = await newTabRepoListRead.request(desktopClient)
           // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Preserve the established response shape at this boundary.
-          const listed = newTabRepoListRead.interpret(reply) as RepoSummary[]
-          return listed.filter((repo) => !repo.executionHostId?.startsWith('runtime:'))
+          return newTabRepoListRead.interpret(reply) as RepoSummary[]
         }
       : null
   )
-  const { repos } = repoList.state
-  const { ensureLoaded: repoListEnsureLoaded, reload: repoListReload } = repoList
+  // One routed client sends each server repo’s calls to its owner.
+  const { client, repos, serverRepoList, repoListEnsureLoaded, repoListReload, repoHostLabels } =
+    useTaskHostRepos({
+      hostId,
+      desktopClient,
+      connState,
+      hostCapabilities,
+      desktopRepoList: repoList
+    })
   const [provider, setProvider] = useState<TaskProvider>('github')
   const [visibleProviders, setVisibleProviders] = useState<TaskProvider[]>(() =>
     normalizeVisibleTaskProviders(undefined)
@@ -117,8 +126,7 @@ export function useMobileTasksRouteAndItemState() {
   const [linearConnectError, setLinearConnectError] = useState('')
   const [taskSort, setTaskSort] = useState<TaskSort>('updated')
   const [selectedRepoIds, setSelectedRepoIds] = useState<Set<string>>(new Set())
-  // The saved choice narrowed to what is listed now (empty = all). Listing changes never prune the
-  // choice; a user edit rewrites it from what's shown, so it can drop a briefly gone server's ids.
+  // Readers narrow saved ids without pruning; only user edits may drop temporarily absent server repos.
   const effectiveRepoKey = [...reconcileRepoSelection(repos, [...selectedRepoIds])]
     .sort()
     .join('\n')
@@ -131,7 +139,7 @@ export function useMobileTasksRouteAndItemState() {
     Array<Extract<TaskItem, { provider: 'github' }>[]>
   >([])
   const [githubCurrentPage, setGithubCurrentPage] = useState(0)
-  const [githubTotalCount, setGithubTotalCount] = useState<number | null>(null)
+  const [githubCountedTotalPages, setGithubCountedTotalPages] = useState<number | null>(null)
   const [githubPaginationLoading, setGithubPaginationLoading] = useState(false)
   const [githubLoadingTargetPage, setGithubLoadingTargetPage] = useState<number | null>(null)
   const [githubRepoSources, setGithubRepoSources] = useState<Record<string, GitHubRepoSources>>({})
@@ -198,6 +206,8 @@ export function useMobileTasksRouteAndItemState() {
     taskResumeRef,
     repoList,
     repos,
+    serverRepoList,
+    repoHostLabels,
     repoListEnsureLoaded,
     repoListReload,
     provider,
@@ -277,8 +287,8 @@ export function useMobileTasksRouteAndItemState() {
     setGithubPages,
     githubCurrentPage,
     setGithubCurrentPage,
-    githubTotalCount,
-    setGithubTotalCount,
+    githubCountedTotalPages,
+    setGithubCountedTotalPages,
     githubPaginationLoading,
     setGithubPaginationLoading,
     githubLoadingTargetPage,

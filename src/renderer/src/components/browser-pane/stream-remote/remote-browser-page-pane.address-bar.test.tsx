@@ -1,32 +1,16 @@
 // @vitest-environment happy-dom
-import { act, cleanup, render, screen } from '@testing-library/react'
-import { useEffect } from 'react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useAppStore } from '@/store'
 import type { BrowserPage } from '../../../../../shared/browser-workspace-types'
 import { requestBrowserFocus } from '../host-guest/browser-focus'
-import {
-  REMOTE_BROWSER_STREAM_LIVE,
-  REMOTE_BROWSER_STREAM_OPENING
-} from './remote-browser-stream-status'
-import {
-  clearBrowserPageDeferredNavigation,
-  deferBrowserPageNavigation
-} from '../navigate/browser-page-deferred-navigation'
+import { REMOTE_BROWSER_STREAM_LIVE } from './remote-browser-stream-status'
 
-// The streamed pane's runtime machinery — stream, input, wheel, context menu, markup — is inert
-// here: this suite is about the chrome the pane wraps around it, which owns focus and the URL field.
+// Keep runtime effects inert to isolate chrome focus and URL editing.
 const mocks = vi.hoisted(() => ({
   frameUrl: { current: null as string | null },
-  addressBarValue: { current: 'about:blank' },
-  windowVisible: { current: true },
-  streamStatus: { current: 'live' as 'live' | 'opening' },
-  activationOrder: [] as string[]
-}))
-
-vi.mock('@/hooks/use-window-stream-visibility', () => ({
-  useWindowStreamVisible: () => mocks.windowVisible.current
+  addressBarValue: { current: 'about:blank' }
 }))
 
 vi.mock('@/runtime/runtime-rpc-client', () => ({
@@ -59,10 +43,7 @@ vi.mock('./use-remote-browser-page-lifecycle', () => ({
       session: { ensureRemotePage: vi.fn(), scheduleTabInfoRefresh: vi.fn() },
       tokens: {}
     },
-    streamStatus:
-      mocks.streamStatus.current === 'opening'
-        ? REMOTE_BROWSER_STREAM_OPENING
-        : REMOTE_BROWSER_STREAM_LIVE,
+    streamStatus: REMOTE_BROWSER_STREAM_LIVE,
     frameUrl: mocks.frameUrl.current,
     frameMetadata: null,
     runtimeWorktree: 'worktree-a',
@@ -85,21 +66,7 @@ vi.mock('./use-remote-browser-page-lifecycle', () => ({
 }))
 
 vi.mock('./use-remote-browser-page-stream', () => ({
-  useRemoteBrowserPageStream: ({
-    stagedPage,
-    isActive
-  }: {
-    stagedPage: boolean
-    isActive: boolean
-  }) => {
-    const windowVisibleForStream = mocks.windowVisible.current
-    useEffect(() => {
-      if (!stagedPage && isActive && windowVisibleForStream) {
-        mocks.activationOrder.push('stream-open')
-      }
-    }, [stagedPage, isActive, windowVisibleForStream])
-    return { reconnectRemoteStream: vi.fn() }
-  }
+  useRemoteBrowserPageStream: () => ({ reconnectRemoteStream: vi.fn() })
 }))
 
 vi.mock('./use-remote-browser-page-input', () => ({
@@ -137,13 +104,12 @@ vi.mock('./use-remote-browser-page-navigation', () => ({
     applyRemoteTabInfo: vi.fn(),
     scheduleRemoteTabInfoRefresh: vi.fn(),
     runRemoteNavigation: vi.fn(),
-    navigateToUrl: (url: string) => mocks.activationOrder.push(`navigate:${url}`),
+    navigateToUrl: vi.fn(),
     submitAddressBar: vi.fn()
   })
 }))
 
-// Why: mirrors the real viewport's focus surfaces — the screencast <img> once a frame lands,
-// and the viewport div that is all there is before the first one.
+// Mirror both real focus surfaces: viewport before the first frame, image afterward.
 vi.mock('./remote-browser-page-viewport', () => ({
   RemoteBrowserPageViewport: ({
     remoteViewportRef,
@@ -224,9 +190,6 @@ describe('RemoteBrowserPagePane address bar parity', () => {
     frameCallbacks = []
     mocks.frameUrl.current = null
     mocks.addressBarValue.current = 'about:blank'
-    mocks.windowVisible.current = true
-    mocks.streamStatus.current = 'live'
-    mocks.activationOrder.length = 0
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       frameCallbacks.push(callback)
       return frameCallbacks.length
@@ -234,7 +197,9 @@ describe('RemoteBrowserPagePane address bar parity', () => {
     vi.stubGlobal('cancelAnimationFrame', () => {})
     Object.defineProperty(window, 'api', {
       configurable: true,
-      value: { ui: { onFocusBrowserAddressBar: () => () => {} } }
+      value: {
+        ui: { onFocusBrowserAddressBar: () => () => {}, onShowBrowserHistory: () => () => {} }
+      }
     })
     useAppStore.setState({
       browserUrlHistory: [],
@@ -245,113 +210,10 @@ describe('RemoteBrowserPagePane address bar parity', () => {
 
   afterEach(() => {
     cleanup()
-    clearBrowserPageDeferredNavigation(PAGE_ID)
-    useAppStore.setState({ remoteBrowserPageHandlesByPageId: {} })
     vi.unstubAllGlobals()
   })
 
-  it('replays a staged URL only after the adopted page opens its stream', () => {
-    deferBrowserPageNavigation(PAGE_ID, 'https://remote.internal/docs')
-    useAppStore.setState({
-      remoteBrowserPageHandlesByPageId: {
-        [PAGE_ID]: { environmentId: 'environment-a', remotePageId: PAGE_ID, staged: true }
-      }
-    })
-
-    renderPane()
-    expect(mocks.activationOrder).toEqual([])
-
-    act(() => {
-      useAppStore.setState({
-        remoteBrowserPageHandlesByPageId: {
-          [PAGE_ID]: { environmentId: 'environment-a', remotePageId: PAGE_ID }
-        }
-      })
-    })
-
-    expect(mocks.activationOrder).toEqual(['stream-open', 'navigate:https://remote.internal/docs'])
-  })
-
-  it('waits for initial stream tab info before replaying a staged URL', () => {
-    mocks.streamStatus.current = 'opening'
-    deferBrowserPageNavigation(PAGE_ID, 'https://remote.internal/after-ready')
-    useAppStore.setState({
-      remoteBrowserPageHandlesByPageId: {
-        [PAGE_ID]: { environmentId: 'environment-a', remotePageId: PAGE_ID, staged: true }
-      }
-    })
-    const view = renderPane()
-
-    act(() => {
-      useAppStore.setState({
-        remoteBrowserPageHandlesByPageId: {
-          [PAGE_ID]: { environmentId: 'environment-a', remotePageId: PAGE_ID }
-        }
-      })
-    })
-    expect(mocks.activationOrder).toEqual(['stream-open'])
-
-    mocks.streamStatus.current = 'live'
-    act(() => view.rerender(paneElement()))
-    expect(mocks.activationOrder).toEqual([
-      'stream-open',
-      'navigate:https://remote.internal/after-ready'
-    ])
-  })
-
-  it('keeps the staged URL until an inactive adopted page becomes active', () => {
-    deferBrowserPageNavigation(PAGE_ID, 'https://remote.internal/inactive')
-    useAppStore.setState({
-      remoteBrowserPageHandlesByPageId: {
-        [PAGE_ID]: { environmentId: 'environment-a', remotePageId: PAGE_ID, staged: true }
-      }
-    })
-    const view = renderPane(false)
-
-    act(() => {
-      useAppStore.setState({
-        remoteBrowserPageHandlesByPageId: {
-          [PAGE_ID]: { environmentId: 'environment-a', remotePageId: PAGE_ID }
-        }
-      })
-    })
-    expect(mocks.activationOrder).toEqual([])
-
-    act(() => view.rerender(paneElement(true)))
-    expect(mocks.activationOrder).toEqual([
-      'stream-open',
-      'navigate:https://remote.internal/inactive'
-    ])
-  })
-
-  it('keeps the staged URL until a hidden window can open its stream', () => {
-    mocks.windowVisible.current = false
-    deferBrowserPageNavigation(PAGE_ID, 'https://remote.internal/hidden')
-    useAppStore.setState({
-      remoteBrowserPageHandlesByPageId: {
-        [PAGE_ID]: { environmentId: 'environment-a', remotePageId: PAGE_ID, staged: true }
-      }
-    })
-    const view = renderPane()
-
-    act(() => {
-      useAppStore.setState({
-        remoteBrowserPageHandlesByPageId: {
-          [PAGE_ID]: { environmentId: 'environment-a', remotePageId: PAGE_ID }
-        }
-      })
-    })
-    expect(mocks.activationOrder).toEqual([])
-
-    mocks.windowVisible.current = true
-    act(() => view.rerender(paneElement()))
-    expect(mocks.activationOrder).toEqual([
-      'stream-open',
-      'navigate:https://remote.internal/hidden'
-    ])
-  })
-
-  it('opens a new blank tab in the address bar with its text selected', () => {
+  it('opens a new blank tab in an empty, focused address bar', () => {
     useAppStore.setState({
       pendingAddressBarFocusByPageId: { [PAGE_ID]: true },
       pendingAddressBarFocusByTabId: { [PAGE_ID]: true }
@@ -361,11 +223,10 @@ describe('RemoteBrowserPagePane address bar parity', () => {
 
     const input = addressBar()
     expect(document.activeElement).toBe(input)
-    expect(input.selectionStart).toBe(0)
-    expect(input.selectionEnd).toBe('about:blank'.length)
+    expect(input.value).toBe('')
   })
 
-  it('offers the shared URL history as suggestions once the bar has focus', () => {
+  it('offers the shared URL history once the user types, not on a blank tab’s focus', () => {
     useAppStore.setState({
       browserUrlHistory: [
         {
@@ -382,6 +243,9 @@ describe('RemoteBrowserPagePane address bar parity', () => {
 
     renderPane()
 
+    // The New Tab page under the bar already lists history, so focus alone opens nothing.
+    expect(screen.queryByText('Google Maps')).toBeNull()
+    fireEvent.change(addressBar(), { target: { value: 'maps' } })
     expect(screen.getByText('Google Maps')).toBeTruthy()
   })
 
@@ -409,8 +273,7 @@ describe('RemoteBrowserPagePane address bar parity', () => {
     mocks.frameUrl.current = 'blob:frame-1'
     act(() => view.rerender(paneElement()))
 
-    // Why: the <img> is what carries remote key input, so focus parked on the viewport leaves
-    // the keyboard dead until the user clicks.
+    // Only the image carries remote key input; viewport focus leaves the keyboard inactive.
     expect(document.activeElement).toBe(screen.getByTestId('frame'))
   })
 
@@ -425,8 +288,7 @@ describe('RemoteBrowserPagePane address bar parity', () => {
     mocks.frameUrl.current = 'blob:frame-1'
     act(() => view.rerender(paneElement()))
 
-    // Why: a blank tab paints its first frame while the user is still typing the URL, so the
-    // handover only applies to focus that is sitting on the viewport with nowhere better to go.
+    // First-frame handoff must not steal a URL the user is still typing.
     expect(document.activeElement).toBe(addressBar())
   })
 

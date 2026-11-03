@@ -1,11 +1,10 @@
-import { createElement, useEffect } from 'react'
+import { createElement, useEffect, type ComponentProps } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RpcClient } from '../transport/rpc-client'
-import { lightTheme } from '../theme/mobile-theme'
 import { HostProtocolGate } from './HostProtocolGate'
 import { useHostProtocolGates } from './host-protocol-gates-context'
-import { APP_DISPLAY_NAME } from '@/product-brand'
+import { findAllByHostType } from '../test-support/react-test-renderer-host-nodes'
 
 const nativeTestState = vi.hoisted(() => ({
   openUrl: vi.fn(),
@@ -17,7 +16,6 @@ vi.mock('react-native', () => ({
   Linking: { openURL: nativeTestState.openUrl },
   Platform: nativeTestState.platform,
   Pressable: 'Pressable',
-  ScrollView: 'ScrollView',
   StyleSheet: {
     create: <T>(styles: T) => styles,
     absoluteFillObject: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }
@@ -26,28 +24,17 @@ vi.mock('react-native', () => ({
   View: 'View'
 }))
 
-vi.mock('lucide-react-native', () => ({ ShieldAlert: 'ShieldAlert' }))
-
-vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }))
-
-vi.mock('../theme/mobile-theme-provider', () => ({
-  useMobileTheme: () => lightTheme,
-  useMobileThemeStyles: <T>(factory: (theme: typeof lightTheme) => T) => factory(lightTheme)
-}))
-
 vi.mock('expo-router', () => ({
   router: { replace: vi.fn() },
-  // `ProtocolBlockScreen` reaches the router through the navigation handoff now, and the handoff's
-  // native form is this hook. Its web form is what posts the target to the shell.
+  // Mock native handoff’s router hook; web sibling posts target to shell.
   useRouter: () => ({ replace: vi.fn(), push: vi.fn(), back: vi.fn(), dismissTo: vi.fn() })
 }))
 
-// Why: mock only client acquisition; the gate must exercise the real
-// useHostStatusGates → evaluateCompat → ProtocolBlockScreen wiring.
+// Mock client acquisition only; keep real status-gates→compatibility→block-screen wiring.
 const hostClient = vi.hoisted(() => ({
   current: { client: null as RpcClient | null, state: 'disconnected' as string }
 }))
-vi.mock('../transport/client-context', () => ({
+vi.mock('../transport/host-client-hooks', () => ({
   useHostClient: () => hostClient.current
 }))
 // The wall's release offer: the native hook imports the update checker module.
@@ -55,14 +42,6 @@ vi.mock('../app-update/use-wall-app-update', () => ({ useWallAppUpdate: () => nu
 // Descriptor bookkeeping only; the real recorder reaches the native keychain through host-store.
 vi.mock('../transport/host-descriptor-recorder', () => ({
   recordHostDescriptorFromStatus: vi.fn()
-}))
-
-vi.mock('../transport/host-store', () => ({
-  recordAuthenticatedRuntimeRecordId: vi.fn().mockResolvedValue(false)
-}))
-
-vi.mock('../transport/authenticated-runtime-host-identity', () => ({
-  HostRuntimeIdentityMismatchError: class HostRuntimeIdentityMismatchError extends Error {}
 }))
 
 function clientWithStatus(result: Record<string, unknown>): RpcClient {
@@ -84,11 +63,16 @@ function MountProbe() {
 }
 
 function gateElement() {
-  return createElement(
-    HostProtocolGate,
-    { hostId: 'host-1' },
-    createElement('HostContent', null, createElement(GateConsumer), createElement(MountProbe))
-  )
+  const props: ComponentProps<typeof HostProtocolGate> = {
+    hostId: 'host-1',
+    children: createElement(
+      'HostContent',
+      null,
+      createElement(GateConsumer),
+      createElement(MountProbe)
+    )
+  }
+  return createElement(HostProtocolGate, props)
 }
 
 async function renderGate(): Promise<ReactTestRenderer> {
@@ -128,13 +112,12 @@ describe('HostProtocolGate', () => {
     }
     renderer = await renderGate()
     const output = renderedText(renderer)
-    expect(output).toContain(`Update ${APP_DISPLAY_NAME} Mobile`)
-    expect(output).toContain('official iOS distribution channel')
-    expect(output).not.toContain('Open iOS download')
+    expect(output).toContain('Update Orca Mobile')
+    expect(output).toContain('Open App Store')
     expect(output).not.toContain('HostContent')
   })
 
-  it('routes Android mobile updates to HiveCloud', async () => {
+  it('routes Android mobile updates to GitHub Releases', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     nativeTestState.platform.OS = 'android'
     hostClient.current = {
@@ -143,14 +126,16 @@ describe('HostProtocolGate', () => {
     }
     renderer = await renderGate()
     const output = renderedText(renderer)
-    expect(output).toContain(`Update ${APP_DISPLAY_NAME} Mobile`)
-    expect(output).toContain(
-      `Update ${APP_DISPLAY_NAME} Mobile from the official Android distribution channel`
-    )
-    expect(output).not.toContain('Open Android download')
+    expect(output).toContain('Update Orca Mobile')
+    expect(output).toContain('Update Orca Mobile from GitHub Releases')
+    expect(output).toContain('Open GitHub Releases')
     expect(output).not.toContain('mobile app store')
     expect(output).not.toContain('HostContent')
-    expect(nativeTestState.openUrl).not.toHaveBeenCalled()
+    const [openReleases] = findAllByHostType(renderer.root, 'Pressable')
+    act(() => openReleases?.props.onPress())
+    expect(nativeTestState.openUrl).toHaveBeenCalledWith(
+      'https://github.com/stablyai/orca/releases'
+    )
   })
 
   it('replaces the host UI with the block screen when desktop is too old', async () => {
@@ -161,9 +146,8 @@ describe('HostProtocolGate', () => {
     }
     renderer = await renderGate()
     const output = renderedText(renderer)
-    expect(output).toContain(`Update ${APP_DISPLAY_NAME} on your computer`)
-    expect(output).not.toContain('Open desktop download')
-    expect(nativeTestState.openUrl).not.toHaveBeenCalled()
+    expect(output).toContain('Update Orca on your computer')
+    expect(output).toContain('Open GitHub Releases')
     expect(output).not.toContain('HostContent')
   })
 
@@ -181,7 +165,7 @@ describe('HostProtocolGate', () => {
     const output = renderedText(renderer)
     expect(output).toContain('HostContent')
     expect(output).toContain('browser.screencast.v1')
-    expect(output).not.toContain(`Update ${APP_DISPLAY_NAME}`)
+    expect(output).not.toContain('Update Orca')
     expect(client.sendRequest).toHaveBeenCalledOnce()
   })
 
@@ -224,9 +208,9 @@ describe('HostProtocolGate', () => {
     expect(output).toContain('Checking host compatibility')
     // Why: the cold-start remount this replaces is exactly what destroys in-flight deep navigation.
     expect(probeMounts.count).toBe(1)
-    const overlay = renderer.root
-      .findAllByType('View')
-      .find((node) => node.props.accessibilityViewIsModal === true)
+    const overlay = findAllByHostType(renderer.root, 'View').find(
+      (node) => node.props.accessibilityViewIsModal === true
+    )
     expect(overlay?.props.pointerEvents).toBe('auto')
   })
 
@@ -246,7 +230,7 @@ describe('HostProtocolGate', () => {
     })
 
     const output = renderedText(renderer)
-    expect(output).toContain(`Update ${APP_DISPLAY_NAME} Mobile`)
+    expect(output).toContain('Update Orca Mobile')
     expect(output).not.toContain('HostContent')
   })
 

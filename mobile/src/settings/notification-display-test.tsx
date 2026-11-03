@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { useEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useAllHostClients } from '../transport/use-all-host-clients'
@@ -7,6 +8,8 @@ import type { RpcFailure } from '../transport/types'
 import { colors, spacing, typography } from '../theme/mobile-theme'
 
 export function NotificationDisplayTest({ onTroubleshoot }: { onTroubleshoot: () => void }) {
+  const t = useMobileTranslation()
+
   const busy = useRef(false)
   const [hostIds, setHostIds] = useState<string[]>([])
   const [sending, setSending] = useState(false)
@@ -77,11 +80,25 @@ export function NotificationDisplayTest({ onTroubleshoot }: { onTroubleshoot: ()
   }
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Having trouble receiving alerts?</Text>
-      <Text style={styles.detail}>Send a test notification through a connected desktop.</Text>
+      <Text style={styles.label}>
+        {t(
+          'settings.notificationDisplayTest.troubleReceivingAlerts',
+          'Having trouble receiving alerts?'
+        )}
+      </Text>
+      <Text style={styles.detail}>
+        {t(
+          'auto.mobile.src.settings.notification.display.test.5f374cc772',
+          'Send a test notification through a connected desktop.'
+        )}
+      </Text>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={sending ? 'Sending…' : 'Send test notification'}
+        accessibilityLabel={
+          sending
+            ? t('settings.notificationDisplayTest.sending', 'Sending…')
+            : t('settings.notificationDisplayTest.sendButton', 'Send test notification')
+        }
         disabled={sending}
         accessibilityState={{ disabled: sending }}
         style={({ pressed }) => [styles.button, pressed && styles.pressed]}
@@ -89,17 +106,21 @@ export function NotificationDisplayTest({ onTroubleshoot }: { onTroubleshoot: ()
       >
         <View>
           <Text accessible={false} style={[styles.buttonText, styles.sizingLabel]}>
-            Send test notification
+            {t('settings.notificationDisplayTest.sendButton', 'Send test notification')}
           </Text>
           <View pointerEvents="none" style={styles.buttonLabel}>
             <Text accessible={false} style={styles.buttonText}>
-              {sending ? 'Sending…' : 'Send test notification'}
+              {sending
+                ? t('settings.notificationDisplayTest.sending', 'Sending…')
+                : t('settings.notificationDisplayTest.sendButton', 'Send test notification')}
             </Text>
           </View>
         </View>
       </Pressable>
       <Pressable accessibilityRole="link" onPress={onTroubleshoot} style={styles.troubleshootLink}>
-        <Text style={styles.linkText}>Troubleshooting</Text>
+        <Text style={styles.linkText}>
+          {t('settings.menuItems.troubleshooting', 'Troubleshooting')}
+        </Text>
       </Pressable>
       {message && (
         <Text accessibilityRole="alert" style={styles.detail}>

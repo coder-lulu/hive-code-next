@@ -1,6 +1,9 @@
-import { PRODUCT_CONFIG } from '../../shared/brand'
+import {
+  agentSessionLeaseFixture,
+  agentSessionRecordFixture
+} from '../../shared/agent-session-record.test-fixture'
+import { agentSessionConversationView } from '../../shared/agent-session-conversation-view'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AgentSessionRecord } from '../../shared/agent-session-record'
 
 const hostRef: { current: unknown } = { current: null }
 
@@ -22,17 +25,10 @@ function installRecord(): void {
   hostRef.current = {
     deps: {
       store: {
-        getRecord: (sessionId: string) =>
-          ({
-            sessionId,
-            location: { executionHostId: 'local', wslDistro: null },
-            lease: {
-              runtimeKind: 'native',
-              claimStatus: 'live',
-              runtimeFence: 1,
-              deathEvidence: null
-            }
-          }) as unknown as AgentSessionRecord
+        getConversation: (sessionId: string) =>
+          agentSessionConversationView(
+            agentSessionRecordFixture(agentSessionLeaseFixture({ sessionId, runtimeFence: 1 }))
+          )
       }
     },
     hasSession: () => true
@@ -60,8 +56,7 @@ describe('the refusal a terminal verb gives a structured worker handle', () => {
   })
 
   it('says the handle is an agent session, not that it went stale', () => {
-    // `terminal_handle_stale` is a claim the handle died. It never did — the session is live and
-    // has no terminal — so callers went looking for a remint that cannot exist.
+    // A live structured handle has no terminal; stale would falsely suggest reminting it.
     const handle = registerWorker()
     installRecord()
     const error = structuredWorkerTerminalRefusal(handle, null)
@@ -73,9 +68,9 @@ describe('the refusal a terminal verb gives a structured worker handle', () => {
     const handle = registerWorker()
     installRecord()
     const message = structuredWorkerTerminalRefusal(handle, null).message
-    expect(message).toContain(`${PRODUCT_CONFIG.cli.primary} terminal read`)
+    expect(message).toContain('orca terminal read')
     expect(message).toContain('worker-read --source transcript')
-    expect(message).toContain(`${PRODUCT_CONFIG.cli.primary} orchestration send`)
+    expect(message).toContain('orca orchestration send')
   })
 
   it('keeps the stale error for a PTY handle, which really can go stale', () => {

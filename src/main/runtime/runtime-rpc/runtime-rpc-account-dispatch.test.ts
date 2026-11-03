@@ -9,6 +9,7 @@ type DispatchOptions = {
 }
 
 const mock = vi.hoisted(() => ({
+  catalog: { list: vi.fn(), worktrees: vi.fn() },
   dispatch: vi.fn<
     (request: unknown, reply: (value: string) => void, options: DispatchOptions) => Promise<void>
   >(async () => {}),
@@ -25,6 +26,7 @@ const mock = vi.hoisted(() => ({
 vi.mock('./runtime-rpc-cloud-dispatch', () => ({
   LOCAL_ONLY_RPC_METHODS: new Set(['cloudRuntime.claim']),
   RuntimeRpcCloudDispatch: class {
+    mobileRelayHostCatalog = mock.catalog
     dispatcher = { dispatchStreaming: mock.dispatch }
     binaryMessageRouter = { dispatch: mock.binary, deleteConnection: mock.deleteConnection }
     runtime = {
@@ -53,11 +55,7 @@ beforeEach(() => {
   mock.dispatch.mockImplementation(async () => {})
 })
 function fixture(runtimeSessionId = 'runtime-session-1') {
-  let text!: (
-    raw: string,
-    reply: (value: string) => void,
-    binary: RpcBinarySender
-  ) => void
+  let text!: (raw: string, reply: (value: string) => void, binary: RpcBinarySender) => void
   let binary!: (bytes: Uint8Array) => void
   let valid = true
   const revalidate = vi.fn(() => valid)
@@ -227,7 +225,7 @@ it('revalidates text, binary and delayed output and detaches using only its conn
   expect(mock.registerMessage).not.toHaveBeenCalled()
   expect(mock.abort).toHaveBeenCalledExactlyOnceWith(f.ws)
   expect(mock.cleanup).toHaveBeenCalledExactlyOnceWith('account-connection-1')
-  expect(mock.cancel).toHaveBeenCalledExactlyOnceWith('account-connection-1')
+  expect(mock.cancel).not.toHaveBeenCalled()
   expect(mock.deleteConnection).toHaveBeenCalledExactlyOnceWith('account-connection-1')
   await tick()
 })
@@ -320,4 +318,24 @@ it('forwards binary backpressure options only while the authenticated session re
   f.invalidate()
   expect(options.sendBinary(bytes, { dropWhenBacklogged: true })).toBe(false)
   expect(f.sendBinary).toHaveBeenCalledOnce()
+})
+
+it('carries the installed host catalog only through a current account session', async () => {
+  const f = fixture()
+  f.text({ id: 'catalog-1', method: 'mobile.relayHosts.list' })
+  await tick()
+  expect(mock.dispatch).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.anything(),
+    expect.objectContaining({
+      mobileRelayHosts: mock.catalog,
+      authenticatedAccountRuntimeSessionId: 'runtime-session-1'
+    })
+  )
+  mock.dispatch.mockClear()
+  f.invalidate()
+  f.text({ id: 'catalog-2', method: 'mobile.relayHosts.list' })
+  await tick()
+  expect(mock.dispatch).not.toHaveBeenCalled()
+  f.detach()
 })

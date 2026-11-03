@@ -4,35 +4,40 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { useSidebarResize } from '@/hooks/useSidebarResize'
 import SidebarHeader from './SidebarHeader'
 import SidebarNav from './SidebarNav'
+import { setSidebarLiveWidth } from './sidebar-live-width'
 import SetupScriptPromptCard from './SetupScriptPromptCard'
-import SidebarFooter from './SidebarFooter'
+import WorktreeList from './WorktreeList'
+import WslMovedProjectsSection from './WslMovedProjectsSection'
+import SidebarToolbar from './SidebarToolbar'
 import WorkspaceBoardDrawer from './WorkspaceBoardDrawer'
 import type { VirtualizedScrollAnchor } from '@/hooks/useVirtualizedScrollAnchor'
 import { cn } from '@/lib/utils'
 import { FolderPlus, Loader2 } from 'lucide-react'
 import { ActivityThreadCollapseContext } from '@/components/activity/activity-thread-collapse-context'
 import { useSidebarProjectDrop } from './useSidebarProjectDrop'
-import type { WorkspaceBoardPanelState } from './useWorkspaceBoardPanel'
+import { useWorkspaceBoardPanel } from './useWorkspaceBoardPanel'
+import { useWorkspaceRevealBodyRedirect } from './use-workspace-reveal-body-redirect'
 import { resolveLeftSidebarStyleVariables } from '@/lib/left-sidebar-appearance'
 import { useSystemPrefersDark } from '@/components/terminal-pane/use-system-prefers-dark'
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
-import { translate } from '@/i18n/i18n'
+import { LocalGitToolchainScanBanner } from './LocalGitToolchainScanBanner'
 import { SeveredTerminalDaemonBanner } from './SeveredTerminalDaemonBanner'
+import { StalledTerminalDaemonBanner } from './StalledTerminalDaemonBanner'
+import { StartupWorktreeRefreshStatus } from './StartupWorktreeRefreshStatus'
 
-// Why lazy: the Agents list pulls the whole activity pipeline (virtualizer, markdown
-// previews, thread derivation); users on the workspace view should not load or render any of it.
+// Keep the Agents activity pipeline out of the workspace view’s initial bundle.
 const SidebarAgentsList = lazyWithRetry(() => import('./SidebarAgentsList'))
 
 const WorktreeMetaDialog = lazyWithRetry(() => import('./WorktreeMetaDialog'))
 const RemoveFolderDialog = lazyWithRetry(() => import('./RemoveFolderDialog'))
+const SleepTwinWorkspaceDialog = lazyWithRetry(() => import('./SleepTwinWorkspaceDialog'))
 const WorktreeVisibilityDialog = lazyWithRetry(() => import('./WorktreeVisibilityDialog'))
 const OrcaYamlTrustDialog = lazyWithRetry(() => import('./OrcaYamlTrustDialog'))
 const ForgetSshWorkspaceDialog = lazyWithRetry(() => import('./ForgetSshWorkspaceDialog'))
 
 const MIN_WIDTH = 220
 const MAX_WIDTH = 500
-// Why: straddle the sidebar/terminal seam so the divider sits on the border-l
-// instead of leaving a blank strip between the hover target and the edge.
+// Straddle the terminal seam so the resize divider sits on the border.
 export const WORKTREE_SIDEBAR_RESIZE_HANDLE_CLASS_NAME =
   'group absolute -right-1.5 top-0 z-10 flex h-full w-3 cursor-col-resize items-stretch justify-center'
 export const WORKTREE_SIDEBAR_RESIZE_HANDLE_LINE_CLASS_NAME =
@@ -41,10 +46,12 @@ export const WORKTREE_SIDEBAR_RESIZE_HANDLE_LINE_CLASS_NAME =
 type SidebarProps = {
   worktreeScrollOffsetRef: React.MutableRefObject<number>
   worktreeScrollAnchorRef: React.MutableRefObject<VirtualizedScrollAnchor>
-  workspaceBoardPanel: WorkspaceBoardPanelState
 }
 
-function Sidebar({ workspaceBoardPanel }: SidebarProps): React.JSX.Element {
+function Sidebar({
+  worktreeScrollOffsetRef,
+  worktreeScrollAnchorRef
+}: SidebarProps): React.JSX.Element {
   const sidebarOpen = useAppStore((s) => s.sidebarOpen)
   const sidebarWidth = useAppStore((s) => s.sidebarWidth)
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth)
@@ -59,8 +66,7 @@ function Sidebar({ workspaceBoardPanel }: SidebarProps): React.JSX.Element {
   const [agentQuery, setAgentQuery] = React.useState('')
   const [agentOptionsTarget, setAgentOptionsTarget] = React.useState<HTMLDivElement | null>(null)
   const agentsScrollTopRef = React.useRef(0)
-  // Held here so collapsed groups (and the layout the saved scrollTop assumes)
-  // survive the Agents list unmounting on sidebar body switches.
+  // Retain collapse state and scroll geometry across Agents-list unmounts.
   const [agentsCollapsedGroupKeys, setAgentsCollapsedGroupKeys] = React.useState<
     ReadonlySet<string>
   >(() => new Set())
@@ -90,17 +96,18 @@ function Sidebar({ workspaceBoardPanel }: SidebarProps): React.JSX.Element {
   ) as React.CSSProperties | undefined
   const { dropOwnerRef, dropHandlers, affordance } = useSidebarProjectDrop()
   const {
+    workspaceBoardOpen,
     workspaceBoardRenderedOpen,
     workspaceBoardDragPreviewOpen,
     workspaceBoardMenuOpen,
+    toggleWorkspaceBoard,
     handleWorkspaceBoardOpenChange,
     setWorkspaceBoardMenuOpen,
-    closeWorkspaceBoard
-  } = workspaceBoardPanel
-
-  const setLiveSidebarWidth = React.useCallback((width: number) => {
-    document.documentElement.style.setProperty('--workspace-sidebar-live-width', `${width}px`)
-  }, [])
+    closeWorkspaceBoard,
+    previewWorkspaceBoardFromDrag,
+    solidifyWorkspaceBoardFromDrag,
+    cancelWorkspaceBoardDragPreview
+  } = useWorkspaceBoardPanel()
 
   const repoCount = repos.length
   const previousRepoCountRef = React.useRef(repoCount)
@@ -126,9 +133,10 @@ function Sidebar({ workspaceBoardPanel }: SidebarProps): React.JSX.Element {
     maxWidth: MAX_WIDTH,
     deltaSign: 1,
     setWidth: setSidebarWidth,
-    onDraftWidthChange: setLiveSidebarWidth
+    onDraftWidthChange: setSidebarLiveWidth
   })
 
+  useWorkspaceRevealBodyRedirect(sidebarOpen && sidebarBody === 'agents')
   // A collapsed sidebar takes no drops.
   const sidebarRef = React.useCallback(
     (node: HTMLDivElement | null) => {
@@ -148,41 +156,53 @@ function Sidebar({ workspaceBoardPanel }: SidebarProps): React.JSX.Element {
       >
         {sidebarOpen && (
           <>
-            {/* Fixed controls */}
-            <SidebarNav onNavigate={closeWorkspaceBoard} />
+            <SidebarNav />
+            <SidebarHeader
+              onWorkspaceBoardMenuOpenChange={setWorkspaceBoardMenuOpen}
+              activityOptionsTarget={setAgentOptionsTarget}
+            />
             <SeveredTerminalDaemonBanner />
-            <section
-              className="sidebar-workspace-section"
-              aria-label={translate('dashboard.sidebar.activityView', 'Activity view')}
-            >
-              <SidebarHeader
-                hideWorkspaceOptions
-                sectionTitle={translate('dashboard.sidebar.activityView', 'Activity view')}
-                onWorkspaceBoardMenuOpenChange={setWorkspaceBoardMenuOpen}
-                activityOptionsTarget={setAgentOptionsTarget}
-              />
-              {sidebarBody === 'agents' && (
-                <React.Suspense fallback={<div className="min-h-0 flex-1" />}>
-                  <ActivityThreadCollapseContext.Provider value={agentsCollapseState}>
-                    <SidebarAgentsList
-                      readFilter={agentReadFilter}
-                      setReadFilter={setAgentReadFilter}
-                      groupBy={agentGroupBy}
-                      setGroupBy={setAgentGroupBy}
-                      query={agentQuery}
-                      setQuery={setAgentQuery}
-                      optionsTarget={agentOptionsTarget}
-                      scrollTopRef={agentsScrollTopRef}
-                    />
-                  </ActivityThreadCollapseContext.Provider>
-                </React.Suspense>
-              )}
-            </section>
+            <StalledTerminalDaemonBanner />
+            {sidebarBody === 'agents' ? (
+              <React.Suspense fallback={<div className="min-h-0 flex-1" />}>
+                <ActivityThreadCollapseContext.Provider value={agentsCollapseState}>
+                  <SidebarAgentsList
+                    readFilter={agentReadFilter}
+                    setReadFilter={setAgentReadFilter}
+                    groupBy={agentGroupBy}
+                    setGroupBy={setAgentGroupBy}
+                    query={agentQuery}
+                    setQuery={setAgentQuery}
+                    optionsTarget={agentOptionsTarget}
+                    scrollTopRef={agentsScrollTopRef}
+                  />
+                </ActivityThreadCollapseContext.Provider>
+              </React.Suspense>
+            ) : (
+              <>
+                <LocalGitToolchainScanBanner />
+                <StartupWorktreeRefreshStatus />
+                <WorktreeList
+                  scrollOffsetRef={worktreeScrollOffsetRef}
+                  scrollAnchorRef={worktreeScrollAnchorRef}
+                  workspaceBoardOpen={workspaceBoardOpen}
+                  onWorktreeCardClick={closeWorkspaceBoard}
+                  onWorkspaceBoardDragPreviewStart={previewWorkspaceBoardFromDrag}
+                  onWorkspaceBoardDragPreviewCommit={solidifyWorkspaceBoardFromDrag}
+                  onWorkspaceBoardDragPreviewCancel={cancelWorkspaceBoardDragPreview}
+                />
+                <WslMovedProjectsSection />
+              </>
+            )}
 
             <div className="relative shrink-0">
               <SetupScriptPromptCard />
 
-              <SidebarFooter />
+              <SidebarToolbar
+                workspaceBoardOpen={workspaceBoardOpen}
+                workspaceBoardDragPreviewOpen={workspaceBoardDragPreviewOpen}
+                onWorkspaceBoardToggle={toggleWorkspaceBoard}
+              />
             </div>
           </>
         )}
@@ -206,7 +226,6 @@ function Sidebar({ workspaceBoardPanel }: SidebarProps): React.JSX.Element {
           </div>
         ) : null}
 
-        {/* Resize handle */}
         {sidebarOpen && (
           <div
             data-sidebar-resize-handle=""
@@ -223,11 +242,11 @@ function Sidebar({ workspaceBoardPanel }: SidebarProps): React.JSX.Element {
         )}
       </div>
 
-      {/* Dialogs render outside sidebar to avoid clipping. Lazy-load them only
-      for the modal that needs their flow-specific hooks and UI. */}
+      {/* Render dialogs outside the sidebar to avoid clipping; mount each flow only while its modal is active. */}
       <React.Suspense fallback={null}>
         {activeModal === 'edit-meta' ? <WorktreeMetaDialog /> : null}
         {activeModal === 'confirm-remove-folder' ? <RemoveFolderDialog /> : null}
+        {activeModal === 'confirm-sleep-twin' ? <SleepTwinWorkspaceDialog /> : null}
         {activeModal === 'worktree-visibility' ? <WorktreeVisibilityDialog /> : null}
         {activeModal === 'confirm-orca-yaml-hooks' ? <OrcaYamlTrustDialog /> : null}
         {activeModal === 'forget-ssh-workspace' ? <ForgetSshWorkspaceDialog /> : null}

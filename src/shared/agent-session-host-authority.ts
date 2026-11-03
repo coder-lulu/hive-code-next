@@ -107,6 +107,7 @@ export type RuntimeEnsureAgentSessionRequest =
     }
   | {
       kind: 'explicit'
+      resumeOrigin?: 'saved'
       worktree: string
       agent: ResumableTuiAgent
       providerSession: AgentProviderSessionMetadata
@@ -155,6 +156,7 @@ export type RuntimeCreateAgentSessionResult = {
 }
 
 export type RuntimeAgentSessionRpcCaller = {
+  terminalImageViewerSupported?: boolean
   clientId?: string
   clientKind?: 'mobile' | 'runtime'
   signal?: AbortSignal

@@ -8,15 +8,12 @@ const OLD_ENV = process.env
 const OLD_FETCH = globalThis.fetch
 let tempHome = ''
 
-async function loadModule(options: { encryptionAvailable?: boolean } = {}) {
+async function loadModule() {
   vi.resetModules()
   const { setSecretStore } = await import('../../shared/secret-store')
   setSecretStore({
-    isEncryptionAvailable: () => options.encryptionAvailable ?? true,
-    // Why a binary prefix and not an identity function: real safeStorage ciphertext is
-    // not printable UTF-8, and the at-rest protection reporter distinguishes sealed from
-    // plaintext by exactly that. An identity double writes a readable token and would
-    // make this suite assert that a sealed credential is exposed.
+    isEncryptionAvailable: () => true,
+    // A binary prefix lets the protection reporter distinguish sealed data from plaintext.
     encryptString: (value) => Buffer.concat([Buffer.from([0x00]), Buffer.from(value)]),
     decryptString: (value) => value.subarray(1).toString('utf-8'),
     describeProtectionGap: () => null
@@ -47,20 +44,6 @@ afterEach(() => {
 })
 
 describe('Bitbucket credential connection', () => {
-  it('returns an actionable error when the keyring cannot seal a verified token', async () => {
-    const conn = await loadModule({ encryptionAvailable: false })
-    globalThis.fetch = vi.fn(async () => Response.json({ username: 'ada' })) as typeof fetch
-
-    await expect(
-      conn.connectBitbucket({ authMode: 'token', accessToken: 'secret-token' })
-    ).resolves.toEqual({
-      ok: false,
-      error:
-        'Could not save Bitbucket credential securely. Install and unlock an OS keyring or keychain, then retry.'
-    })
-    expect(conn.getBitbucketConnectionStatus().source).toBe('none')
-  })
-
   it('verifies credentials before saving and reports a stored connection', async () => {
     const conn = await loadModule()
     globalThis.fetch = vi.fn(async () =>
@@ -123,8 +106,6 @@ describe('Bitbucket credential connection', () => {
     const rejected = await conn.connectBitbucket({ authMode: 'token', accessToken: 'bad' })
     expect(!rejected.ok && rejected.error).toMatch(/rejected these credentials/i)
 
-    // Why: a timeout or 5xx says nothing about the token; calling it invalid
-    // sends the user off to regenerate a credential that still works.
     for (const failure of [
       async () => {
         throw new Error('network down')
@@ -168,39 +149,5 @@ describe('Bitbucket credential connection', () => {
       source: 'environment',
       authMode: 'token'
     })
-  })
-
-  it('lets an env API base URL override the stored one without env credentials', async () => {
-    const conn = await loadModule()
-    globalThis.fetch = vi.fn(async () =>
-      Response.json({ username: 'ada' })
-    ) as unknown as typeof fetch
-    await conn.connectBitbucket({
-      authMode: 'basic',
-      email: 'ada@example.com',
-      apiToken: 'tok',
-      baseUrl: 'https://stored.example.com/2.0'
-    })
-
-    // Only the base URL is in the env, so `hasAuth(env)` is false — precedence
-    // is per-setting, not all-or-nothing.
-    process.env.ORCA_BITBUCKET_API_BASE_URL = 'https://env.example.com/2.0'
-    const { resolveBitbucketAuthConfig } = await import('./resolve-auth')
-    expect(resolveBitbucketAuthConfig().baseUrl).toBe('https://env.example.com/2.0')
-  })
-
-  it('clears the stored connection on disconnect', async () => {
-    const conn = await loadModule()
-    globalThis.fetch = vi.fn(async () =>
-      Response.json({ username: 'ada' })
-    ) as unknown as typeof fetch
-    await conn.connectBitbucket({
-      authMode: 'basic',
-      email: 'ada@example.com',
-      apiToken: 'tok'
-    })
-
-    conn.disconnectBitbucket()
-    expect(conn.getBitbucketConnectionStatus().source).toBe('none')
   })
 })

@@ -3,13 +3,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AGENT_LAUNCH_RUNTIME_CAPABILITIES } from '../../src/shared/agent-launch-runtime-capability'
-import { closeTestJournalHostDatabase } from '../../src/main/native-chat/agent-session-journal/journal-host-database-test-support'
+import type { StructuredAgentSessionFirstMessage } from '../../src/shared/structured-agent-session-create'
 import { openTestAgentSessionRecordStore } from '../../src/main/runtime/agent-session-record-store-test-harness'
-import {
-  RuntimeClient,
-  RuntimeClientError,
-  RuntimeRpcFailureError
-} from '../../src/cli/runtime-client'
+import { RuntimeClient, RuntimeClientError } from '../../src/cli/runtime-client'
 import { callAgentLaunch, readCliAgentLaunch } from '../../src/cli/agent-launch-request'
 import { parseArgs } from '../../src/cli/args'
 import { AGENT_LAUNCH_HANDLERS } from '../../src/cli/handlers/agent-launch'
@@ -21,16 +17,10 @@ import {
   setAgentLaunchRecordStore
 } from '../../src/main/runtime/rpc/methods/agent-launch.test-fixture'
 
-import { mapDispatcherError } from '../../src/main/runtime/rpc/dispatcher-error-response'
-
 const chatCreate = vi.hoisted(() => vi.fn())
-const promptCommit = vi.hoisted(() => vi.fn(async () => 'message_test'))
 const terminalPrompt = vi.hoisted(() => vi.fn(async () => true))
 vi.mock('../../src/main/runtime/rpc/methods/structured-agent-session-create', () => ({
   createStructuredAgentSessionForWorktree: chatCreate
-}))
-vi.mock('../../src/main/runtime/rpc/methods/agent-launch-structured-prompt', () => ({
-  commitStructuredAgentSessionLaunchPrompt: promptCommit
 }))
 vi.mock('../../src/main/runtime/rpc/methods/agent-launch-terminal-prompt', () => ({
   deliverTerminalAgentLaunchPrompt: terminalPrompt
@@ -41,14 +31,22 @@ let directory: string
 beforeEach(async () => {
   directory = await mkdtemp(join(tmpdir(), 'orca-launch-cli-'))
   setAgentLaunchRecordStore(await openTestAgentSessionRecordStore(directory))
-  chatCreate.mockReset().mockResolvedValue({ ok: true, value: { sessionId: 'codex_test' } })
-  promptCommit.mockClear()
+  chatCreate
+    .mockReset()
+    .mockImplementation(async (args: { firstMessage?: StructuredAgentSessionFirstMessage }) => ({
+      ok: true,
+      value: {
+        sessionId: 'codex_test',
+        ...(args.firstMessage
+          ? { firstMessage: { clientMessageId: args.firstMessage.clientMessageId } }
+          : {})
+      }
+    }))
   terminalPrompt.mockClear()
 })
 afterEach(async () => {
   setAgentLaunchRecordStore(null)
   vi.restoreAllMocks()
-  closeTestJournalHostDatabase(directory)
   await rm(directory, { recursive: true, force: true })
 })
 
@@ -72,21 +70,7 @@ function hostClient(runtime: ReturnType<typeof runtimeStub>, loseReply = false) 
     }
     const method = methodNamed(AGENT_LAUNCH_METHODS, 'agent.launchReplay')
     expect(name).toBe('agent.launchReplay')
-    const result = await (async () => {
-      try {
-        return await method.handler(method.params.parse(params), rpcContext(runtime, {}))
-      } catch (error) {
-        const response = mapDispatcherError(
-          { id: 'reply', authToken: 'token', method: name, params },
-          { runtimeId: 'runtime-1' },
-          error
-        )
-        if (response.ok) {
-          throw new Error('Expected error response')
-        }
-        throw new RuntimeRpcFailureError(response)
-      }
-    })()
+    const result = await method.handler(method.params.parse(params), rpcContext(runtime, {}))
     if (loseReply && !lost) {
       lost = true
       throw new RuntimeClientError(
@@ -106,18 +90,14 @@ const create = {
 } as const
 
 describe('CLI launch through host surface creation and replay admission', () => {
-  it('refuses a background launch before preparing a new workspace', async () => {
-    const runtime = runtimeStub()
-    await expect(
-      callAgentLaunch(
-        hostClient(runtime),
-        { agent: 'codex' },
-        { target: create, presentation: 'background' },
-        AGENT_LAUNCH_RUNTIME_CAPABILITIES
-      )
-    ).rejects.toThrow('Background agent launch requires an already prepared workspace')
-    expect(runtime.createManagedWorktree).not.toHaveBeenCalled()
-    expect(chatCreate).not.toHaveBeenCalled()
+  it('keeps a new worktree background chat inactive', async () => {
+    await callAgentLaunch(
+      hostClient(runtimeStub()),
+      { agent: 'codex' },
+      { target: create, presentation: 'background' },
+      AGENT_LAUNCH_RUNTIME_CAPABILITIES
+    )
+    expect(chatCreate.mock.calls[0]?.[0].activate).toBe(false)
   })
 
   it('honors explicit local chat focus', async () => {
@@ -157,7 +137,7 @@ describe('CLI launch through host surface creation and replay admission', () => 
         await callAgentLaunch(
           hostClient(runtime, true),
           launch,
-          { target, presentation: target.kind === 'existing' ? 'background' : 'focused' },
+          { target, presentation: 'background' },
           AGENT_LAUNCH_RUNTIME_CAPABILITIES
         )
         throw new Error('Expected lost reply')
@@ -186,15 +166,19 @@ describe('CLI launch through host surface creation and replay admission', () => 
           'codex',
           { createsWorktree: target.kind === 'create-worktree' }
         ),
-        { target, presentation: target.kind === 'existing' ? 'background' : 'focused' },
+        { target, presentation: 'background' },
         AGENT_LAUNCH_RUNTIME_CAPABILITIES
       )
+      const firstMessage = chatCreate.mock.calls[0]?.[0].firstMessage
+      expect(firstMessage).toMatchObject({
+        clientMessageId: expect.any(String),
+        body: { blocks: [{ type: 'text', text: launch.prompt.text }] }
+      })
       expect(result.result.prompt).toMatchObject({
         outcome: 'journaled',
-        messageId: 'message_test'
+        messageId: firstMessage.clientMessageId
       })
       expect(chatCreate).toHaveBeenCalledTimes(1)
-      expect(promptCommit).toHaveBeenCalledTimes(1)
       expect(runtime.createManagedWorktree).toHaveBeenCalledTimes(
         target.kind === 'create-worktree' ? 1 : 0
       )
@@ -215,7 +199,7 @@ describe('CLI launch through host surface creation and replay admission', () => 
         await callAgentLaunch(
           initialClient,
           launch,
-          { target, presentation: target.kind === 'existing' ? 'background' : 'focused' },
+          { target, presentation: 'background' },
           AGENT_LAUNCH_RUNTIME_CAPABILITIES
         )
         throw new Error('Expected lost reply')
@@ -240,7 +224,7 @@ describe('CLI launch through host surface creation and replay admission', () => 
           await callAgentLaunch(
             retryClient,
             retry,
-            { target, presentation: target.kind === 'existing' ? 'background' : 'focused' },
+            { target, presentation: 'background' },
             AGENT_LAUNCH_RUNTIME_CAPABILITIES
           )
         }).rejects.toMatchObject({ code: 'invalid_argument' })
@@ -255,7 +239,7 @@ describe('CLI launch through host surface creation and replay admission', () => 
             createsWorktree: target.kind === 'create-worktree'
           }
         ),
-        { target, presentation: target.kind === 'existing' ? 'background' : 'focused' },
+        { target, presentation: 'background' },
         AGENT_LAUNCH_RUNTIME_CAPABILITIES
       )
       expect(retryClient.call).toHaveBeenCalledExactlyOnceWith(

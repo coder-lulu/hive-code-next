@@ -1,5 +1,5 @@
 import { listEnvironments } from '../../shared/runtime-environment-store'
-import { publicRuntimeEnvironmentWithHostKey } from './runtime-environment-host-key'
+import { publicRuntimeEnvironmentWithHostKey } from './runtime-environments/runtime-environment-host-key'
 import type {
   HiveAccountRuntimeDirectoryState,
   HiveRuntimePendingDisplayName
@@ -8,24 +8,24 @@ import {
   usesAccountRuntimeRelay,
   type PublicKnownRuntimeEnvironment
 } from '../../shared/runtime-environments'
-import type { RemoteRuntimeSubscription } from '../../shared/remote-runtime-client'
-import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
+import type { RemoteRuntimeSubscription } from '../../shared/remote-runtime/remote-runtime-client'
+import { RemoteRuntimeClientError } from '../../shared/remote-runtime/remote-runtime-client-error'
 import type {
   RuntimeOrchestrationEnvelope,
   RuntimeRpcResponse
 } from '../../shared/runtime-rpc-envelope'
 import type { RuntimeStatus } from '../../shared/runtime-types'
 import { getHiveAccountRuntimeAccess } from '../hive-runtime-cloud/hive-account-runtime-access'
-import { runtimeEnvironmentRevisionFailure } from './runtime-environment-revision-guard'
+import { runtimeEnvironmentRevisionFailure } from './runtime-environments/runtime-environment-revision-guard'
 import {
   mergeHiveAccountRuntimeCatalog,
   resolveHiveRuntimeCatalogEntry
 } from '../hive-runtime-cloud/hive-runtime-catalog'
 import {
   callRuntimeEnvironment,
-  getRuntimeEnvironmentStatus,
   subscribeRuntimeEnvironment
-} from './runtime-environment-transport-routing'
+} from './runtime-environments/runtime-environment-transport-routing'
+import { getRuntimeEnvironmentStatus } from './runtime-environments/runtime-environment-status-probe'
 
 export function listRuntimeEnvironmentCatalog(
   userDataPath: string

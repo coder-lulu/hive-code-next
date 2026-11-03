@@ -10,10 +10,10 @@ import type { RuntimeCapability } from '../../../shared/protocol-version'
 type Statuses = Map<string, RuntimeEnvironmentStatus>
 type StoreState = {
   runtimeStatusByEnvironmentId: Statuses
-  settings: { experimentalNativeChat: boolean } | null
+  settings: { nativeChatProviders: Record<string, boolean> } | null
 }
 
-const ON = { experimentalNativeChat: true }
+const ON = { nativeChatProviders: {} }
 
 const mocks = vi.hoisted(() => {
   const state: StoreState = { runtimeStatusByEnvironmentId: new Map(), settings: null }
@@ -36,7 +36,7 @@ vi.mock('./local-runtime-capabilities', () => ({
 }))
 vi.mock('./local-structured-chats', () => ({
   localStructuredChatsInUse: async (settings: StoreState['settings']) =>
-    settings?.experimentalNativeChat === true
+    settings !== null && settings.nativeChatProviders.codex !== false
 }))
 vi.mock('@/store', () => ({
   useAppStore: {
@@ -166,19 +166,18 @@ describe('host structured agents', () => {
     await vi.waitFor(() => expect(agentIds('runtime:env-1')).toEqual(['claude']))
   })
 
-  // Asking installs a host's structured store; a profile with structured chat off never pays it.
-  it('asks no host until structured chat is turned on', async () => {
-    mocks.state = { ...mocks.state, settings: { experimentalNativeChat: false } }
+  it('keeps paired catalogs available for explicit operations with all launch defaults false', async () => {
+    mocks.state = { ...mocks.state, settings: { nativeChatProviders: { codex: false, claude: false } } }
     uninstall = installHostStructuredAgentsSync()
     setStatuses(new Map([['env-1', pairedStatus('rt-1', REGISTERED)]]))
-    await Promise.resolve()
-    await Promise.resolve()
-    expect(mocks.callRuntimeRpc).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(agentIds('runtime:env-1')).toEqual(['claude', 'grok']))
+    setStatuses(new Map())
+    expect(agentIds('runtime:env-1')).toBeUndefined()
+  })
 
-    const previous = mocks.state
-    mocks.state = { ...previous, settings: ON }
-    mocks.listeners.forEach((listener) => listener(mocks.state, previous))
-    await vi.waitFor(() => expect(agentIds('local')).toEqual(['claude', 'grok']))
+  it('reads an authorized paired catalog even before default preferences load', async () => {
+    mocks.state = { ...mocks.state, settings: null, runtimeStatusByEnvironmentId: new Map([['env-1', pairedStatus('rt-1', REGISTERED)]]) }
+    uninstall = installHostStructuredAgentsSync()
     await vi.waitFor(() => expect(agentIds('runtime:env-1')).toEqual(['claude', 'grok']))
   })
 

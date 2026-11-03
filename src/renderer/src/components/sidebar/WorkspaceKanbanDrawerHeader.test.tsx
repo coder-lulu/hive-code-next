@@ -12,7 +12,6 @@ type InspectableProps = {
   className?: string
   'aria-label'?: string
   onClick?: () => void
-  onClose?: () => void
 }
 
 const statuses: WorkspaceStatusDefinition[] = [{ id: 'todo', label: 'Todo' }]
@@ -80,14 +79,21 @@ function renderHeader(
 }
 
 describe('WorkspaceKanbanDrawerHeader', () => {
-  it('routes search dismissal to the common drawer close callback', () => {
+  it('routes the close button through the explicit drawer close callback', () => {
     const onClose = vi.fn()
-    const header = renderHeader(onClose)
-    expect(findByType(header, WorkspaceKanbanSearchField)?.props.onClose).toBe(onClose)
-    expect(findElement(header, (props) => props['aria-label'] === 'Close')).toBeNull()
+    const closeButton = findElement(
+      renderHeader(onClose),
+      (props) => props['aria-label'] === 'Close'
+    )
+
+    expect(closeButton?.props.onClick).toBe(onClose)
+
+    closeButton?.props.onClick?.()
+
+    expect(onClose).toHaveBeenCalledOnce()
   })
 
-  it('keeps search outside the common sheet title', () => {
+  it('renders the search field as a sibling of the sheet title, not inside it', () => {
     const header = renderHeader(vi.fn(), {
       query: 'orca',
       isFiltering: true,
@@ -96,7 +102,7 @@ describe('WorkspaceKanbanDrawerHeader', () => {
     })
 
     const title = findByType(header, SheetTitle)
-    expect(title).toBeNull()
+    expect(title).not.toBeNull()
     expect(findByType(title, WorkspaceKanbanSearchField)).toBeNull()
 
     const field = findByType(header, WorkspaceKanbanSearchField)
@@ -108,7 +114,7 @@ describe('WorkspaceKanbanDrawerHeader', () => {
     })
   })
 
-  it('keeps workspace controls alongside search without a second close button', () => {
+  it('keeps the filter, settings, and close cluster reachable alongside the field', () => {
     const header = renderHeader(vi.fn(), {
       query: 'orca',
       isFiltering: true,
@@ -118,17 +124,14 @@ describe('WorkspaceKanbanDrawerHeader', () => {
 
     expect(findByType(header, SidebarFilter)).not.toBeNull()
     expect(findByType(header, WorkspaceKanbanSettingsMenu)).not.toBeNull()
-    expect(findElement(header, (props) => props['aria-label'] === 'Close')).toBeNull()
+    expect(findElement(header, (props) => props['aria-label'] === 'Close')).not.toBeNull()
   })
 
   it('keeps the selected-count badge and the field clear of the control cluster', () => {
     const header = renderHeader(vi.fn(), { selectedCount: 3, query: 'orca' })
 
-    // Reserve room for the filter and workspace settings controls.
-    expect(
-      findElement(header, (props) => Boolean(props.className?.includes('shrink-0')))
-    ).not.toBeNull()
-    expect(findByType(header, SheetHeader)?.props.className).toContain('pr-24')
+    expect(findByType(header, SheetTitle)?.props.className).toContain('shrink-0')
+    expect(findByType(header, SheetHeader)?.props.className).toContain('pr-32')
     expect(
       findElement(header, (props) => Boolean(props.className?.includes('rounded-full')))
     ).not.toBeNull()

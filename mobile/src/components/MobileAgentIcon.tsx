@@ -1,49 +1,51 @@
+import { useId } from 'react'
 import { Image, StyleSheet, Text, View } from 'react-native'
 import type { ImageSourcePropType } from 'react-native'
 import { Terminal } from 'lucide-react-native'
-import type { TuiAgent } from '../../../src/shared/tui-agent'
 import Svg, { Defs, G, LinearGradient, Path, Stop } from 'react-native-svg'
 import { colors } from '../theme/mobile-theme'
-import { useMobileTheme } from '../theme/mobile-theme-provider'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 import { MOBILE_AGENT_CATALOG } from '../tasks/mobile-agent-catalog'
 import { MOBILE_AGENT_ICON_ASSETS } from './mobile-agent-icon-assets'
 import { ClaudeIcon, OpenAIIcon } from './AgentIcons'
 
-// Why: agent branding should match the desktop/new-worktree picker everywhere
-// mobile lets users choose the agent that will own a workspace.
+const iconAssets: Partial<Record<string, ImageSourcePropType>> = MOBILE_AGENT_ICON_ASSETS
+
+// Match desktop/new-worktree agent branding across mobile pickers.
 
 function PiIcon({ size = 16 }: { size?: number }) {
-  const theme = useMobileTheme()
+  useMobileColorScheme()
   return (
     <Svg width={size} height={size} viewBox="0 0 800 800">
       <Path
-        fill={theme.color.text.primary}
+        fill={colors.textPrimary}
         fillRule="evenodd"
         d="M165.29 165.29 H517.36 V400 H400 V517.36 H282.65 V634.72 H165.29 Z M282.65 282.65 V400 H400 V282.65 Z"
       />
-      <Path fill={theme.color.text.primary} d="M517.36 400 H634.72 V634.72 H517.36 Z" />
+      <Path fill={colors.textPrimary} d="M517.36 400 H634.72 V634.72 H517.36 Z" />
     </Svg>
   )
 }
 
 function OmpIcon({ size = 16 }: { size?: number }) {
-  // SVG sourced from omp.sh's transparent homepage mark. Why: react-native-svg
-  // does not support the homepage's CSS oklch stops, so use its favicon hex stops.
+  // Use omp.sh transparent mark with favicon hex stops because RN SVG cannot parse homepage CSS oklch stops.
+  const gradientId = `ompMarkGradient-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
   return (
     <Svg width={size} height={size} viewBox="0 0 64 64">
       <Defs>
-        <LinearGradient id="ompMarkGradient" x1="0" y1="0" x2="1" y2="1">
+        <LinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
           <Stop offset="0" stopColor="#ed4abf" />
           <Stop offset="0.5" stopColor="#9b4dff" />
           <Stop offset="1" stopColor="#5ad8e6" />
         </LinearGradient>
       </Defs>
-      <Path fill="url(#ompMarkGradient)" d="M10 14h44v9H43v33h-9V23h-9v22h-9V23H10z" />
+      <Path fill={`url(#${gradientId})`} d="M10 14h44v9H43v33h-9V23h-9v22h-9V23H10z" />
     </Svg>
   )
 }
 
 function AiderIcon({ size = 16 }: { size?: number }) {
+  useMobileColorScheme()
   return (
     <Svg width={size} height={size} viewBox="0 0 436 436">
       <G transform="translate(0,436) scale(0.1,-0.1)" fill={colors.textPrimary} stroke="none">
@@ -55,7 +57,13 @@ function AiderIcon({ size = 16 }: { size?: number }) {
 }
 
 function BundledIcon({ source, size = 16 }: { source: ImageSourcePropType; size?: number }) {
-  return <Image source={source} style={{ width: size, height: size, borderRadius: 2 }} />
+  return (
+    <Image
+      source={source}
+      defaultSource={Array.isArray(source) ? undefined : source}
+      style={{ width: size, height: size, borderRadius: 2 }}
+    />
+  )
 }
 
 function FaviconIcon({ domain, size = 16 }: { domain: string; size?: number }) {
@@ -68,6 +76,7 @@ function FaviconIcon({ domain, size = 16 }: { domain: string; size?: number }) {
 }
 
 function AgentLetterIcon({ letter, size = 16 }: { letter: string; size?: number }) {
+  useMobileColorScheme()
   return (
     <View
       style={[
@@ -87,17 +96,13 @@ function AgentLetterIcon({ letter, size = 16 }: { letter: string; size?: number 
   )
 }
 
-function ThemeAwareOpenAIIcon({ size = 16 }: { size?: number }) {
-  const theme = useMobileTheme()
-  return <OpenAIIcon size={size} color={theme.color.text.primary} />
-}
-
 export function MobileAgentIcon({ agentId, size = 16 }: { agentId: string; size?: number }) {
+  useMobileColorScheme()
   if (agentId === 'claude' || agentId === 'claude-agent-teams') {
     return <ClaudeIcon size={size} />
   }
   if (agentId === 'codex') {
-    return <ThemeAwareOpenAIIcon size={size} />
+    return <OpenAIIcon size={size} />
   }
   if (agentId === 'pi') {
     return <PiIcon size={size} />
@@ -112,9 +117,9 @@ export function MobileAgentIcon({ agentId, size = 16 }: { agentId: string; size?
     return <Terminal size={size} color={colors.textMuted} />
   }
 
-  // Why: prefer the favicon bundled into the app over Google's favicon service,
-  // which is unreachable in some regions and offline (#8451).
-  const bundledIcon = MOBILE_AGENT_ICON_ASSETS[agentId as TuiAgent]
+  // Use bundled favicon instead of Google service for offline/regional availability (#8451).
+  const iconAgentId = agentId === 'dsb' ? 'dsh' : agentId
+  const bundledIcon = iconAssets[iconAgentId]
   if (bundledIcon) {
     return <BundledIcon source={bundledIcon} size={size} />
   }

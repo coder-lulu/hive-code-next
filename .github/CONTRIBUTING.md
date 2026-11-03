@@ -1,21 +1,18 @@
-# Contributing to HiveCode
+# Contributing to Orca
 
-HiveCode is a product fork of [Orca](https://github.com/stablyai/orca). Changes
-in this repository should improve the HiveCode product while preserving the
-compatibility surfaces required by existing Orca clients.
-
-Engineering references are maintained in the [private documentation repository](https://github.com/coder-lulu/hive-code-docs); access requires repository authorization.
+Thanks for contributing to Orca.
 
 ## Before You Start
 
 - Keep changes scoped to a clear user-facing improvement, bug fix, or refactor.
-- HiveCode targets macOS, Linux, and Windows. Guard platform-specific behavior
-  explicitly and keep local, remote, and SSH paths covered.
-- Reuse existing architecture and utilities. Avoid new dependencies unless the
-  change requires one.
-- User-visible copy, legal identity, and release identity use HiveCode. Preserve
-  upstream names only for protocols, environment variables, persisted formats,
-  plugin identities, and other documented compatibility contracts.
+- Orca targets macOS, Linux, and Windows. Every change must stay compatible with all three platforms unless the code is explicitly guarded by a runtime platform check.
+- For keyboard shortcuts, use runtime platform checks in renderer code and `CmdOrCtrl` in Electron menu accelerators.
+- For shortcut labels, show `⌘` and `⇧` on macOS, and `Ctrl+` and `Shift+` on Linux and Windows.
+- For file paths, use Node or Electron path utilities such as `path.join`.
+- Orca must work against local repositories, remote servers, and SSH worktrees. Do not assume a process, file, credential, shell, or network path exists only on the local machine.
+- Orca supports many CLI agents, integrations, and git providers. Keep generic behavior provider-neutral; guard integration-specific logic behind explicit checks.
+- Keep changes well-engineered and performant: follow existing architecture, avoid unnecessary work in hot paths, clean up owned resources, and use concrete module names.
+- For UI work, follow [`docs/STYLEGUIDE.md`](../docs/STYLEGUIDE.md), use the tokens and shadcn primitives it specifies, and verify polished behavior across platforms, light/dark mode, and SSH latency.
 
 ## Local Setup
 
@@ -24,12 +21,142 @@ Install Node 24, pnpm, and the Bun version in [`config/.bun-version`](../config/
 native PTYs, socket liveness, and V8 memory behavior. `pnpm test:node` runs the same suites
 entirely on Node. Builds and dependency installation still use Node and pnpm.
 
+The server, its workers and its packaged dependencies target Node 24. The compatibility
+launcher and CLI still target Node 18; the launcher hands off to bundled Node 24 before
+loading server code. WSL guest programs and host discovery retain their Node 18 minimum.
+Keep Node 24 APIs and server imports out of these host compatibility paths. Running an
+unpackaged server directly requires Node 24 or newer.
+
+Use the pnpm version in `packageManager` in [`package.json`](../package.json): `corepack enable`
+needs Corepack 0.34.5 or newer to start the pinned pnpm (`npm install -g corepack@latest`). On
+Windows it writes shims next to `node.exe` and fails with `EPERM` outside an elevated shell when
+Node is in `C:\Program Files\nodejs`; run `npm install -g pnpm@<that version>` instead.
+
+`pnpm install` compiles native modules such as `node-pty` with `node-gyp` and loads them in
+Electron, so a fresh machine also needs:
+
+- **macOS**: Xcode Command Line Tools (`xcode-select --install`).
+- **Windows**: Python 3 and Visual Studio Build Tools with the "Desktop development with C++"
+  workload.
+- **Linux**: a C++ toolchain, Python 3, and the libraries Electron loads even on a headless
+  machine, plus `xvfb`, which the `*.electron.test.ts` files in `pnpm test` use when `DISPLAY` is
+  unset. On Ubuntu 24.04+ and Debian 13+:
+
+  ```bash
+  sudo apt-get update && sudo apt-get install -y build-essential python3 xvfb libgtk-3-0 libnss3 libgbm1 libasound2t64
+  ```
+
+  Older releases name the last package `libasound2`.
+
 ```bash
 pnpm install
 pnpm dev
 ```
 
-Ordinary installs include native dependencies for the current OS and CPU. Before cross-architecture packaging, including the dual-architecture macOS build, run `pnpm install:release`; see [the install policy](https://github.com/coder-lulu/hive-code-docs/blob/main/reference/pnpm-install-policy.md).
+`mobile/` is a separate pnpm project with its own lockfile, so the root `pnpm install` leaves its
+dependencies uninstalled. `pnpm build` (`build:mobile-web` fails without them) and the lint
+passes that cover `mobile/` need them. Install them before building or linting, and again
+when `mobile/pnpm-lock.yaml` changes:
+
+```bash
+pnpm -C mobile install --frozen-lockfile
+```
+
+### Dev Profiles and Parallel Instances
+
+`pnpm dev` in a linked Git worktree uses its own userData profile, renderer port, and remote
+debugging (CDP) port, so dev instances in different worktrees run side by side. The main checkout
+keeps the shared `orca-dev` profile. Ports are derived from the worktree path and move to the next
+free port when taken: renderer ports start at 15200 and CDP ports at 9333.
+
+On startup the runner prints one stdout line and writes the same JSON to `out/dev-instance.json`:
+
+```text
+ORCA_DEV_INSTANCE {"userData":".../orca-dev-wt/1d3830d4d3","profile":"worktree","rendererPort":15339,"rendererUrl":"http://localhost:15339","cdpPort":9513,"cdpUrl":"http://127.0.0.1:9513","repoRoot":"...","runnerPid":4242}
+```
+
+| Option                                                                  | Effect                                                     |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `pnpm dev --shared-profile` or `ORCA_DEV_PROFILE=shared`                | Use the shared `orca-dev` profile                          |
+| `pnpm dev --worktree-profile` or `ORCA_DEV_PROFILE=worktree`            | Use a per-worktree profile, including in the main checkout |
+| `ORCA_DEV_USER_DATA_PATH=<dir>`                                         | Use an explicit profile directory                          |
+| `REMOTE_DEBUGGING_PORT=<port>`, `ORCA_DEV_RENDERER_PORT=<port>`         | Pin a port                                                 |
+| `pnpm dev --seed-profile[=<dir>]` or `ORCA_DEV_SEED_PROFILE=<dir or 1>` | Seed an empty profile on first launch                      |
+
+Per-worktree profiles live in `orca-dev-wt/<hash>` next to `orca-dev` (`~/Library/Application
+Support` on macOS, `%APPDATA%` on Windows, `$XDG_CONFIG_HOME` or `~/.config` on Linux). The
+automatic storage cleanup removes them once their worktree is gone and nothing still runs from
+them. `config/scripts/orca-dev.mjs` and the `orca-dev` terminal wrapper target the profile this
+checkout's `pnpm dev` used.
+
+Seeding copies a slim set of state from another profile: projects, workspaces, settings, SSH
+targets, and the Orca account session. Terminal sessions, PTY leases, automations, caches, logs,
+and lock files are not copied, and the source profile is only read. The default source is
+`orca-dev`, or the installed app's profile when `orca-dev` is empty. Seed from `orca-dev` when you
+need the signed-in account session: dev builds cannot decrypt secrets the installed app encrypted.
+
+```bash
+pnpm dev:seed-profile [--from=<profile dir>] [--to=<profile dir>] [--reset]
+pnpm dev:fresh [--keep] [--seed-from[=<profile dir>]]   # temporary profile, removed on exit
+```
+
+### Targeting Local Tests
+
+Use a test file or directory when you know the relevant suites. For dependency-based
+feedback, Vitest can select tests affected by your edits:
+
+```bash
+pnpm test:changed src/main/runtime --maxWorkers=2
+pnpm test --changed=origin/main --maxWorkers=2
+pnpm test src/shared/app-version.test.ts --maxWorkers=2
+```
+
+`test:changed` considers staged, unstaged, and untracked files. `--changed=origin/main`
+also includes committed changes since the branch's merge base. Update that ref when
+you need a newer baseline. Both accept the same path filters and options as `pnpm test`.
+When Git reports no changed files at all, the launcher exits before starting Vitest.
+
+Affected tests use Vitest's static import graph. Run suites explicitly for computed
+dynamic imports, fixture files, subprocess inputs, or other dependencies outside that
+graph. Local affected tests do not replace CI.
+
+To reduce main-process rebuild CPU and memory when you do not need its source maps,
+set `ORCA_DEV_MAIN_SOURCEMAPS=0` before `pnpm dev`. In Bash/zsh:
+
+```bash
+ORCA_DEV_MAIN_SOURCEMAPS=0 pnpm dev
+```
+
+In PowerShell, use `$env:ORCA_DEV_MAIN_SOURCEMAPS='0'` before `pnpm dev`.
+Remove the variable when debugging the main process with source maps. Renderer and
+preload settings are unaffected; production builds always keep their hidden main maps.
+
+`pnpm dev` serves the renderer with Vite's bundled dev mode: a few bundled chunks instead of
+thousands of module requests, so the first render and full reloads are faster. While a rebuild is
+pending, a newly opened pop-out, space, or web window may briefly get placeholder HTML. If the
+renderer misbehaves, set `ORCA_DEV_BUNDLED=0` (PowerShell: `$env:ORCA_DEV_BUNDLED='0'`) and report it.
+
+Local installs use pnpm's global virtual store: each package version is one slot
+under `~/pnpm/store` that every worktree links to, instead of a full `node_modules` per worktree.
+An existing worktree converts on its next `pnpm install`, and an older branch without the setting
+converts back the same way. CI always uses the normal layout. On Windows, pnpm links with
+junctions when you lack the symlink privilege, so no administrator rights or Developer Mode are
+needed. Things to know:
+
+- Keep `~/node_modules` (and any other `node_modules` above the store) out of your home
+  directory. Node resolves upward from the store slot, so a stray one there supplies
+  dependencies the package never declared and hides missing-dependency bugs; `pnpm install` warns
+  when it finds one.
+- Native addons are never rebuilt in place in a shared slot: each CPU gets its own build
+  beside it (see [`native-build-entry.cjs`](../config/scripts/native-build-entry.cjs)), so
+  cross-arch packaging is safe for other worktrees.
+- `ORCA_PNPM_GLOBAL_VIRTUAL_STORE=0` opts out. Keep it set
+  in your shell: `pnpm run` re-checks the install and relinks a worktree whose layout no longer
+  matches.
+
+Ordinary installs include native optional dependencies for the current OS and CPU only.
+Before a cross-architecture build (including `pnpm build:mac`, which produces both x64 and
+arm64 artifacts by default), run `pnpm install:release` to add the other CPU's variants.
 
 Linux `pnpm build`, `pnpm build:native`, and Linux packaging require a running Docker
 daemon to build the clipboard helper against Ubuntu 20.04 rather than the host's
@@ -38,16 +165,43 @@ Wayland development, run `pnpm build:native` before `pnpm dev` to make text copy
 available. See the [clipboard build guide](../native/wayland-clipboard/README.md#building-and-testing).
 macOS and Windows builds do not use this helper or require Docker for it.
 
+## Branch Naming
 
+Use a clear, descriptive branch name that reflects the change.
 
-Before opening a change, run the checks relevant to its scope. The normal
-baseline is:
+Good examples:
+
+- `fix/ctrl-backspace-delete-word`
+- `feat/shift-enter-newline`
+- `chore/update-contributor-guide`
+
+Avoid vague names like `test`, `misc`, or `changes`.
+
+## Before Opening a PR
+
+Run the same checks that CI runs, after the `mobile/` install from [Local Setup](#local-setup):
 
 ```bash
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm build
 ```
+
+`pnpm lint` runs independent checks in a bounded pool. Use
+`pnpm lint --maxWorkers=2 --timings` to limit concurrent checks and print their durations.
+
+For repeated local typechecks, use `pnpm tc` (or `pnpm tc:node`, `pnpm tc:web`,
+and `pnpm tc:cli`). On Apple Silicon macOS and x64/arm64 Linux, these use the pinned
+`tsrs` compiler with incremental caches. Keep `.cache/typecheck/` between checks;
+delete it to force a fresh check. Caches are separate for each project, compiler
+version, and worktree. At most two projects run together, subject to the memory budget.
+Windows, Intel macOS, and other unsupported platforms use pinned Bun automatically.
+Pass `--compiler=bun` to explicitly use Bun, or `--compiler=native` to use TypeScript.
+CI uses `pnpm typecheck:ci`, which explicitly selects Bun and its CI concurrency.
+Shared tests are checked by the
+Node project; shared production code is checked in all three environments.
+Run `pnpm tc:node` after editing shared tests, or `pnpm tc` to check everything.
 
 Add high-quality tests for behavior changes and bug fixes. Prefer tests that would actually catch a regression, not shallow coverage that only exercises the happy path.
 
@@ -63,98 +217,73 @@ CI enforces this for `src/preload/` and `src/shared/`.
 
 Each pull request should follow [`.github/pull_request_template.md`](./pull_request_template.md). In particular:
 
+- if you are an outside contributor, link the issue your PR addresses
 - open with an ELI5 of the change (plain language paragraph; the PR title is the one-liner)
 - explain what changed and why, and stay focused on a single topic when possible
-- for any UI or interaction change, attach **before and after** screenshots (or short videos); if there is no visual change, say `No visual change` and why
+- for any UI or interaction change, attach **before and after** screenshots (or short videos); if there is no visual or interaction change, write `N/A` and briefly explain why
 - include high-quality tests when behavior changes or bug fixes warrant them
 - include a brief code review summary from your AI coding agent that explicitly checks cross-platform compatibility, SSH/remote/local compatibility, supported agent and integration compatibility, performance risk, UI quality when applicable, and basic security risk
 - mention any platform-specific, remote/SSH-specific, agent-specific, integration-specific, or git-provider-specific behavior and testing notes
+- **Include your X (Twitter) handle** in the PR template Author section — we shout out contributors when we merge features on [@orca_build](https://x.com/orca_build).
 
-## Upstream Synchronization
+## Release Process
 
-Upstream synchronization runs directly on `hivecode/main-next` or `main`, based
-on the frozen remote product tip. No vendor branch or mandatory vendor PR is used. Do not edit release tags, upstream casks, or
-upstream publication settings as part of an ordinary product change. Resolve
-product-versus-upstream conflicts deliberately, then run the boundary and test
-checks on the final candidate before publication. CI transports that candidate
-as a Git bundle and separates its execution from publication credentials.
-Do not re-enable disabled Actions as part of synchronization.
+Version bumps, tags, and releases are maintainer-managed. Do not include release version changes in a normal contribution unless a maintainer asks for them.
 
-The public product history starts from its reviewed source snapshot. Future
-synchronizations use a real three-way content merge against the frozen reviewed
-upstream checkpoint, including when the public trees have no common ancestor.
-CI requires Git 2.38 or newer for `merge-tree --write-tree`; this maintenance
-requirement does not change the product's supported Git versions. A clean merge
-becomes a single-parent product commit rather than importing upstream commits.
-`config/upstream-tree-sync-receipt.json` records the frozen inputs and resulting
-tree. Trusted gate and publication code recomputes that tree and verifies the
-receipt; any following checkpoint commit may change only the synchronization
-state. A merge conflict requires individual review and cannot be resolved by
-automatically choosing either side.
+### Cutting a release (maintainers)
 
-For a conflicting interval, review base/product/upstream file versions and run
-the relevant behavior checks in an isolated working tree. Record the exact
-input and reviewed result blob identities, reasons and regression obligations
-in `config/upstream-tree-review.json`. Commit this maintenance metadata and any
-required control changes before freezing the product target for content
-preparation. The verifier reads the review from that frozen target; a candidate
-cannot grant itself permission to replace files. Missing conflict decisions,
-different inputs, changed results or control-file overrides fail verification.
-The ledger may be part of the content commit, but its original ownership and
-nonpending historical evidence must remain unchanged.
+All releases are cut from the **Cut Release** GitHub Actions workflow. There is no local `pnpm release:*` script — running releases locally is too easy to get wrong (dirty tree, wrong branch, stale main).
 
-Reviewed result objects must be available from the local review or its Git
-bundle. An automatic preparation job that has only metadata and cannot obtain
-those objects fails explicitly. It never invents resolutions or treats a hash
-as proof that a missing file was reviewed. Candidate execution remains in
-read-only jobs; publication uses the frozen control code.
+**To cut a release:**
 
-When independently published product branches have different public roots,
-every root must carry the same immutable baseline provenance, original ledger
-blob, reviewed upstream cursor and pending decisions. The frozen product state
-must pass that verification before tree absorption can supply inclusion evidence.
-An unreviewed root cannot inherit another root's provenance. Preserve the original
-historical product SHAs; import reviewed code changes without adding private
-pre-open-source history to the public branch.
+1. Open [Actions → Cut Release](../../actions/workflows/release-cut.yml).
+2. Click **Run workflow** and pick:
+   - **kind**: one of `rc`, `patch`, `minor`, `major`.
+   - **ref**: the branch, tag, or SHA to build from. Defaults to `main`.
+3. Run it.
 
-Keep `docs/` pinned to the private documentation gitlink. Any upstream change to
-`docs/` or `.gitmodules`, including a change later reverted in the same interval,
-blocks automatic synchronization until authenticated private absorption and its
-reviewed checkpoint are recorded. Never copy upstream or private documentation
-bodies into the public tree to bypass this boundary.
+The workflow resolves the next version from GitHub Releases, bumps `package.json`, tags, pushes, and runs the multi-platform build + publish inline.
 
-Publish the reviewed documentation changes to the authorized private repository
-first. `upstream-private-docs-review.mjs` checks its authenticated private status,
-write access, published commit and exact source/private blob coverage. Freeze
-that proof with the updated gitlink in the maintenance metadata. Public records
-contain identities and review decisions, while documentation bodies stay private.
+**How the next version is chosen:**
 
-The synchronization boundary is mandatory for both historical and current
-upstream changes: all upstream BUG, security, stability, and data-consistency
-fixes must be absorbed or documented as already equivalent, and all upstream
-features that do not cross a product boundary must be absorbed. Product
-decision is required only for an explicit product-boundary or compatibility
-conflict. Where an upstream feature overlaps HiveCode UI, preserve HiveCode
-branding and existing UI capabilities while adopting upstream behavior.
+All stable kinds (`patch`, `minor`, `major`) are computed off the latest _stable_ release, ignoring any RCs in between.
 
-The first synchronization performs one complete historical review. Later runs
-start at the reviewed upstream SHA in the frozen product target's
-`config/upstream-sync-state.json` and also revisit unresolved boundary feature
-decisions. Candidate checkpoint changes become effective only after boundary
-review, exact-candidate gates and a normal fast-forward push to the product
-branch. Re-check the remote product tip immediately before publication; if it
-moved, repeat preflight and validation. Failed gates and unpublished candidates
-therefore cannot cause skipped updates. A malformed checkpoint or rewritten
-upstream history requires explicit repair before continuing.
+- `kind=rc` + last tag was stable (e.g. `v1.3.14`) → `v1.3.15-rc.0`.
+- `kind=rc` + active RC series (e.g. `v1.3.15-rc.2`) → `v1.3.15-rc.3`.
+- `kind=patch` + latest stable `v1.3.14` → `v1.3.15` (regardless of any intermediate RCs).
+- `kind=minor` + latest stable `v1.3.14` → `v1.4.0`.
+- `kind=major` + latest stable `v1.3.14` → `v2.0.0`.
 
-See [the private upstream review guide](https://github.com/coder-lulu/hive-code-docs/blob/main/reference/upstream-sync-review.md)
-for inclusion evidence, required decisions, retry behavior, and focused platform
-verification. Neither Git ancestry nor a passing merge replaces behavior review.
+**Safety guarantees:**
 
-## Compatibility Contract
+- Stable releases are refused if the new version isn't strictly greater than the latest published stable. This is the only rule `electron-updater` actually needs — it compares semver within the `latest` channel, so a regressing stable is the one thing that breaks auto-update for fresh installs.
+- Complete RC draft releases created by the release workflow are published before cutting a new tag only when the draft tag was built from the current release ref. Stale drafts are skipped so fixes cut a fresh RC instead of exposing old artifacts.
+- If the latest RC tag exists but is still draft-only or missing its GitHub Release, the workflow resumes that tag only when it was built from the current release ref. Otherwise the next RC number is cut.
+- RC numbering also considers release commits on `main`, so deleting a stale tag does not let a later cut reuse the same RC number.
+- Off-main releases (when `ref` is not the tip of `main`) only push the tag. `main` is never mutated from a non-main ref, so you can safely release an older commit without polluting history.
+- When `ref` is the tip of `main`, the workflow tries to fast-forward the version-bump commit onto `main`. If main requires pull requests, it leaves main unchanged and pushes only the release tag. Other push errors still stop the cut.
 
-Do not rename or remove these without an explicit migration plan: `orca` and
-`orca-ide` CLI aliases, `orca://`, `ORCA_*` variables, `X-Orca-Agent-Hook-Token`,
-`.orca` paths, `engines.orca`, `stablyai.orca-*` plugin IDs, and legacy bundle or
-provider identifiers. They are retained for interoperability even though the
-product is branded HiveCode.
+**Common scenarios:**
+
+- **Normal release:** `kind=patch`, `ref=main`.
+- **"A bad commit just landed on main, release the commit before it":** `kind=patch`, `ref=<good-sha>`. `main` is left alone; the tag points at the good SHA. Fix forward on `main` afterward.
+- **One-off RC for a feature branch:** `kind=rc`, `ref=<branch-or-sha>`. Produces an RC tag that does not touch `main`.
+- **Minor or major bump:** `kind=minor` or `kind=major`.
+
+## Release Channels
+
+The public Homebrew cask tracks stable desktop releases:
+
+```bash
+brew install --cask stablyai/orca/orca
+```
+
+Release candidates use a separate cask token:
+
+```bash
+brew install --cask stablyai/orca/orca@rc
+```
+
+The two casks conflict because both install `Orca.app`. Switch channels with a
+normal `brew uninstall --cask` followed by the install for the other channel.
+Do not use `--zap` unless you intentionally want to remove local Orca state.

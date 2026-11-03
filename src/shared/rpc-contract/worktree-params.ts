@@ -1,3 +1,4 @@
+import { CLIENT_PROVENANCE_SNAPSHOT_MAX } from '../automation-workspace-provenance'
 import { z } from 'zod'
 import { normalizeExecutionHostId } from '../execution-host'
 import { isTuiAgent } from '../tui-agent-config'
@@ -38,6 +39,19 @@ export const OptionalTuiAgent = z
   .transform((value): TuiAgent | undefined => (isTuiAgent(value) ? value : undefined))
   .optional()
 
+/** Descriptive remote-owner labels; automation authority still requires the host's dispatch token. */
+export const ClientAutomationWorkspaceProvenance = z.object({
+  automationId: z.string().min(1).max(256),
+  automationNameSnapshot: z.string().max(CLIENT_PROVENANCE_SNAPSHOT_MAX),
+  automationRunId: z.string().min(1).max(256),
+  automationRunTitleSnapshot: z.string().max(CLIENT_PROVENANCE_SNAPSHOT_MAX),
+  executionTargetType: z.enum(['local', 'ssh']),
+  executionTargetId: z.string().max(256),
+  projectId: z.string().max(256),
+  repoId: z.string().max(256).optional(),
+  hostId: OptionalExecutionHostId
+})
+
 export const AutomationWorkspaceProvenanceRequest = z.object({
   automationId: z.string(),
   automationRunId: z.string(),
@@ -71,6 +85,7 @@ export const WorktreeTeardownMissingTerminalsParams = WorktreeDetectedListParams
 
 export const WorktreePsParams = z.object({
   limit: OptionalFiniteNumber,
+  includeAgentWait: OptionalBoolean,
   afterSnapshotId: z.string().min(1).max(128).nullable().optional(),
   supportsWorktreeVisibilitySourceDefaults: z.literal(true).optional()
 })
@@ -84,6 +99,10 @@ export const WorktreeSelector = z.object({
     .unknown()
     .transform((v) => (typeof v === 'string' ? v : ''))
     .pipe(z.string().min(1, 'Missing worktree selector'))
+})
+
+export const WorktreeSleepParams = WorktreeSelector.extend({
+  markChatsAsleep: z.boolean().optional()
 })
 
 export const WorktreeActivate = WorktreeSelector.extend({
@@ -111,6 +130,15 @@ export function assertLinkedWorkItemSourceContextMatch(
   }
 }
 
+export const WorktreeGitHubLinkBase = z
+  .object({
+    hostId: OptionalExecutionHostId.unwrap(),
+    instanceId: z.string().min(1).nullable(),
+    linkedPR: z.number().int().positive().nullable(),
+    suppressedGitHubPR: z.number().int().positive().nullable()
+  })
+  .strict()
+
 export const WorktreeSet = WorktreeSelector.extend({
   // Why: '' is the blanking contract — "fall back to the branch/folder name".
   // OptionalString coerced it to undefined, so on remote/SSH hosts clearing the
@@ -122,6 +150,7 @@ export const WorktreeSet = WorktreeSelector.extend({
   linkedIssue: TriStateLinkedIssue,
   linkedPR: TriStateLinkedIssue,
   suppressedGitHubPR: z.number().int().positive().nullable().optional(),
+  githubLinkBase: WorktreeGitHubLinkBase.optional(),
   linkedLinearIssue: z.union([z.string(), z.null()]).optional(),
   linkedLinearIssueWorkspaceId: z.union([z.string(), z.null()]).optional(),
   linkedLinearIssueOrganizationUrlKey: z.union([z.string(), z.null()]).optional(),
@@ -157,11 +186,23 @@ export const WorktreeSet = WorktreeSelector.extend({
     .optional(),
   // Older clients may send unsupported review shapes alongside unrelated metadata edits.
   diffComments: z.array(DiffCommentSchema).optional().catch(undefined),
+  diffCommentsBase: z.array(DiffCommentSchema).optional(),
+  firstAgentMessageRenameError: z.null().optional(),
   mobileDiffReview: MobileDiffReviewSchema.optional().catch(undefined),
   parentWorktree: OptionalString,
   noParent: OptionalBoolean
 }).superRefine((params, ctx) => {
   assertLinkedWorkItemSourceContextMatch(params, ctx)
+  if (
+    (params.linkedPR === null || params.suppressedGitHubPR !== undefined) &&
+    params.githubLinkBase === undefined
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['githubLinkBase'],
+      message: 'A captured GitHub link snapshot is required to clear or suppress a PR.'
+    })
+  }
   if (params.parentWorktree && params.noParent === true) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,

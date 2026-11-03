@@ -1,3 +1,4 @@
+import { translate } from './i18n/mobile-i18n'
 import { Activity, Edit3, PowerOff, RefreshCw, Trash2, Users } from 'lucide-react-native'
 import type { ActionSheetAction } from './components/ActionSheetModal'
 import { hostCatalogEntryHasLocalPairing } from './runtime-directory/account-runtime-catalog'
@@ -46,7 +47,10 @@ export function getHostListActionSheetActions(args: {
     ...(isLive
       ? [
           {
-            label: '断开当前手机连接',
+            label: translate(
+              'auto.mobile.src.host.list.action.sheet.actions.2f6186d8c5',
+              'Disconnect this phone'
+            ),
             icon: PowerOff,
             onPress: () => {
               args.onDismiss()
@@ -56,7 +60,7 @@ export function getHostListActionSheetActions(args: {
         ]
       : []),
     {
-      label: '网络诊断',
+      label: translate('diagnostics.connectionDiagnosticsView.title', 'Network diagnostics'),
       icon: Activity,
       disabled: !host.profile,
       hint: host.profile ? undefined : '连接资料暂不可用',
@@ -77,14 +81,20 @@ export function getHostListActionSheetActions(args: {
     ...(accountRuntime && host.runtimeRecordId
       ? [
           {
-            label: '会话管理',
+            label: translate(
+              'auto.mobile.src.host.list.action.sheet.actions.d640d4b521',
+              'Session management'
+            ),
             icon: Users,
             disabled: !args.onSessions,
             closeBeforePress: true,
             onPress: () => args.onSessions?.(host.id)
           },
           {
-            label: '删除 Runtime',
+            label: translate(
+              'auto.mobile.src.host.list.action.sheet.actions.cdc39b6908',
+              'Delete Runtime'
+            ),
             icon: Trash2,
             destructive: true,
             disabled: !args.onUnclaim,
@@ -96,7 +106,10 @@ export function getHostListActionSheetActions(args: {
     ...(hostCatalogEntryHasLocalPairing(host)
       ? [
           {
-            label: '移除本地配对',
+            label: translate(
+              'auto.mobile.src.host.list.action.sheet.actions.4c527fcdc5',
+              'Remove local pairing'
+            ),
             destructive: true,
             closeBeforePress: true,
             onPress: () => args.onRemove(host)

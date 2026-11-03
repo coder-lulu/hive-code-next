@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, Text, View } from 'react-native'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { ClaudeIcon, OpenAIIcon } from '../components/AgentIcons'
 import {
   getActiveProviderRateLimits,
@@ -8,22 +9,25 @@ import {
   type AccountsSnapshot,
   type ProviderKey
 } from '../components/AccountUsage'
-import type { MobileTheme } from '../theme/mobile-theme'
-import { useMobileTheme } from '../theme/mobile-theme-provider'
+import { colors, radii, spacing } from '../theme/mobile-theme'
+import { themedStyleSheet } from '../theme/themed-styles'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 import type { HostProfile } from '../transport/types'
 
 export function MobileHomeAccountUsageCards(props: {
   items: { host: HostProfile; snapshot: AccountsSnapshot }[]
   onOpen: (hostId: string) => void
 }) {
-  const theme = useMobileTheme()
-  const styles = createStyles(theme)
+  const t = useMobileTranslation()
+  useMobileColorScheme()
   if (props.items.length === 0) {
     return null
   }
   return (
     <>
-      <Text style={styles.sectionHeading}>Account usage</Text>
+      <Text style={styles.sectionHeading}>
+        {t('home.accountUsageCards.sectionHeading', 'Account usage')}
+      </Text>
       {props.items.map(({ host, snapshot }) => {
         const claudeActive =
           snapshot.claude.accounts.find(
@@ -60,22 +64,22 @@ export function MobileHomeAccountUsageCards(props: {
                     {provider === 'claude' ? (
                       <ClaudeIcon size={18} />
                     ) : (
-                      <OpenAIIcon size={18} color={theme.color.text.primary} />
+                      <OpenAIIcon size={18} color={colors.textPrimary} />
                     )}
                   </View>
                   <View style={styles.info}>
                     <Text style={styles.email} numberOfLines={1}>
-                      {active?.email ?? 'System default'}
+                      {active?.email ?? t('home.accountUsageCards.systemDefault', 'System default')}
                     </Text>
                     <View style={styles.bars}>
                       <UsageBar
-                        label="5h"
+                        label={t('home.accountUsageCards.sessionWindow', '5h')}
                         usedPercent={sessionBar.usedPercent}
                         unavailable={sessionBar.unavailable}
                         loading={sessionBar.loading}
                       />
                       <UsageBar
-                        label="7d"
+                        label={t('home.accountUsageCards.weeklyWindow', '7d')}
                         usedPercent={weeklyBar.usedPercent}
                         unavailable={weeklyBar.unavailable}
                         loading={weeklyBar.loading}
@@ -92,43 +96,45 @@ export function MobileHomeAccountUsageCards(props: {
   )
 }
 
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    sectionHeading: {
-      ...theme.typography.meta,
-      marginTop: theme.spacing.space24,
-      marginBottom: theme.spacing.space8,
-      paddingHorizontal: theme.spacing.space4,
-      color: theme.color.text.secondary,
-      fontWeight: '600'
-    },
-    card: {
-      gap: theme.spacing.space12,
-      marginBottom: theme.spacing.space8,
-      paddingHorizontal: theme.spacing.space16,
-      paddingVertical: theme.spacing.space12,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.color.border.subtle,
-      borderRadius: theme.radii.card,
-      backgroundColor: theme.color.bg.surface
-    },
-    cardPressed: { backgroundColor: theme.color.bg.subtle },
-    hostLabel: {
-      ...theme.typography.caption,
-      color: theme.color.text.tertiary,
-      fontWeight: '500'
-    },
-    row: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.space12 },
-    icon: {
-      width: theme.size.minimumTouchTarget,
-      height: theme.size.minimumTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: theme.radii.control,
-      backgroundColor: theme.color.bg.subtle
-    },
-    info: { flex: 1, minWidth: 0, gap: theme.spacing.space4 },
-    email: { ...theme.typography.meta, fontWeight: '600', color: theme.color.text.primary },
-    bars: { flexDirection: 'row', gap: theme.spacing.space12, marginTop: theme.spacing.space4 }
-  })
-}
+const styles = themedStyleSheet(() => ({
+  sectionHeading: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.xs
+  },
+  card: {
+    backgroundColor: colors.bgPanel,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    borderRadius: radii.card,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    gap: spacing.sm,
+    marginBottom: spacing.sm
+  },
+  cardPressed: { backgroundColor: colors.bgRaised },
+  hostLabel: {
+    fontSize: 11,
+    color: colors.textMuted,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4
+  },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm + 2 },
+  icon: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    backgroundColor: colors.bgRaised,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  info: { flex: 1, minWidth: 0, gap: 2 },
+  email: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
+  bars: { flexDirection: 'row', gap: spacing.md, marginTop: 4 }
+}))

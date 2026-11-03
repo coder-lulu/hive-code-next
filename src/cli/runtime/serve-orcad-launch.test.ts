@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { join } from 'node:path'
 import { formatServeRuntimeSelection } from '../../shared/orcad-local-serve-selection'
 import type { runProcess } from '@orca/process-host'
-import { orcadServeArgs, resolveLocalServeRuntime, serveOptionArgs } from './serve-orcad-launch'
+import { resolveLocalServeRuntime } from './serve-orcad-launch'
+import { orcadServeArgs, serveOptionArgs } from '../../shared/orcad-serve-argv'
 
 type RunProcess = typeof runProcess
 
@@ -24,7 +25,7 @@ const options = {
 }
 
 describe('orca serve asking the app which host to run', () => {
-  it("runs the app's own selection entry as plain Node and reads its answer", async () => {
+  it("requests the app's selection entry in Node mode and parses its answer", async () => {
     const selection = {
       kind: 'orcad' as const,
       runtime: '/rt/node',
@@ -60,7 +61,7 @@ describe('orca serve asking the app which host to run', () => {
     expect(run).not.toHaveBeenCalled()
   })
 
-  it('serves on Electron, and says why, when the app gives no answer', async () => {
+  it('selects Electron with a reason when the app gives no answer', async () => {
     expect(await resolveLocalServeRuntime(options, answering('', 1))).toEqual({
       kind: 'electron',
       reason: expect.stringContaining('did not answer')
@@ -74,7 +75,7 @@ describe('orca serve asking the app which host to run', () => {
     })
   })
 
-  it('forwards every desktop serve flag, binding wide as Electron serve does', () => {
+  it('renders orcad serve options with the default bind address', () => {
     expect(
       orcadServeArgs({
         json: true,
@@ -100,6 +101,19 @@ describe('orca serve asking the app which host to run', () => {
       '/work/app'
     ])
     expect(orcadServeArgs({})).toEqual(['--bind', '0.0.0.0'])
+  })
+
+  it("hands orcad the app's browser client directory when the app has one", () => {
+    expect(
+      orcadServeArgs({ port: '6768' }, '/opt/Orca/resources/app.asar.unpacked/out/web')
+    ).toEqual([
+      '--bind',
+      '0.0.0.0',
+      '--port',
+      '6768',
+      '--web-client-root',
+      '/opt/Orca/resources/app.asar.unpacked/out/web'
+    ])
   })
 
   it('spells the same flags with the --serve- prefix for the Electron host', () => {

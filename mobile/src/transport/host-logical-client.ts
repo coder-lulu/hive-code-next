@@ -4,10 +4,7 @@ import type { ConnectionLogSink, HostProfile } from './types'
 import { directPathForEndpoint } from './mobile-direct-endpoint-probe'
 import { AccountRuntimeRpcClient } from './account-runtime-rpc-client'
 
-export async function openHostLogicalClient(
-  host: HostProfile,
-  onLog: ConnectionLogSink
-): Promise<RpcClient> {
+export function openHostLogicalClient(host: HostProfile, onLog: ConnectionLogSink): RpcClient {
   if (host.accountRuntime) {
     return createStableLogicalRpcClient(
       new AccountRuntimeRpcClient(host.id, host.accountRuntime, onLog),

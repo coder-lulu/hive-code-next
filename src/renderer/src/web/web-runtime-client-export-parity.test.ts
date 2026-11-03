@@ -1,10 +1,13 @@
 import { expect, expectTypeOf, it } from 'vitest'
-import type { WebPairingOffer } from './web-pairing'
+import type { PairedRuntimeConnection } from '../../../shared/paired-runtime-connection'
 import type { CloudLaunchBootstrap } from './cloud-launch-bootstrap'
-import type { WebRuntimeConnection } from './web-runtime-client-protocol'
+import type { WebRuntimeTransportConnection } from './web-runtime-transport-connection'
 import * as WebClient from './web-runtime-client'
 
-type WebRuntimeClientInput = WebPairingOffer | CloudLaunchBootstrap | WebRuntimeConnection
+type WebRuntimeClientInput =
+  | PairedRuntimeConnection
+  | CloudLaunchBootstrap
+  | WebRuntimeTransportConnection
 
 it('keeps the paired-web client public export surface exact', () => {
   expectTypeOf<ConstructorParameters<typeof WebClient.WebRuntimeClient>>().toEqualTypeOf<
@@ -14,7 +17,7 @@ it('keeps the paired-web client public export surface exact', () => {
     ]
   >()
   expectTypeOf<keyof WebClient.WebRuntimeClient>().toEqualTypeOf<
-    'call' | 'close' | 'subscribe' | 'statusOwner'
+    'call' | 'close' | 'subscribe' | 'statusOwner' | 'connectionEpoch'
   >()
   expect(Object.keys(WebClient)).toEqual(['WebRuntimeClient'])
 })

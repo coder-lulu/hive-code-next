@@ -40,7 +40,7 @@ vi.mock('./orchestration-structured-worker-session', async (importOriginal) => (
 }))
 
 const STRUCTURED_DEFAULT = {
-  experimentalNativeChat: true,
+  nativeChatProviders: {},
   agentCmdOverrides: {},
   agentDefaultArgs: {},
   agentDefaultEnv: {}
@@ -172,7 +172,7 @@ describe('worker-start honours the settings default', () => {
   })
 
   it('starts a terminal agent worker when it is not', async () => {
-    const result = await startWorker({ experimentalNativeChat: false })
+    const result = await startWorker({ nativeChatProviders: { claude: false } })
 
     expect(result).toMatchObject({
       state: 'ready',
@@ -251,7 +251,7 @@ describe('worker-start honours the settings default', () => {
     const created = mockWorktreeCreation()
 
     const result = await startWorker(
-      { ...STRUCTURED_DEFAULT, experimentalNativeChat: false },
+      { ...STRUCTURED_DEFAULT, nativeChatProviders: { claude: false } },
       { worktree: 'new-child', name: 'worker-child' }
     )
 

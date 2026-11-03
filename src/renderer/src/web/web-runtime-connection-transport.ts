@@ -1,23 +1,30 @@
-import { WebRuntimeConnectionTimers } from './web-runtime-connection-timers'
-import { withWebClientUpgradeMarker } from '../../../shared/web-origin-security'
-import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
+import {
+  webRuntimeToken,
+  webRuntimeTransportCredential,
+  type WebRuntimeTransportConnection
+} from './web-runtime-transport-connection'
 import { withReconnectJitter } from '../../../shared/reconnect-jitter'
 import { WebRuntimeConnectionHeartbeat } from './web-runtime-connection-heartbeat'
 import {
   routeWebRuntimeConnectionFrame,
   type WebRuntimeConnectionState
 } from './web-runtime-connection-frame-router'
-import { createWebRuntimeUnauthorizedError } from './web-runtime-client-error'
-import { RuntimeE2EEClientSession } from '../../../shared/runtime-e2ee-client-session'
 import {
-  webRuntimeAuthenticationFrame,
-  type WebRuntimeConnection
-} from './web-runtime-client-protocol'
+  WebRuntimeConnectionAuth,
+  type WebRuntimeConnectionLifecycle
+} from './web-runtime-connection-auth'
+import type { WebRuntimeAuthPlan } from './web-runtime-credential-source'
+import { WebRuntimeConnectionTimers } from './web-runtime-connection-timers'
+import {
+  createPairedE2EEClientHandshake,
+  type PairedE2EEClientHandshake
+} from '../../../shared/paired-e2ee-client-handshake'
+import { WEB_PAIRED_E2EE_PRIMITIVES } from './web-paired-e2ee-primitives'
+import { withWebClientUpgradeMarker } from '../../../shared/web-origin-security'
 import type { WebRuntimeTransportSubscription } from './web-runtime-subscription-contract'
 import { WebRuntimeSubscriptionRegistry } from './web-runtime-subscription-registry'
 import { WebRuntimeRequestRegistry } from './web-runtime-request-registry'
 import { WebRuntimeConnectionWaiters } from './web-runtime-connection-waiters'
-import { APP_DISPLAY_NAME } from '@/product-brand'
 
 const CONNECT_TIMEOUT_MS = 12_000
 const HANDSHAKE_TIMEOUT_MS = 10_000
@@ -25,8 +32,8 @@ const RECONNECT_DELAYS_MS = [500, 1000, 2000, 4000, 8000, 15_000]
 
 export class WebRuntimeConnectionTransport {
   ws: WebSocket | null = null
-  session: RuntimeE2EEClientSession | null = null
-  private inboundChain: Promise<void> = Promise.resolve()
+  handshake: PairedE2EEClientHandshake | null = null
+  private readonly auth: WebRuntimeConnectionAuth
   state: WebRuntimeConnectionState = 'disconnected'
   readonly subscriptions: Map<string, WebRuntimeTransportSubscription>
   readonly heartbeat: WebRuntimeConnectionHeartbeat
@@ -35,31 +42,32 @@ export class WebRuntimeConnectionTransport {
   private intentionallyClosed = false
   private readonly timers = new WebRuntimeConnectionTimers()
   private readonly subscriptionRegistry: WebRuntimeSubscriptionRegistry
-  private readonly requestRegistry: WebRuntimeRequestRegistry
+  readonly requestRegistry: WebRuntimeRequestRegistry
   private readonly connectionWaiters: WebRuntimeConnectionWaiters
 
   constructor(
-    private readonly connection: WebRuntimeConnection,
+    private readonly connection: WebRuntimeTransportConnection,
     clock: { now: () => number; isDocumentVisible: () => boolean },
-    private readonly lifecycle: {
-      onStateChanged?: (state: WebRuntimeConnectionState) => void
-      reconnect?: boolean
-    } = {}
+    private readonly lifecycle: WebRuntimeConnectionLifecycle = {}
   ) {
+    this.auth = new WebRuntimeConnectionAuth(connection, {
+      ...lifecycle,
+      retryLater: () => this.scheduleReconnect()
+    })
     this.connectionWaiters = new WebRuntimeConnectionWaiters({
       endpoint: connection.endpoint,
       getState: () => this.state,
-      getAuthError: createWebRuntimeUnauthorizedError,
+      getAuthError: () => this.auth.failureError(),
       isIntentionallyClosed: () => this.intentionallyClosed
     })
     this.subscriptionRegistry = new WebRuntimeSubscriptionRegistry({
-      credential: () => this.rpcCredential(),
+      credential: () => webRuntimeTransportCredential(this.connection),
       nextId: () => this.nextId(),
       sendEncrypted: (message) => this.sendEncrypted(message)
     })
     this.subscriptions = this.subscriptionRegistry.subscriptions
     this.requestRegistry = new WebRuntimeRequestRegistry({
-      credential: () => this.rpcCredential(),
+      deviceToken: webRuntimeToken(connection),
       nextId: () => this.nextId(),
       waitForConnected: (timeoutMs, signal) => this.connectionWaiters.wait(timeoutMs, signal),
       sendEncrypted: (message) => this.sendEncrypted(message)
@@ -72,7 +80,7 @@ export class WebRuntimeConnectionTransport {
       sendProbe: () =>
         this.sendEncrypted({
           id: `web-heartbeat-${this.nextId()}`,
-          ...this.rpcCredential(),
+          deviceToken: webRuntimeToken(this.connection),
           method: 'status.get'
         }),
       handleDeadSocket: (socket) => this.handleSocketClosed(socket)
@@ -80,65 +88,86 @@ export class WebRuntimeConnectionTransport {
     this.openConnection()
   }
 
-  async call(
-    method: string,
-    params?: unknown,
-    options?: { timeoutMs?: number; signal?: AbortSignal }
-  ): Promise<RuntimeRpcResponse<unknown>> {
-    return this.requestRegistry.call(method, params, options)
-  }
+  readonly call: WebRuntimeRequestRegistry['call'] = (method, params, options) =>
+    this.requestRegistry.call(method, params, options)
 
   close(options: { notifySubscriptions?: boolean } = {}): void {
     this.intentionallyClosed = true
     this.clearTimers()
-    this.requestRegistry.rejectAll(`Remote ${APP_DISPLAY_NAME} runtime connection closed.`)
-    this.connectionWaiters.rejectAll(
-      new Error(`Remote ${APP_DISPLAY_NAME} runtime connection closed.`)
-    )
+    this.requestRegistry.rejectAll('Remote Orca runtime connection closed.')
+    this.connectionWaiters.rejectAll(new Error('Remote Orca runtime connection closed.'))
     this.subscriptionRegistry.close(options.notifySubscriptions ?? true)
-    if (this.ws) {
-      this.ws.close()
-      this.ws = null
-    }
-    this.session = null
+    this.ws?.close()
+    this.ws = null
+    this.handshake = null
     this.setState('disconnected')
   }
 
   async handleSocketMessage(rawData: unknown, sourceWs?: WebSocket): Promise<void> {
     await routeWebRuntimeConnectionFrame(rawData, sourceWs, {
       getState: () => this.state,
-      getSession: () => this.session,
+      getHandshake: () => this.handshake,
       getSocket: () => this.ws,
-      authenticationFrame: () =>
-        webRuntimeAuthenticationFrame(this.connection, this.session!.transcriptHashB64),
       pending: this.requestRegistry.pending,
       subscriptions: this.subscriptions,
-      sendEncrypted: (message) => this.sendEncrypted(message),
-      setConnected: () => {
-        this.timers.clear('handshake')
-        this.reconnectAttempt = 0
-        this.setState('connected')
-      },
-      setAuthFailed: () => {
-        this.intentionallyClosed = true
-        this.setState('auth-failed')
-      },
-      rejectUnauthorized: (error) => this.requestRegistry.rejectAll(error),
-      notifyUnauthorized: () =>
-        this.notifySubscriptionsError('unauthorized', 'Unauthorized. Pair this web client again.')
+      sendAuth: (handshake) => this.sendAuth(handshake),
+      setConnected: () => this.handleAuthenticated(),
+      authRejected: (reply) => void this.handleAuthRejected(reply)
     })
+  }
+
+  private handleAuthenticated(): void {
+    const socket = this.ws
+    const handshake = this.handshake
+    if (
+      socket &&
+      handshake &&
+      this.auth.migrateIfPlanned({
+        handshake,
+        beginMigration: () => this.setState('migrating'),
+        call: (method, params) => this.requestRegistry.callNow(method, params),
+        // Why reconnect either way: the next socket authenticates with the key or the token.
+        reconnect: () => {
+          if (this.ws === socket) {
+            this.reconnectAttempt = 0
+            socket.close()
+            this.handleSocketClosed(socket)
+          }
+        }
+      })
+    ) {
+      return
+    }
+    this.timers.clear('handshake')
+    this.reconnectAttempt = 0
+    this.setState('connected')
+  }
+
+  private async handleAuthRejected(
+    reply: Parameters<WebRuntimeConnectionAuth['rejected']>[0]
+  ): Promise<void> {
+    const socket = this.ws
+    const outcome = await this.auth.rejected(reply)
+    if (outcome.kind === 'failed') {
+      this.intentionallyClosed = true
+      this.setState('auth-failed')
+      this.requestRegistry.rejectAll(outcome.error)
+      this.subscriptionRegistry.notifyError('unauthorized', outcome.error.message)
+    }
+    socket?.close()
   }
 
   handleSocketClosed(closedWs: WebSocket): void {
     if (this.ws !== closedWs) {
       return
     }
+    this.auth.socketClosed()
     this.ws = null
-    this.session = null
+    this.handshake = null
     this.timers.clear('connect')
     this.timers.clear('handshake')
     this.heartbeat.clear()
-    this.requestRegistry.rejectAll(`Remote ${APP_DISPLAY_NAME} runtime connection interrupted.`)
+    this.requestRegistry.rejectAll('Remote Orca runtime connection interrupted.')
     this.subscriptionRegistry.handleInterrupted()
     if (this.intentionallyClosed || this.state === 'auth-failed') {
       this.setState(this.state === 'auth-failed' ? 'auth-failed' : 'disconnected')
@@ -151,11 +180,12 @@ export class WebRuntimeConnectionTransport {
   setState(next: WebRuntimeConnectionState): void {
     this.state = next
     if (next === 'connected') {
+      this.requestRegistry.connectionOpened()
       this.subscriptionRegistry.replayInterrupted()
       this.heartbeat.start()
       this.connectionWaiters.resolveAll()
     } else if (next === 'auth-failed') {
-      this.connectionWaiters.rejectAll(createWebRuntimeUnauthorizedError())
+      this.connectionWaiters.rejectAll(this.auth.failureError())
     }
     this.lifecycle.onStateChanged?.(next)
   }
@@ -164,6 +194,14 @@ export class WebRuntimeConnectionTransport {
     if (this.intentionallyClosed) {
       return
     }
+    this.auth.open((plan) => {
+      if (!this.intentionallyClosed && !this.ws) {
+        this.openSocket(plan)
+      }
+    })
+  }
+
+  private openSocket(plan: WebRuntimeAuthPlan): void {
     let socket: WebSocket
     try {
       socket = new WebSocket(withWebClientUpgradeMarker(this.connection.endpoint))
@@ -174,7 +212,7 @@ export class WebRuntimeConnectionTransport {
     }
     socket.binaryType = 'arraybuffer'
     this.ws = socket
-    this.session = null
+    this.handshake = null
     this.setState('connecting')
     this.timers.arm('connect', CONNECT_TIMEOUT_MS, () => {
       if (this.ws === socket && socket.readyState === WebSocket.CONNECTING) {
@@ -188,14 +226,18 @@ export class WebRuntimeConnectionTransport {
       }
       this.timers.clear('connect')
       this.setState('handshaking')
-      this.session = RuntimeE2EEClientSession.create({
-        desktopPublicKeyB64: this.connection.publicKeyB64,
+      const handshake = createPairedE2EEClientHandshake({
+        primitives: WEB_PAIRED_E2EE_PRIMITIVES,
+        hostPublicKeyB64: this.connection.hostPublicKeyB64,
+        framing: this.auth.framingFor(plan),
         transport: 'direct'
       })
-      socket.send(JSON.stringify(this.session.hello))
+      this.handshake = handshake
+      socket.send(handshake.helloText())
       this.timers.arm('handshake', HANDSHAKE_TIMEOUT_MS, () => {
-        if (this.ws === socket && this.state === 'handshaking') {
+        if (this.ws === socket && (this.state === 'handshaking' || this.state === 'migrating')) {
           socket.close()
+          this.handleSocketClosed(socket)
         }
       })
     }
@@ -204,41 +246,47 @@ export class WebRuntimeConnectionTransport {
         return
       }
       this.heartbeat.noteInboundFrame()
-      this.inboundChain = this.inboundChain
-        .then(() => (this.ws === socket ? this.handleSocketMessage(event.data, socket) : undefined))
-        .catch(() => {
-          if (this.ws === socket) {
-            socket.close()
-          }
-        })
+      void this.handleSocketMessage(event.data, socket)
     }
     socket.onclose = () => this.handleSocketClosed(socket)
     socket.onerror = () => {
-      if (this.state === 'connecting') {
+      if (this.ws === socket && this.state === 'connecting') {
         this.connectionWaiters.rejectUnavailable()
       }
     }
   }
 
-  rpcCredential(): { deviceToken: string } | Record<string, never> {
-    return this.connection.kind === 'pairing' ? { deviceToken: this.connection.deviceToken } : {}
-  }
-
   sendEncrypted(message: unknown): boolean {
     const socket = this.ws
-    if (!socket || socket.readyState !== WebSocket.OPEN || !this.session) {
+    if (!socket || socket.readyState !== WebSocket.OPEN || !this.handshake) {
       return false
     }
-    socket.send(this.session.sealText(JSON.stringify(message)))
+    socket.send(this.handshake.channel.sealText(JSON.stringify(this.auth.outbound(message))))
     return true
+  }
+
+  private sendAuth(handshake: PairedE2EEClientHandshake): void {
+    const socket = this.ws
+    this.auth.sendAuth({
+      handshake,
+      fallbackToken: webRuntimeToken(this.connection) ?? '',
+      // Why: the socket may have closed or been replaced while the auth step ran.
+      isCurrent: () =>
+        this.handshake === handshake &&
+        this.ws === socket &&
+        socket?.readyState === WebSocket.OPEN &&
+        this.state === 'handshaking',
+      send: (frame) => socket?.send(frame),
+      fail: () => socket?.close()
+    })
   }
 
   sendEncryptedBinary(bytes: Uint8Array<ArrayBufferLike>): boolean {
     const socket = this.ws
-    if (!socket || socket.readyState !== WebSocket.OPEN || !this.session) {
+    if (!socket || socket.readyState !== WebSocket.OPEN || !this.handshake) {
       return false
     }
-    socket.send(new Uint8Array(this.session.sealBinary(bytes)))
+    socket.send(this.handshake.channel.sealBinary(bytes))
     return true
   }
 
@@ -264,10 +312,6 @@ export class WebRuntimeConnectionTransport {
   nextId(): string {
     this.requestCounter += 1
     return `web-rpc-${this.requestCounter}-${Date.now()}`
-  }
-
-  private notifySubscriptionsError(code: string, message: string): void {
-    this.subscriptionRegistry.notifyError(code, message)
   }
 
   private clearTimers(): void {

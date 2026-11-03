@@ -1,10 +1,6 @@
 import { encodeGitPathspecs } from './git-pathspec-stdin'
 
-/**
- * Host-side "stage everything" for a Source Control listing that hit the status
- * cap: the renderer only holds the first rows, so it cannot name every path.
- * `all` stages tracked and untracked changes; `tracked` stages only tracked ones.
- */
+/** Host-side staging covers paths omitted by capped status listings: all includes untracked, tracked excludes them. */
 export type GitStageWorktreeScope = 'all' | 'tracked'
 
 /** What a host that ran a scoped stage replies with; a host without scope support replies without it. */
@@ -15,12 +11,9 @@ export function parseGitStageWorktreeScope(value: unknown): GitStageWorktreeScop
 }
 
 export const GIT_STAGE_WORKTREE_SCOPE_UNSUPPORTED_MESSAGE =
-  'The HiveCode version running this workspace cannot stage changes beyond the ones listed, so nothing was staged. Update HiveCode on that host, or stage from a terminal.'
+  'The Orca version running this workspace cannot stage changes beyond the ones listed, so nothing was staged. Update Orca on that host, or stage from a terminal.'
 
-/**
- * Why: an older host strips `scope` and stages only `filePaths`, which scoped callers send empty,
- * so a missing receipt means nothing was staged — never report that as a successful "stage all".
- */
+/** Older hosts strip scope and stage the empty filePaths list; require a receipt before reporting stage-all success. */
 export function requireGitStageWorktreeScopeReceipt(
   reply: unknown,
   scope: GitStageWorktreeScope
@@ -41,6 +34,8 @@ type GitStageRunner = (args: string[], stdin?: string) => Promise<{ stdout: stri
 export type StageGitWorktreeScopeOptions = {
   /** Untracked paths `all` must skip: Orca's shared symlinks, already verified as symlinks. */
   excludedUntrackedPaths?: readonly string[]
+  /** The execution owner decides casing; a Windows viewer may be staging on POSIX or WSL. */
+  caseSensitive?: boolean
 }
 
 function nulSeparatedPaths(stdout: string): string[] {
@@ -53,45 +48,37 @@ export async function stageGitWorktreeScope(
   options: StageGitWorktreeScopeOptions = {}
 ): Promise<GitStageWorktreeScopeReceipt> {
   const excluded = scope === 'all' ? (options.excludedUntrackedPaths ?? []) : []
-  const isExcludedUntrackedPath = (entry: string): boolean =>
-    excluded.some((root) => entry === root || entry.startsWith(`${root}/`))
-  // Why: --relative keeps a folder workspace inside a larger repo from staging outside its folder.
+  // --relative keeps folder workspaces inside their own portion of a larger repo.
   const unresolved = nulSeparatedPaths(
     (await runGit(['diff', '--name-only', '--relative', '-z', '--diff-filter=U'])).stdout
   )
-  if (unresolved.length === 0) {
-    if (excluded.length === 0) {
-      await runGit(['add', scope === 'all' ? '--all' : '--update', '--', '.'])
-      return { stagedScope: scope }
-    }
-    // Why: the exclude must only hide the untracked link; tracked changes at that path still stage.
-    const tracked = nulSeparatedPaths((await runGit(['ls-files', '-z', '--cached'])).stdout)
-    if (tracked.length > 0) {
-      await runGit(['add', '--update', '--', '.'])
-    }
-    // An ignored Windows junction must not become an explicit pathspec: Git rejects it even
-    // under an exclude. Name only visible untracked paths, preserving tracked changes above.
-    const untracked = nulSeparatedPaths(
-      (await runGit(['ls-files', '-z', '--others', '--exclude-standard'])).stdout
-    ).filter((path) => !isExcludedUntrackedPath(path))
-    if (untracked.length > 0) {
-      await runGit(
-        ['add', '--pathspec-from-file=-', '--pathspec-file-nul'],
-        encodeGitPathspecs(untracked.map((path) => `:(literal)${path}`))
-      )
-    }
+  if (unresolved.length === 0 && excluded.length === 0) {
+    await runGit(['add', scope === 'all' ? '--all' : '--update', '--', '.'])
     return { stagedScope: scope }
   }
-  // Why: `git add` resolves an unmerged path even under an exclude pathspec, so name the rest instead.
+  // Name safe paths: exclude pathspecs can resolve conflicts or error on ignored Windows junctions.
   const unresolvedSet = new Set(unresolved)
+  const normalize = (path: string): string => {
+    const relative = path
+      .replaceAll('\\', '/')
+      .replace(/^(?:\.\/)+/, '')
+      .replace(/\/+$/, '')
+    return options.caseSensitive === false ? relative.toLowerCase() : relative
+  }
+  const excludedPaths = excluded.map(normalize).filter(Boolean)
   const tracked = nulSeparatedPaths(
-    (await runGit(['diff', '--name-only', '--relative', '-z'])).stdout
+    (await runGit(['diff', '--name-only', '--relative', '--no-renames', '-z'])).stdout
   ).filter((path) => !unresolvedSet.has(path))
   const untracked =
     scope === 'all'
       ? nulSeparatedPaths(
           (await runGit(['ls-files', '-z', '--others', '--exclude-standard'])).stdout
-        ).filter((path) => !isExcludedUntrackedPath(path))
+        ).filter((path) => {
+          const relative = normalize(path)
+          return !excludedPaths.some(
+            (excludedPath) => relative === excludedPath || relative.startsWith(`${excludedPath}/`)
+          )
+        })
       : []
   const paths = [...new Set([...tracked, ...untracked])]
   if (paths.length > 0) {

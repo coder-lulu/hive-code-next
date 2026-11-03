@@ -37,8 +37,6 @@ it.each([
   'mobile/fastlane/Appfile',
   'mobile/fastlane/ios_release_version.rb',
   'mobile/fastlane/ios_release_version_test.rb',
-  'mobile/fastlane/ios_batch_release.rb',
-  'mobile/fastlane/ios_batch_release_test.rb',
   'mobile/Gemfile',
   'mobile/Gemfile.lock',
   'mobile/.ruby-version',
@@ -89,16 +87,25 @@ it('gates Ruby independently and retains mobile static validation', () => {
       step.name !== 'Summarize RPC recording changes'
   )
   expect(gated.map((step) => step.name)).toEqual([
-    'Setup Ruby and fastlane',
+    'Setup Ruby',
+    'Resolve fastlane bundle cache',
+    'Restore fastlane bundle',
+    'Install fastlane',
     'Test iOS release version resolution',
     'Test TestFlight lane arguments',
-    'Test frozen iOS batch and Apple availability',
-    'Smoke-check the Fastfile'
+    'Smoke-check the Fastfile',
+    'Smoke-check CocoaPods'
   ])
   for (const step of gated) {
     expect(step.if).toBe("steps.ruby-scope.outputs.should_run != 'false'")
   }
-  for (const name of ['Typecheck', 'Typecheck tests (ratchet)', 'Lint', 'Check formatting']) {
+  for (const name of [
+    'Lint mobile imports with mobile dependencies installed',
+    'Typecheck',
+    'Typecheck tests (ratchet)',
+    'Lint',
+    'Check formatting'
+  ]) {
     expect(steps.find((step) => step.name === name)?.if).toBeUndefined()
     expect(steps.some((step) => step.name === name)).toBe(true)
   }
@@ -111,15 +118,10 @@ it('gates Ruby independently and retains mobile static validation', () => {
     expect(workflow.on.pull_request.paths.some((pattern) => matchesGlob(file, pattern))).toBe(true)
   }
   expect(workflow.jobs.verify.env.BUNDLE_FROZEN).toBe('true')
-  expect(steps.find((step) => step.name === 'Setup Ruby and fastlane').with['bundler-cache']).toBe(
-    true
-  )
+  expect(steps.find((step) => step.name === 'Install fastlane').run).toContain('bundle install')
   expect(steps.find((step) => step.name === 'Smoke-check the Fastfile').run).toBe(
     'bundle exec fastlane lanes'
   )
-  expect(
-    steps.find((step) => step.name === 'Test frozen iOS batch and Apple availability').run
-  ).toBe('ruby fastlane/ios_batch_release_test.rb')
 })
 
 function fixture(detectorStep = detector) {
@@ -146,7 +148,7 @@ function fixture(detectorStep = detector) {
     'config/scripts/pr-code-change-scope.mjs',
     'config/scripts/pr-package-test-paths.mjs',
     'config/scripts/pr-layout-oracle-route.mjs',
-    'config/scripts/pr-daemon-init-test-scope.mjs',
+    'config/scripts/pr-shell-contract-prefixes.mjs',
     'config/scripts/mobile-release-check-scope.mjs',
     'config/scripts/mobile-test-change-scope.mjs'
   ]) {

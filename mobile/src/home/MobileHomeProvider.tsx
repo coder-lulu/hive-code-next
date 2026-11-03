@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { useCallback, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react'
 import { useLocalSearchParams } from 'expo-router'
 import { Alert } from 'react-native'
@@ -21,7 +22,7 @@ import {
   useForceReconnect,
   useForgetHostClient,
   useHostClient
-} from '../transport/client-context'
+} from '../transport/host-client-hooks'
 import { hostEndpointLabel } from '../transport/host-endpoint-label'
 import { resolveHomeHostConnectionState } from '../transport/home-host-auto-connect'
 import { removeHostAndCloseClient } from '../transport/host-removal-lifecycle'
@@ -32,11 +33,14 @@ import { isResumeTargetConfirmedMissing, type HomeResumeCard } from '../worktree
 import { MobileHomeContext, type MobileHomeContextValue } from './mobile-home-context'
 import { MobileHomeDrawer } from './MobileHomeDrawer'
 import { useMobileHomeData } from './use-mobile-home-data'
-import type { MobileHomeConnectionMethod } from './mobile-home-connection-content'
+import { homeAlerts, type MobileHomeConnectionMethod } from './mobile-home-connection-content'
 
 type HostActionTarget = { host: HostCatalogEntry; scopeRevision: number }
 
 export function MobileHomeProvider({ children }: PropsWithChildren) {
+  const t = useMobileTranslation()
+  const alerts = useMemo(() => homeAlerts(t), [t])
+
   const data = useMobileHomeData()
   const params = useLocalSearchParams<{ runtimeId?: string }>()
   const theme = useMobileTheme()
@@ -185,9 +189,9 @@ export function MobileHomeProvider({ children }: PropsWithChildren) {
         openMobileTasks(activeConnectedHost.id, provider)
         return
       }
-      Alert.alert('Runtime 当前不可用', '连接恢复前，任务状态不可验证，也不会切换到其他电脑执行。')
+      Alert.alert(...alerts.unavailable)
     },
-    [activeConnectedHost, openMobileTasks, sessionScope]
+    [activeConnectedHost, openMobileTasks, sessionScope, alerts]
   )
 
   function openHost(snapshot: HostCatalogEntry): void {
@@ -199,19 +203,11 @@ export function MobileHomeProvider({ children }: PropsWithChildren) {
     if (host.credentialStatus === 'missing') {
       data.router.push('/pair-scan')
     } else if (host.credentialStatus === 'temporarily-unavailable' && !liveConnected) {
-      void data
-        .reloadHostCatalog()
-        .catch(() => Alert.alert('Could not check pairing', 'Please try again.'))
+      void data.reloadHostCatalog().catch(() => Alert.alert(...alerts.pairingFailure))
     } else if (host.credentialStatus === 'cloud-offline' && !liveConnected) {
-      Alert.alert(
-        'Runtime offline',
-        'This Runtime will be available when it reconnects to HiveCloud.'
-      )
+      Alert.alert(...alerts.offline)
     } else if (host.credentialStatus === 'cloud-unavailable' && !liveConnected) {
-      Alert.alert(
-        'Cloud connection unavailable',
-        'This Runtime is not advertising a mobile Relay route yet.'
-      )
+      Alert.alert(...alerts.cloudUnavailable)
     } else {
       setSelectedRuntimeId(host.id)
       data.router.push(hostStackHostRoute(host.id))
@@ -248,7 +244,7 @@ export function MobileHomeProvider({ children }: PropsWithChildren) {
       if (current.current.confirmRemove !== confirmRemove || !resolveActionTarget(confirmRemove)) {
         return
       }
-      Alert.alert('Could not remove host', 'Please try again.')
+      Alert.alert(...alerts.removeFailure)
     }
   }
 
@@ -343,7 +339,7 @@ export function MobileHomeProvider({ children }: PropsWithChildren) {
         title={validActionTarget?.name}
         message={
           validActionTarget?.accessSources?.includes('account-claimed')
-            ? '管理账号运行环境与云端别名'
+            ? t('home.manageRuntimes', 'Manage account runtime environments and cloud aliases')
             : validActionTarget
               ? hostEndpointLabel(validActionTarget.endpoint)
               : undefined
@@ -398,8 +394,12 @@ export function MobileHomeProvider({ children }: PropsWithChildren) {
       />
       <ConfirmModal
         visible={validRemoveTarget != null}
-        title="移除本地配对"
-        message={`从这台手机移除“${validRemoveTarget?.name}”的本地配对？此操作不会解除云端认领。`}
+        title={t('home.removePairing', 'Remove local pairing')}
+        message={t(
+          'home.confirmRemovePairing',
+          'Remove the local pairing for “{{value0}}” from this phone? Its cloud claim will remain.',
+          { value0: validRemoveTarget?.name }
+        )}
         confirmLabel="移除"
         destructive
         onConfirm={() => void handleRemove()}

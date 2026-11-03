@@ -36,10 +36,12 @@ let host: StructuredAgentSessionHost
 
 function adapter(): StructuredAgentSessionAdapter {
   return {
+    open: vi.fn(async () => ({ reportedOptions: {} })),
     supportsCreate: () => true,
     acquire: vi
       .fn<StructuredAgentSessionAdapter['acquire']>()
       .mockImplementation(async ({ fence, spawnToken }) => ({
+        acquisitionGeneration: globalThis.crypto.randomUUID(),
         process: {
           hostId: 'local',
           pid: 4242,
@@ -158,7 +160,7 @@ describe('committed adopting create RPC replay', () => {
     // probes durable-identity replay, which only runs once the gate admits the call.
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The RPC gate reads only this setting from the test double.
     vi.spyOn(runtime, 'getClientSettings').mockReturnValue({
-      experimentalNativeChat: true
+      nativeChatProviders: {}
     } as ReturnType<OrcaRuntimeService['getClientSettings']>)
     vi.spyOn(runtime, 'getStructuredAgentSessionCreateSupport').mockResolvedValue({
       supported: true

@@ -12,14 +12,15 @@
 
 ## Linked Issue
 
-External contributors must link the issue this PR resolves. Use an issue-closing reference.
-<!-- Repository maintainers may link an existing issue without opening an unnecessary new one. -->
+_If you do not have one and are an outside contributor, your PR **will** be ignored. Refs is not sufficient. Link an actual issue_
+<!-- Link the issue this PR addresses, there should ALWAYS be one (for outside contributors) -->
+<!-- SPECIAL CASE: If you are a maintainer (member of stablyai org) AVOID opening needless issues. Only attach pre-existing ones -->
 
 Fixes #
 
 ## Visual Proof
 
-<!-- REQUIRED for UI / behavior changes. Please attach a BEFORE and AFTER that can easily tabbed/switched. Use videos for when appropriate over screenshots -->
+<!-- REQUIRED for UI / behavior changes. Please attach a BEFORE and AFTER that can easily be tabbed/switched. Use videos for when appropriate over screenshots -->
 <!-- If there is truly no visual or interaction change, write exactly: `N/A` and briefly say why. -->
 <!-- For attachments NEVER add directly to the PR files (do not commit to files), use `gh image` extension or drag + drop (works for any attachment) -->
 
@@ -32,17 +33,18 @@ Fixes #
 
 ## AI Disclosure
 
+<!-- DO NOT FILL IN IF YOU ARE STABLYAI TEAM MEMBER (INTERNAL CONTRIBUTOR), IGNORE SECTION: -->
 <!-- Which AI model if anyone was used, please state the details -->
 
 ## Review
 
 ## Agent skill upstream boundary
 
-- [ ] Not applicable, or this change follows [the private agent skill boundary](https://github.com/coder-lulu/hive-code-docs/blob/main/reference/agent-skill-sharing-upstream-boundary.md) and copies or mechanically translates no upstream skill-installer source, tests, fixtures, registry entries, path tables, comments, or documentation.
+- [ ] Not applicable, or this change copies or mechanically translates no upstream skill-installer source, tests, fixtures, registry entries, path tables, comments, or documentation.
 
 ## Notes
 
-Ensure no issues in: Security, Cross-platoform support (Linux, Windows, Mac), Remote SSH, Mobile, general backwards compatibility, performance
+Ensure no issues in: Security, Cross-platform support (Linux, Windows, Mac), Remote SSH, Mobile, general backwards compatibility, performance
 
 ## Checklist
 

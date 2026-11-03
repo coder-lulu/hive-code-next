@@ -1,19 +1,22 @@
 import { View } from 'react-native'
-import { useMobileSessionThemeStyles } from './mobile-session-styles'
+import { styles } from './mobile-session-styles'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 import type { MobileSessionController } from './use-mobile-session-controller'
 import { MobileSessionContentRow } from './MobileSessionContentRow'
 import { MobileSessionHeader } from './MobileSessionHeader'
 import { MobileSessionSheets } from './MobileSessionSheets'
+import { useSessionSideRail } from './session-side-rail'
 
 export function MobileSessionSurface({ controller }: { controller: MobileSessionController }) {
-  const { styles } = useMobileSessionThemeStyles(controller.activeSessionTab?.type)
+  useMobileColorScheme()
   const { setMobileSessionRootRef } = controller
+  const rail = useSessionSideRail(controller)
   return (
     <View ref={setMobileSessionRootRef} style={styles.container}>
       <View style={styles.kavInner}>
-        <MobileSessionHeader controller={controller} />
-        {/* Content-row host (KTD2): on wide, content shares this row with the docked panel as the flex-1 left child. */}
-        <MobileSessionContentRow controller={controller} />
+        <MobileSessionHeader controller={controller} backInRail={rail.backInRail} />
+        {}
+        <MobileSessionContentRow controller={controller} keysInRail={rail.keysInRail} />
       </View>
       <MobileSessionSheets controller={controller} />
     </View>

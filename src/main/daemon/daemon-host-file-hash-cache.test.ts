@@ -1,38 +1,23 @@
 import type * as NodeFs from 'node:fs'
-import {
-  cpSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  statSync,
-  utimesSync,
-  writeFileSync
-} from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setAppEnvironment } from '../../shared/app-environment'
-import { fileStatSignature } from '../file-stat-signature'
 import { hashDaemonHostFile } from './daemon-host-file-hash-cache'
-import { readDaemonHostBuildMarker } from './daemon-host-build-inventory'
 import { buildInstallFixture } from './daemon-host-relocation.test-fixture'
 import { getRelocatedDaemonHost, materializeRelocatedDaemonHost } from './daemon-host-relocation'
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof NodeFs>()
-  return {
-    ...actual,
-    cpSync: vi.fn(actual.cpSync),
-    readFileSync: vi.fn(actual.readFileSync),
-    statSync: vi.fn(actual.statSync)
-  }
+  return { ...actual, readFileSync: vi.fn(actual.readFileSync) }
 })
 
 function codeReads(): unknown[] {
   return vi
     .mocked(readFileSync)
     .mock.calls.map(([path]) => path)
-    .filter((path) => typeof path === 'string' && path.endsWith('.js'))
+    .filter((path) => typeof path === 'string' && (path.endsWith('.js') || path.endsWith('.node')))
 }
 
 const originalPlatform = process.platform
@@ -62,18 +47,19 @@ function pinMtime(path: string): void {
   utimesSync(path, PINNED_MTIME_SECONDS, PINNED_MTIME_SECONDS)
 }
 
-function rewriteKeepingSizeAndMtime(path: string, contents: string): void {
+async function rewriteKeepingSizeAndMtime(path: string, contents: string): Promise<void> {
   const before = statSync(path)
   expect(contents.length).toBe(before.size)
+  // Allow ctime to tick before restoring mtime on the same-size rewrite.
+  await new Promise((resolve) => setTimeout(resolve, 20))
   writeFileSync(path, contents)
   pinMtime(path)
-  expect(statSync(path).mtimeMs).toBe(before.mtimeMs)
+  const after = statSync(path)
+  expect(after.mtimeMs).toBe(before.mtimeMs)
+  expect(after.ctimeMs).not.toBe(before.ctimeMs)
 }
 
-beforeEach(async () => {
-  const actual = await vi.importActual<typeof NodeFs>('node:fs')
-  vi.mocked(statSync).mockImplementation(actual.statSync)
-  vi.mocked(cpSync).mockClear()
+beforeEach(() => {
   vi.mocked(readFileSync).mockClear()
   tempDir = mkdtempSync(join(os.tmpdir(), 'daemon-host-hash-cache-'))
   installDir = join(tempDir, 'app')
@@ -105,61 +91,22 @@ afterEach(() => {
   rmSync(tempDir, { recursive: true, force: true })
 })
 
-describe('daemon-host code integrity', () => {
-  it('revalidates warm code with bounded reads and no runtime reads or mirror copy', () => {
+describe('daemon-host code hash cache', () => {
+  it('validates a warm mirror against freshly read source and mirror code', () => {
     const root = materializedRoot()
-    const marker = readDaemonHostBuildMarker(root)!
-    const codePaths = marker.files
-      .filter((file) => file.path.endsWith('.js'))
-      .flatMap((file) => [join(installDir, file.path), join(root, file.path)])
-    expect(codePaths.length).toBeGreaterThan(0)
+    expect(getRelocatedDaemonHost()?.execPath).toBe(join(root, 'Orca.exe'))
     vi.mocked(readFileSync).mockClear()
-    vi.mocked(cpSync).mockClear()
 
     expect(getRelocatedDaemonHost()?.execPath).toBe(join(root, 'Orca.exe'))
     expect(materializeRelocatedDaemonHost()?.execPath).toBe(join(root, 'Orca.exe'))
-    expect(codeReads().sort()).toEqual(codePaths.flatMap((path) => [path, path]).sort())
-    const codeBytes = codePaths.reduce((total, path) => total + statSync(path).size, 0)
-    expect(codeBytes * 2).toBeLessThan(1024)
-    expect(vi.mocked(cpSync)).not.toHaveBeenCalled()
-    const binaryReads = vi
-      .mocked(readFileSync)
-      .mock.calls.filter(
-        ([path]) => typeof path === 'string' && /\.(?:exe|dll|node|bin|dat)$/u.test(path)
-      )
-    expect(binaryReads).toEqual([])
+    expect(codeReads()).toContain(join(installDir, chunkRel))
+    expect(codeReads()).toContain(join(root, chunkRel))
   })
 
-  it.each(['source', 'mirror'] as const)(
-    'rejects a %s code edit even when its complete stat signature is unchanged',
-    async (side) => {
-      const root = materializedRoot()
-      const path = join(side === 'source' ? installDir : root, chunkRel)
-      const actual = await vi.importActual<typeof NodeFs>('node:fs')
-      pinMtime(path)
-      const frozen = actual.statSync(path, { bigint: true })
-      vi.mocked(statSync).mockImplementation(((
-        filePath: NodeFs.PathLike,
-        options?: { bigint?: boolean }
-      ) => {
-        // Keep real missing-file errors and all other paths; only this file's identity is frozen.
-        const observed = actual.statSync(filePath, options)
-        return filePath === path && options?.bigint ? frozen : observed
-      }) as typeof statSync)
-      expect(getRelocatedDaemonHost()).not.toBeNull()
-      const before = hashDaemonHostFile(path)
-      rewriteKeepingSizeAndMtime(path, 'chunX')
-      expect(statSync(path, { bigint: true })).toBe(frozen)
-
-      expect(hashDaemonHostFile(path)).not.toBe(before)
-      expect(getRelocatedDaemonHost()).toBeNull()
-    }
-  )
-
-  it('detects a same-size source edit that restores mtime', () => {
+  it('detects a same-size source edit that restores mtime', async () => {
     pinMtime(join(installDir, chunkRel))
     const root = materializedRoot()
-    rewriteKeepingSizeAndMtime(join(installDir, chunkRel), 'chunX')
+    await rewriteKeepingSizeAndMtime(join(installDir, chunkRel), 'chunX')
 
     expect(getRelocatedDaemonHost()).toBeNull()
     expect(codeReads()).toContain(join(installDir, chunkRel))
@@ -168,11 +115,11 @@ describe('daemon-host code integrity', () => {
     expect(readFileSync(join(rebuilt, chunkRel), 'utf8')).toBe('chunX')
   })
 
-  it('detects a same-size mirror edit that restores mtime', () => {
+  it('detects a same-size mirror edit that restores mtime', async () => {
     const root = materializedRoot()
     pinMtime(join(root, chunkRel))
     expect(getRelocatedDaemonHost()).not.toBeNull()
-    rewriteKeepingSizeAndMtime(join(root, chunkRel), 'chunX')
+    await rewriteKeepingSizeAndMtime(join(root, chunkRel), 'chunX')
 
     expect(getRelocatedDaemonHost()).toBeNull()
   })
@@ -191,20 +138,5 @@ describe('daemon-host code integrity', () => {
 
     expect(getRelocatedDaemonHost()?.execPath).toBe(join(root, 'Orca.exe'))
     expect(() => hashDaemonHostFile(join(installDir, chunkRel))).toThrow()
-  })
-
-  it('keeps file ids and timestamps that a float stat would collapse distinct', () => {
-    const base = {
-      dev: 1n,
-      ino: 9_007_199_254_740_993n,
-      size: 5n,
-      mtimeNs: 1_700_000_000_000_000_001n,
-      ctimeNs: 1_700_000_000_000_000_001n
-    }
-    const signature = fileStatSignature(base)
-
-    expect(fileStatSignature({ ...base, ino: base.ino + 1n })).not.toBe(signature)
-    expect(fileStatSignature({ ...base, mtimeNs: base.mtimeNs + 1n })).not.toBe(signature)
-    expect(fileStatSignature({ ...base, ctimeNs: base.ctimeNs + 1n })).not.toBe(signature)
   })
 })

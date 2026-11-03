@@ -6,7 +6,7 @@ import { formatAutomationTokens } from '@/components/automations/automation-usag
 import { formatGitHistoryTimestamp } from '@/components/right-sidebar/source-control/sync/git-history-format'
 import { getWorkspaceSpaceScanDateTimeLabel } from '@/components/status-bar/workspace-space-format'
 import { formatSessionTime } from '@/components/stats/usage-formatters'
-import { pluginLanguageResourceId } from '../../../shared/plugins/plugin-language-pack-artifact'
+import { pluginLanguageResourceId } from '../../../shared/plugins/artifacts/plugin-language-pack-artifact'
 
 afterEach(async () => {
   setRendererPluginLanguagePacks([])
@@ -46,7 +46,14 @@ it('formats plugin dates and fractional counts using the declared locale', async
   const id = 'plugin:review.ui-formatting/fr-FR' as const
   const resourceLanguage = pluginLanguageResourceId(id)
   setRendererPluginLanguagePacks([
-    { id, resourceLanguage, pluginKey: 'review.ui-formatting', locale: 'fr-FR', catalog: {} }
+    {
+      id,
+      resourceLanguage,
+      pluginKey: 'review.ui-formatting',
+      locale: 'fr-FR',
+      coverage: 100,
+      catalog: {}
+    }
   ])
   await i18n.changeLanguage(resourceLanguage)
   const timestamp = Date.UTC(2026, 9, 3, 13, 24)

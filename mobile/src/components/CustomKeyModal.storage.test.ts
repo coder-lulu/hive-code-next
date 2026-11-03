@@ -19,7 +19,7 @@ vi.mock('react-native', () => ({
 vi.mock('../theme/mobile-theme-provider', () => ({ useMobileTheme: () => lightTheme }))
 vi.mock('./BottomDrawer', () => ({ BottomDrawer: 'BottomDrawer' }))
 
-import { loadCustomKeys, saveCustomKeys, type CustomKey } from './CustomKeyModal'
+import { loadCustomKeys, saveCustomKeys, type CustomKey } from '../terminal/terminal-custom-keys'
 
 const STORAGE_KEY = 'orca:custom-accessory-keys'
 

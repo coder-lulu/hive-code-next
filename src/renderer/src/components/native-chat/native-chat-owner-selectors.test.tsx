@@ -22,7 +22,6 @@ vi.mock('@/store', async () => {
   const { getDefaultSettings } = await import('../../../../shared/constants')
   return {
     useAppStore: create<ContextState>(() => ({
-      getKnownWorktreeById: () => undefined,
       settings: getDefaultSettings('/home/test'),
       repos: [],
       projectGroups: [],
@@ -91,7 +90,6 @@ function worktree(id: string, path = '/repo'): Worktree {
 
 function contextState(overrides: Partial<ContextState> = {}): ContextState {
   return {
-    getKnownWorktreeById: () => undefined,
     settings: getDefaultSettings('/home/test'),
     repos: [],
     projectGroups: [],
@@ -210,7 +208,8 @@ describe('native chat ownership selectors', () => {
     expect(select(current)).toEqual({
       worktreeId: 'chat-owner',
       worktreePath: '/after',
-      runtimeEnvironmentId: 'owning-runtime'
+      runtimeEnvironmentId: 'owning-runtime',
+      sourceTabId: 'chat'
     })
     useAppStore.setState(current)
     expect(select(initial)?.worktreePath).toBe('/before')

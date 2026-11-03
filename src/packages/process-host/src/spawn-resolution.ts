@@ -1,3 +1,4 @@
+import { assertWslDistroAllowed } from './wsl-distro-allowlist'
 import type { SpawnOptions as NodeSpawnOptions } from 'node:child_process'
 import { buildWindowsCmdShimCommandLine, isCmdInterpretedProgram } from './windows-command-line'
 import { resolveWindowsCmdShim } from './windows-cmd-shim-resolution'
@@ -23,6 +24,7 @@ export type ResolvedSpawn = {
  */
 export function resolveSpawn(spec: ProcessSpec, platform: NodeJS.Platform): ResolvedSpawn {
   const args = spec.args ?? []
+  assertWslDistroAllowed(spec.program, args)
   const base: NodeSpawnOptions = {
     cwd: spec.cwd,
     env: spec.env,

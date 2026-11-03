@@ -105,7 +105,6 @@ export async function collectAutomationRunUsage({
   )
 }
 
-/** Collects and writes the usage a just-finalized run earned, returning the row to answer with. */
 export async function writeAutomationRunUsage(input: {
   store: Store
   runs: AutomationRunWriter
@@ -120,8 +119,7 @@ export async function writeAutomationRunUsage(input: {
     claudeUsage: input.claudeUsage,
     codexUsage: input.codexUsage
   })
-  // Why: the run is final during the await above, so a concurrent create-time
-  // retention prune may have evicted it — the usage write must not throw then.
+  // Retention may prune the finalized run while usage collection awaits.
   if (!store.listAutomationRuns(run.automationId).some((entry) => entry.id === run.id)) {
     return run
   }

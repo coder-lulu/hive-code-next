@@ -1,9 +1,4 @@
-import { APP_DISPLAY_NAME } from '../../../../../shared/brand'
-/**
- * A worker-start that fails counts toward the Task's circuit breaker, so a coordinator retrying a
- * start that can never succeed (an agent stuck at an interactive prompt) stops at the third failure
- * instead of launching one more live agent every time.
- */
+/** Failed worker starts must advance the circuit breaker instead of spawning indefinitely. */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { OrchestrationDb } from '../orchestration-db'
@@ -70,7 +65,7 @@ describe('failed worker starts and the circuit breaker', () => {
     }
     expect(refusal).toMatchObject({
       code: 'task_not_startable',
-      message: `Task ${taskId} failed 3 times, so ${APP_DISPLAY_NAME} will not retry it again (last error: ${BLOCKED}). Report the failure to the user instead of retrying.`,
+      message: `Task ${taskId} failed 3 times, so Orca will not retry it again (last error: ${BLOCKED}). Report the failure to the user instead of retrying.`,
       data: { taskId, status: 'failed', retryOf: third, failureCount: 3 }
     })
     expect(refusal).toMatchObject({

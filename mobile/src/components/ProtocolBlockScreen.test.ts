@@ -1,8 +1,7 @@
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { WallAppUpdate } from '../app-update/use-wall-app-update'
-import { INITIAL_SNAPSHOT } from '../update/mobile-update-state'
+import type { KnownAppUpdate } from '../storage/app-update-preferences'
 import type { BlockedVerdict } from './ProtocolBlockScreen'
 import { ProtocolBlockScreen } from './ProtocolBlockScreen'
 
@@ -13,46 +12,33 @@ const nativeTestState = vi.hoisted(() => {
 })
 
 const wallUpdate = vi.hoisted(() => {
-  const state: { current: WallAppUpdate | null } = { current: null }
+  const state: { current: KnownAppUpdate | null } = { current: null }
   return state
 })
 
-// The wall delegates verified native installation to the existing Hive updater owner.
+// The release the installed app's update check found; the real hook imports the checker module.
 vi.mock('../app-update/use-wall-app-update', () => ({ useWallAppUpdate: () => wallUpdate.current }))
 
 vi.mock('react-native', () => ({
   Linking: { openURL: nativeTestState.openUrl },
   Platform: nativeTestState.platform,
   Pressable: 'Pressable',
-  ScrollView: 'ScrollView',
   StyleSheet: { create: <T>(styles: T) => styles },
   Text: 'Text',
   View: 'View'
 }))
 
-vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }))
-vi.mock('lucide-react-native', () => ({ ShieldAlert: 'ShieldAlert' }))
-vi.mock('../theme/mobile-theme-provider', async () => {
-  const { lightTheme } = await import('../theme/mobile-theme')
-  return {
-    useMobileTheme: () => lightTheme,
-    useMobileThemeStyles: <T>(factory: (theme: typeof lightTheme) => T) => factory(lightTheme)
-  }
-})
-vi.mock('../platform/external-link', () => ({
-  openExternalLink: (...args: unknown[]) => nativeTestState.openUrl(...args)
-}))
-
 vi.mock('expo-router', () => ({
   router: { replace: vi.fn() },
-  // `ProtocolBlockScreen` reaches the router through the navigation handoff now, and the handoff's
-  // native form is this hook. Its web form is what posts the target to the shell.
+  // Mock native handoff’s router hook; web sibling posts target to shell.
   useRouter: () => ({ replace: vi.fn(), push: vi.fn(), back: vi.fn(), dismissTo: vi.fn() })
 }))
 
+const RELEASES_URL = 'https://github.com/stablyai/orca/releases'
+
 let renderer: ReactTestRenderer | null = null
 
-function render(verdict: BlockedVerdict, mobileUpdate: WallAppUpdate | null = null): string {
+function render(verdict: BlockedVerdict, mobileUpdate: KnownAppUpdate | null = null): string {
   wallUpdate.current = mobileUpdate
   act(() => {
     renderer = create(createElement(ProtocolBlockScreen, { verdict }))
@@ -69,6 +55,12 @@ function pressableCount(): number {
   return renderer?.root.findAll((node) => isMockedHostElement(node.type, 'Pressable')).length ?? 0
 }
 
+function primaryActionUrl(): unknown {
+  const pressable = renderer?.root.findAll((node) => isMockedHostElement(node.type, 'Pressable'))[0]
+  act(() => pressable?.props.onPress())
+  return nativeTestState.openUrl.mock.calls[0]?.[0]
+}
+
 describe('ProtocolBlockScreen', () => {
   beforeEach(() => {
     nativeTestState.openUrl.mockClear()
@@ -80,19 +72,19 @@ describe('ProtocolBlockScreen', () => {
     renderer = null
   })
 
-  it('renders the HiveCode protocol wall without inventing unavailable download links', () => {
+  // Why: the protocol wall shipped before the bundle one; its copy is what users already see.
+  it('keeps the existing protocol wall rendering unchanged', () => {
     const mobile = render({
       kind: 'blocked',
       reason: 'mobile-too-old',
       desktopVersion: 5,
       requiredMobileVersion: 99
     })
-    expect(mobile).toContain('Update HiveCode Mobile')
+    expect(mobile).toContain('Update Orca Mobile')
     expect(mobile).toContain(
-      'This desktop needs a newer HiveCode Mobile app. Update HiveCode Mobile from the official iOS distribution channel, then try this host again.'
+      'This desktop needs a newer Orca Mobile app. Update Orca Mobile from the App Store, then try this host again.'
     )
-    expect(mobile).not.toContain('Open iOS download')
-    expect(pressableCount()).toBe(1)
+    expect(mobile).toContain('Open App Store')
     act(() => renderer?.unmount())
 
     const desktop = render({
@@ -101,37 +93,42 @@ describe('ProtocolBlockScreen', () => {
       desktopVersion: 0,
       requiredDesktopVersion: 2
     })
-    expect(desktop).toContain('Update HiveCode on your computer')
+    expect(desktop).toContain('Update Orca on your computer')
     expect(desktop).toContain(
-      'This paired desktop app is too old for your current HiveCode Mobile app. Update HiveCode on your computer, then try this host again.'
+      'This paired desktop app is too old for your current Orca Mobile app. Update Orca on your computer, then try this host again.'
     )
-    expect(desktop).not.toContain('Open desktop download')
-    expect(pressableCount()).toBe(1)
+    expect(desktop).toContain('Open GitHub Releases')
   })
 
-  it('explains a host without a bundle without fabricating a desktop download', () => {
-    const output = render({ kind: 'blocked', reason: 'bundle-unavailable' })
-    expect(output).toContain('Update HiveCode on your computer')
-    expect(output).toContain(
-      'This paired desktop app does not include the mobile workspace yet. Update HiveCode on your computer, then try this host again.'
-    )
-    expect(output).not.toContain('Open desktop download')
-    expect(pressableCount()).toBe(1)
-    expect(nativeTestState.openUrl).not.toHaveBeenCalled()
+  it('tells a host without a bundle, or without this screen, the desktop is too old', () => {
+    for (const reason of ['bundle-unavailable', 'page-route-unlisted'] as const) {
+      const output = render({ kind: 'blocked', reason })
+      expect(output).toContain('Update Orca on your computer')
+      expect(output).toContain(
+        'This paired desktop app is too old for your current Orca Mobile app. Update Orca on your computer, then try this host again.'
+      )
+      expect(output).not.toContain('does not include the mobile workspace')
+      expect(primaryActionUrl()).toBe(RELEASES_URL)
+    }
   })
 
-  it('explains an unknown manifest schema using the configured distribution channel', () => {
+  it('sends a screen that needs a grant this app lacks to the mobile update', () => {
+    const output = render({ kind: 'blocked', reason: 'page-route-grant-missing' })
+    expect(output).toContain('Update Orca Mobile')
+    expect(output).toContain("This desktop's mobile workspace needs a newer Orca Mobile app.")
+  })
+
+  it('sends an unknown manifest schema to the mobile update', () => {
     const output = render({
       kind: 'blocked',
       reason: 'bundle-shell-too-old',
       schemaVersion: 2
     })
-    expect(output).toContain('Update HiveCode Mobile')
+    expect(output).toContain('Update Orca Mobile')
     expect(output).toContain(
-      "This desktop's mobile workspace needs a newer HiveCode Mobile app. Update HiveCode Mobile from the official iOS distribution channel, then try this host again."
+      "This desktop's mobile workspace needs a newer Orca Mobile app. Update Orca Mobile from the App Store, then try this host again."
     )
-    expect(output).not.toContain('Open iOS download')
-    expect(pressableCount()).toBe(1)
+    expect(primaryActionUrl()).toBe('itms-apps://apps.apple.com/app/orca-ide/id6766130217')
   })
 
   it('offers no download for a cached bundle the host outgrew, because none would clear it', () => {
@@ -148,9 +145,9 @@ describe('ProtocolBlockScreen', () => {
       'The workspace cached for this host is older than the desktop expects. Reconnect to this host to download the current one.'
     )
     // A store update cannot replace a stale cache, so neither store link is offered.
-    expect(output).not.toContain('Open iOS download')
-    expect(output).not.toContain('Open desktop download')
-    expect(output).not.toContain('Update HiveCode')
+    expect(output).not.toContain('Open App Store')
+    expect(output).not.toContain('Open GitHub Releases')
+    expect(output).not.toContain('Update Orca')
     // Back to hosts is the only button left, and it is not a download.
     expect(pressableCount()).toBe(1)
     expect(output).toContain('Back to hosts')
@@ -159,7 +156,7 @@ describe('ProtocolBlockScreen', () => {
     expect(output).toContain('If this message stays, remove this host and pair it again.')
   })
 
-  it('explains when the host is older than its own bundle', () => {
+  it('sends a host older than its own bundle to the desktop update', () => {
     const output = render({
       kind: 'blocked',
       reason: 'bundle-incompatible',
@@ -167,12 +164,9 @@ describe('ProtocolBlockScreen', () => {
       hostProtocolVersion: 1,
       requiredHostProtocolVersion: 2
     })
-    expect(output).toContain('Update HiveCode on your computer')
-    expect(output).toContain(
-      'This paired desktop app is too old for your current HiveCode Mobile app'
-    )
-    expect(output).not.toContain('Open desktop download')
-    expect(pressableCount()).toBe(1)
+    expect(output).toContain('Update Orca on your computer')
+    expect(output).toContain('This paired desktop app is too old for your current Orca Mobile app')
+    expect(primaryActionUrl()).toBe(RELEASES_URL)
   })
 
   it('sends a desktop whose page is older than this shell to the desktop update', () => {
@@ -183,124 +177,65 @@ describe('ProtocolBlockScreen', () => {
       pageVersion: 0,
       requiredPageVersion: 1
     })
-    expect(output).toContain('Update HiveCode on your computer')
-    expect(output).toContain(
-      'This paired desktop app is too old for your current HiveCode Mobile app'
-    )
-    expect(output).not.toContain('Open desktop download')
-    expect(pressableCount()).toBe(1)
+    expect(output).toContain('Update Orca on your computer')
+    expect(output).toContain('This paired desktop app is too old for your current Orca Mobile app')
+    expect(primaryActionUrl()).toBe(RELEASES_URL)
   })
 
-  it('names the Android distribution channel without fabricating a listing', () => {
+  it('routes an Android bundle wall to GitHub Releases, not a store that has no listing', () => {
     nativeTestState.platform.OS = 'android'
     const output = render({
       kind: 'blocked',
       reason: 'bundle-shell-too-old',
       schemaVersion: 2
     })
-    expect(output).toContain(
-      'Update HiveCode Mobile from the official Android distribution channel'
-    )
-    expect(output).not.toContain('Open Android download')
-    expect(pressableCount()).toBe(1)
+    expect(output).toContain('Update Orca Mobile from GitHub Releases')
+    expect(primaryActionUrl()).toBe(RELEASES_URL)
   })
 
-  it('keeps the full recovery note when no configured download action exists', () => {
+  it('keeps the update walls on two buttons and the full recovery note', () => {
     const output = render({ kind: 'blocked', reason: 'bundle-unavailable' })
     expect(output).toContain('Already updated? Go back to Hosts and refresh the connection.')
-    expect(pressableCount()).toBe(1)
+    // The presence precondition for the absence asserted on the refresh wall above.
+    expect(pressableCount()).toBe(2)
   })
 
-  describe('with a verified Hive update available', () => {
-    function update(overrides: Partial<WallAppUpdate> = {}): WallAppUpdate {
-      return {
-        version: '1.5.0-beta.24',
-        pending: false,
-        message: null,
-        // The fixture proves delegation only; it never claims a native installation succeeded.
-        install: vi.fn<WallAppUpdate['install']>(async () => ({
-          ...INITIAL_SNAPSHOT,
-          state: 'not-available',
-          message: 'The test does not perform native installation'
-        })),
-        ...overrides
-      }
+  describe('with the newest release known', () => {
+    const release = {
+      version: '0.0.52',
+      url: 'https://github.com/stablyai/orca/releases/tag/mobile-v0.0.52'
     }
 
-    it('delegates the Android action to the verified Hive installer', () => {
-      nativeTestState.platform.OS = 'android'
-      const release = update()
-      const output = render(
-        { kind: 'blocked', reason: 'bundle-shell-too-old', schemaVersion: 2 },
-        release
-      )
-      expect(output).toContain('获取 HiveCode 1.5.0-beta.24')
-      const action = renderer!.root.findByProps({
-        accessibilityLabel: '获取 HiveCode 1.5.0-beta.24'
-      })
-      expect(action.props.accessibilityRole).toBe('button')
-      expect(action.props.disabled).toBe(false)
-      act(() => action.props.onPress())
-      expect(release.install).toHaveBeenCalledOnce()
-      expect(nativeTestState.openUrl).not.toHaveBeenCalled()
-    })
-
-    it('keeps an installation in progress disabled and announces its message', () => {
-      nativeTestState.platform.OS = 'android'
-      const release = update({ pending: true, message: '正在下载已验证的更新' })
-      const output = render(
-        { kind: 'blocked', reason: 'bundle-shell-too-old', schemaVersion: 2 },
-        release
-      )
-      const action = renderer!.root.findByProps({
-        accessibilityLabel: '获取 HiveCode 1.5.0-beta.24'
-      })
-      expect(action.props.disabled).toBe(true)
-      expect(action.props.accessibilityState).toEqual({ busy: true })
-      expect(output).toContain('正在下载已验证的更新')
-      expect(release.install).not.toHaveBeenCalled()
-    })
-
-    it('displays a real updater failure without reporting installation success', () => {
-      nativeTestState.platform.OS = 'android'
-      const output = render(
-        { kind: 'blocked', reason: 'bundle-shell-too-old', schemaVersion: 2 },
-        update({ message: '无法打开安装程序，请检查系统权限' })
-      )
-      expect(output).toContain('无法打开安装程序，请检查系统权限')
-      expect(nativeTestState.openUrl).not.toHaveBeenCalled()
-    })
-
-    it.each([
-      { kind: 'blocked', reason: 'bundle-unavailable' },
-      {
-        kind: 'blocked',
-        reason: 'bundle-incompatible',
-        side: 'mobile',
-        bundleRuntimeProtocolVersion: 3,
-        requiredBundleRuntimeProtocolVersion: 4
-      }
-    ] as const)('does not install a mobile package to clear $reason', (verdict) => {
-      const release = update()
-      const output = render(verdict, release)
-      expect(output).not.toContain('获取 HiveCode')
-      expect(pressableCount()).toBe(1)
-      expect(release.install).not.toHaveBeenCalled()
-      expect(nativeTestState.openUrl).not.toHaveBeenCalled()
-    })
-  })
-
-  it.each(['ios', 'android'] as const)(
-    'keeps the updater unavailable on %s without a verified artifact or configured link',
-    (os) => {
+    it.each(['ios', 'android'] as const)('opens that exact release on %s', (os) => {
       nativeTestState.platform.OS = os
       const output = render(
-        { kind: 'blocked', reason: 'mobile-too-old', desktopVersion: 5, requiredMobileVersion: 9 },
-        null
+        { kind: 'blocked', reason: 'bundle-shell-too-old', schemaVersion: 2 },
+        release
       )
-      expect(output).not.toContain('获取 HiveCode')
-      expect(pressableCount()).toBe(1)
-      expect(nativeTestState.openUrl).not.toHaveBeenCalled()
-    }
-  )
+      expect(output).toContain('Get Orca 0.0.52')
+      expect(output).not.toContain('Open App Store')
+      expect(output).not.toContain('Open GitHub Releases')
+      expect(primaryActionUrl()).toBe(release.url)
+    })
+
+    it('leaves the desktop wall on the desktop releases', () => {
+      const output = render({ kind: 'blocked', reason: 'bundle-unavailable' }, release)
+      expect(output).not.toContain('Get Orca')
+      expect(primaryActionUrl()).toBe(RELEASES_URL)
+    })
+  })
+
+  it.each([
+    ['ios', 'Open App Store', 'itms-apps://apps.apple.com/app/orca-ide/id6766130217'],
+    ['android', 'Open GitHub Releases', RELEASES_URL]
+  ] as const)('keeps the %s store link when no release is known', (os, label, url) => {
+    nativeTestState.platform.OS = os
+    const output = render(
+      { kind: 'blocked', reason: 'mobile-too-old', desktopVersion: 5, requiredMobileVersion: 9 },
+      null
+    )
+    expect(output).toContain(label)
+    expect(output).not.toContain('Get Orca')
+    expect(primaryActionUrl()).toBe(url)
+  })
 })

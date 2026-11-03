@@ -1,9 +1,8 @@
-import { productNameText } from '@/product-brand'
 import { useEffect } from 'react'
+import { translate } from '../i18n/mobile-i18n'
 import { worktreeActivate } from '../host-screen/host-screen-operations'
 import { headlessActivationNeedsHostRenderer } from '../worktree/worktree-activation-result'
 import { createInitialSessionAutoCreateState } from './use-initial-session-terminal-autocreate'
-import { createEffectTimerRegistry } from './session-effect-timer-registry'
 import type { MobileSessionKeyboardStateModel } from './use-mobile-session-keyboard-state'
 import type { RpcResponse } from '../transport/types'
 
@@ -47,7 +46,7 @@ export function useMobileSessionStartup(scope: MobileSessionKeyboardStateModel) 
     ensureSessionTabs
   } = scope
   useEffect(() => {
-    // Why: Expo reuses this screen across worktrees; reset route state so it can't open stale UI or reject the next snapshot.
+    // Reset reused-route state so the next workspace cannot inherit stale UI or snapshot gates.
     sessionTabActionSheetRequestSeqRef.current += 1
     sessionTabActionSheetKeyboardHideSubRef.current?.remove()
     sessionTabActionSheetKeyboardHideSubRef.current = null
@@ -102,27 +101,40 @@ export function useMobileSessionStartup(scope: MobileSessionKeyboardStateModel) 
     if (connState !== 'connected') {
       return
     }
-    // Why: keep the current xterm visible while the reconnect snapshot hydrates, not a blank "Loading terminals" surface.
+    // Keep xterm visible while reconnect history hydrates.
     if (initializedHandlesRef.current.size === 0) {
       setTerminalsLoaded(false)
     }
-    // Why: clear the initialized flag so the reconnect scrollback replaces stale content instead of being dropped.
+    // Clear initialization so reconnect scrollback replaces stale content instead of being ignored.
     initializedHandlesRef.current.clear()
-    const timerRegistry = createEffectTimerRegistry()
+    let disposed = false
+    const timers: ReturnType<typeof setTimeout>[] = []
+    function addTimer(fn: () => void, ms: number) {
+      if (disposed) {
+        return
+      }
+      timers.push(setTimeout(fn, ms))
+    }
     void (async () => {
-      // Both activations share this reader; a missing reply remains an explicit null outcome.
+      // Interpret only actual replies; preserve absent activation replies as null rather than inventing refusals.
       const reportActivationOutcome = (response: RpcResponse | null): void => {
         const activation = response === null ? null : worktreeActivate.interpret(response)
         if (
-          !timerRegistry.disposed &&
+          !disposed &&
           activation?.accepted === true &&
           headlessActivationNeedsHostRenderer(activation.value)
         ) {
-          showToast(productNameText('Open Orca on the host to wake sleeping agents.'), 3000)
+          showToast(
+            translate(
+              'session.useStartup.wakeAgents',
+              'Open HiveCode on the host to wake sleeping agents.'
+            ),
+            3000
+          )
         }
       }
       if (client && created !== '1' && !isFloatingWorkspaceRoute) {
-        // Why: hydrate host-owned tabs without pulling other paired clients (esp. desktop) into this worktree.
+        // Hydrate tabs without navigating other paired clients into this workspace.
         void worktreeActivate
           .request(client, {
             worktree: `id:${worktreeId}`,
@@ -132,21 +144,21 @@ export function useMobileSessionStartup(scope: MobileSessionKeyboardStateModel) 
           .then(reportActivationOutcome)
           .catch(() => null)
       }
-      if (timerRegistry.disposed) {
+      if (disposed) {
         return
       }
       await ensureSessionTabs().catch(() => null)
-      if (timerRegistry.disposed) {
+      if (disposed) {
         return
       }
       await fetchTerminals({ allowEmptyLoaded: false })
-      if (timerRegistry.disposed) {
+      if (disposed) {
         return
       }
-      timerRegistry.schedule(() => void fetchTerminals({ allowEmptyLoaded: false }), 750)
-      timerRegistry.schedule(() => void fetchTerminals({ allowEmptyLoaded: true }), 1500)
+      addTimer(() => void fetchTerminals({ allowEmptyLoaded: false }), 750)
+      addTimer(() => void fetchTerminals({ allowEmptyLoaded: true }), 1500)
       if (client && created === '1' && !isFloatingWorkspaceRoute) {
-        timerRegistry.schedule(() => {
+        addTimer(() => {
           if (activeHandleRef.current) {
             return
           }
@@ -159,17 +171,20 @@ export function useMobileSessionStartup(scope: MobileSessionKeyboardStateModel) 
               })
               .catch(() => null)
             reportActivationOutcome(activationResponse)
-            if (timerRegistry.disposed) {
+            if (disposed) {
               return
             }
             await fetchTerminals({ allowEmptyLoaded: true })
-            timerRegistry.schedule(() => void fetchTerminals({ allowEmptyLoaded: true }), 750)
+            addTimer(() => void fetchTerminals({ allowEmptyLoaded: true }), 750)
           })()
         }, 1800)
       }
     })()
     return () => {
-      timerRegistry.dispose()
+      disposed = true
+      for (const t of timers) {
+        clearTimeout(t)
+      }
     }
   }, [
     client,

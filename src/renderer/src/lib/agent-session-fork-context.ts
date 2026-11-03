@@ -1,5 +1,4 @@
-import { APP_DISPLAY_NAME } from '@/product-brand'
-
+import { trimAgentSessionContext } from '../../../shared/agent-session-context-budget'
 const MAX_FORK_CONTEXT_CHARS = 36_000
 const MAX_FORK_CAPTURE_SANITIZE_CHARS = MAX_FORK_CONTEXT_CHARS * 4
 const ESCAPE_CODE = 27
@@ -9,17 +8,6 @@ export type AgentSessionForkPromptInput = {
   capturedText: string
   sourceLabel?: string | null
   agentLabel?: string | null
-}
-
-function trimToContextBudget(value: string): string {
-  if (value.length <= MAX_FORK_CONTEXT_CHARS) {
-    return value
-  }
-  // Why: terminal scrollback can be very large; keep the newest turns where
-  // the current user intent and latest findings are most likely to live.
-  const omitted = value.length - MAX_FORK_CONTEXT_CHARS
-  const marker = `\n\n[Earlier terminal output omitted: ${omitted} characters]\n\n`
-  return `${marker}${value.slice(-(MAX_FORK_CONTEXT_CHARS - marker.length))}`
 }
 
 function getMarkdownFenceForTranscript(value: string): string {
@@ -40,8 +28,7 @@ function tailBoundForkCapture(value: string): string {
   if (value.length <= MAX_FORK_CAPTURE_SANITIZE_CHARS) {
     return value
   }
-  // Why: fork prompts keep newest terminal turns. Bound the raw capture before
-  // ANSI/OSC cleanup so a huge scrollback cannot run several full-output scans.
+  // Bound raw capture before ANSI/OSC cleanup to avoid repeated scans of huge scrollback.
   return value.slice(-MAX_FORK_CAPTURE_SANITIZE_CHARS)
 }
 
@@ -134,7 +121,7 @@ function isUnsupportedTranscriptControl(code: number): boolean {
 }
 
 export function buildBoundedSessionTranscript(capturedText: string): string | null {
-  const transcript = trimToContextBudget(
+  const transcript = trimAgentSessionContext(
     cleanAgentSessionForkTranscript(tailBoundForkCapture(capturedText))
   )
   return transcript || null
@@ -152,7 +139,7 @@ export function buildAgentSessionForkPrompt({
   const fence = getMarkdownFenceForTranscript(transcript)
 
   const header = [
-    `This is a fork of an existing ${APP_DISPLAY_NAME} agent session.`,
+    'This is a fork of an existing Orca agent session.',
     '',
     'Use the captured transcript as background context for this new, independent session. Keep file edits and decisions independent from the original terminal unless I explicitly ask you to coordinate with it.',
     '',

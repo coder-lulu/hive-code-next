@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { MuseUsageSnapshot } from '../../../../shared/muse-usage-types'
+import { formatAgentTypeLabel } from '../../../../shared/agent-type-label'
 import { useAppStore } from '../../store'
 import { RefreshCw } from 'lucide-react'
 import type { ClaudeUsageRange } from '../../../../shared/claude-usage-types'
@@ -41,6 +42,11 @@ export function UsageOverviewPane({ isActive = true }: { isActive?: boolean }): 
     let current = true
     setMuseSnapshot(null)
     setMuseLoading(true)
+    if (!window.api.museUsage?.getSnapshot) {
+      setMuseUnavailable(true)
+      setMuseLoading(false)
+      return
+    }
     void window.api.museUsage
       .getSnapshot({ scope: 'all', range, limit: 100 })
       .then((snapshot) => {
@@ -110,7 +116,9 @@ export function UsageOverviewPane({ isActive = true }: { isActive?: boolean }): 
         <Select
           value={range}
           onValueChange={(value) => {
-            setRange(value as ClaudeUsageRange)
+            if (value === '7d' || value === '30d' || value === '90d' || value === 'all') {
+              setRange(value)
+            }
             setSelectedDay(null)
           }}
         >
@@ -134,7 +142,15 @@ export function UsageOverviewPane({ isActive = true }: { isActive?: boolean }): 
         <Select
           value={agent}
           onValueChange={(value) => {
-            setAgent(value as UsageProviderId | 'all')
+            if (
+              value === 'all' ||
+              value === 'claude' ||
+              value === 'codex' ||
+              value === 'opencode' ||
+              value === 'muse'
+            ) {
+              setAgent(value)
+            }
             setSelectedDay(null)
           }}
         >
@@ -145,10 +161,10 @@ export function UsageOverviewPane({ isActive = true }: { isActive?: boolean }): 
             <SelectItem value="all">
               {translate('usage.redesign.allAgents', 'All collected agents')}
             </SelectItem>
-            <SelectItem value="claude">Claude</SelectItem>
-            <SelectItem value="codex">Codex</SelectItem>
-            <SelectItem value="opencode">OpenCode</SelectItem>
-            <SelectItem value="muse">Muse</SelectItem>
+            <SelectItem value="claude">{formatAgentTypeLabel('claude')}</SelectItem>
+            <SelectItem value="codex">{formatAgentTypeLabel('codex')}</SelectItem>
+            <SelectItem value="opencode">{formatAgentTypeLabel('opencode')}</SelectItem>
+            <SelectItem value="muse">{formatAgentTypeLabel('muse')}</SelectItem>
           </SelectContent>
         </Select>
         <Button

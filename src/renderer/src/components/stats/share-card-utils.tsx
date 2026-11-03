@@ -1,3 +1,4 @@
+import { PRODUCT_SOURCE_REPOSITORY } from '@/product-links'
 import type {
   ClaudeUsageDailyPoint,
   ClaudeUsageSummary
@@ -5,6 +6,7 @@ import type {
 import type { CodexUsageDailyPoint, CodexUsageSummary } from '../../../../shared/codex-usage-types'
 import { getIntlLocale, translate } from '@/i18n/i18n'
 import { APP_DISPLAY_NAME } from '@/product-brand'
+import { GitHubIcon } from '@/components/icons/GitHubIcon'
 
 export type ClaudeShareData = {
   provider: 'claude'
@@ -114,8 +116,7 @@ export type DailySegment = { key: string; value: number; color: string }
 export function getDailySegments(
   entry: ClaudeUsageDailyPoint | CodexUsageDailyPoint
 ): DailySegment[] {
-  // Why: segment order matches the original charts exactly (top-to-bottom).
-  // Segments render as stacked block divs in a table cell with vertical-align: bottom.
+  // Preserve chart segment order in the bottom-aligned stack.
   if ('cacheReadTokens' in entry) {
     return [
       { key: 'cache-write', value: entry.cacheWriteTokens, color: 'rgba(217, 70, 239, 0.7)' },
@@ -228,16 +229,26 @@ export function CardFooter(props: {
         </span>
       </div>
       <div style={{ display: 'table-cell', verticalAlign: 'middle', textAlign: 'right' }}>
+        <span style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+          <GitHubIcon
+            width={13}
+            height={13}
+            fill="#888"
+            style={{ opacity: 0.6, verticalAlign: 'middle' }}
+          />
+        </span>
         <span
           style={{
             fontSize: 11,
             color: '#888',
             letterSpacing: 0.2,
             verticalAlign: 'middle',
-            marginLeft: 0
+            marginLeft: 5
           }}
         >
-          {APP_DISPLAY_NAME}
+          {PRODUCT_SOURCE_REPOSITORY
+            ? ['github.com', '/'].join('') + PRODUCT_SOURCE_REPOSITORY
+            : ''}
         </span>
       </div>
     </div>

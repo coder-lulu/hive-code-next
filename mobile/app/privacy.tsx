@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../src/i18n/use-mobile-translation'
 import { productNameText } from '@/product-brand'
 import { useState } from 'react'
 import { Linking } from 'react-native'
@@ -16,6 +17,8 @@ import {
 const privacyAction = resolveFutureFeatureActionState('privacy', true)
 
 export default function PrivacyScreen() {
+  const t = useMobileTranslation()
+
   const policyUrl = privacyAction.capability.configurationValue
   const [opening, setOpening] = useState(false)
   const [openFailed, setOpenFailed] = useState(false)
@@ -31,39 +34,64 @@ export default function PrivacyScreen() {
   return (
     <FutureFeatureScreen
       capabilityId="privacy"
-      title="隐私中心"
-      description="集中查看隐私文档、权限与数据处理入口。"
+      title={t('auto.mobile.app.privacy.2ed11021aa', 'Privacy center')}
+      description={t(
+        'auto.mobile.app.privacy.9d674fc15d',
+        'View privacy documents, permissions, and data handling options in one place.'
+      )}
     >
       {policyUrl ? (
         <FutureFeatureAction
           disabled={privacyAction.disabled}
-          label="查看正式隐私政策"
+          label={t('auto.mobile.app.privacy.8bec93be5f', 'View the official privacy policy')}
           loading={opening}
           reason={privacyAction.reason}
           onPress={openPolicy}
         />
       ) : (
-        <FutureFeatureNotice title="隐私政策尚未配置">
-          当前没有权威隐私政策来源，因此不会在应用内生成或展示推测性条款。
+        <FutureFeatureNotice
+          title={t('auto.mobile.app.privacy.deeb02fa0d', 'Privacy policy is not configured')}
+        >
+          {t(
+            'auto.mobile.app.privacy.8689823031',
+            'No authoritative privacy policy is available, so the app will not generate or display speculative terms.'
+          )}
         </FutureFeatureNotice>
       )}
 
       {openFailed ? (
-        <FutureFeatureNotice danger title="未能打开隐私政策">
+        <FutureFeatureNotice
+          danger
+          title={t('auto.mobile.app.privacy.278e436d14', 'Could not open the privacy policy')}
+        >
           {productNameText(
             '系统未能验证或打开已配置的正式链接。为确保来源可信，Orca 未跳转到其他地址。'
           )}
         </FutureFeatureNotice>
       ) : null}
 
-      <FutureFeatureSection title="隐私控制">
-        <FutureFeatureRow label="个人信息收集清单" value="后续支持" />
-        <FutureFeatureRow label="第三方信息共享清单" value="后续支持" />
-        <FutureFeatureRow label="系统权限管理" value="后续支持" />
+      <FutureFeatureSection title={t('auto.mobile.app.privacy.b0e1606f77', 'Privacy controls')}>
+        <FutureFeatureRow
+          label={t('auto.mobile.app.privacy.6fce0bb813', 'Personal information collection list')}
+          value="后续支持"
+        />
+        <FutureFeatureRow
+          label={t('auto.mobile.app.privacy.5c81466d71', 'Third-party information sharing list')}
+          value="后续支持"
+        />
+        <FutureFeatureRow
+          label={t('auto.mobile.app.privacy.6f94af9742', 'System permission settings')}
+          value="后续支持"
+        />
       </FutureFeatureSection>
 
-      <FutureFeatureNotice title="本地与电脑数据">
-        当前页面不会读取、上传或修改已配对电脑的工作区、终端和源码数据。
+      <FutureFeatureNotice
+        title={t('auto.mobile.app.privacy.28c4de1688', 'Local and computer data')}
+      >
+        {t(
+          'auto.mobile.app.privacy.b0ca358b55',
+          'This page will not read, upload, or modify workspace, terminal, or source code data on paired computers.'
+        )}
       </FutureFeatureNotice>
     </FutureFeatureScreen>
   )

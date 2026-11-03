@@ -18,7 +18,6 @@ type MobileInputFloorState = {
   base: DriverState
   generation: number
   committedGeneration: number
-  committing: number
   pending: Map<symbol, { clientId: string; generation: number }>
 }
 
@@ -38,7 +37,7 @@ export class RuntimeTerminalDriverController {
   }
 
   set(ptyId: string, next: DriverState): void {
-    // Desktop takeback and disconnect invalidate every delayed mobile completion, even a no-op.
+    // A desktop reclaim or disconnect supersedes unfinished mobile input.
     if (next.kind !== 'mobile') {
       this.inputFloorClaims.delete(ptyId)
     }
@@ -95,7 +94,6 @@ export class RuntimeTerminalDriverController {
       base: this.get(ptyId),
       generation: 0,
       committedGeneration: 0,
-      committing: 0,
       pending: new Map<symbol, { clientId: string; generation: number }>()
     }
     this.inputFloorClaims.set(ptyId, state)
@@ -118,19 +116,14 @@ export class RuntimeTerminalDriverController {
         const previousFloor = state.base
         state.committedGeneration = generation
         state.base = { kind: 'mobile', clientId }
-        state.committing += 1
-        try {
-          await this.deps.commitMobileFloor(
-            ptyId,
-            clientId,
-            previousFloor,
-            () =>
-              this.inputFloorClaims.get(ptyId) === state && state.committedGeneration === generation
-          )
-        } finally {
-          state.committing -= 1
-          this.deleteSettledClaim(ptyId, state)
-        }
+        await this.deps.commitMobileFloor(
+          ptyId,
+          clientId,
+          previousFloor,
+          () =>
+            this.inputFloorClaims.get(ptyId) === state && state.committedGeneration === generation
+        )
+        this.deleteSettledClaim(ptyId, state)
       },
       rollback: () => {
         if (settled) {
@@ -155,11 +148,7 @@ export class RuntimeTerminalDriverController {
   }
 
   private deleteSettledClaim(ptyId: string, state: MobileInputFloorState): void {
-    if (
-      state.pending.size === 0 &&
-      state.committing === 0 &&
-      this.inputFloorClaims.get(ptyId) === state
-    ) {
+    if (state.pending.size === 0 && this.inputFloorClaims.get(ptyId) === state) {
       this.inputFloorClaims.delete(ptyId)
     }
   }

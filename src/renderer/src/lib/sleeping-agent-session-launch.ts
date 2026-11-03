@@ -59,11 +59,11 @@ export function launchSleepingAgentSession(
     agentArgs:
       launchConfig !== undefined && !hostDefaultsAuthoritative
         ? launchConfig.agentArgs
-        : resolveTuiAgentLaunchArgs(record.agent, state.settings?.agentDefaultArgs),
+        : resolveTuiAgentLaunchArgs(record.agent, state.settings),
     agentEnv:
       launchConfig !== undefined && !hostDefaultsAuthoritative
         ? launchConfig.agentEnv
-        : resolveTuiAgentLaunchEnv(record.agent, state.settings?.agentDefaultEnv),
+        : resolveTuiAgentLaunchEnv(record.agent, state.settings),
     ...(!hostDefaultsAuthoritative && launchConfig?.agentCommand
       ? { agentCommand: launchConfig.agentCommand }
       : {}),

@@ -1,3 +1,4 @@
+import { AUTHENTICATED_DIRECT_FRAMING_POLICY } from './authenticated-direct-framing-policy'
 import { publicKeyFromBase64 } from './e2ee'
 import { RpcClientSocketSession } from './rpc-client-socket-session'
 import { redactSocketEndpoint } from './socket-event-debug'
@@ -55,6 +56,7 @@ export class RpcClientSocketFactory {
       redactSocketEndpoint(this.options.endpoint)
     )
     return new RpcClientSocketSession({
+      framingPolicy: AUTHENTICATED_DIRECT_FRAMING_POLICY,
       endpoint: this.options.endpoint,
       deviceToken: this.options.deviceToken,
       serverPublicKeyB64: this.options.serverPublicKeyB64,

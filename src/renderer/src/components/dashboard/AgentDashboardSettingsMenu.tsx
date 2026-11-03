@@ -11,6 +11,7 @@ import { SettingsSwitch } from '../settings/SettingsFormControls'
 import { translate } from '@/i18n/i18n'
 
 type AgentDashboardSettingsMenuProps = {
+  onSwitchToPopout?: () => void
   /** Lets the host keep the companion board open while this menu owns the
    *  next outside click, matching the workspace board's menu handling. */
   onOpenChange: (open: boolean) => void
@@ -20,7 +21,8 @@ type AgentDashboardSettingsMenuProps = {
  *  workspace board's settings menu. In-window only — the pop-out renderer has
  *  no store access, so it never mounts this. */
 export function AgentDashboardSettingsMenu({
-  onOpenChange
+  onOpenChange,
+  onSwitchToPopout: _onSwitchToPopout
 }: AgentDashboardSettingsMenuProps): React.JSX.Element {
   const showIdle = useAppStore((s) => s.settings?.agentDashboardShowIdle === true)
   const updateSettings = useAppStore((s) => s.updateSettings)

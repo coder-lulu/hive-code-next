@@ -1,3 +1,4 @@
+import { findByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -34,7 +35,7 @@ describe('MobileThemeProvider', () => {
       renderer = create(createElement(MobileThemeProvider, null, createElement(ThemeProbe)))
     })
 
-    expect(renderer!.root.findByType('ThemeProbe').props).toMatchObject({
+    expect(findByHostType(renderer!.root, 'ThemeProbe').props).toMatchObject({
       scheme: 'dark',
       canvas: '#0D0F12'
     })
@@ -50,7 +51,7 @@ describe('MobileThemeProvider', () => {
         )
       )
     })
-    expect(renderer!.root.findByType('ThemeProbe').props.scheme).toBe('dark')
+    expect(findByHostType(renderer!.root, 'ThemeProbe').props.scheme).toBe('dark')
 
     act(() => {
       renderer!.update(
@@ -61,7 +62,7 @@ describe('MobileThemeProvider', () => {
         )
       )
     })
-    expect(renderer!.root.findByType('ThemeProbe').props.scheme).toBe('light')
+    expect(findByHostType(renderer!.root, 'ThemeProbe').props.scheme).toBe('light')
   })
 
   it('uses light as the safe fallback for an unavailable system scheme', () => {

@@ -36,7 +36,6 @@ function buildSettings(
   return {
     telemetry: {
       installId: 'test-install-id',
-      existedBeforeTelemetryRelease: false,
       optedIn: true,
       ...telemetry
     }
@@ -78,7 +77,6 @@ describe('PrivacyPane — toggle markup reflects stored preference', () => {
     const markup = renderToStaticMarkup(
       React.createElement(PrivacyPane, {
         settings: buildSettings({
-          existedBeforeTelemetryRelease: true,
           optedIn: null
         })
       })
@@ -188,8 +186,7 @@ describe('PrivacyPane — markup respects blocked state', () => {
     const markup = renderToStaticMarkup(
       React.createElement(PrivacyPane, {
         settings: buildSettings({
-          existedBeforeTelemetryRelease: false,
-          optedIn: true
+              optedIn: true
         })
       })
     )
@@ -203,7 +200,6 @@ describe('PrivacyPane — markup respects blocked state', () => {
     const markup = renderToStaticMarkup(
       React.createElement(PrivacyPane, {
         settings: buildSettings({
-          existedBeforeTelemetryRelease: true,
           optedIn: null
         })
       })
@@ -215,7 +211,6 @@ describe('PrivacyPane — markup respects blocked state', () => {
     const markup = renderToStaticMarkup(
       React.createElement(PrivacyPane, {
         settings: buildSettings({
-          existedBeforeTelemetryRelease: true,
           optedIn: true
         })
       })

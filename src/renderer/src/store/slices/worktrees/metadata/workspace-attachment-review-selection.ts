@@ -1,6 +1,7 @@
 import type { WorkspaceAttachmentMutation } from '../../../../../../shared/workspace-attachment-mutation'
 import type { WorktreeMeta } from '../../../../../../shared/worktree/meta-types'
 import type { Worktree } from '../../../../../../shared/worktree/types'
+import { getWorkspaceAttachments } from '../../../../../../shared/workspace-attachments'
 import { getHostedReviewLinkForMetaRefresh } from './hosted-review-link-mutation'
 
 const REVIEW_SLOTS = [
@@ -10,6 +11,21 @@ const REVIEW_SLOTS = [
   'linkedAzureDevOpsPR',
   'linkedGiteaPR'
 ] as const
+
+export function captureWorkspaceAttachmentMutation(
+  updates: Partial<WorktreeMeta> & WorkspaceAttachmentMutation,
+  worktree: Parameters<typeof getWorkspaceAttachments>[0]
+): Partial<WorktreeMeta> & WorkspaceAttachmentMutation {
+  return updates.linkedItems === undefined
+    ? updates
+    : {
+        ...updates,
+        linkedItems: updates.linkedItems,
+        linkedItemsBase: updates.linkedItemsBase ?? getWorkspaceAttachments(worktree),
+        linkedItemsSelectionChanged:
+          updates.linkedItemsSelectionChanged ?? hasExplicitWorkspaceReviewSelection(updates)
+      }
+}
 
 export function hasExplicitWorkspaceReviewSelection(updates: Partial<WorktreeMeta>): boolean {
   return (

@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { fetchMock, handlers, productEndpoint } = vi.hoisted(() => ({
+const { fetchMock, handlers } = vi.hoisted(() => ({
   fetchMock: vi.fn(),
-  handlers: new Map<string, (_event: unknown, args?: unknown) => unknown>(),
-  productEndpoint: { value: 'https://www.onorca.dev/v1/feedback' as string | null }
+  handlers: new Map<string, (_event: unknown, args?: unknown) => unknown>()
 }))
 
 vi.mock('electron', () => ({
@@ -17,14 +16,8 @@ vi.mock('electron', () => ({
   net: { fetch: (...args: unknown[]) => fetchMock(...args) }
 }))
 
-vi.mock('../product/product-external-service-endpoints', () => ({
-  getProductExternalServiceEndpoints: () => ({ feedback: productEndpoint.value })
-}))
-
-import {
-  MAX_FEEDBACK_IMAGE_RESPONSE_BYTES,
-  MAX_FEEDBACK_IMAGE_TOTAL_BYTES
-} from './feedback-image-attachments'
+import { MAX_FEEDBACK_IMAGE_RESPONSE_BYTES } from './feedback-image-attachments'
+import { MAX_FEEDBACK_IMAGE_TOTAL_BYTES } from '../../shared/feedback-image-limits'
 import { registerFeedbackHandlers, submitFeedback } from './feedback'
 
 function okResponse(): Response {
@@ -65,30 +58,12 @@ describe('submitFeedback', () => {
   beforeEach(() => {
     vi.useRealTimers()
     handlers.clear()
-    productEndpoint.value = 'https://www.onorca.dev/v1/feedback'
     fetchMock.mockReset()
     fetchMock.mockResolvedValue(okResponse())
   })
 
   afterEach(() => {
     vi.useRealTimers()
-  })
-
-  it('fails closed without a configured product feedback endpoint', async () => {
-    productEndpoint.value = null
-
-    await expect(
-      submitFeedback({
-        feedback: 'must stay local',
-        githubLogin: null,
-        githubEmail: null
-      })
-    ).resolves.toMatchObject({
-      ok: false,
-      status: null,
-      error: expect.stringContaining('not configured')
-    })
-    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('strips GitHub identity and anonymous contact fields when submitted anonymously', async () => {
@@ -425,7 +400,6 @@ describe('submitFeedback', () => {
       expect(body).toBeInstanceOf(FormData)
       expect(body.getAll('feedbackImage')).toHaveLength(2)
       expect(body.get('feedback')).toBe('images attached')
-      // Why: multipart must not lose the enrichment fields the JSON lane sends.
       expect(body.get('submissionType')).toBe('feedback')
       expect(body.get('appVersion')).toBe('1.2.3-test')
     })
@@ -576,8 +550,7 @@ describe('submitFeedback', () => {
       expect(fetchMock).not.toHaveBeenCalled()
     })
 
-    // Why: the renderer screens types first, so this lane only matters for a
-    // renderer invoking the channel directly — the case the handler guards.
+    // Enforce MIME ownership at IPC even if a renderer bypasses its own checks.
     it('rejects a prototype member posing as a content type over IPC', async () => {
       registerFeedbackHandlers()
       const result = (await handlers.get('feedback:submit')?.(null, {
@@ -621,8 +594,7 @@ describe('submitFeedback', () => {
     })
 
     it('does not fail a crash report over images it was never going to send', async () => {
-      // Why: the crash lane discards images, so validating them there would
-      // abort a crash report the user needs delivered.
+      // Crash submissions discard images; invalid unused images must not block delivery.
       await submitFeedback({
         ...diagnosticSubmitArgs(),
         images: Array.from({ length: 9 }, () => ({

@@ -74,6 +74,7 @@ beforeEach(async () => {
   structuredNativeChatEnabled = true
   closeSession = vi.fn(async () => true)
   acquire = vi.fn(async ({ fence, spawnToken }) => ({
+    acquisitionGeneration: globalThis.crypto.randomUUID(),
     process: { hostId: 'local', pid: 4242, processStartTimeMs: 1_700_000_000_000, spawnToken },
     link: {
       linkId: `link-${fence}`,
@@ -91,6 +92,7 @@ beforeEach(async () => {
     logger: createStructuredAgentSessionLogger(),
     store,
     adapter: {
+      open: vi.fn(async () => ({ reportedOptions: {} })),
       acquire,
       // A failed acquisition is proven gone, as the real adapters prove it; without this an
       // acquire that throws leaves an unverifiable owner nothing may replace.

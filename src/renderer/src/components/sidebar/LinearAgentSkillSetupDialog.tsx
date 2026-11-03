@@ -1,3 +1,8 @@
+import {
+  ORCA_LINEAR_SKILL_INSTALL_COMMAND,
+  buildAgentFeatureSkillUpdateCommand
+} from '@/lib/agent-feature-install-commands'
+import { buildSkillCommandForRuntime } from '@/components/settings/CliSkillRuntimeSetup'
 import type { ComponentProps } from 'react'
 import { CheckCircle2, EyeOff, Info } from 'lucide-react'
 import { IntegrationStatusPill } from '@/components/integration-status-pill'
@@ -12,10 +17,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
-import {
-  AGENT_SKILL_CLI_PREREQUISITE_NOTICE,
-  isOrcaCliAvailableOnPath
-} from '@/lib/agent-skill-cli-prerequisite'
+import { ORCA_LINEAR_SKILL_NAME } from '@/lib/agent-feature-skill-names'
 import { translate } from '@/i18n/i18n'
 
 type AgentSkillSetupPanelProps = ComponentProps<typeof AgentSkillSetupPanel>
@@ -25,14 +27,12 @@ type LinearAgentSkillSetupDialogProps = {
   showSuccess: boolean
   successDescription: string
   missingLabel: string
-  command: string
-  installedCommand: string
-  terminalShellOverride?: string
   terminalRuntime?: AgentSkillSetupPanelProps['terminalRuntime']
+  updateSkillName: string
   installed: boolean
   loading: boolean
   error: string | null
-  getPrerequisiteStatus?: AgentSkillSetupPanelProps['getPrerequisiteStatus']
+  getPrerequisiteStatus: AgentSkillSetupPanelProps['getPrerequisiteStatus']
   onBeforeOpenTerminal: AgentSkillSetupPanelProps['onBeforeOpenTerminal']
   onRecheck: AgentSkillSetupPanelProps['onRecheck']
   onOpenChange: (open: boolean) => void
@@ -45,16 +45,14 @@ export function LinearAgentSkillSetupDialog({
   showSuccess,
   successDescription,
   missingLabel,
-  command,
-  installedCommand,
-  terminalShellOverride,
+  updateSkillName,
   terminalRuntime,
   installed,
   loading,
   error,
+  onRecheck,
   getPrerequisiteStatus,
   onBeforeOpenTerminal,
-  onRecheck,
   onOpenChange,
   onDismissPermanently,
   onDone
@@ -102,8 +100,8 @@ export function LinearAgentSkillSetupDialog({
                 </DialogTitle>
                 <DialogDescription className="sr-only">
                   {translate(
-                    'auto.components.sidebar.LinearAgentSkillSetupPrompt.modalDescription',
-                    'Install the Linear skill from a terminal.'
+                    'auto.components.sidebar.LinearAgentSkillSetupPrompt.modalInstallDescription',
+                    'Install the Linear skill for your agents.'
                   )}
                 </DialogDescription>
               </DialogHeader>
@@ -126,41 +124,30 @@ export function LinearAgentSkillSetupDialog({
                 'Enable Linear ticket access'
               )}
               description={missingLabel}
-              command={command}
-              installedCommand={installedCommand}
-              terminalTitle={translate(
-                'auto.components.sidebar.LinearAgentSkillSetupPrompt.terminalTitle',
-                'Install Linear agent skill'
+              skillNames={[ORCA_LINEAR_SKILL_NAME]}
+              command={buildSkillCommandForRuntime(
+                ORCA_LINEAR_SKILL_INSTALL_COMMAND,
+                terminalRuntime
               )}
-              terminalAriaLabel={translate(
-                'auto.components.sidebar.LinearAgentSkillSetupPrompt.terminalAria',
-                'Linear agent skill installer terminal'
+              installedCommand={buildSkillCommandForRuntime(
+                buildAgentFeatureSkillUpdateCommand(updateSkillName),
+                terminalRuntime
               )}
-              terminalWorktreeId="sidebar-linear-agent-skill-setup"
-              terminalHeightPx={240}
-              terminalShellOverride={terminalShellOverride}
+              installedSkillNames={[updateSkillName]}
               terminalRuntime={terminalRuntime}
               installed={installed}
               loading={loading}
               error={error}
               installLabel={translate(
-                'auto.components.sidebar.LinearAgentSkillSetupPrompt.install',
-                'Install CLI & Skill'
+                'auto.components.skills.SkillInstallDialog.39acb9e8f4',
+                'Install skill'
               )}
-              // Why: Install is this modal's sole CTA, so make it the filled primary —
-              // matching the other setup surfaces (filled primary + muted dismiss).
               installVariant="default"
-              preInstallNotice={AGENT_SKILL_CLI_PREREQUISITE_NOTICE}
               getPrerequisiteStatus={getPrerequisiteStatus}
-              isPrerequisiteAvailable={isOrcaCliAvailableOnPath}
               onBeforeOpenTerminal={onBeforeOpenTerminal}
               onRecheck={onRecheck}
             />
-            {/* Why: permanent opt-out as a quiet EyeOff icon next to the × — matching
-                SetupGuideModal's "hide this setup surface" affordance — instead of a
-                footer button that competes with (or gets reflex-clicked over) Install.
-                Rendered last so the dialog's initial focus lands on Install, not here —
-                otherwise Enter-on-open would permanently dismiss. */}
+            {/* Place permanent opt-out last so initial focus/Enter reaches Install rather than dismissing forever. */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -173,8 +160,7 @@ export function LinearAgentSkillSetupDialog({
                       "Don't show again"
                     )}
                     onClick={onDismissPermanently}
-                    // Why: top-3 (not top-3.5) so this icon-xs button's centered 16px icon
-                    // lines up with the bare × close icon (top-4) — verified pixel-aligned.
+                    // Align this button’s centered icon with the adjacent bare close icon.
                     className="absolute top-3 right-10 text-muted-foreground"
                   >
                     <EyeOff className="size-4" />

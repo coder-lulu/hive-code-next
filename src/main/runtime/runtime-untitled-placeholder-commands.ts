@@ -8,7 +8,7 @@ import type { RuntimeFileCommandHost } from './files/file-command-host'
 import type { RuntimeFileExplorerPath } from './files/file-target'
 import { assertRuntimeFileMutationExpectation } from './files/file-mutation-expectation'
 import { requireLocalRuntimeFileRoute } from './files/file-target'
-import { resolveAuthorizedPath } from '../ipc/filesystem-auth'
+import { resolveAuthorizedPath } from '../ipc/filesystem/filesystem-auth'
 
 type PlaceholderHost = Pick<RuntimeFileCommandHost, 'getRuntimeId' | 'requireStore'> & {
   resolveFileExplorerPath(worktree: string, relativePath: string): Promise<RuntimeFileExplorerPath>

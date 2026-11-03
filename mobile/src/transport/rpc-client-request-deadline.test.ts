@@ -69,8 +69,7 @@ class MockWebSocket {
 const mockSockets: MockWebSocket[] = []
 const originalWebSocket = globalThis.WebSocket
 
-/** Latest settled state of a request, so a timeout can be observed without
- *  awaiting a promise that would reject under fake timers. */
+// Observe rejection state without awaiting a promise under fake timers.
 function track(request: Promise<unknown>): { read: () => string } {
   let outcome = 'pending'
   request.then(
@@ -88,6 +87,7 @@ describe('mobile rpc-client request deadline', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     mockSockets.length = 0
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The socket fixture provides the constructor, states, handlers, send and close used by the real client.
     globalThis.WebSocket = MockWebSocket as unknown as typeof WebSocket
   })
 
@@ -110,15 +110,14 @@ describe('mobile rpc-client request deadline', () => {
     const outcome = track(request)
 
     try {
-      // The first reconnect delay burns 500ms of the caller's 5s budget.
       await vi.advanceTimersByTimeAsync(500)
       mockSockets[1]!.open()
       await vi.advanceTimersByTimeAsync(0)
+      expectRequestSent(mockSockets[1]!, 'terminal.send', { terminal: 't1', text: 'hi' })
 
       await vi.advanceTimersByTimeAsync(4_499)
       expect(outcome.read()).toBe('pending')
 
-      // Restarting the budget after connecting would still have 500ms to go here.
       await vi.advanceTimersByTimeAsync(1)
       expect(outcome.read()).toBe('Request timed out: terminal.send')
     } finally {
@@ -146,8 +145,8 @@ describe('mobile rpc-client request deadline', () => {
       await vi.advanceTimersByTimeAsync(500)
       mockSockets[1]!.open()
       await vi.advanceTimersByTimeAsync(0)
+      expectRequestSent(mockSockets[1]!, 'speech.dictation.finish', { dictationId: 'd1' })
 
-      // A shared deadline would already have fired at 4_500 here.
       await vi.advanceTimersByTimeAsync(4_999)
       expect(outcome.read()).toBe('pending')
 
@@ -163,7 +162,6 @@ describe('mobile rpc-client request deadline', () => {
     const client = connect('ws://desktop.invalid', 'token', 'server-key')
     mockSockets[0]!.open()
 
-    // Under the 1s minimum: the floor clamps to 400ms rather than stretching it.
     const request = client.sendRequest(
       'terminal.send',
       { terminal: 't1', text: 'hi' },
@@ -172,6 +170,8 @@ describe('mobile rpc-client request deadline', () => {
     const outcome = track(request)
 
     try {
+      await vi.advanceTimersByTimeAsync(0)
+      expectRequestSent(mockSockets[0]!, 'terminal.send', { terminal: 't1', text: 'hi' })
       await vi.advanceTimersByTimeAsync(399)
       expect(outcome.read()).toBe('pending')
       await vi.advanceTimersByTimeAsync(1)
@@ -182,3 +182,15 @@ describe('mobile rpc-client request deadline', () => {
     }
   })
 })
+
+function expectRequestSent(socket: MockWebSocket, method: string, params: unknown): void {
+  const frames = socket.sent
+    .filter((frame) => frame.startsWith('encrypted:'))
+    .map((frame) => JSON.parse(frame.slice('encrypted:'.length)))
+  expect(frames).toContainEqual({
+    id: expect.stringMatching(/^rpc-/),
+    deviceToken: 'token',
+    method,
+    params
+  })
+}

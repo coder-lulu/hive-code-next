@@ -3,6 +3,7 @@ import type { SettingsSearchEntry } from './settings-search'
 import { translate } from '@/i18n/i18n'
 import { translateSearchKeyword } from './settings-search-keywords'
 import { createLocalizedCatalog } from '@/i18n/localized-catalog'
+import { localizeKeybindingDefinition } from './keybinding-title-copy'
 
 export const getTerminalShortcutPolicySearchEntry = createLocalizedCatalog(
   (): SettingsSearchEntry => ({
@@ -12,7 +13,7 @@ export const getTerminalShortcutPolicySearchEntry = createLocalizedCatalog(
     ),
     description: translate(
       'auto.components.settings.shortcuts.search.ebd7d81e1d',
-      'Choose whether Orca or the focused terminal wins when shortcuts overlap.'
+      'Choose whether HiveCode or the focused terminal wins when shortcuts overlap.'
     ),
     keywords: [
       ...translateSearchKeyword('auto.components.settings.shortcuts.search.ca6a0c2df7', 'shortcut'),
@@ -35,7 +36,7 @@ export const getTerminalShortcutPolicySearchEntry = createLocalizedCatalog(
 )
 
 const getShortcutDefinitionSearchEntries = createLocalizedCatalog(() =>
-  KEYBINDING_DEFINITIONS.map((item) => ({
+  KEYBINDING_DEFINITIONS.map(localizeKeybindingDefinition).map((item) => ({
     actionId: item.id,
     searchEntry: {
       title: item.title,
@@ -59,7 +60,8 @@ export function getShortcutsPaneSearchEntries(options?: {
     ...getShortcutDefinitionSearchEntries()
       .filter(
         ({ actionId }) =>
-          (includeManagedBrowser || actionId !== 'tab.newBrowser') &&
+          (includeManagedBrowser ||
+            (actionId !== 'tab.newBrowser' && actionId !== 'tab.newBrowserSplitRight')) &&
           (includeMobileEmulator || actionId !== 'tab.newSimulator')
       )
       .map(({ searchEntry }) => searchEntry),

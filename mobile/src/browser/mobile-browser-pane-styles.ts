@@ -1,200 +1,183 @@
 import { StyleSheet } from 'react-native'
-import type { MobileTheme } from '../theme/mobile-theme'
 import { TEXT_INPUT_FONT_SIZE } from '../platform/text-input-font-size'
+import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import { themedStyleSheet } from '../theme/themed-styles'
 
-export function createMobileBrowserPaneStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    root: {
-      flex: 1,
-      minHeight: 0,
-      backgroundColor: theme.color.bg.canvas
-    },
-    toolbar: {
-      minHeight: theme.size.navigationBarHeight,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.space4,
-      paddingHorizontal: theme.spacing.space8,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.color.border.subtle,
-      backgroundColor: theme.color.bg.surface
-    },
-    viewport: {
-      flex: 1,
-      minHeight: 0,
-      overflow: 'hidden',
-      backgroundColor: theme.color.bg.canvas
-    },
-    browserImageHost: {
-      ...StyleSheet.absoluteFillObject,
-      alignItems: 'center',
-      justifyContent: 'center',
-      overflow: 'hidden'
-    },
-    browserImageFill: {
-      width: '100%',
-      height: '100%'
-    },
-    browserImageLayer: {
-      ...StyleSheet.absoluteFillObject,
-      alignItems: 'center',
-      justifyContent: 'center'
-    },
-    browserImageLayerHidden: {
-      opacity: 0
-    },
-    browserZoomOffset: {
-      alignItems: 'center',
-      justifyContent: 'center'
-    },
-    browserFrameBox: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      overflow: 'hidden'
-    },
-    browserImage: {
-      backgroundColor: theme.color.bg.canvas
-    },
-    overlay: {
-      ...StyleSheet.absoluteFillObject,
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: theme.spacing.space24,
-      gap: theme.spacing.space8
-    },
-    emptyOverlay: {
-      backgroundColor: theme.color.bg.canvas
-    },
-    loadingIndicatorHost: {
-      width: theme.size.minimumTouchTarget,
-      height: theme.size.minimumTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.color.border.subtle,
-      borderRadius: theme.radii.control,
-      backgroundColor: theme.color.bg.surface
-    },
-    errorText: {
-      ...theme.typography.meta,
-      maxWidth: theme.size.overlayMaxWidth,
-      color: theme.color.status.dangerText,
-      backgroundColor: theme.color.bg.surface,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.color.border.default,
-      borderRadius: theme.radii.control,
-      paddingHorizontal: theme.spacing.space16,
-      paddingVertical: theme.spacing.space12,
-      textAlign: 'center',
-      overflow: 'hidden'
-    },
-    dialogOverlay: {
-      ...StyleSheet.absoluteFillObject,
-      zIndex: 30,
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: theme.spacing.space24,
-      backgroundColor: theme.color.overlay
-    },
-    dialogCard: {
-      width: '100%',
-      maxWidth: theme.size.overlayMaxWidth,
-      borderRadius: theme.radii.overlay,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.color.border.default,
-      backgroundColor: theme.color.bg.elevated,
-      padding: theme.spacing.space20
-    },
-    dialogTitle: {
-      ...theme.typography.sectionTitle,
-      color: theme.color.text.primary
-    },
-    dialogMessage: {
-      ...theme.typography.body,
-      color: theme.color.text.secondary,
-      marginTop: theme.spacing.space8
-    },
-    dialogError: {
-      ...theme.typography.meta,
-      color: theme.color.status.dangerText,
-      marginTop: theme.spacing.space8
-    },
-    dialogActions: {
-      flexDirection: 'row',
-      justifyContent: 'flex-end',
-      gap: theme.spacing.space8,
-      marginTop: theme.spacing.space20
-    },
-    dialogButton: {
-      minHeight: theme.size.minimumTouchTarget,
-      minWidth: theme.size.minimumTouchTarget,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.color.border.default,
-      borderRadius: theme.radii.control,
-      backgroundColor: theme.color.bg.surface,
-      paddingHorizontal: theme.spacing.space16,
-      alignItems: 'center',
-      justifyContent: 'center'
-    },
-    dialogButtonPrimary: {
-      borderColor: theme.color.bg.selected,
-      backgroundColor: theme.color.bg.selected
-    },
-    dialogButtonPressed: {
-      opacity: 0.76
-    },
-    dialogButtonText: {
-      ...theme.typography.label,
-      color: theme.color.text.primary
-    },
-    dialogButtonPrimaryText: {
-      color: theme.color.text.inverse
-    },
-    keyboardDock: {
-      zIndex: 20,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.color.border.subtle,
-      backgroundColor: theme.color.bg.surface
-    },
-    inputRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.space8,
-      paddingHorizontal: theme.spacing.space12,
-      paddingTop: theme.spacing.space8,
-      paddingBottom: theme.spacing.space8
-    },
-    keyboardInput: {
-      ...theme.typography.code,
-      fontSize: TEXT_INPUT_FONT_SIZE,
-      flex: 1,
-      minHeight: theme.size.minimumTouchTarget,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.color.border.default,
-      backgroundColor: theme.color.bg.surface,
-      color: theme.color.text.primary,
-      borderRadius: theme.radii.control,
-      paddingHorizontal: theme.spacing.space12
-    },
-    keyboardInputFocused: {
-      borderColor: theme.color.brand.primary
-    },
-    sendButton: {
-      width: theme.size.minimumTouchTarget,
-      height: theme.size.minimumTouchTarget,
-      borderRadius: theme.radii.circle,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.color.bg.subtle
-    },
-    sendButtonEnabled: {
-      backgroundColor: theme.color.bg.selected
-    },
-    sendButtonPressed: {
-      opacity: 0.76
-    },
-    disabled: {
-      opacity: 0.45
-    }
-  })
-}
+export const mobileBrowserPaneStyles = themedStyleSheet(() => ({
+  root: {
+    flex: 1,
+    minHeight: 0,
+    backgroundColor: colors.bgBase
+  },
+  toolbar: {
+    minHeight: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSubtle,
+    backgroundColor: colors.bgPanel
+  },
+  viewport: {
+    flex: 1,
+    minHeight: 0,
+    overflow: 'hidden',
+    backgroundColor: colors.bgBase
+  },
+  browserImageHost: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden'
+  },
+  browserImageFill: {
+    width: '100%',
+    height: '100%'
+  },
+  browserImageLayer: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  browserImageLayerHidden: {
+    opacity: 0
+  },
+  browserZoomOffset: {
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  browserFrameBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden'
+  },
+  browserImage: {
+    backgroundColor: colors.bgBase
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+    gap: spacing.sm,
+    backgroundColor: 'rgba(13, 15, 24, 0.2)'
+  },
+  errorText: {
+    color: colors.textPrimary,
+    backgroundColor: colors.bgPanel,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    borderRadius: radii.button,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: 13,
+    textAlign: 'center',
+    overflow: 'hidden'
+  },
+  dialogOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+    backgroundColor: 'rgba(13, 15, 24, 0.5)'
+  },
+  dialogCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    backgroundColor: colors.bgPanel,
+    padding: spacing.lg
+  },
+  dialogTitle: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '600'
+  },
+  dialogMessage: {
+    color: colors.textSecondary,
+    fontSize: typography.bodySize,
+    lineHeight: 20,
+    marginTop: spacing.sm
+  },
+  dialogButtonDisabled: {
+    opacity: 0.5
+  },
+  dialogError: {
+    color: colors.statusRed,
+    fontSize: typography.metaSize,
+    lineHeight: 18,
+    marginTop: spacing.sm
+  },
+  dialogActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+    marginTop: spacing.lg
+  },
+  dialogButton: {
+    minHeight: 34,
+    borderRadius: radii.button,
+    backgroundColor: colors.bgRaised,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  dialogButtonPrimary: {
+    backgroundColor: colors.textPrimary
+  },
+  dialogButtonPressed: {
+    opacity: 0.75
+  },
+  dialogButtonText: {
+    color: colors.textSecondary,
+    fontSize: typography.bodySize,
+    fontWeight: '600'
+  },
+  dialogButtonPrimaryText: {
+    color: colors.bgBase
+  },
+  keyboardDock: {
+    zIndex: 20,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSubtle,
+    backgroundColor: colors.bgPanel
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xs + 2
+  },
+  keyboardInput: {
+    flex: 1,
+    height: 34,
+    backgroundColor: colors.bgRaised,
+    color: colors.textPrimary,
+    borderRadius: radii.input,
+    paddingHorizontal: spacing.md,
+    // Use text-input seam: native keeps body size; web floor 16px prevents focus zoom that keyboard seam mistakes for no keyboard.
+    fontSize: TEXT_INPUT_FONT_SIZE,
+    fontFamily: typography.monoFamily,
+    marginRight: spacing.sm
+  },
+  sendButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bgRaised
+  },
+  disabled: {
+    opacity: 0.35
+  },
+  disabledText: {
+    color: colors.textMuted
+  }
+}))

@@ -129,6 +129,9 @@ const pullRequestSchema = z
     mergeQueueRequired: prNullableFlag('mergeQueueRequired'),
     mergeStateStatus: prNullableText('mergeStateStatus'),
     headSha: prText('headSha'),
+    headRefName: z.string().optional(),
+    confirmedContainedHeadOid: z.string().optional(),
+    headDivergedFromMergedPRAtOid: z.string().optional(),
     prRepo: prRepoIdentity('prRepo'),
     mergeMethodSettings: prMergeMethodSettings('mergeMethodSettings')
   })
@@ -149,6 +152,9 @@ const pullRequestSchema = z
           mergeQueueRequired: pr.mergeQueueRequired,
           mergeStateStatus: pr.mergeStateStatus,
           headSha: pr.headSha,
+          headRefName: pr.headRefName,
+          confirmedContainedHeadOid: pr.confirmedContainedHeadOid,
+          headDivergedFromMergedPRAtOid: pr.headDivergedFromMergedPRAtOid,
           prRepo: pr.prRepo,
           mergeMethodSettings: pr.mergeMethodSettings
         }

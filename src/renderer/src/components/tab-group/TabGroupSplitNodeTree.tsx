@@ -3,6 +3,11 @@ import type { TabGroupLayoutNode } from '../../../../shared/tab-types'
 import { useAppStore } from '../../store'
 import TabGroupPanel, { type TabGroupPanelTabStrip } from './TabGroupPanel'
 import type { HoveredTabInsertion } from './useTabDragSplit'
+import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/layout-owner-switch'
+import { setGroupRatioThroughLayoutOwner } from './tab-group-layout-owner-commands'
+
+const MIN_RATIO = 0.15
+const MAX_RATIO = 0.85
 
 export type TabGroupSplitSurface = {
   renderGroup: (groupId: string, edges: { top: boolean; right: boolean }) => React.ReactNode
@@ -10,16 +15,15 @@ export type TabGroupSplitSurface = {
   isDragging: boolean
 }
 
-const MIN_RATIO = 0.15
-const MAX_RATIO = 0.85
-
-function ResizeHandle({
+export function ResizeHandle({
   direction,
   onResizeStart,
+  onResizeEnd,
   onRatioChange
 }: {
   direction: 'horizontal' | 'vertical'
   onResizeStart: () => void
+  onResizeEnd?: () => void
   onRatioChange: (ratio: number) => void
 }): React.JSX.Element {
   const isHorizontal = direction === 'horizontal'
@@ -70,9 +74,7 @@ function ResizeHandle({
           : (moveEvent.clientY - rect.top) / rect.height
         const clamped = Math.min(MAX_RATIO, Math.max(MIN_RATIO, ratio))
         draggedRatio = clamped
-        // Why: direct style writes keep the drag off the store — a commit per
-        // pointermove published 60-120 global store updates/s against every
-        // subscriber (STA-3328). React re-applies identical flex on commit.
+        // Write pane styles during drag to avoid 60–120 global store updates per second; commit once on release.
         firstPane.style.flex = `${clamped} 1 0%`
         secondPane.style.flex = `${1 - clamped} 1 0%`
       }
@@ -84,6 +86,7 @@ function ResizeHandle({
         }
         cleaned = true
         resizeObserver.disconnect()
+        onResizeEnd?.()
         if (draggedRatio !== null) {
           onRatioChange(draggedRatio)
         }
@@ -130,7 +133,7 @@ function ResizeHandle({
       handle.addEventListener('lostpointercapture', onLostPointerCapture)
       activeResizeCleanupRef.current = cleanup
     },
-    [isHorizontal, onRatioChange, onResizeStart]
+    [isHorizontal, onRatioChange, onResizeStart, onResizeEnd]
   )
 
   return (
@@ -144,6 +147,7 @@ function ResizeHandle({
 }
 
 function SplitNode({
+  surface,
   node,
   nodePath,
   worktreeId,
@@ -160,8 +164,7 @@ function SplitNode({
   suppressRightBorder,
   suppressBottomBorder,
   isTabDragActive,
-  hoveredTabInsertion,
-  surface
+  hoveredTabInsertion
 }: {
   surface?: TabGroupSplitSurface
   node: TabGroupLayoutNode
@@ -196,10 +199,7 @@ function SplitNode({
         groupId={node.groupId}
         worktreeId={worktreeId}
         isVisible={isWorktreeActive}
-        // Why: hidden worktrees stay mounted so their PTYs and split layouts
-        // survive worktree switches, but only the visible worktree may own the
-        // global terminal shortcuts. If an offscreen group's pane stays
-        // "focused", Cmd/Ctrl+W and split shortcuts can hit the wrong worktree.
+        // Retain hidden PTYs/layouts, but grant global terminal shortcuts only to the visible focused group.
         isFocused={isWorktreeActive && node.groupId === focusedGroupId}
         hasSplitGroups={hasSplitGroups}
         tabStrip={tabStrip}
@@ -244,8 +244,7 @@ function SplitNode({
           touchesLeftEdge={touchesLeftEdge}
           touchesBottomEdge={isHorizontal ? touchesBottomEdge : false}
           suppressLeftBorder={suppressLeftBorder}
-          // Why: the resize handle paints the inner seam — pane borders here
-          // stack into a triple-line bar beside the divider.
+          // The resize handle owns the inner seam; pane borders would stack into extra lines.
           suppressRightBorder={isHorizontal ? true : suppressRightBorder}
           suppressBottomBorder={isHorizontal ? suppressBottomBorder : true}
           isTabDragActive={isTabDragActive}
@@ -258,7 +257,9 @@ function SplitNode({
         onRatioChange={(nextRatio) =>
           surface
             ? surface.onRatioChange(nodePath, nextRatio)
-            : setTabGroupSplitRatio(worktreeId, nodePath, nextRatio)
+            : ORCA_LAYOUT_OWNER_IS_MAIN
+              ? setGroupRatioThroughLayoutOwner(worktreeId, nodePath, nextRatio)
+              : setTabGroupSplitRatio(worktreeId, nodePath, nextRatio)
         }
       />
       <div className="flex min-w-0 min-h-0 overflow-hidden" style={{ flex: `${1 - ratio} 1 0%` }}>
@@ -287,15 +288,9 @@ function SplitNode({
   )
 }
 
-/**
- * The chrome-free group tree: recursive splits, resize handles, and one TabGroupPanel per leaf.
- * The host owns the drag scope (WorkspaceTabDragLayer), outer chrome, and edge policy.
- *
- * Host contract: the tree's nodes size themselves as flex items (`flex-1`), so the host must
- * mount it in a flex container that owns its rect (WorktreeSplitSurface's `absolute inset-0
- * flex`, the floating panel's surface frame). In a block parent every pane collapses to 0px.
- */
+/** Host this chrome-free tree in a sized flex container or panes collapse; the host owns drag scope and outer seams. */
 export function TabGroupSplitNodeTree({
+  surface,
   layout,
   worktreeId,
   focusedGroupId,
@@ -304,8 +299,7 @@ export function TabGroupSplitNodeTree({
   hoveredTabInsertion,
   tabStrip = 'attached',
   markdownAnnotationsEnabled = true,
-  rootTouchesBottomEdge = false,
-  surface
+  rootTouchesBottomEdge = false
 }: {
   surface?: TabGroupSplitSurface
   layout: TabGroupLayoutNode

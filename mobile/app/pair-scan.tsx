@@ -1,62 +1,60 @@
-import { productNameText } from '@/product-brand'
-import { CameraView, useCameraPermissions } from 'expo-camera'
-import { useRouter } from 'expo-router'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import {
-  AlertTriangle,
-  ChevronLeft,
-  ClipboardPaste,
-  QrCode,
-  RefreshCw,
-  Settings
-} from 'lucide-react-native'
-import { useCallback, useRef, useState } from 'react'
-import {
+  AppState,
+  View,
+  Text,
+  Pressable,
   ActivityIndicator,
   Linking,
-  ScrollView,
-  Text,
-  View,
-  useWindowDimensions,
   type LayoutChangeEvent
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { ConnectionLog } from '../src/components/ConnectionLog'
-import { PairingActionButton } from '../src/components/pairing/PairingActionButton'
-import { PairingCodeSheet } from '../src/components/pairing/PairingCodeSheet'
-import { resolvePairScanCameraSize } from '../src/components/pairing/pair-scan-camera-size'
-import { createPairScanScreenStyles } from '../src/components/pairing/pair-scan-screen-styles'
-import {
-  PairingConnectingState,
-  PairingScreenContent,
-  PairingSecurityNotice
-} from '../src/components/pairing/PairingScreenContent'
-import { MobileIconButton } from '../src/components/ui/MobileIconButton'
-import { MobileScreenHeader } from '../src/components/ui/MobileScreenHeader'
-import {
-  loadMobileOnboardingSteps,
-  mobileOnboardingDestination
-} from '../src/onboarding/mobile-onboarding-plan'
-import { useMobileTheme, useMobileThemeStyles } from '../src/theme/mobile-theme-provider'
-import { useRefreshHostClient } from '../src/transport/client-context'
+import { CameraView, useCameraPermissions } from 'expo-camera'
+import { useRouter } from 'expo-router'
+import { ChevronLeft, Clipboard as ClipboardIcon, QrCode } from 'lucide-react-native'
 import { decodePairingUrl, parsePairingCode } from '../src/transport/pairing'
+import { getPairingScanErrorMessage } from '../src/transport/pairing-scan-error-message'
 import {
   startPreProfilePairing,
   type PreProfilePairingAttempt
 } from '../src/transport/pre-profile-pairing-coordinator'
 import type { ConnectionLogEntry, PairingOffer } from '../src/transport/types'
+import { useRefreshHostClient } from '../src/transport/host-client-hooks'
+import { colors, spacing } from '../src/theme/mobile-theme'
+import { useMobileColorScheme } from '../src/theme/use-mobile-color-scheme'
+import { useMobileTranslation } from '../src/i18n/use-mobile-translation'
+import { TextInputModal } from '../src/components/TextInputModal'
+import { ConnectionLog } from '../src/components/ConnectionLog'
+import {
+  loadMobileOnboardingSteps,
+  mobileOnboardingDestination
+} from '../src/onboarding/mobile-onboarding-plan'
+import { pairScanStyles as styles } from '../src/pair-scan-styles'
 
+// Bound initial pairing at ~25s (one connect timeout plus retry) so broken routes show an actionable error/log; live RPC retries indefinitely.
 const PAIRING_OVERALL_TIMEOUT_MS = 25_000
-const SCAN_RETICLE_SCALE = 0.3
-const SCAN_RETICLE_MAX_SIZE = 64
+const SCAN_RETICLE_SCALE = 0.62
+const SCAN_RETICLE_MAX_SIZE = 360
+
+function Step({ number, text }: { number: number; text: string }) {
+  useMobileColorScheme()
+  return (
+    <View style={styles.step}>
+      <View style={styles.stepBadge}>
+        <Text style={styles.stepNumber}>{number}</Text>
+      </View>
+      <Text style={styles.stepText}>{text}</Text>
+    </View>
+  )
+}
 
 export default function PairScanScreen() {
+  useMobileColorScheme()
+  const t = useMobileTranslation()
   const router = useRouter()
   const refreshHostClient = useRefreshHostClient()
   const insets = useSafeAreaInsets()
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createPairScanScreenStyles)
-  const viewportWidth = useWindowDimensions().width
-  const [permission, requestPermission] = useCameraPermissions()
+  const [permission, requestPermission, getPermission] = useCameraPermissions()
   const [status, setStatus] = useState<'scanning' | 'connecting' | 'error'>('scanning')
   const [errorMessage, setErrorMessage] = useState('')
   const [pasteVisible, setPasteVisible] = useState(false)
@@ -66,53 +64,86 @@ export default function PairScanScreen() {
   const processingRef = useRef(false)
   const mountedRef = useRef(true)
   const activePairingAttemptRef = useRef<PreProfilePairingAttempt | null>(null)
-  const pairingGenerationRef = useRef(0)
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void getPermission().catch(() => {})
+      }
+    })
+    return () => subscription.remove()
+  }, [getPermission])
 
   const setPairScanRootRef = useCallback((node: View | null): void => {
     if (node !== null) {
       mountedRef.current = true
       return
     }
+    // Dispose pairing on route detach: attempts can outlive the visible screen, before passive cleanup.
+    mountedRef.current = false
     activePairingAttemptRef.current?.dispose()
     activePairingAttemptRef.current = null
-    pairingGenerationRef.current += 1
+  }, [])
+
+  const handleBarCodeScanned = useCallback(
+    ({ data }: { data: string }) => {
+      if (processingRef.current) {
+        return
+      }
+      processingRef.current = true
+
+      const offer = decodePairingUrl(data)
+      if (!offer) {
+        setStatus('error')
+        setErrorMessage(getPairingScanErrorMessage(data, t))
+        processingRef.current = false
+        return
+      }
+
+      void testAndSave(offer)
+    },
+    [router, t]
+  )
+
+  const handlePasteSubmit = useCallback(
+    (input: string) => {
+      setPasteVisible(false)
+      if (processingRef.current) {
+        return
+      }
+      processingRef.current = true
+
+      const offer = parsePairingCode(input)
+      if (!offer) {
+        setStatus('error')
+        setErrorMessage(
+          t(
+            'app.pairScan.invalidPairingCode',
+            'Not a valid pairing code — copy it from your computer and paste again'
+          )
+        )
+        processingRef.current = false
+        return
+      }
+
+      void testAndSave(offer)
+    },
+    [t]
+  )
+
+  const cancelPairing = useCallback(() => {
     mountedRef.current = false
-  }, [])
-
-  const handleBarCodeScanned = useCallback(({ data }: { data: string }) => {
-    if (processingRef.current) {
-      return
-    }
-    processingRef.current = true
-    const offer = decodePairingUrl(data)
-    if (!offer) {
-      setStatus('error')
-      setErrorMessage(productNameText('Not a valid Orca QR code'))
-      processingRef.current = false
-      return
-    }
-    void testAndSave(offer)
-  }, [])
-
-  const handlePasteSubmit = useCallback((input: string) => {
-    setPasteVisible(false)
-    if (processingRef.current) {
-      return
-    }
-    processingRef.current = true
-    const offer = parsePairingCode(input)
-    if (!offer) {
-      setStatus('error')
-      setErrorMessage(productNameText('配对码无效，请从电脑版 Orca 重新复制后再试。'))
-      processingRef.current = false
-      return
-    }
-    void testAndSave(offer)
-  }, [])
+    activePairingAttemptRef.current?.dispose()
+    activePairingAttemptRef.current = null
+    router.back()
+  }, [router])
 
   const handleCameraLayout = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout
-    const nextBounds = { width: Math.round(width), height: Math.round(height) }
+    const nextBounds = {
+      width: Math.round(width),
+      height: Math.round(height)
+    }
     setCameraBounds((currentBounds) =>
       currentBounds.width === nextBounds.width && currentBounds.height === nextBounds.height
         ? currentBounds
@@ -125,16 +156,13 @@ export default function PairScanScreen() {
     logsRef.current = []
     setLogs([])
     activePairingAttemptRef.current?.dispose()
-    const pairingGeneration = ++pairingGenerationRef.current
-    const pairingIsCurrent = () =>
-      mountedRef.current && pairingGenerationRef.current === pairingGeneration
 
     const attempt = startPreProfilePairing({
       offer,
       timeoutMs: PAIRING_OVERALL_TIMEOUT_MS,
       connectOptions: {
         onLog: (entry) => {
-          if (!pairingIsCurrent() || activePairingAttemptRef.current !== attempt) {
+          if (!mountedRef.current || activePairingAttemptRef.current !== attempt) {
             return
           }
           logsRef.current = [...logsRef.current, entry]
@@ -145,45 +173,49 @@ export default function PairScanScreen() {
     activePairingAttemptRef.current = attempt
     try {
       const { hostId } = await attempt.result
-      const attemptIsCurrent = pairingIsCurrent() && activePairingAttemptRef.current === attempt
+      const attemptIsCurrent = activePairingAttemptRef.current === attempt
       attempt.dispose()
       if (activePairingAttemptRef.current === attempt) {
         activePairingAttemptRef.current = null
       }
-      if (!attemptIsCurrent) {
+      if (!mountedRef.current || !attemptIsCurrent) {
         return
       }
+      // Re-pair reuses host id; close cached client so it reloads the persisted endpoint/relay (STA-1840).
       refreshHostClient(hostId)
       const onboardingSteps = await loadMobileOnboardingSteps()
-      if (!pairingIsCurrent()) {
+      if (!mountedRef.current) {
         return
       }
       router.replace(mobileOnboardingDestination(onboardingSteps, hostId))
-    } catch (error) {
+    } catch (err) {
       const timedOut = attempt.timedOut
-      const attemptIsCurrent = pairingIsCurrent() && activePairingAttemptRef.current === attempt
+      const attemptIsCurrent = activePairingAttemptRef.current === attempt
       attempt.dispose()
       if (activePairingAttemptRef.current === attempt) {
         activePairingAttemptRef.current = null
       }
-      if (!attemptIsCurrent) {
+      if (!mountedRef.current || !attemptIsCurrent) {
         return
       }
-      console.warn('[pair] connect failed', error)
+      console.warn('[pair] connect failed', err)
       setStatus('error')
       setErrorMessage(
         timedOut
-          ? `连接在 ${PAIRING_OVERALL_TIMEOUT_MS / 1000} 秒内未完成，请查看下方日志后重试。`
-          : `配对失败：${error instanceof Error ? error.message : String(error)}`
+          ? t(
+              'app.pairScan.connectTimedOut',
+              "Couldn't connect within {{seconds}}s — see log below for where it stalled",
+              { seconds: PAIRING_OVERALL_TIMEOUT_MS / 1000 }
+            )
+          : t('app.pairScan.pairingFailed', 'Pairing failed: {{error}}', {
+              error: err instanceof Error ? err.message : String(err)
+            })
       )
       processingRef.current = false
     }
   }
 
   function retry() {
-    pairingGenerationRef.current += 1
-    activePairingAttemptRef.current?.dispose()
-    activePairingAttemptRef.current = null
     setStatus('scanning')
     setErrorMessage('')
     logsRef.current = []
@@ -191,109 +223,130 @@ export default function PairScanScreen() {
     processingRef.current = false
   }
 
+  // Include Android three-button/iOS home-indicator inset so paste button stays clear.
+  const containerPadding = {
+    paddingTop: insets.top + spacing.sm,
+    paddingBottom: insets.bottom + spacing.sm
+  }
+  // Keep QR guide square even on rectangular iPad previews.
   const reticleSize = Math.min(
     Math.round(Math.min(cameraBounds.width, cameraBounds.height) * SCAN_RETICLE_SCALE),
     SCAN_RETICLE_MAX_SIZE
   )
-  const cameraSize = resolvePairScanCameraSize(viewportWidth, theme.spacing.space20)
-  const bottomPadding = { paddingBottom: insets.bottom + theme.spacing.space20 }
-  const header = (
-    <MobileScreenHeader
-      leading={
-        <MobileIconButton
-          accessibilityLabel="返回"
-          icon={ChevronLeft}
-          onPress={() => {
-            pairingGenerationRef.current += 1
-            activePairingAttemptRef.current?.dispose()
-            activePairingAttemptRef.current = null
-            processingRef.current = false
-            router.back()
-          }}
-        />
-      }
-      title="连接电脑"
-    />
-  )
 
   if (!permission) {
     return (
-      <View ref={setPairScanRootRef} style={styles.container}>
-        {header}
-        <View style={styles.centered}>
-          <ActivityIndicator color={theme.color.text.secondary} size="large" />
-          <Text style={styles.loadingText}>正在准备相机…</Text>
-        </View>
+      <View ref={setPairScanRootRef} style={[styles.container, containerPadding]}>
+        <ActivityIndicator color={colors.textSecondary} />
       </View>
     )
   }
 
-  if (!permission.granted) {
+  if (!permission.granted && status === 'scanning') {
     const canAskAgain = permission.canAskAgain !== false
     return (
-      <View ref={setPairScanRootRef} style={styles.container}>
-        {header}
-        <ScrollView contentContainerStyle={[styles.scrollCentered, bottomPadding]}>
-          <PairingScreenContent
-            description={
-              canAskAgain
-                ? productNameText(
-                    '允许相机访问以扫描电脑版 Orca 显示的二维码，也可以直接输入配对码。'
-                  )
-                : productNameText(
-                    '请在系统设置中开启相机权限，或直接输入电脑版 Orca 显示的配对码。'
-                  )
-            }
-            icon={QrCode}
-            title={canAskAgain ? '扫描桌面端二维码' : '相机权限已关闭'}
+      <View ref={setPairScanRootRef} style={[styles.container, containerPadding]}>
+        <Pressable
+          style={styles.backButton}
+          onPress={cancelPairing}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.back', 'Back')}
+        >
+          <ChevronLeft size={22} color={colors.textSecondary} />
+        </Pressable>
+        <View style={styles.centered}>
+          <Text style={styles.title}>
+            {canAskAgain
+              ? t('app.pairScan.title', 'Pair with desktop')
+              : t('app.pairScan.cameraDisabledTitle', 'Camera Access Disabled')}
+          </Text>
+          <Text style={styles.subtitle}>
+            {canAskAgain
+              ? t(
+                  'app.pairScan.cameraPermissionDescription',
+                  'Scan the QR code from HiveCode on your desktop, or paste the pairing code instead.'
+                )
+              : t(
+                  'app.pairScan.cameraDisabledDescription',
+                  'Enable camera access in Settings, or paste the pairing code instead.'
+                )}
+          </Text>
+          <Pressable
+            style={styles.primaryButton}
+            onPress={canAskAgain ? requestPermission : () => void Linking.openSettings()}
           >
-            <View style={styles.actions}>
-              <PairingActionButton
-                icon={canAskAgain ? QrCode : Settings}
-                label={canAskAgain ? '允许相机访问' : '打开系统设置'}
-                onPress={canAskAgain ? requestPermission : () => void Linking.openSettings()}
-              />
-              <PairingActionButton
-                icon={ClipboardPaste}
-                label="输入配对码"
-                onPress={() => setPasteVisible(true)}
-                variant="secondary"
-              />
-            </View>
-            <PairingSecurityNotice />
-          </PairingScreenContent>
-        </ScrollView>
-        <PairingCodeSheet
-          onCancel={() => setPasteVisible(false)}
-          onSubmit={handlePasteSubmit}
+            {canAskAgain && <QrCode size={16} color={colors.bgBase} />}
+            <Text style={styles.primaryButtonText}>
+              {canAskAgain
+                ? t('common.continue', 'Continue')
+                : t('app.pairScan.openSettings', 'Open Settings')}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.pasteButton, pressed && styles.pasteButtonPressed]}
+            onPress={() => setPasteVisible(true)}
+          >
+            <ClipboardIcon size={16} color={colors.textSecondary} />
+            <Text style={styles.pasteButtonText}>
+              {t('app.pairScan.pasteInstead', 'Paste code instead')}
+            </Text>
+          </Pressable>
+        </View>
+        <TextInputModal
           visible={pasteVisible}
+          title={t('app.pairScan.pasteCodeTitle', 'Paste pairing code')}
+          message={t(
+            'app.pairScan.pasteCodeMessage',
+            'Copy the code shown under the QR on your computer.'
+          )}
+          placeholder={t(
+            'app.pairScan.pasteCodePlaceholder',
+            'orca://pair?code=... or paste the code'
+          )}
+          onSubmit={handlePasteSubmit}
+          onCancel={() => setPasteVisible(false)}
         />
       </View>
     )
   }
 
   return (
-    <View ref={setPairScanRootRef} style={styles.container}>
-      {header}
-      {status === 'scanning' ? (
-        <ScrollView contentContainerStyle={[styles.scannerContent, bottomPadding]}>
-          <View style={styles.cameraStage}>
-            <View
-              accessibilityLabel="二维码扫描区域"
-              onLayout={handleCameraLayout}
-              style={[styles.cameraWrap, { width: cameraSize, height: cameraSize }]}
-            >
-              {!pasteVisible ? (
-                <CameraView
-                  barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-                  facing="back"
-                  onBarcodeScanned={handleBarCodeScanned}
-                  style={styles.camera}
-                />
-              ) : (
-                <View style={styles.cameraPlaceholder} />
-              )}
-              <View pointerEvents="none" style={styles.reticle}>
+    <View ref={setPairScanRootRef} style={[styles.container, containerPadding]}>
+      <Pressable
+        style={styles.backButton}
+        onPress={cancelPairing}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={t('common.back', 'Back')}
+      >
+        <ChevronLeft size={22} color={colors.textSecondary} />
+      </Pressable>
+
+      <View style={styles.steps}>
+        <Step
+          number={1}
+          text={t('app.pairScan.openDesktopStep', 'Open HiveCode on your computer')}
+        />
+        <Step
+          number={2}
+          text={t('app.pairScan.openMobileSettingsStep', 'Go to Settings → Mobile')}
+        />
+        <Step number={3} text={t('app.pairScan.scanCodeStep', 'Scan the QR code')} />
+      </View>
+
+      {status === 'scanning' && (
+        <>
+          {/* Pause camera behind paste sheet to save power and prevent unnoticed scans. */}
+          {!pasteVisible && (
+            <View style={styles.cameraWrap} onLayout={handleCameraLayout}>
+              <CameraView
+                style={styles.camera}
+                facing="back"
+                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                onBarcodeScanned={handleBarCodeScanned}
+              />
+              <View style={styles.reticle} pointerEvents="none">
                 <View style={[styles.reticleFrame, { width: reticleSize, height: reticleSize }]}>
                   <View style={[styles.corner, styles.cornerTL]} />
                   <View style={[styles.corner, styles.cornerTR]} />
@@ -302,76 +355,75 @@ export default function PairScanScreen() {
                 </View>
               </View>
             </View>
-            <Text accessibilityRole="header" style={styles.scanTitle}>
-              扫描桌面端二维码
-            </Text>
-            <Text style={styles.scanDescription}>
-              二维码只用于交换配对信息，不包含你的代码内容。
-            </Text>
-          </View>
-          <View style={styles.bottomActions}>
-            <View
-              accessibilityLiveRegion="polite"
-              accessibilityRole="text"
-              style={styles.scanStatus}
-            >
-              <QrCode color={theme.color.text.inverse} size={20} strokeWidth={2} />
-              <Text style={styles.scanStatusText}>正在扫描</Text>
-            </View>
-            <PairingActionButton
-              label="无法使用相机？"
-              onPress={() => setPasteVisible(true)}
-              variant="ghost"
-            />
-          </View>
-        </ScrollView>
-      ) : null}
-
-      {status === 'connecting' ? (
-        <ScrollView contentContainerStyle={[styles.scrollCentered, bottomPadding]}>
-          <PairingConnectingState>
-            {logs.length > 0 ? (
-              <View style={styles.logSlot}>
-                <ConnectionLog entries={logs} title="配对日志" />
-              </View>
-            ) : null}
-          </PairingConnectingState>
-        </ScrollView>
-      ) : null}
-
-      {status === 'error' ? (
-        <ScrollView contentContainerStyle={[styles.scrollCentered, bottomPadding]}>
-          <PairingScreenContent
-            description={errorMessage}
-            icon={AlertTriangle}
-            title="无法连接电脑"
-            tone="danger"
+          )}
+          {pasteVisible && <View style={styles.cameraPlaceholder} />}
+          <Pressable
+            style={({ pressed }) => [styles.pasteButton, pressed && styles.pasteButtonPressed]}
+            onPress={() => setPasteVisible(true)}
           >
-            {logs.length > 0 ? (
-              <View style={styles.logSlot}>
-                <ConnectionLog entries={logs} title="配对日志" />
-              </View>
-            ) : null}
-            <View style={styles.actions}>
-              <PairingActionButton icon={RefreshCw} label="重新扫描" onPress={retry} />
-              <PairingActionButton
-                icon={ClipboardPaste}
-                label="输入配对码"
-                onPress={() => {
-                  retry()
-                  setPasteVisible(true)
-                }}
-                variant="secondary"
-              />
-            </View>
-          </PairingScreenContent>
-        </ScrollView>
-      ) : null}
+            <ClipboardIcon size={16} color={colors.textSecondary} />
+            <Text style={styles.pasteButtonText}>
+              {t('app.pairScan.pastePairingCode', 'Or paste pairing code')}
+            </Text>
+          </Pressable>
+        </>
+      )}
 
-      <PairingCodeSheet
-        onCancel={() => setPasteVisible(false)}
-        onSubmit={handlePasteSubmit}
+      {status === 'connecting' && (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={colors.textSecondary} />
+          <Text style={styles.connectingText}>{t('app.pairScan.connecting', 'Connecting…')}</Text>
+          <View style={styles.logSlot}>
+            <ConnectionLog entries={logs} title={t('app.pairScan.pairingLog', 'Pairing log')} />
+          </View>
+        </View>
+      )}
+
+      {status === 'error' && (
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>{errorMessage}</Text>
+          {logs.length > 0 && (
+            <View style={styles.logSlot}>
+              <ConnectionLog entries={logs} title={t('app.pairScan.pairingLog', 'Pairing log')} />
+            </View>
+          )}
+          <View style={styles.errorActions}>
+            <Pressable style={styles.primaryButton} onPress={retry}>
+              <Text style={styles.primaryButtonText}>
+                {t('app.pairScan.tryAgain', 'Try Again')}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.secondaryButton,
+                pressed && styles.pasteButtonPressed
+              ]}
+              onPress={() => {
+                retry()
+                setPasteVisible(true)
+              }}
+            >
+              <Text style={styles.secondaryButtonText}>
+                {t('app.pairScan.pasteInstead', 'Paste code instead')}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      <TextInputModal
         visible={pasteVisible}
+        title={t('app.pairScan.pasteCodeTitle', 'Paste pairing code')}
+        message={t(
+          'app.pairScan.pasteCodeMessage',
+          'Copy the code shown under the QR on your computer.'
+        )}
+        placeholder={t(
+          'app.pairScan.pasteCodePlaceholder',
+          'orca://pair?code=... or paste the code'
+        )}
+        onSubmit={handlePasteSubmit}
+        onCancel={() => setPasteVisible(false)}
       />
     </View>
   )

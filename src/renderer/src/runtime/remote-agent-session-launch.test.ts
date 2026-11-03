@@ -54,8 +54,7 @@ describe('remote agent-session launch routing', () => {
       const legacy = vi.fn().mockResolvedValue('legacy')
       mocks.supportsCapability.mockResolvedValue(false)
 
-      // Why: an old host rejects the widened agent enum with invalid_argument, which is not a
-      // fallback code — so the probe, not the error handler, has to keep the pane alive.
+      // Old hosts reject widened enums with non-fallback invalid_argument; capability probes must prevent the bad launch.
       await expect(
         runRemoteAgentSessionLaunch({
           environmentId: 'env-1',
@@ -117,7 +116,7 @@ describe('remote agent-session launch routing', () => {
       runRemoteAgentSessionLaunch({
         environmentId: 'env-1',
         hostAuthority,
-        hostAuthorityCapability: 'agent-session.launch-permission.v1',
+        hostAuthorityCapabilities: ['agent-session.launch-permission.v1'],
         legacyFallbackPolicy: 'deny',
         legacy
       })
@@ -126,12 +125,54 @@ describe('remote agent-session launch routing', () => {
     expect(legacy).not.toHaveBeenCalled()
   })
 
+  it('does not fall back after a semantic capability probe fails', async () => {
+    const legacy = vi.fn()
+    const hostAuthority = vi.fn()
+    mocks.supportsCapability.mockRejectedValue(new Error('Disconnected'))
+    await expect(
+      runRemoteAgentSessionLaunch({
+        environmentId: 'env-1',
+        hostAuthority,
+        legacy,
+        hostAuthorityCapabilities: ['agent-session.launch-permission.v1'],
+        legacyFallbackPolicy: 'deny'
+      })
+    ).rejects.toMatchObject({ code: 'capability_unsupported' })
+    expect(hostAuthority).not.toHaveBeenCalled()
+    expect(legacy).not.toHaveBeenCalled()
+  })
+
+  it.each(['method_not_found', 'agent_session_legacy_required'])(
+    'does not downgrade a semantic launch after %s',
+    async (code) => {
+      mocks.supportsCapability.mockResolvedValue(true)
+      const legacy = vi.fn()
+      const hostAuthority = vi.fn().mockRejectedValue(
+        new RuntimeRpcCallError({
+          id: 'semantic',
+          ok: false,
+          error: { code, message: 'Host refused' }
+        })
+      )
+      await expect(
+        runRemoteAgentSessionLaunch({
+          environmentId: 'env-1',
+          hostAuthority,
+          legacy,
+          legacyFallbackPolicy: 'deny'
+        })
+      ).rejects.toMatchObject({ code: 'capability_unsupported' })
+      expect(hostAuthority).toHaveBeenCalledOnce()
+      expect(legacy).not.toHaveBeenCalled()
+    }
+  )
+
   it('requires both resume and permission capabilities before semantic resume dispatch', async () => {
     const hostAuthority = vi.fn().mockResolvedValue('structured')
     const legacy = vi.fn().mockResolvedValue('legacy')
     mocks.supportsCapability.mockImplementation(
       async (_environmentId: string, capability: string) =>
-        capability === 'agent-session.codex-resume.v1'
+        capability === 'agent-session.kimi-resume.v1'
     )
 
     await expect(
@@ -139,7 +180,7 @@ describe('remote agent-session launch routing', () => {
         environmentId: 'env-1',
         hostAuthority,
         hostAuthorityCapabilities: [
-          'agent-session.codex-resume.v1',
+          'agent-session.kimi-resume.v1',
           'agent-session.launch-permission.v1'
         ],
         legacyFallbackPolicy: 'deny',

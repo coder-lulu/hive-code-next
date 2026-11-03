@@ -26,6 +26,7 @@ const MOBILE_DYNAMIC_RPC_METHODS = [
   'github.prChecks',
   'github.prCheckDetails',
   'github.listAssignableUsers',
+  'github.markPRReadyForReview',
   'github.mergePR',
   'github.setPRAutoMerge',
   'github.requestPRReviewers',

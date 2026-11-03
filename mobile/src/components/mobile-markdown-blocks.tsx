@@ -8,7 +8,7 @@ import {
   type StyleProp,
   type TextStyle
 } from 'react-native'
-import type { NativeChatVisualDirective } from '../../../src/shared/native-chat-visual-directive'
+import type { NativeChatVisualDirective } from '../../../src/shared/native-chat/native-chat-visual-directive'
 import { isMobileMermaidLanguage } from './mobile-mermaid-language'
 import { mobileMarkdownTableColumnWidths } from './mobile-markdown-table-columns'
 import { mobileMarkdownVisualPlaceholderIndex } from './mobile-markdown-visual-lines'
@@ -17,9 +17,12 @@ import {
   renderInline,
   type MarkdownInlineContext
 } from './mobile-markdown-inline'
+import { MARKDOWN_TONES, scaledMarkdownText, styles } from './mobile-markdown-styles'
 import { MarkdownText } from './mobile-markdown-text'
 import { codeFenceClosed, plainText } from './mobile-markdown-tree'
 import { MermaidDiagram } from './pr-sidebar/MermaidDiagram'
+import { MobileMarkdownCodeBlock } from './MobileMarkdownCodeBlock'
+import { translate } from '../i18n/mobile-i18n'
 
 /** Prose base size — passed to MermaidDiagram fallback mono text. */
 const MERMAID_BASE = 13
@@ -34,6 +37,7 @@ export type MarkdownBlockContext = MarkdownInlineContext & {
   /** Interactive children own their touches and must forward the row action. */
   rowLongPress?: () => void
   directives: readonly NativeChatVisualDirective[]
+  renderImage?: (href: string, alt: string) => ReactNode
   renderVisual?: (directive: NativeChatVisualDirective, index: number) => ReactNode
   mermaidOccurrences: Map<string, number>
 }
@@ -42,9 +46,7 @@ export type MarkdownBlockContext = MarkdownInlineContext & {
 export type ParagraphText = { style: StyleProp<TextStyle>; selectable: boolean }
 
 function renderCode(node: Code, key: number, ctx: MarkdownBlockContext): ReactNode {
-  // Mermaid fences render as diagrams (WebView), not as raw code — same as PR sidebar.
-  // Growing or unclosed fences are still streaming: mounting the WebView per tick would
-  // reload its document up to 20x/sec, so they stay raw code until done.
+  // Keep streaming/unclosed Mermaid fences as code; per-tick WebView mounts would reload document up to 20x/sec. Render diagram only once complete.
   if (isMobileMermaidLanguage(node.lang ?? undefined) && !ctx.growing && codeFenceClosed(node)) {
     const occurrence = ctx.mermaidOccurrences.get(node.value) ?? 0
     ctx.mermaidOccurrences.set(node.value, occurrence + 1)
@@ -53,31 +55,31 @@ function renderCode(node: Code, key: number, ctx: MarkdownBlockContext): ReactNo
     )
   }
   return (
-    <View key={key} style={ctx.styles.codeBlock}>
-      {node.lang ? <NativeText style={ctx.styles.codeLanguage}>{node.lang}</NativeText> : null}
-      <MarkdownText selectable style={ctx.styles.codeText}>
-        {node.value}
-      </MarkdownText>
-    </View>
+    <MobileMarkdownCodeBlock
+      key={key}
+      code={node.value}
+      language={node.lang ?? undefined}
+      textScale={ctx.textScale}
+    />
   )
 }
 
 function renderList(node: List, key: number, ctx: MarkdownBlockContext, depth: number): ReactNode {
   const itemText: ParagraphText = { style: ctx.listText, selectable: true }
   return (
-    <View key={key} style={ctx.styles.list}>
+    <View key={key} style={styles.list}>
       {node.children.map((item, itemIndex) => (
-        <View key={itemIndex} style={ctx.styles.listItem}>
-          <NativeText style={ctx.styles.listMarker}>
+        <View key={itemIndex} style={styles.listItem}>
+          <NativeText style={[styles.listMarker, ctx.tone.secondary]}>
             {item.checked == null
               ? node.ordered
                 ? `${(node.start ?? 1) + itemIndex}.`
-                : '-'
+                : '•'
               : item.checked
                 ? '[x]'
                 : '[ ]'}
           </NativeText>
-          <View style={ctx.styles.listItemBody}>
+          <View style={styles.listItemBody}>
             {renderBlocks(item.children, ctx, itemText, depth + 1)}
           </View>
         </View>
@@ -90,24 +92,33 @@ function renderTable(node: Table, key: number, ctx: MarkdownBlockContext): React
   const rows = node.children.map((row) => row.children)
   // Rows lay out independently, so a shared width per column is what lines them up.
   const columnWidths = mobileMarkdownTableColumnWidths(
-    rows.map((cells) => cells.map((cell) => plainText(cell)))
+    rows.map((cells) => cells.map((cell) => plainText(cell))),
+    ctx.textScale
   )
+  // A table keeps its own dark surface, so its spans keep the default palette.
+  const cellCtx = { ...ctx, tone: MARKDOWN_TONES.default }
   return (
-    <ScrollView key={key} horizontal showsHorizontalScrollIndicator={false}>
-      <View style={ctx.styles.table}>
+    <ScrollView
+      key={key}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.tableScroll}
+    >
+      <View style={styles.table}>
         {rows.map((cells, rowIndex) => (
-          <View key={rowIndex} style={ctx.styles.tableRow}>
+          <View key={rowIndex} style={styles.tableRow}>
             {columnWidths.map((width, cellIndex) => (
               <MarkdownText
                 key={cellIndex}
                 selectable
                 style={[
-                  ctx.styles.tableCell,
-                  rowIndex === 0 ? ctx.styles.tableHeader : null,
+                  styles.tableCell,
+                  rowIndex === 0 ? styles.tableHeader : null,
+                  scaledMarkdownText(styles.tableCell, ctx.textScale),
                   { width, textAlign: node.align?.[cellIndex] ?? 'left' }
                 ]}
               >
-                {renderInline(cells[cellIndex]?.children ?? [], ctx)}
+                {renderInline(cells[cellIndex]?.children ?? [], cellCtx)}
               </MarkdownText>
             ))}
           </View>
@@ -146,16 +157,21 @@ function renderBlock(
           </Fragment>
         ) : null
       }
+      if (node.children.length === 1 && only?.type === 'image' && ctx.renderImage) {
+        return <Fragment key={key}>{ctx.renderImage(only.url, only.alt ?? '')}</Fragment>
+      }
       if (node.children.length === 1 && only?.type === 'image' && /^https?:\/\//i.test(only.url)) {
         return (
           <Pressable
             key={key}
-            style={ctx.styles.imageFrame}
+            style={styles.imageFrame}
             onPress={() => openMarkdownHref(only.url, ctx.onOpenFile)}
             onLongPress={ctx.rowLongPress}
           >
-            <NativeText style={ctx.styles.link}>{only.alt || 'Open image'}</NativeText>
-            <NativeText style={ctx.styles.imageCaption} numberOfLines={1}>
+            <NativeText style={styles.link}>
+              {only.alt || translate('components.markdownBlocks.openImage', 'Open image')}
+            </NativeText>
+            <NativeText style={styles.imageCaption} numberOfLines={1}>
               {only.url}
             </NativeText>
           </Pressable>
@@ -172,18 +188,33 @@ function renderBlock(
         <MarkdownText
           key={key}
           selectable
-          style={[ctx.styles.heading, node.depth <= 2 ? ctx.styles.headingLarge : null]}
+          style={[
+            styles.heading,
+            node.depth <= 2 ? styles.headingLarge : null,
+            scaledMarkdownText(
+              node.depth <= 2 ? styles.headingLarge : styles.heading,
+              ctx.textScale
+            ),
+            ctx.tone.text
+          ]}
         >
           {renderInline(node.children, ctx)}
         </MarkdownText>
       )
     case 'blockquote':
       return (
-        <View key={key} style={ctx.styles.quote}>
+        <View key={key} style={styles.quote}>
           {renderBlocks(
             node.children,
             ctx,
-            { style: ctx.styles.quoteText, selectable: true },
+            {
+              style: [
+                styles.quoteText,
+                scaledMarkdownText(styles.quoteText, ctx.textScale),
+                ctx.tone.secondary
+              ],
+              selectable: true
+            },
             depth + 1
           )}
         </View>
@@ -195,14 +226,14 @@ function renderBlock(
     case 'table':
       return renderTable(node, key, ctx)
     case 'thematicBreak':
-      return <View key={key} style={ctx.styles.rule} />
+      return <View key={key} style={styles.rule} />
     case 'footnoteDefinition':
       return (
-        <View key={key} style={ctx.styles.listItem}>
-          <NativeText
-            style={ctx.styles.listMarker}
-          >{`[${node.label ?? node.identifier}]`}</NativeText>
-          <View style={ctx.styles.listItemBody}>
+        <View key={key} style={styles.listItem}>
+          <NativeText style={[styles.listMarker, ctx.tone.secondary]}>
+            {`[${node.label ?? node.identifier}]`}
+          </NativeText>
+          <View style={styles.listItemBody}>
             {renderBlocks(node.children, ctx, { style: ctx.listText, selectable: true }, depth + 1)}
           </View>
         </View>

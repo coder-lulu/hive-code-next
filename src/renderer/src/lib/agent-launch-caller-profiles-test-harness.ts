@@ -1,60 +1,23 @@
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/constants'
 import type { LaunchAgentInNewTabArgs } from '@/lib/launch-agent-in-new-tab'
 
-// Exercise production caller argument shapes through the shared launch funnel.
+/** Run each production caller’s argument shape through the real launch funnel without importing every caller graph; preserve observable outcomes as funnel internals change. */
+/** Each call site mints its own request id, so a profile carries none. */
 export type CallerLaunchArgs = Omit<
   LaunchAgentInNewTabArgs,
   'beforeSurfaceOpen' | 'agentSessionLaunchPlan' | 'onPromptDelivered' | 'requestId'
 >
 
 export type AgentLaunchCallerProfile = {
-  /** Production module that owns this call site. */
   caller: string
-  /** Stable id used in test titles so a dropped profile is visible in the report. */
   id: string
-  /**
-   * The argument object this call site builds. Values the call site derives at runtime (agent,
-   * workspace, prompt text, group) use a representative stand-in; values it fixes as a literal are
-   * reproduced exactly.
-   */
+  /** Reproduce caller literals exactly; use representative agent/workspace/prompt/group values where callers derive them at runtime. */
   args: CallerLaunchArgs
 }
 
 const PROMPT = 'Explain the failing check and propose a fix.'
-const WORKSPACE_PROMPT = { agent: 'codex', worktreeId: 'wt-1', prompt: PROMPT } as const
 
 export const AGENT_LAUNCH_CALLER_PROFILES: readonly AgentLaunchCallerProfile[] = [
-  {
-    id: 'home-temporary-session',
-    caller: 'src/renderer/src/components/Landing.tsx',
-    args: {
-      agent: 'codex',
-      worktreeId: FLOATING_TERMINAL_WORKTREE_ID,
-      prompt: PROMPT,
-      promptDelivery: 'auto-submit',
-      launchSource: 'desktop_home'
-    }
-  },
-  {
-    id: 'home-workspace-session',
-    caller: 'src/renderer/src/components/Landing.tsx',
-    args: {
-      ...WORKSPACE_PROMPT,
-      executionHostId: 'local',
-      promptDelivery: 'auto-submit',
-      launchSource: 'desktop_home'
-    }
-  },
-  {
-    id: 'session-create-dialog',
-    caller: 'src/renderer/src/components/sessions/SessionCreateDialog.tsx',
-    args: { ...WORKSPACE_PROMPT, executionHostId: 'local', launchSource: 'session_create' }
-  },
-  {
-    id: 'dashboard-spawn',
-    caller: 'src/renderer/src/components/dashboard/launch-dashboard-agent.ts',
-    args: { agent: 'codex', worktreeId: 'wt-1', launchSource: 'unknown' }
-  },
   {
     id: 'empty-workspace-default-chat',
     caller: 'src/renderer/src/lib/empty-workspace-default-agent-chat.ts',
@@ -150,7 +113,7 @@ export const AGENT_LAUNCH_CALLER_PROFILES: readonly AgentLaunchCallerProfile[] =
   },
   {
     id: 'terminal-create-shortcut',
-    caller: 'src/renderer/src/components/use-terminal-create-actions.ts',
+    caller: 'src/renderer/src/components/agent-tab-shortcut-launch.ts',
     args: { agent: 'codex', worktreeId: 'wt-1', groupId: 'group-1', launchSource: 'shortcut' }
   },
   {
@@ -196,7 +159,6 @@ export const AGENT_LAUNCH_CALLER_PROFILES: readonly AgentLaunchCallerProfile[] =
   }
 ]
 
-/** The profile table shaped for `it.each`, so every test title names the call site it covers. */
 export function callerProfileCases(): [string, AgentLaunchCallerProfile][] {
   return AGENT_LAUNCH_CALLER_PROFILES.map((profile) => [profile.id, profile])
 }

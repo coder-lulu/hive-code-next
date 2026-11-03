@@ -1,7 +1,8 @@
-import type { AccountsPaneSectionModel } from './accounts-pane-types'
 // @vitest-environment happy-dom
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { callAntigravityAccounts } from '@/runtime/runtime-antigravity-accounts-client'
+import type { AntigravityAccountState } from '../../../../shared/antigravity-account-types'
 import { getDefaultSettings } from '../../../../shared/constants'
 import type {
   ClaudeManagedAccountSummary,
@@ -26,12 +27,14 @@ const renderPane = (scope: SettingsHostScope): React.JSX.Element => (
 
 const fake = vi.hoisted(() => {
   const state: {
+    query: string
     pendingSelect: ((roster: unknown) => void) | null
     write: ReturnType<typeof vi.fn>
     rosters: Map<string, unknown>
     watchedTargets: unknown[]
     selects: unknown[][]
   } = {
+    query: 'claude',
     pendingSelect: null,
     write: vi.fn(),
     rosters: new Map(),
@@ -40,17 +43,9 @@ const fake = vi.hoisted(() => {
   }
   return state
 })
-vi.mock('./accounts-pane-overview', async () => {
-  const { ClaudeAccountsSheetList } = await import('./accounts-pane-claude-section')
-  return {
-    AccountsPaneOverview: ({ model }: { model: AccountsPaneSectionModel }) => (
-      <ClaudeAccountsSheetList model={model} />
-    )
-  }
-})
 vi.mock('@/i18n/i18n', () => ({
-  i18n: { language: 'en', getResourceBundle: () => ({}) },
-  getIntlLocale: () => 'en-US',
+  getIntlLocale: () => 'en',
+  i18n: { language: 'en' },
   translate: (_key: string, fallback: string, values?: Record<string, string | number>) =>
     Object.entries(values ?? {}).reduce(
       (text, [key, value]) => text.replaceAll(`{{${key}}}`, String(value)),
@@ -60,7 +55,7 @@ vi.mock('@/i18n/i18n', () => ({
 vi.mock('@/store', () => ({
   useAppStore: (selector: (state: Record<string, unknown>) => unknown) =>
     selector({
-      settingsSearchQuery: 'claude',
+      settingsSearchQuery: fake.query,
       rateLimits: {
         codex: null,
         codexTarget: { runtime: 'host', wslDistro: null },
@@ -69,9 +64,15 @@ vi.mock('@/store', () => ({
         grok: { updatedAt: 0 }
       },
       runtimeEnvironments: [],
+      runtimeStatusByEnvironmentId: new Map(),
       recordFeatureInteraction: fake.write,
       fetchSettings: fake.write
     })
+}))
+vi.mock('@/runtime/runtime-antigravity-accounts-client', () => ({
+  callAntigravityAccounts: vi.fn(),
+  callAntigravityChatSignIn: vi.fn(),
+  subscribeAntigravityChatSignIn: vi.fn()
 }))
 vi.mock('@/runtime/runtime-provider-accounts-client', () => {
   const empty = () => ({
@@ -126,6 +127,13 @@ function claudeRoster(id: string, email: string, active: boolean): ClaudeRateLim
 }
 
 beforeEach(() => {
+  vi.mocked(callAntigravityAccounts).mockResolvedValue({
+    accounts: [],
+    activeAccountId: null,
+    selectedAccountId: null,
+    currentAccount: null
+  })
+  fake.query = 'claude'
   fake.pendingSelect = null
   fake.watchedTargets = []
   fake.selects = []
@@ -148,6 +156,27 @@ afterEach(() => {
   Reflect.deleteProperty(window, 'api')
 })
 
+function openClaudeDrawer(): HTMLElement {
+  if (!screen.queryByRole('dialog')) {
+    const card = document.getElementById('accounts-claude')
+    if (!card) {
+      throw new Error('Missing Claude account card')
+    }
+    fireEvent.click(within(card).getByRole('button'))
+  }
+  return screen.getByRole('dialog')
+}
+function accountRow(email: string): HTMLElement {
+  const row = within(openClaudeDrawer()).getByText(email).closest('div.flex.items-center.gap-3')
+  if (!(row instanceof HTMLElement)) {
+    throw new Error('Missing account row')
+  }
+  return row
+}
+function selectAccount(email: string): void {
+  fireEvent.click(within(accountRow(email)).getByRole('button', { name: 'Switch' }))
+}
+
 it('lists the accounts of the host chosen in the page, not the focused server', async () => {
   render(renderPane(scopeFor(null)))
   await act(async () => {})
@@ -155,18 +184,49 @@ it('lists the accounts of the host chosen in the page, not the focused server', 
   expect(fake.watchedTargets).toEqual([{ kind: 'local' }])
 })
 
+it('shows Windows account guidance for the page owner rather than the focused server', async () => {
+  fake.query = 'antigravity'
+  const empty: AntigravityAccountState = {
+    accounts: [],
+    activeAccountId: null,
+    selectedAccountId: null,
+    currentAccount: null
+  }
+  vi.mocked(callAntigravityAccounts).mockResolvedValue(empty)
+  render(
+    <AccountsPane
+      settings={focusedElsewhere}
+      updateSettings={vi.fn()}
+      hostScope={scopeFor('server-a')}
+      accountOwnerPlatform="win32"
+    />
+  )
+
+  expect(await screen.findByText('No native agy account is signed in.')).toBeTruthy()
+  expect(callAntigravityAccounts).toHaveBeenCalledWith(
+    { kind: 'environment', environmentId: 'server-a' },
+    { runtime: 'host', wslDistro: null },
+    'List'
+  )
+  expect(
+    screen.getByText(
+      'Select applies and verifies the host default agy credential. Command choices and later account changes are handled by agy. Existing sessions may keep their previous account.'
+    )
+  ).toBeTruthy()
+  expect(screen.queryByText(/Selection applies to new agy sessions on this host/)).toBeNull()
+})
+
 it("drops a server's late account result after the page moves to another server", async () => {
   const view = render(renderPane(scopeFor('server-a')))
   await act(async () => {})
-  fireEvent.click(screen.getByRole('button', { name: 'Switch' }))
+  selectAccount('alpha@server-a.test')
   expect(fake.pendingSelect).not.toBeNull()
 
   await act(async () => view.rerender(renderPane(scopeFor('server-b'))))
-  expect(screen.getByText('beta@server-b.test')).toBeTruthy()
+  expect(within(openClaudeDrawer()).getByText('beta@server-b.test')).toBeTruthy()
 
   await act(async () => fake.pendingSelect?.(claudeRoster('acct-a', 'alpha@server-a.test', true)))
 
-  // Server A's roster must not replace server B's in the pane now scoped to B.
   expect(screen.queryByText('alpha@server-a.test')).toBeNull()
   expect(screen.getByText('beta@server-b.test')).toBeTruthy()
 })
@@ -174,15 +234,11 @@ it("drops a server's late account result after the page moves to another server"
 it('keeps a late account result once the pane is back on the server it was sent to', async () => {
   const view = render(renderPane(scopeFor('server-a')))
   await act(async () => {})
-  fireEvent.click(screen.getByRole('button', { name: 'Switch' }))
+  await selectAccount('alpha@server-a.test')
   for (const environmentId of ['server-b', 'server-a']) {
     await act(async () => view.rerender(renderPane(scopeFor(environmentId))))
   }
-  const alphaRow = (): HTMLElement => {
-    const row = screen.getByText('alpha@server-a.test').closest('div')
-    expect(row).not.toBeNull()
-    return row ?? document.body
-  }
+  const alphaRow = (): HTMLElement => accountRow('alpha@server-a.test')
   expect(within(alphaRow()).queryByText('Active')).toBeNull()
 
   await act(async () => fake.pendingSelect?.(claudeRoster('acct-a', 'alpha@server-a.test', true)))
@@ -211,8 +267,11 @@ it("shows a WSL host's distro accounts from this desktop and selects for that di
   )
   await act(async () => {})
   expect(fake.watchedTargets).toEqual([{ kind: 'local' }])
-  fireEvent.click(screen.getByRole('button', { name: 'Switch' }))
+  selectAccount('wsl@ubuntu.test')
   expect(fake.selects).toEqual([
     [{ kind: 'local' }, { accountId: 'acct-w', runtime: 'wsl', wslDistro: 'Ubuntu' }]
   ])
 })
+
+vi.mock('./MiniMaxAccountsSection', () => ({ MiniMaxAccountsSection: () => null }))
+vi.mock('./ZcodePlanAccountsSection', () => ({ ZcodePlanAccountsSection: () => null }))

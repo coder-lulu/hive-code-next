@@ -1,3 +1,5 @@
+import { createWebRuntimeStatusOptions } from './web-runtime-session-status'
+import { credentialFor } from './web-runtime-session-credentials'
 import type {
   RuntimeHostStatusSnapshot,
   RuntimeHostStatusResponse
@@ -7,7 +9,7 @@ import type { RuntimeRpcResponse } from '../../../../shared/runtime-rpc-envelope
 import { WebRuntimeClient } from '../web-runtime-client'
 import {
   clearStoredWebRuntimeEnvironment,
-  getPreferredWebPairingOffer,
+  getPreferredWebRuntimeConnection,
   readStoredWebRuntimeEnvironment,
   updateStoredEnvironmentRuntimeId
 } from '../web-runtime-environment'
@@ -64,26 +66,13 @@ export function clearWebRuntimeDisplayProjection(owner: WebRuntimeDisplayOwner):
   displayProjection.clear(owner)
 }
 
-function webRuntimeStatusOptions(environment: StoredWebRuntimeEnvironment) {
-  const generation = displayProjection.generation
-  return {
-    environmentId: environment.id,
-    pairingRevision: environment.pairingRevision ?? environment.createdAt,
-    publish: (snapshot: RuntimeHostStatusSnapshot) => {
-      if (generation !== displayProjection.generation) {
-        return
-      }
-      for (const listener of statusListeners) {
-        listener(snapshot)
-      }
-    },
-    verified: (response: RuntimeHostStatusResponse) => {
-      if (generation === displayProjection.generation) {
-        updateEnvironmentFromResponse(environment, response)
-      }
-    }
-  }
-}
+const webRuntimeStatusOptions = (environment: StoredWebRuntimeEnvironment) =>
+  createWebRuntimeStatusOptions(
+    environment,
+    displayProjection,
+    statusListeners,
+    updateEnvironmentFromResponse
+  )
 
 export function configureWebRuntimeBootstrap(
   cloudBootstrap?: CloudLaunchBootstrap,
@@ -158,9 +147,10 @@ export async function observeWebRuntimeStatus(
     webRuntimeState.activeCloudBootstrap &&
       environment.id === cloudEnvironmentId(webRuntimeState.activeCloudBootstrap)
       ? webRuntimeState.activeCloudBootstrap
-      : getPreferredWebPairingOffer(environment),
+      : getPreferredWebRuntimeConnection(environment),
     {
-      reconnect: false
+      reconnect: false,
+      credential: webRuntimeState.activeCloudBootstrap ? undefined : credentialFor(environment)
     }
   )
   try {
@@ -204,8 +194,14 @@ export function getClientForEnvironment(
             webRuntimeState.activeCloudBootstrap &&
               environment.id === cloudEnvironmentId(webRuntimeState.activeCloudBootstrap)
               ? webRuntimeState.activeCloudBootstrap
-              : getPreferredWebPairingOffer(environment),
-            { status: webRuntimeStatusOptions(environment) }
+              : getPreferredWebRuntimeConnection(environment),
+            {
+              status: webRuntimeStatusOptions(environment),
+              credential: webRuntimeState.activeCloudBootstrap
+                ? undefined
+                : credentialFor(environment),
+              allowKeyMigration: !webRuntimeState.activeCloudBootstrap
+            }
           )
     webRuntimeState.activeClientEnvironmentId = environment.id
   }

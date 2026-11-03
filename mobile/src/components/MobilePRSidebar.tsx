@@ -1,3 +1,5 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
+import { fetchPRCheckDetails } from '../session/github-pr-rpc'
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native'
 import { RotateCw } from 'lucide-react-native'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
@@ -180,13 +182,17 @@ function PrSidebarContent({
   showOpenOnWeb: boolean
   botAuthorOverrides: ReadonlySet<string>
 }) {
+  const t = useMobileTranslation()
+
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createMobilePrSidebarStyles)
   if (branch === 'loading') {
     return (
       <View style={styles.stateArea}>
         <ActivityIndicator color={theme.color.text.secondary} />
-        <Text style={styles.stateText}>正在加载拉取请求…</Text>
+        <Text style={styles.stateText}>
+          {t('auto.mobile.src.components.MobilePRSidebar.d8240c01dc', 'Loading pull requests…')}
+        </Text>
       </View>
     )
   }
@@ -199,10 +205,13 @@ function PrSidebarContent({
           style={styles.retryButton}
           onPress={onRetry}
           accessibilityRole="button"
-          accessibilityLabel="重新加载拉取请求"
+          accessibilityLabel={t(
+            'auto.mobile.src.components.MobilePRSidebar.4e013eb88e',
+            'Reload pull requests'
+          )}
         >
           <RotateCw size={14} color={theme.color.text.primary} strokeWidth={2.2} />
-          <Text style={styles.retryText}>重试</Text>
+          <Text style={styles.retryText}>{t('common.retry', 'Retry')}</Text>
         </Pressable>
       </View>
     )
@@ -287,7 +296,22 @@ function PrSidebarSections({
           prNumber: pr.number,
           prTitle: pr.title,
           prUrl: pr.url,
-          checks: data.checks
+          checks: data.checks,
+          loadCheckDetails: async (check) => {
+            if (!client) {
+              throw new Error('Host is disconnected')
+            }
+            const outcome = await fetchPRCheckDetails(client, worktreeId, {
+              checkRunId: check.checkRunId,
+              workflowRunId: check.workflowRunId,
+              checkName: check.name,
+              url: check.url
+            })
+            if (!outcome.ok) {
+              throw new Error(outcome.error)
+            }
+            return outcome.result
+          }
         })
       ),
     isBusy: triage.isBusy('fix-checks'),
@@ -300,7 +324,8 @@ function PrSidebarSections({
         buildResolveConflictsPrompt({
           prNumber: pr.number,
           baseRef: pr.conflictSummary?.baseRef ?? pr.baseRefName ?? null,
-          files: pr.conflictSummary?.files ?? []
+          files: pr.conflictSummary?.files ?? [],
+          worktreeId
         })
       ),
     isBusy: triage.isBusy('resolve-conflicts'),
@@ -322,6 +347,7 @@ function PrSidebarSections({
           />
           <PRActionsSection
             pr={data.pr}
+            githubLinkBase={data.githubLinkBase}
             actions={actions}
             client={client}
             worktreeId={worktreeId}

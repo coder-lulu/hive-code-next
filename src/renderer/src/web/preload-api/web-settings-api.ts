@@ -4,7 +4,7 @@ import {
   normalizeComputerAwakeMode
 } from '../../../../shared/computer-awake-mode'
 import { normalizeTerminalCursorStyleDefault } from '../../../../shared/terminal-cursor-style-settings'
-import { mergeSettings } from './web-preference-normalization'
+import { mergeSettings, runtimeChatPermissionSetting } from './web-preference-normalization'
 import {
   getRuntimeBackedStoredSettings,
   getStoredSettings,
@@ -28,7 +28,10 @@ export function createWebSettingsApi(): Partial<PreloadApi> {
       // Why: localStorage-backed settings are synchronous, so the pre-hydration kill-switch read works the same as desktop.
       getSync: () => settingsForActiveVisibilityOwner(getStoredSettings()),
       set: async (updates) => {
-        const sanitizedUpdates = { ...updates }
+        const chatUpdates = runtimeChatPermissionSetting(updates)
+        const sanitizedUpdates = { ...updates, ...chatUpdates }
+        Reflect.deleteProperty(sanitizedUpdates, 'nativeChatPermissionMode')
+        Reflect.deleteProperty(sanitizedUpdates, 'experimentalNativeChat')
         const runtimeEnvironment = requireActiveEnvironmentOrNull()
         delete sanitizedUpdates.activeRuntimeEnvironmentId
         if (
@@ -62,26 +65,23 @@ export function createWebSettingsApi(): Partial<PreloadApi> {
             )
           )
         }
-        if ('autoRenameBranchFromWorkDefaultedOn' in sanitizedUpdates) {
-          sanitizedUpdates.autoRenameBranchFromWorkDefaultedOn = true
-        }
         if ('terminalCursorStyle' in sanitizedUpdates) {
           Object.assign(
             sanitizedUpdates,
-            normalizeTerminalCursorStyleDefault(
-              { terminalCursorStyle: sanitizedUpdates.terminalCursorStyle },
-              { preserveExplicitValue: true }
-            )
+            normalizeTerminalCursorStyleDefault({
+              terminalCursorStyle: sanitizedUpdates.terminalCursorStyle
+            })
           )
         }
         const localUpdates = { ...sanitizedUpdates }
         if (runtimeEnvironment) {
           delete localUpdates.worktreeVisibilityDefaults
         }
-        const next = mergeSettings(getStoredSettings(), localUpdates, {
-          preserveAutoRenameBranchFromWorkUpdate: 'autoRenameBranchFromWork' in sanitizedUpdates
-        })
-        writeStoredSettings(next)
+        const next = mergeSettings(getStoredSettings(), localUpdates)
+        // Paired permission writes become durable only after the host acknowledges them.
+        if (!runtimeEnvironment || Object.keys(chatUpdates).length === 0) {
+          writeStoredSettings(next)
+        }
         return settingsForActiveVisibilityOwner(
           await syncRuntimeBackedSettings(sanitizedUpdates, next)
         )

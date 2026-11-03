@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native'
 import { Check, Copy, FileWarning, Sparkles } from 'lucide-react-native'
 import { useClipboardWriter } from '../../platform/clipboard'
-import { useMobileTheme, useMobileThemeStyles } from '../../theme/mobile-theme-provider'
+import { colors } from '../../theme/mobile-theme'
+import { useMobileColorScheme } from '../../theme/use-mobile-color-scheme'
+import { useMobileTranslation } from '../../i18n/use-mobile-translation'
 import type { PRInfo } from '../../../../src/shared/github/pull-request-types'
 import { PRSection } from './PRSection'
 import { resolveConflictDisplay } from './pr-conflict-presentation'
-import { createPrConflictStyles } from './pr-conflict-styles'
-import { createPrAiTriageStyles } from './pr-ai-triage-styles'
+import { prConflictStyles as styles } from './pr-conflict-styles'
+import { prAiTriageStyles as triageStyles } from './pr-ai-triage-styles'
 import { AgentLaunchNotice } from '../AgentLaunchNotice'
 import type { MobileAgentLaunchAvailability } from '../../session/mobile-agent-launch-availability'
 
@@ -23,22 +25,20 @@ export type PrConflictsTriage = {
 }
 
 type Props = {
+  // Accept conflict view-model inputs only; full PRInfo remains compatible.
   pr: Pick<PRInfo, 'mergeable' | 'conflictSummary'>
-  // True while a refresh is in flight, so the fallback notice can explain that
-  // missing conflict file details may still be loading (desktop parity).
+  // Explain absent file details as loading while refresh is in flight, matching desktop.
   isRefreshing?: boolean
   triage?: PrConflictsTriage
 }
 
-// Conflicting-files section — shown only when the hosted review reports merge
-// conflicts. Lists the conflicting file paths, or a fallback notice when the file
-// list is not yet available. Ports the desktop ConflictingFilesSection +
-// MergeConflictNotice into the mobile card shell.
+// Show hosted conflicts as paths or missing-list fallback, matching desktop conflict/notice components.
 export function PRConflictingFilesSection({ pr, isRefreshing = false, triage }: Props) {
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createPrConflictStyles)
-  const triageStyles = useMobileThemeStyles(createPrAiTriageStyles)
+  useMobileColorScheme()
+  const t = useMobileTranslation()
+  // Use clipboard seam: iOS custom scheme lacks page secure context, while Android https provides one.
   const clipboard = useClipboardWriter()
+  // Track idle/success/failure: dropping pasteboard refusal used to look like successful copy, unlike Tasks error reporting.
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
   const copiedResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const conflict = resolveConflictDisplay(pr)
@@ -54,12 +54,17 @@ export function PRConflictingFilesSection({ pr, isRefreshing = false, triage }: 
   if (!conflict) {
     return null
   }
-  let noticeBody = '无法获取冲突文件详情'
+  let noticeBody = t(
+    'pullRequest.conflictingFilesSection.detailsUnavailable',
+    'Conflict file details are unavailable'
+  )
   if (isRefreshing) {
-    noticeBody = '正在刷新冲突详情…'
+    noticeBody = t('pullRequest.conflictingFilesSection.refreshing', 'Refreshing conflict details…')
   } else if (conflict.localMergeClean) {
-    noticeBody =
-      'GitHub 报告存在冲突，但本地 Git 未能复现。请刷新 PR 或推送分支，以重新计算可合并状态。'
+    noticeBody = t(
+      'pullRequest.conflictingFilesSection.localMergeClean',
+      'GitHub reports conflicts, but local Git did not reproduce them. Refresh the PR or push the branch to recalculate mergeability.'
+    )
   }
 
   const copyRefreshCommands = async () => {
@@ -83,25 +88,57 @@ export function PRConflictingFilesSection({ pr, isRefreshing = false, triage }: 
   }
 
   const copyLabel =
-    copyState === 'copied' ? '已复制' : copyState === 'failed' ? '复制失败' : '复制命令'
+    copyState === 'copied'
+      ? t('common.copied', 'Copied')
+      : copyState === 'failed'
+        ? t('pullRequest.conflictingFilesSection.copyFailed', 'Failed to copy text')
+        : t('pullRequest.conflictingFilesSection.copyCommands', 'Copy commands')
+  const count = conflict.commitsBehind
+  // Preserve the commit's styling when a translation moves its placeholder.
+  const behindParts =
+    count !== null && conflict.baseCommit !== null
+      ? (count === 1
+          ? t(
+              'pullRequest.conflictingFilesSection.commitsBehind_one',
+              '{{count}} commit behind (base commit: {{baseCommit}})',
+              { count, baseCommit: '\uFFFC' }
+            )
+          : t(
+              'pullRequest.conflictingFilesSection.commitsBehind_other',
+              '{{count}} commits behind (base commit: {{baseCommit}})',
+              { count, baseCommit: '\uFFFC' }
+            )
+        ).split('\uFFFC')
+      : null
 
   return (
-    <PRSection title="冲突">
-      {conflict.commitsBehind !== null && conflict.baseCommit !== null ? (
+    <PRSection title={t('pullRequest.conflictingFilesSection.title', 'Conflicts')}>
+      {behindParts ? (
         <Text style={styles.meta}>
-          落后 {conflict.commitsBehind} 个提交（基准提交：
-          <Text style={styles.metaMono}>{conflict.baseCommit}</Text>）
+          {behindParts[0]}
+          <Text style={styles.metaMono}>{conflict.baseCommit}</Text>
+          {behindParts.slice(1).join('')}
         </Text>
       ) : null}
 
       {conflict.fileDetailsUnavailable ? (
         <View>
-          <Text style={styles.noticeTitle}>此分支存在必须解决的冲突</Text>
+          <Text style={styles.noticeTitle}>
+            {t(
+              'pullRequest.conflictingFilesSection.mustResolve',
+              'This branch has conflicts that must be resolved'
+            )}
+          </Text>
           <Text style={styles.noticeBody}>{noticeBody}</Text>
           {conflict.mergeabilityRefreshCommands ? (
             <View style={styles.commandBox}>
               <View style={styles.commandHeader}>
-                <Text style={styles.commandLabel}>在此工作树中运行</Text>
+                <Text style={styles.commandLabel}>
+                  {t(
+                    'pullRequest.conflictingFilesSection.runFromWorktree',
+                    'Run from this worktree'
+                  )}
+                </Text>
                 <Pressable
                   style={({ pressed }) => [
                     styles.copyCommandButton,
@@ -109,12 +146,15 @@ export function PRConflictingFilesSection({ pr, isRefreshing = false, triage }: 
                   ]}
                   onPress={() => void copyRefreshCommands()}
                   accessibilityRole="button"
-                  accessibilityLabel="复制刷新可合并状态的命令"
+                  accessibilityLabel={t(
+                    'pullRequest.conflictingFilesSection.copyRefreshCommands',
+                    'Copy mergeability refresh commands'
+                  )}
                 >
                   {copyState === 'copied' ? (
-                    <Check size={13} color={theme.color.text.primary} strokeWidth={2.2} />
+                    <Check size={13} color={colors.textPrimary} strokeWidth={2.2} />
                   ) : (
-                    <Copy size={13} color={theme.color.text.primary} strokeWidth={2.2} />
+                    <Copy size={13} color={colors.textPrimary} strokeWidth={2.2} />
                   )}
                   <Text style={styles.copyCommandText}>{copyLabel}</Text>
                 </Pressable>
@@ -128,8 +168,10 @@ export function PRConflictingFilesSection({ pr, isRefreshing = false, triage }: 
       ) : (
         <View>
           <View style={styles.filesHeader}>
-            <FileWarning size={14} color={theme.color.text.secondary} strokeWidth={2} />
-            <Text style={styles.filesHeaderText}>冲突文件</Text>
+            <FileWarning size={14} color={colors.textSecondary} strokeWidth={2} />
+            <Text style={styles.filesHeaderText}>
+              {t('pullRequest.conflictingFilesSection.filesHeading', 'Conflicting files')}
+            </Text>
           </View>
           <ScrollView
             style={styles.fileList}
@@ -146,8 +188,7 @@ export function PRConflictingFilesSection({ pr, isRefreshing = false, triage }: 
         </View>
       )}
 
-      {/* "Resolve conflicts with AI" — mirrors desktop's PRTriageStrip. Launches an
-          agent that brings the base branch in and completes the merge. */}
+      {/* Launch desktop-style conflict agent to bring base branch in and complete merge. */}
       {triage ? (
         <View style={triageStyles.triageArea}>
           <Pressable
@@ -158,14 +199,19 @@ export function PRConflictingFilesSection({ pr, isRefreshing = false, triage }: 
             onPress={triage.resolveConflicts}
             disabled={triage.isBusy || triage.availability !== 'available'}
             accessibilityRole="button"
-            accessibilityLabel="使用 AI 解决冲突"
+            accessibilityLabel={t(
+              'pullRequest.conflictingFilesSection.resolveWithAi',
+              'Resolve conflicts with AI'
+            )}
           >
             {triage.isBusy ? (
-              <ActivityIndicator color={theme.color.text.secondary} />
+              <ActivityIndicator color={colors.textSecondary} />
             ) : (
-              <Sparkles size={14} color={theme.color.text.secondary} strokeWidth={2.2} />
+              <Sparkles size={14} color={colors.textSecondary} strokeWidth={2.2} />
             )}
-            <Text style={triageStyles.triageButtonText}>使用 AI 解决冲突</Text>
+            <Text style={triageStyles.triageButtonText}>
+              {t('pullRequest.conflictingFilesSection.resolveWithAi', 'Resolve conflicts with AI')}
+            </Text>
           </Pressable>
           <AgentLaunchNotice
             availability={triage.availability}

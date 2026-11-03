@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parsePluginManifest, pluginManifestSchema } from './plugin-manifest'
+import { parsePluginManifest, pluginManifestSchema } from './manifest/plugin-manifest'
 
 function manifest(contributes: Record<string, unknown>): Record<string, unknown> {
   return {
@@ -16,6 +16,34 @@ function manifest(contributes: Record<string, unknown>): Record<string, unknown>
 }
 
 describe('content-pack manifest contributions', () => {
+  it('preserves a native locale display name while removing misleading display controls', () => {
+    const parsed = pluginManifestSchema.parse(
+      manifest({
+        languagePacks: [
+          {
+            locale: 'pt-BR',
+            path: 'locales/pt-BR.json',
+            displayName: '\u202ePortuguês (Brasil)\u202c'
+          }
+        ]
+      })
+    )
+    expect(parsed.contributes.languagePacks[0]?.displayName).toBe('Português (Brasil)')
+  })
+
+  it.each(['', 'x'.repeat(81), '\u202e\u202c'])(
+    'refuses an empty or unbounded locale name: %j',
+    (displayName) => {
+      expect(
+        parsePluginManifest(
+          manifest({
+            languagePacks: [{ locale: 'pt-BR', path: 'locales/pt-BR.json', displayName }]
+          })
+        ).ok
+      ).toBe(false)
+    }
+  )
+
   it('accepts the documented P1 contribution set without a worker', () => {
     const parsed = pluginManifestSchema.parse(
       manifest({

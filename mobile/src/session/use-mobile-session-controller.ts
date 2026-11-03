@@ -23,6 +23,7 @@ import { useMobileSessionTerminalSendActions } from './use-mobile-session-termin
 import { useMobileSessionFileActions } from './use-mobile-session-file-actions'
 import { useMobileSessionTerminalInput } from './use-mobile-session-terminal-input'
 import { useMobileSessionAccessorySelection } from './use-mobile-session-accessory-selection'
+import { useTerminalDockKeys } from './use-terminal-dock-keys'
 import { useMobileSessionAttachments } from './use-mobile-session-attachments'
 import { useMobileSessionTerminalCreateActions } from './use-mobile-session-terminal-create-actions'
 import { useMobileSessionContentCreateActions } from './use-mobile-session-content-create-actions'
@@ -81,7 +82,7 @@ export function useMobileSessionController() {
   const lifecycle = Object.assign(tabReconciliation, useMobileSessionLifecycle(tabReconciliation))
   const keyboardState = Object.assign(lifecycle, useMobileSessionKeyboardState(lifecycle))
   useMobileSessionStartup(keyboardState)
-  useMobileSessionPreferenceFocus(keyboardState)
+  const preferences = useMobileSessionPreferenceFocus(keyboardState)
   const tabSwitching = Object.assign(keyboardState, useMobileSessionTabSwitching(keyboardState))
   useNotificationPaneNavigation(tabSwitching)
   const terminalWebview = Object.assign(tabSwitching, useMobileSessionTerminalWebview(tabSwitching))
@@ -98,10 +99,14 @@ export function useMobileSessionController() {
     terminalInput,
     useMobileSessionAccessorySelection(terminalInput)
   )
-  const attachments = Object.assign(
-    accessorySelection,
-    useMobileSessionAttachments(accessorySelection)
-  )
+  // The key row and the input fields share held ctrl/alt/shift, and the Duo rail renders the row apart from the fields.
+  const dockKeys = Object.assign(accessorySelection, {
+    dockKeys: useTerminalDockKeys({
+      activeHandle: accessorySelection.activeHandle,
+      sendInput: accessorySelection.handleAccessoryKey
+    })
+  })
+  const attachments = Object.assign(dockKeys, useMobileSessionAttachments(dockKeys))
   const terminalCreateActions = Object.assign(
     attachments,
     useMobileSessionTerminalCreateActions(attachments)
@@ -120,7 +125,7 @@ export function useMobileSessionController() {
     presentation,
     useMobileSessionPanelRouteActions(presentation)
   )
-  return panelRouteActions
+  return Object.assign(panelRouteActions, preferences)
 }
 
 export type MobileSessionController = ReturnType<typeof useMobileSessionController>

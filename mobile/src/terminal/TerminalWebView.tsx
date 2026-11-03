@@ -1,18 +1,12 @@
-import {
-  useRef,
-  useCallback,
-  forwardRef,
-  useImperativeHandle,
-  useEffect,
-  useMemo,
-  useState
-} from 'react'
-import { ActivityIndicator, Platform, Text, View } from 'react-native'
+import { useRef, useCallback, useState, forwardRef, useImperativeHandle } from 'react'
+import { Platform, View } from 'react-native'
 import { WebView, type WebViewMessageEvent } from 'react-native-webview'
-import { darkTheme } from '../theme/mobile-theme'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import type { TerminalWebViewHandle, TerminalWebViewProps } from './terminal-webview-contract'
 import { TerminalWebViewEngineErrorOverlay } from './terminal-webview-engine-error-state'
 import { createTerminalWebViewFrameStyles } from './terminal-webview-frame-styles'
+import { useMobileTheme } from '../theme/mobile-theme-provider'
+import { resolveMobileTerminalTheme } from './mobile-terminal-theme'
 import { xtermWebViewSource } from './terminal-webview-html'
 import type { TerminalWebViewCommand } from './terminal-webview-messages'
 import { useTerminalWebViewController } from './use-terminal-webview-controller'
@@ -23,20 +17,13 @@ export type { TerminalWebViewHandle } from './terminal-webview-contract'
 
 export const TerminalWebView = forwardRef<TerminalWebViewHandle, Props>(
   function TerminalWebView(props, ref) {
+    const theme = useMobileTheme()
+    const frameStyles = createTerminalWebViewFrameStyles(
+      resolveMobileTerminalTheme(theme, props.terminalTheme).theme.background ??
+        theme.terminal.background
+    )
+    const t = useMobileTranslation()
     const webViewRef = useRef<WebView>(null)
-    const [hasPaintedContent, setHasPaintedContent] = useState(false)
-    const [showLoading, setShowLoading] = useState(false)
-    const foreground = props.terminalTheme?.theme.foreground ?? darkTheme.terminal.foreground
-    const background = props.terminalTheme?.theme.background ?? darkTheme.terminal.background
-    const frameStyles = useMemo(() => createTerminalWebViewFrameStyles(background), [background])
-
-    useEffect(() => {
-      if (hasPaintedContent) {
-        return
-      }
-      const timer = setTimeout(() => setShowLoading(true), 300)
-      return () => clearTimeout(timer)
-    }, [hasPaintedContent])
 
     const post = useCallback((command: TerminalWebViewCommand & { id: number }) => {
       webViewRef.current?.postMessage(JSON.stringify(command))
@@ -56,10 +43,7 @@ export const TerminalWebView = forwardRef<TerminalWebViewHandle, Props>(
     })
 
     useImperativeHandle(ref, () => handle, [handle])
-    // Why: the document builds its terminal before ready, so it needs the text scale before any
-    // message can reach it; later changes arrive as set-font-scale.
-    // Why: in the page source rather than injected: Android can run an injected script after the
-    // document's own, which then starts without them.
+    // Seed scale in page source before document startup; Android injected scripts may run too late.
     const [source] = useState(() =>
       xtermWebViewSource({ textScale: props.textScale ?? 1, shown: props.shownAtMount ?? true })
     )
@@ -72,10 +56,6 @@ export const TerminalWebView = forwardRef<TerminalWebViewHandle, Props>(
         } catch {
           return
         }
-        if (msg.type === 'ready') {
-          setHasPaintedContent(true)
-          setShowLoading(false)
-        }
         receive(msg)
       },
       [receive]
@@ -86,17 +66,8 @@ export const TerminalWebView = forwardRef<TerminalWebViewHandle, Props>(
       webViewRef.current?.reload()
     }, [clearEngineError])
 
-    const handleLoadStart = useCallback(() => {
-      setHasPaintedContent(false)
-      setShowLoading(false)
-      resetReadiness()
-    }, [resetReadiness])
-
     const handleContentProcessDidTerminate = useCallback(() => {
-      // Why: WKWebView content-process loss is recoverable; stale commands belong
-      // to the dead document and the replacement must prove readiness before replay.
-      setHasPaintedContent(false)
-      setShowLoading(false)
+      // Content-process recovery must discard dead-document commands and prove new readiness before replay.
       resetReadiness()
       clearEngineError()
       webViewRef.current?.reload()
@@ -111,34 +82,35 @@ export const TerminalWebView = forwardRef<TerminalWebViewHandle, Props>(
           originWhitelist={['*']}
           javaScriptEnabled
           scrollEnabled={false}
-          // Why: Android parent gesture containers can intercept vertical drags
-          // before the injected xterm scroll router sees them.
+          // Prevent Android parent gestures from intercepting drags before xterm sees them.
           nestedScrollEnabled
           scalesPageToFit={false}
-          // Why: Android WebView defaults textZoom to the system font scale, inflating
-          // xterm's DOM glyphs past its canvas-measured cell grid (#4579). iOS ignores it.
+          // Fix Android textZoom at 100 so OS font scaling cannot exceed xterm’s canvas-measured grid.
           textZoom={100}
-          onLoadStart={handleLoadStart}
+          onLoadStart={resetReadiness}
           onMessage={handleMessage}
-          onError={(event) => reportNativeEngineError('Terminal WebView load failed', event)}
-          onHttpError={(event) => reportNativeEngineError('Terminal WebView HTTP error', event)}
+          onError={(event) =>
+            reportNativeEngineError(
+              t('terminal.webView.loadFailed', 'Terminal WebView load failed'),
+              event
+            )
+          }
+          onHttpError={(event) =>
+            reportNativeEngineError(
+              t('terminal.webView.httpError', 'Terminal WebView HTTP error'),
+              event
+            )
+          }
           onRenderProcessGone={(event) =>
-            reportNativeEngineError('Terminal WebView render process ended', event)
+            reportNativeEngineError(
+              t('terminal.webView.renderProcessEnded', 'Terminal WebView render process ended'),
+              event
+            )
           }
           onContentProcessDidTerminate={handleContentProcessDidTerminate}
         />
-        {!engineError && !hasPaintedContent && showLoading ? (
-          <View style={frameStyles.loadingOverlay} accessibilityLiveRegion="polite">
-            <ActivityIndicator color={foreground} />
-            <Text style={[frameStyles.loadingText, { color: foreground }]}>正在加载会话内容…</Text>
-          </View>
-        ) : null}
         {engineError ? (
-          <TerminalWebViewEngineErrorOverlay
-            message={engineError}
-            terminalTheme={props.terminalTheme}
-            onReload={handleReload}
-          />
+          <TerminalWebViewEngineErrorOverlay message={engineError} onReload={handleReload} />
         ) : null}
       </View>
     )

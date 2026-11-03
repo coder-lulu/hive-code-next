@@ -1,11 +1,8 @@
+import { getRuntimeEnvironmentRemovalPresentation } from './runtime-environment-host-details-account'
 import { Loader2, Trash2 } from 'lucide-react'
 import type { PublicKnownRuntimeEnvironment } from '../../../../shared/runtime-environments'
 import { translate } from '@/i18n/i18n'
 import { Button } from '../ui/button'
-import {
-  getRuntimeEnvironmentEndpointDisplay,
-  getRuntimeEnvironmentRemovalPresentation
-} from './runtime-environment-host-details'
 import {
   Dialog,
   DialogContent,
@@ -93,25 +90,29 @@ export function RuntimeEnvironmentRemoveDialog({
   onOpenChange: (open: boolean) => void
   onCancel: () => void
   onConfirm: () => void
-}): React.JSX.Element {
-  const removalPresentation = pendingRemove
+}): React.JSX.Element | null {
+  const presentation = pendingRemove
     ? getRuntimeEnvironmentRemovalPresentation(pendingRemove, removingActiveServer)
     : null
+  if (!presentation) {
+    return null
+  }
   return (
-    <Dialog
-      open={pendingRemove !== null && removalPresentation !== null}
-      onOpenChange={onOpenChange}
-    >
+    <Dialog open={pendingRemove !== null} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm sm:max-w-sm" showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle className="text-sm">{removalPresentation?.title}</DialogTitle>
-          <DialogDescription>{removalPresentation?.description}</DialogDescription>
+          <DialogTitle className="text-sm">{presentation.title}</DialogTitle>
+          <DialogDescription>{presentation.description}</DialogDescription>
         </DialogHeader>
         {pendingRemove ? (
           <div className="rounded-md border border-border/70 bg-muted/35 px-3 py-2 text-xs">
             <div className="truncate font-medium">{pendingRemove.name}</div>
             <div className="mt-0.5 truncate font-mono text-muted-foreground">
-              {getRuntimeEnvironmentEndpointDisplay(pendingRemove)}
+              {pendingRemove.endpoints[0]?.endpoint ??
+                translate(
+                  'auto.components.settings.RuntimeEnvironmentsPane.6ef71985da',
+                  'No endpoint'
+                )}
             </div>
           </div>
         ) : null}
@@ -120,9 +121,13 @@ export function RuntimeEnvironmentRemoveDialog({
           <Button variant="outline" onClick={onCancel} disabled={removingId !== null}>
             {translate('auto.components.settings.RuntimeEnvironmentsPane.af53761f31', 'Cancel')}
           </Button>
-          <Button variant="destructive" onClick={onConfirm} disabled={removingId !== null}>
+          <Button
+            variant="destructive"
+            onClick={onConfirm}
+            disabled={removingId !== null || removingActiveServer}
+          >
             {removingId !== null ? <Loader2 className="animate-spin" /> : <Trash2 />}
-            {removalPresentation?.actionLabel}
+            {presentation.actionLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

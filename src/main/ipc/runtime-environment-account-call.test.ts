@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PublicKnownRuntimeEnvironment } from '../../shared/runtime-environments'
-import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
+import { RemoteRuntimeClientError } from '../../shared/remote-runtime/remote-runtime-client-error'
 import { callCatalogEnvironment } from './runtime-environment-account-routing'
 
 const mocks = vi.hoisted(() => ({ localCall: vi.fn(), cloudCall: vi.fn(), resolve: vi.fn() }))

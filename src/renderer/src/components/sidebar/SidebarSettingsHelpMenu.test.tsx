@@ -4,18 +4,17 @@ import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { APP_DISPLAY_NAME } from '@/product-brand'
 import { SidebarSettingsHelpMenu } from './SidebarSettingsHelpMenu'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 
 const mocks = vi.hoisted(() => ({
   openModal: vi.fn(),
   openSettingsPage: vi.fn(),
   openSettingsTarget: vi.fn(),
+  appRestart: vi.fn(),
+  updaterCheck: vi.fn(),
   shellOpenUrl: vi.fn(),
   useShortcutKeyDetails: vi.fn(),
-  useSetupGuideProgress: vi.fn(),
-  useSetupGuideProgressSnapshot: vi.fn(),
-  /** Counts evaluations of the feedback chunk; a dynamic import evaluates it exactly once. */
   feedbackChunkLoads: 0,
   setupProgress: {
     ready: true,
@@ -25,18 +24,25 @@ const mocks = vi.hoisted(() => ({
   }
 }))
 
+let updateStatus = { state: 'idle' } as const
+const roots: Root[] = []
+
 vi.mock('@/store', () => ({
   useAppStore: (selector: (state: unknown) => unknown) =>
     selector({
       openModal: mocks.openModal,
       openSettingsPage: mocks.openSettingsPage,
-      openSettingsTarget: mocks.openSettingsTarget
+      openSettingsTarget: mocks.openSettingsTarget,
+      updateStatus
     })
 }))
 
 vi.mock('@/hooks/useShortcutLabel', () => ({
-  useShortcutKeyDetails: mocks.useShortcutKeyDetails,
-  useShortcutKeyComboDetails: () => [{ keys: ['Ctrl', 'J'], doubleTap: false }]
+  useShortcutKeyDetails: mocks.useShortcutKeyDetails
+}))
+
+vi.mock('@/hooks/useMountedRef', () => ({
+  useMountedRef: () => ({ current: true })
 }))
 
 vi.mock('../onboarding/show-onboarding-event', () => ({
@@ -44,11 +50,7 @@ vi.mock('../onboarding/show-onboarding-event', () => ({
 }))
 
 vi.mock('../setup-guide/use-setup-guide-progress', () => ({
-  useSetupGuideProgress: mocks.useSetupGuideProgress
-}))
-
-vi.mock('../setup-guide/setup-guide-progress-snapshot', () => ({
-  useSetupGuideProgressSnapshot: mocks.useSetupGuideProgressSnapshot
+  useSetupGuideProgress: () => mocks.setupProgress
 }))
 
 vi.mock('../setup-guide/SetupGuideProgressRing', () => ({
@@ -133,30 +135,39 @@ vi.mock('./SidebarFeedbackDialog', () => {
 function installWindowApi(): void {
   Object.assign(window, {
     api: {
+      app: {
+        restart: mocks.appRestart
+      },
       shell: {
         openUrl: mocks.shellOpenUrl
+      },
+      updater: {
+        check: mocks.updaterCheck
       }
     }
   })
 }
 
-let mountedRoot: Root | undefined
-let mountedContainer: HTMLDivElement | undefined
-
 async function renderMenu(): Promise<HTMLDivElement> {
-  mountedContainer = document.createElement('div')
-  document.body.append(mountedContainer)
-  mountedRoot = createRoot(mountedContainer)
-  await act(async () => mountedRoot?.render(<SidebarSettingsHelpMenu />))
-  return mountedContainer
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  roots.push(root)
+
+  await act(async () => {
+    root.render(<SidebarSettingsHelpMenu />)
+  })
+
+  return container
 }
 
-afterEach(() => {
-  act(() => mountedRoot?.unmount())
-  mountedContainer?.remove()
-  mountedRoot = undefined
-  mountedContainer = undefined
-})
+function findMenuItem(container: HTMLElement, label: string): HTMLButtonElement {
+  const button = Array.from(
+    container.querySelectorAll<HTMLButtonElement>('[data-testid="menu-item"]')
+  ).find((element) => element.textContent?.includes(label))
+  expect(button).toBeDefined()
+  return button as HTMLButtonElement
+}
 
 describe('SidebarSettingsHelpMenu', () => {
   beforeEach(() => {
@@ -164,25 +175,20 @@ describe('SidebarSettingsHelpMenu', () => {
     vi.clearAllMocks()
     installWindowApi()
     mocks.useShortcutKeyDetails.mockReturnValue({ keys: ['⌘', ','], doubleTap: false })
+    updateStatus = { state: 'idle' }
     mocks.setupProgress = {
       ready: true,
       coreDoneCount: 2,
       coreTotal: 5,
       stepDone: {}
     }
-    mocks.useSetupGuideProgress.mockImplementation(() => mocks.setupProgress)
-    mocks.useSetupGuideProgressSnapshot.mockImplementation(() => mocks.setupProgress)
   })
 
-  it('keeps global search in the sidebar navigation while retaining settings', async () => {
-    const container = await renderMenu()
-    const search = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Search worktrees and browser tabs"]'
-    )
-    const settings = container.querySelector<HTMLButtonElement>('button[aria-label="Settings"]')
-    expect(search).toBeNull()
-    expect(settings).not.toBeNull()
-    expect(mocks.openModal).not.toHaveBeenCalled()
+  afterEach(() => {
+    roots.splice(0).forEach((root) => {
+      act(() => root.unmount())
+    })
+    document.body.replaceChildren()
   })
 
   it('renders the help button with correct aria-label', () => {
@@ -219,13 +225,6 @@ describe('SidebarSettingsHelpMenu', () => {
     expect(html).toContain('data-testid="setup-guide-progress-ring"')
   })
 
-  it('reads the root observer snapshot without starting another progress probe', () => {
-    renderToStaticMarkup(<SidebarSettingsHelpMenu />)
-
-    expect(mocks.useSetupGuideProgressSnapshot).toHaveBeenCalledOnce()
-    expect(mocks.useSetupGuideProgress).not.toHaveBeenCalled()
-  })
-
   it('hides Milestones when setup is complete', () => {
     mocks.setupProgress = {
       ready: true,
@@ -242,22 +241,92 @@ describe('SidebarSettingsHelpMenu', () => {
     expect(html).toContain('Onboarding')
   })
 
-  it('hides public help links when no official product authorities are configured', () => {
+  it('renders the product restart action by default', () => {
     const html = renderToStaticMarkup(<SidebarSettingsHelpMenu />)
-    for (const label of ['Docs', 'Changelog', 'GitHub', 'Discord', '>X<']) {
-      expect(html).not.toContain(label)
-    }
-    expect(mocks.shellOpenUrl).not.toHaveBeenCalled()
+    expect(html).toContain(`Restart ${APP_DISPLAY_NAME}`)
   })
 
-  it('keeps update and restart actions out of the help menu', () => {
+  it('renders Docs link', () => {
     const html = renderToStaticMarkup(<SidebarSettingsHelpMenu />)
-    expect(html).not.toContain('Check for Updates')
-    expect(html).not.toContain(`Restart ${APP_DISPLAY_NAME}`)
+    expect(html).toContain('Docs')
   })
 
-  // No other test in this file opens the menu or selects Send Feedback, so the 0 -> 1
-  // transition below is this warm and nothing else, whatever order the tests run in.
+  it('renders Changelog link', () => {
+    const html = renderToStaticMarkup(<SidebarSettingsHelpMenu />)
+    expect(html).toContain('Changelog')
+  })
+
+  it('renders GitHub link', () => {
+    const html = renderToStaticMarkup(<SidebarSettingsHelpMenu />)
+    expect(html).toContain('GitHub')
+  })
+
+  it('renders Discord link', () => {
+    const html = renderToStaticMarkup(<SidebarSettingsHelpMenu />)
+    expect(html).toContain('Discord')
+    expect(html).toContain('viewBox="0 0 20 20"')
+    expect(html).toContain('M16.0742 4.45014C14.9244 3.92097 13.7106 3.54556 12.4638 3.3335')
+  })
+
+  it('opens the Discord invite when no workspace browser can host it', async () => {
+    const container = await renderMenu()
+    const discordButton = findMenuItem(container, 'Discord')
+
+    await act(async () => {
+      discordButton.click()
+    })
+
+    expect(mocks.shellOpenUrl).toHaveBeenCalledWith('https://discord.gg/fzjDKHxv8Q')
+  })
+
+  it('renders X link', () => {
+    const html = renderToStaticMarkup(<SidebarSettingsHelpMenu />)
+    expect(html).toContain('>X<')
+  })
+
+  it('renders Check for Updates menu item', () => {
+    const html = renderToStaticMarkup(<SidebarSettingsHelpMenu />)
+    expect(html).toContain('Check for Updates')
+    expect(html).toMatch(/(⇧\+click|Shift\+click) checks the latest RC/)
+    expect(html).toMatch(/(⌘\+click|Ctrl\+click) checks the latest perf build/)
+  })
+
+  it('passes update-check modifier options through the updater bridge', async () => {
+    const container = await renderMenu()
+    const checkButton = findMenuItem(container, 'Check for Updates')
+    const primaryModifier = navigator.userAgent.includes('Mac')
+      ? { metaKey: true }
+      : { ctrlKey: true }
+
+    await act(async () => {
+      checkButton.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, shiftKey: true }))
+      checkButton.click()
+    })
+    await act(async () => {
+      checkButton.dispatchEvent(
+        new MouseEvent('pointerdown', { bubbles: true, ...primaryModifier })
+      )
+      checkButton.click()
+    })
+    await act(async () => {
+      checkButton.click()
+    })
+
+    expect(mocks.updaterCheck).toHaveBeenNthCalledWith(1, {
+      includePrerelease: true,
+      includePerfPrerelease: false
+    })
+    expect(mocks.updaterCheck).toHaveBeenNthCalledWith(2, {
+      includePrerelease: false,
+      includePerfPrerelease: true
+    })
+    expect(mocks.updaterCheck).toHaveBeenNthCalledWith(3, {
+      includePrerelease: false,
+      includePerfPrerelease: false
+    })
+  })
+
+  // Only this test opens the menu, so its first warm must cause the chunk’s sole evaluation regardless of order.
   it('warms the feedback chunk when the menu opens, before Send Feedback is selected', async () => {
     const container = await renderMenu()
     expect(mocks.feedbackChunkLoads).toBe(0)
@@ -267,7 +336,6 @@ describe('SidebarSettingsHelpMenu', () => {
     })
 
     expect(mocks.feedbackChunkLoads).toBe(1)
-    // Warming must not mount the dialog: it stays behind its own open state.
     expect(document.body.querySelector('[data-testid="feedback-dialog"]')).toBeNull()
   })
 

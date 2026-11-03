@@ -1,3 +1,4 @@
+import { OrchestrationPane } from './settings-pane-components'
 import { AiServicesPane } from './AiServicesPane'
 import { AgentsPane } from './AgentsPane'
 import { AgentDetectionRefreshButton } from './AgentDetectionRefreshButton'
@@ -179,4 +180,26 @@ export function renderDesktopCapabilitySettingsSections(
       ) : null}
     </SettingsSection>
   ) : null
+}
+
+export function renderOrchestrationSettingsSection(
+  context: SettingsRenderContext
+): React.JSX.Element {
+  const { model, navigation, view } = context
+  return (
+    <SettingsSection
+      id="orchestration"
+      title={translate('auto.components.settings.Settings.00c3a7950d', 'Orchestration')}
+      description={translate(
+        'auto.components.settings.Settings.475980f53d',
+        'Coordinate multiple coding agents through {{value0}}.',
+        { value0: APP_DISPLAY_NAME }
+      )}
+      searchEntries={navigation.getSectionSearchEntries('orchestration')}
+    >
+      {view.isSectionMounted('orchestration') ? (
+        <OrchestrationPane settings={model.settings} updateSettings={model.updateSettings} />
+      ) : null}
+    </SettingsSection>
+  )
 }

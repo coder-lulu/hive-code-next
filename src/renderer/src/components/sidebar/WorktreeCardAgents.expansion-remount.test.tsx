@@ -1,5 +1,11 @@
 // @vitest-environment happy-dom
 
+import type { DashboardAgentRow } from '@/components/dashboard/useDashboardData'
+import { ProjectTreeContext } from './project-tree-context'
+import {
+  ProjectWorkspaceCardDisclosure,
+  ProjectWorkspaceDisclosure
+} from './ProjectWorkspaceDisclosure'
 import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -11,17 +17,30 @@ import {
   useWorktreeAgentExpansionState
 } from './worktree-card-agents-expansion-state'
 
-let mockAgents: unknown[] = []
+let mockAgents: DashboardAgentRow[] = []
+let mockActiveWorktreeId: string | null = null
+let mockActiveHostId: string | null = null
 
-function mockAgent(paneKey: string, prompt: string): unknown {
+function mockAgent(paneKey: string, prompt: string): DashboardAgentRow {
   return {
     paneKey,
-    tab: { id: paneKey.split(':')[0] },
+    tab: {
+      id: paneKey.split(':')[0],
+      ptyId: null,
+      worktreeId: 'wt-remount',
+      title: prompt,
+      customTitle: null,
+      color: null,
+      sortOrder: 0,
+      createdAt: 1000
+    },
     agentType: 'codex',
     rowSource: undefined,
     state: 'done',
     startedAt: 1000,
     entry: {
+      paneKey,
+      updatedAt: 1000,
       prompt,
       lastAssistantMessage: undefined,
       state: 'done',
@@ -36,8 +55,12 @@ function mockAgent(paneKey: string, prompt: string): unknown {
 vi.mock('@/store', () => ({
   useAppStore: (selector: (state: unknown) => unknown) =>
     selector({
+      activeView: 'terminal',
+      activeWorktreeId: mockActiveWorktreeId,
+      activeWorkspaceExecutionHostId: mockActiveHostId,
       agentActivityDisplayMode: 'compact',
       acknowledgedAgentsByPaneKey: {},
+      retainedAgentsByPaneKey: {},
       cacheTimerByKey: {},
       dropAgentStatus: vi.fn(),
       dismissRetainedAgent: vi.fn(),
@@ -95,8 +118,6 @@ async function mountAgents(worktreeId: string): Promise<HTMLElement> {
 }
 
 function summaryButton(host: HTMLElement): HTMLButtonElement {
-  // The compact multi-agent summary is the only control carrying aria-expanded
-  // when the agents are flat (no per-agent child disclosure).
   const button = host.querySelector<HTMLButtonElement>('button[aria-expanded]')
   if (!button) {
     throw new Error('compact agent summary button not found')
@@ -107,6 +128,8 @@ function summaryButton(host: HTMLElement): HTMLButtonElement {
 describe('WorktreeCardAgents inline-list expansion durability', () => {
   beforeEach(() => {
     clearWorktreeAgentExpansionStateForTests()
+    mockActiveWorktreeId = null
+    mockActiveHostId = null
     mockAgents = [mockAgent('tab-1:1', 'One'), mockAgent('tab-2:2', 'Two')]
   })
 
@@ -121,6 +144,50 @@ describe('WorktreeCardAgents inline-list expansion durability', () => {
     clearWorktreeAgentExpansionStateForTests()
   })
 
+  it('shares the active project disclosure with session rows and keeps host twins independent', async () => {
+    mockActiveWorktreeId = 'tree'
+    mockActiveHostId = 'local'
+    const { default: WorktreeCardAgents } = await import('./WorktreeCardAgents')
+    const host = document.createElement('div')
+    document.body.append(host)
+    let root = createRoot(host)
+    const tree = (
+      <ProjectTreeContext.Provider value={true}>
+        {(['local', 'ssh:other'] as const).map((hostId) => (
+          <div key={hostId} data-host={hostId}>
+            <ProjectWorkspaceCardDisclosure worktree={{ id: 'tree', hostId }} agents={mockAgents}>
+              <ProjectWorkspaceDisclosure isFolder={false} />
+              <WorktreeCardAgents worktreeId="tree" agents={mockAgents} />
+            </ProjectWorkspaceCardDisclosure>
+          </div>
+        ))}
+      </ProjectTreeContext.Provider>
+    )
+    await act(async () => root.render(tree))
+    const local = () =>
+      host.querySelector<HTMLButtonElement>('[data-host="local"] .project-tree-disclosure')!
+    const remote = () =>
+      host.querySelector<HTMLButtonElement>('[data-host="ssh:other"] .project-tree-disclosure')!
+    expect(local().getAttribute('aria-expanded')).toBe('true')
+    expect(remote().getAttribute('aria-expanded')).toBe('false')
+    expect(host.querySelectorAll('[data-host="local"] .project-tree-session-row')).toHaveLength(2)
+    expect(host.querySelector('.compact-agent-summary-panel')).toBeNull()
+    await act(async () => local().click())
+    expect(local().getAttribute('aria-expanded')).toBe('false')
+    expect(
+      host
+        .querySelector('[data-host="local"] .compact-agent-expansion-grid')
+        ?.getAttribute('aria-hidden')
+    ).toBe('true')
+    await act(async () => root.unmount())
+    root = createRoot(host)
+    await act(async () => root.render(tree))
+    expect(local().getAttribute('aria-expanded')).toBe('false')
+    expect(remote().getAttribute('aria-expanded')).toBe('false')
+    await act(async () => root.unmount())
+    host.remove()
+  })
+
   it('keeps the compact agent summary expanded across a card remount', async () => {
     const host = await mountAgents('wt-remount')
     expect(summaryButton(host).getAttribute('aria-expanded')).toBe('false')
@@ -130,9 +197,7 @@ describe('WorktreeCardAgents inline-list expansion durability', () => {
     })
     expect(summaryButton(host).getAttribute('aria-expanded')).toBe('true')
 
-    // Simulate the WorktreeCard remount that a virtualizer recycle or a sibling
-    // child-worktrees toggle triggers: fully unmount, then mount a fresh tree
-    // for the same worktree. Before the fix this reset the summary to collapsed.
+    // Fully remount the same worktree as virtualizer recycling or child-worktree toggles do.
     await act(async () => {
       const first = mountedRoots.shift()!
       first.root.unmount()
@@ -193,7 +258,6 @@ describe('worktree-card-agents-expansion-state module cache', () => {
     })
     expect(read()).toBe('true')
 
-    // Remount the hook consumer: the collapsed parent must survive.
     await act(async () => root.unmount())
     root = createRoot(host)
     await act(async () => {
@@ -222,11 +286,11 @@ describe('worktree-card-agents-expansion-state module cache', () => {
   })
 
   it('preserves a manual collapse of the initially active session path after remount', async () => {
+    mockActiveWorktreeId = 'active'
+    mockActiveHostId = 'local'
     function Probe() {
-      const { compactRootListExpanded, toggleCompactRootList } = useWorktreeAgentExpansionState(
-        'local|active',
-        true
-      )
+      const { compactRootListExpanded, toggleCompactRootList } =
+        useWorktreeAgentExpansionState('local|active')
       return (
         <button aria-expanded={compactRootListExpanded} onClick={toggleCompactRootList}>
           Toggle
@@ -251,7 +315,9 @@ describe('worktree-card-agents-expansion-state module cache', () => {
 it('toggles the visible state after the active-workspace default changes', async () => {
   clearWorktreeAgentExpansionStateForTests()
   function Probe({ active }: { active: boolean }) {
-    const state = useWorktreeAgentExpansionState('activation-change', active)
+    mockActiveWorktreeId = active ? 'activation-change' : null
+    mockActiveHostId = null
+    const state = useWorktreeAgentExpansionState('activation-change')
     return (
       <button aria-expanded={state.compactRootListExpanded} onClick={state.toggleCompactRootList}>
         Toggle
@@ -266,6 +332,7 @@ it('toggles the visible state after the active-workspace default changes', async
     await act(async () => root.render(<Probe active />))
     const button = host.querySelector('button')!
     const before = button.getAttribute('aria-expanded')
+    expect(before).toBe('true')
     await act(async () => button.click())
     expect(button.getAttribute('aria-expanded')).not.toBe(before)
   } finally {

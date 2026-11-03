@@ -1,6 +1,6 @@
 import { PassThrough } from 'node:stream'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { CodexAppServerFrameSizeError } from './codex-app-server-frame-size-error'
+import { CodexAppServerFrameSizeError } from './app-server/codex-app-server-frame-size-error'
 import { createProviderRecordReader as createCodexAppServerRecordReader } from '../provider-process/provider-record-reader'
 
 const streams: PassThrough[] = []

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { getAgentImageHandling, isNativeChatPastedImagePath } from './native-chat-image-paste'
+import { getAgentImageHandling } from './native-chat-image-paste'
+import { isNativeChatPastedImagePath } from '../../../../shared/native-chat-image-label'
 
 describe('image paste agent map', () => {
   it('vision-capable TUIs take image attachments', () => {

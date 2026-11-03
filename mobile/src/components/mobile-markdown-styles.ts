@@ -1,145 +1,216 @@
-import { StyleSheet } from 'react-native'
-import type { MobileTheme } from '../theme/mobile-theme'
+import { StyleSheet, type TextStyle } from 'react-native'
+import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import { themedStyleSheet, themedStyles } from '../theme/themed-styles'
 
-export function createMobileMarkdownStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    root: {
-      gap: theme.spacing.space8
-    },
-    paragraph: {
-      ...theme.typography.meta,
-      color: theme.color.text.primary
-    },
-    heading: {
-      ...theme.typography.label,
-      fontWeight: '600',
-      color: theme.color.text.primary
-    },
-    headingLarge: {
-      ...theme.typography.body,
-      fontWeight: '600'
-    },
-    bold: {
-      fontWeight: '600',
-      color: theme.color.text.primary
-    },
-    italic: {
-      fontStyle: 'italic'
-    },
-    strike: {
-      textDecorationLine: 'line-through'
-    },
-    link: {
-      color: theme.color.brand.primary,
-      textDecorationLine: 'underline'
-    },
-    inlineCode: {
-      ...theme.typography.caption,
-      fontFamily: theme.typography.code.fontFamily,
-      color: theme.color.text.primary,
-      backgroundColor: theme.color.bg.subtle,
-      borderRadius: theme.radii.small,
-      paddingHorizontal: theme.spacing.space4
-    },
-    inlineCodeLink: {
-      color: theme.color.brand.primary,
-      textDecorationLine: 'underline'
-    },
-    quote: {
-      borderLeftWidth: 2,
-      borderLeftColor: theme.color.border.default,
-      paddingLeft: theme.spacing.space8,
-      gap: theme.spacing.space4
-    },
-    quoteText: {
-      ...theme.typography.meta,
-      color: theme.color.text.secondary
-    },
-    codeBlock: {
-      backgroundColor: theme.color.bg.subtle,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.color.border.default,
-      borderRadius: theme.radii.control,
-      padding: theme.spacing.space8
-    },
-    codeLanguage: {
-      ...theme.typography.caption,
-      color: theme.color.text.tertiary,
-      marginBottom: theme.spacing.space4,
-      textTransform: 'uppercase'
-    },
-    codeText: {
-      ...theme.typography.code,
-      color: theme.color.text.primary
-    },
-    imageFrame: {
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.color.border.default,
-      borderRadius: theme.radii.control,
-      backgroundColor: theme.color.bg.subtle,
-      overflow: 'hidden',
-      padding: theme.spacing.space8
-    },
-    imageCaption: {
-      ...theme.typography.caption,
-      paddingHorizontal: theme.spacing.space8,
-      paddingVertical: theme.spacing.space4,
-      color: theme.color.text.secondary
-    },
-    table: {
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderLeftWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.color.border.default,
-      borderRadius: theme.radii.control,
-      overflow: 'hidden',
-      backgroundColor: theme.color.bg.surface
-    },
-    tableRow: {
-      flexDirection: 'row'
-    },
-    tableCell: {
-      ...theme.typography.caption,
-      borderRightWidth: StyleSheet.hairlineWidth,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.color.border.default,
-      paddingHorizontal: theme.spacing.space8,
-      paddingVertical: theme.spacing.space4,
-      color: theme.color.text.primary
-    },
-    tableHeader: {
-      fontWeight: '600',
-      backgroundColor: theme.color.bg.subtle
-    },
-    tableTruncated: {
-      ...theme.typography.caption,
-      padding: theme.spacing.space8,
-      color: theme.color.text.tertiary
-    },
-    list: {
-      gap: theme.spacing.space4
-    },
-    listItem: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: theme.spacing.space8
-    },
-    listMarker: {
-      ...theme.typography.meta,
-      minWidth: 22,
-      color: theme.color.text.secondary,
-      fontFamily: theme.typography.code.fontFamily
-    },
-    listItemBody: { flex: 1, minWidth: 0, gap: theme.spacing.space4 },
-    footnoteReference: { color: theme.color.text.secondary },
-    listText: {
-      ...theme.typography.meta,
-      color: theme.color.text.primary
-    },
-    rule: {
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: theme.color.border.subtle
-    }
-  })
+export const styles = themedStyleSheet(() => ({
+  root: {
+    gap: spacing.md
+  },
+  paragraph: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.textPrimary
+  },
+  heading: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '700',
+    color: colors.textPrimary
+  },
+  headingLarge: {
+    fontSize: 15,
+    lineHeight: 21
+  },
+  bold: {
+    fontWeight: '700',
+    color: colors.textPrimary
+  },
+  italic: {
+    fontStyle: 'italic'
+  },
+  strike: {
+    textDecorationLine: 'line-through'
+  },
+  link: {
+    color: colors.accentBlue,
+    textDecorationLine: 'underline'
+  },
+  inlineCode: {
+    fontFamily: typography.monoFamily,
+    fontSize: 12,
+    color: colors.textPrimary,
+    backgroundColor: colors.bgRaised,
+    borderRadius: radii.row,
+    paddingHorizontal: 4
+  },
+  inlineCodeLink: {
+    color: colors.accentBlue,
+    textDecorationLine: 'underline'
+  },
+  quote: {
+    borderLeftWidth: 2,
+    borderLeftColor: colors.borderSubtle,
+    borderTopRightRadius: radii.row,
+    borderBottomRightRadius: radii.row,
+    backgroundColor: colors.bgPanel,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm
+  },
+  quoteText: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.textSecondary
+  },
+  codeBlock: {
+    backgroundColor: colors.bgRaised,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    borderRadius: radii.input,
+    overflow: 'hidden'
+  },
+  codeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    minHeight: 32,
+    paddingLeft: spacing.md,
+    paddingRight: spacing.xs,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.borderSubtle
+  },
+  codeLanguage: {
+    flexShrink: 1,
+    fontSize: typography.metaSize,
+    color: colors.textSecondary,
+    textTransform: 'uppercase'
+  },
+  codeBody: {
+    flexDirection: 'row',
+    paddingVertical: spacing.sm
+  },
+  codeLineNumbers: {
+    paddingHorizontal: spacing.sm,
+    color: colors.textMuted,
+    textAlign: 'right'
+  },
+  codeLines: {
+    paddingRight: spacing.md
+  },
+  codeText: {
+    fontFamily: typography.monoFamily,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.textPrimary
+  },
+  imageFrame: {
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    borderRadius: radii.input,
+    backgroundColor: colors.bgRaised,
+    overflow: 'hidden',
+    padding: spacing.sm
+  },
+  imageCaption: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    fontSize: 11,
+    color: colors.textSecondary
+  },
+  tableScroll: {
+    minWidth: '100%'
+  },
+  table: {
+    flexGrow: 1,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderColor: colors.borderSubtle,
+    borderRadius: radii.input,
+    overflow: 'hidden',
+    backgroundColor: colors.bgPanel
+  },
+  tableRow: {
+    flexDirection: 'row'
+  },
+  tableCell: {
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.borderSubtle,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.textPrimary,
+    // Every row grows its cells from the same widths, so a short table fills the message aligned.
+    flexGrow: 1,
+    flexShrink: 0
+  },
+  tableHeader: {
+    fontWeight: '700',
+    backgroundColor: colors.bgRaised
+  },
+  list: {
+    gap: spacing.xs
+  },
+  listItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm
+  },
+  listMarker: {
+    // A floor, not a width: "10." would wrap inside a fixed 22.
+    minWidth: 22,
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.textSecondary,
+    fontFamily: typography.monoFamily
+  },
+  listItemBody: {
+    flex: 1,
+    minWidth: 0,
+    gap: spacing.xs
+  },
+  listText: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.textPrimary
+  },
+  footnoteReference: {
+    color: colors.textSecondary
+  },
+  rule: {
+    marginVertical: spacing.xs,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.borderSubtle
+  }
+}))
+
+/** A style's size and line height under the reader's zoom; null at 1x, where the sheet holds. */
+export function scaledMarkdownText(
+  style: { fontSize: number; lineHeight: number },
+  textScale: number
+): { fontSize: number; lineHeight: number } | null {
+  return textScale !== 1
+    ? { fontSize: style.fontSize * textScale, lineHeight: style.lineHeight * textScale }
+    : null
 }
 
-export type MobileMarkdownStyles = ReturnType<typeof createMobileMarkdownStyles>
+export type MarkdownTone = {
+  text: TextStyle | null
+  secondary: TextStyle | null
+  link: TextStyle | null
+  inlineCode: TextStyle | null
+}
+
+/** Colours over the styles above, for one surface. The default tone overrides nothing. */
+export const MARKDOWN_TONES: Record<'default' | 'userMessage', MarkdownTone> = {
+  default: { text: null, secondary: null, link: null, inlineCode: null },
+  // Desktop's user bubble only strengthens the text; links and code keep their chat colors.
+  userMessage: themedStyles(() => ({
+    text: { color: colors.chatForegroundStrong },
+    secondary: null,
+    link: null,
+    inlineCode: null
+  }))
+}

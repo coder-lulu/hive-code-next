@@ -1,8 +1,7 @@
-import { existsSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { quoteCliCommandArgument } from './shell-command-quote'
 import { RuntimeRpcFailureError } from './runtime-client'
 import {
   formatCliError,
@@ -17,7 +16,6 @@ import {
 } from './format'
 import type { ComputerActionResult, RuntimeWorktreeRecord } from '../shared/runtime-types'
 import type { Automation } from '../shared/automations-types'
-import { APP_DISPLAY_NAME } from '../shared/brand'
 
 let testScreenshotDir: string | null = null
 
@@ -73,10 +71,10 @@ describe('formatCliError', () => {
         message: 'app not found: Gmail',
         data: {
           nextSteps: [
-            'Run `hive computer list-apps --json` and retry with the exact app name or bundle ID.',
-            'If the target is a website or web app such as Gmail, choose the desktop browser app/window that contains it; `hive computer` app selectors refer to desktop apps, not website names.',
-            'Do not retry the same `hive computer ... --app <web app>` command unchanged.',
-            'If the desired browser is not listed, open or focus that browser first, then retry `hive computer list-apps --json` and `hive computer list-windows --app <browser> --json`.'
+            'Run `orca computer list-apps --json` and retry with the exact app name or bundle ID.',
+            'If the target is a website or web app such as Gmail, choose the desktop browser app/window that contains it; `orca computer` app selectors refer to desktop apps, not website names.',
+            'Do not retry the same `orca computer ... --app <web app>` command unchanged.',
+            'If the desired browser is not listed, open or focus that browser first, then retry `orca computer list-apps --json` and `orca computer list-windows --app <browser> --json`.'
           ]
         }
       },
@@ -86,10 +84,10 @@ describe('formatCliError', () => {
     const output = formatCliError(error)
 
     expect(output).toContain('app not found: Gmail')
-    expect(output).toContain('Next step: Run `hive computer list-apps --json`')
+    expect(output).toContain('Next step: Run `orca computer list-apps --json`')
     expect(output).toContain('desktop browser app/window')
     expect(output).toContain('--app <web app>')
-    expect(output).not.toContain('hive goto')
+    expect(output).not.toContain('orca goto')
   })
 
   it('prints runtime next steps for structured lineage errors', () => {
@@ -120,7 +118,6 @@ describe('formatCliError', () => {
   })
 
   it('preserves orchestration migration recovery in human and JSON errors', () => {
-    const migrationNextStep = `Using this same ${APP_DISPLAY_NAME} CLI executable, run: skills get orchestration --full`
     const error = new RuntimeRpcFailureError({
       id: 'req_migration',
       ok: false,
@@ -130,13 +127,15 @@ describe('formatCliError', () => {
         data: {
           effectsApplied: false,
           nextCommandArgs: ['skills', 'get', 'orchestration', '--full'],
-          nextSteps: [migrationNextStep]
+          nextSteps: ['Using this same Orca CLI executable, run: skills get orchestration --full']
         }
       },
       _meta: { runtimeId: 'runtime-1' }
     })
 
-    expect(formatCliError(error)).toContain(`Next step: ${migrationNextStep}`)
+    expect(formatCliError(error)).toContain(
+      'Next step: Using this same Orca CLI executable, run: skills get orchestration --full'
+    )
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})
     reportCliError(error, true)
     expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject({
@@ -144,8 +143,7 @@ describe('formatCliError', () => {
         code: 'orchestration_migration_required',
         data: {
           effectsApplied: false,
-          nextCommandArgs: ['skills', 'get', 'orchestration', '--full'],
-          nextSteps: [migrationNextStep]
+          nextCommandArgs: ['skills', 'get', 'orchestration', '--full']
         }
       }
     })
@@ -170,10 +168,13 @@ describe('formatWorktreeList', () => {
       truncated: false
     })
 
-    expect(output).toContain('parentWorktreeId: null')
-    expect(output).toContain('childWorktreeIds: repo::/tmp/repo/child')
-    expect(output).toContain('parentWorktreeId: repo::/tmp/repo/parent')
-    expect(output).toContain('childWorktreeIds: []')
+    const [parent, child] = output.split('\n\n')
+    expect(parent).toContain('repo::/tmp/repo/parent  feature/parent')
+    expect(parent).toContain('parentWorktreeId: null')
+    expect(parent).toContain('childWorktreeIds: repo::/tmp/repo/child')
+    expect(child).toContain('repo::/tmp/repo/child  feature/child')
+    expect(child).toContain('parentWorktreeId: repo::/tmp/repo/parent')
+    expect(child).toContain('childWorktreeIds: []')
   })
 })
 
@@ -469,8 +470,9 @@ describe('formatComputerAction', () => {
       windowId: 99
     })
 
+    const app = process.platform === 'win32' ? '"Text Editor"' : "'Text Editor'"
     expect(output).toContain(
-      `Use \`hive computer get-app-state --app ${quoteCliCommandArgument('Text Editor')} --worktree id:repo::/tmp/repo --window-id 99\``
+      `Use \`orca computer get-app-state --app ${app} --worktree id:repo::/tmp/repo --window-id 99\``
     )
     expect(output).toContain('5 visible elements in current window')
     expect(output).toContain(
@@ -499,7 +501,7 @@ describe('formatComputerAction', () => {
     })
 
     expect(output).toContain(
-      'Use `hive computer get-app-state --app com.apple.finder --session manual --window-index 1`'
+      'Use `orca computer get-app-state --app com.apple.finder --session manual --window-index 1`'
     )
   })
 
@@ -533,7 +535,7 @@ describe('formatComputerAction', () => {
     expect(output).toContain('Screenshot failed (screenshot_failed)')
     expect(output).toContain('payload cap')
     expect(output).toContain(
-      'Use `hive computer get-app-state --app com.apple.finder --window-id 42`'
+      'Use `orca computer get-app-state --app com.apple.finder --window-id 42`'
     )
     expect(output).not.toContain('Click completed')
   })
@@ -624,7 +626,7 @@ describe('formatComputerAction', () => {
     })
 
     expect(output).toContain(
-      'Use `hive computer get-app-state --app com.apple.finder --session manual --window-id 42`'
+      'Use `orca computer get-app-state --app com.apple.finder --session manual --window-id 42`'
     )
     expect(output).toContain('Click attempted via synthetic, unverified (window changed)')
     expect(output).toContain(
@@ -655,9 +657,8 @@ describe('formatComputerAction', () => {
 
     const output = formatComputerAction('click', result)
 
-    expect(output).toContain(
-      `Use \`hive computer get-app-state --app ${quoteCliCommandArgument('Linux Browser')} --window-index 2\``
-    )
+    const app = process.platform === 'win32' ? '"Linux Browser"' : "'Linux Browser'"
+    expect(output).toContain(`Use \`orca computer get-app-state --app ${app} --window-index 2\``)
     expect(output).not.toContain('--window-id')
   })
 
@@ -683,9 +684,8 @@ describe('formatComputerAction', () => {
 
     const output = formatComputerAction('click', result)
 
-    expect(output).toContain(
-      `Use \`hive computer get-app-state --app ${quoteCliCommandArgument('Linux Browser')} --window-index 2\``
-    )
+    const app = process.platform === 'win32' ? '"Linux Browser"' : "'Linux Browser'"
+    expect(output).toContain(`Use \`orca computer get-app-state --app ${app} --window-index 2\``)
     expect(output).not.toContain('--window-index 4')
     expect(output).not.toContain('--window-id')
   })
@@ -787,11 +787,12 @@ describe('printResult computer screenshots', () => {
     )
 
     expect(existsSync(expiredPath)).toBe(true)
-    const output = JSON.parse(logSpy.mock.calls[0][0]) as {
+    const output: {
       result: { screenshot: { dataOmitted: boolean; path: string } }
-    }
+    } = JSON.parse(logSpy.mock.calls[0][0])
     expect(output.result.screenshot.dataOmitted).toBe(true)
     expect(output.result.screenshot.path).toContain('req_1-screenshot.png')
+    expect(readFileSync(output.result.screenshot.path, 'utf8')).toBe('png-data')
   })
 
   it('keeps inline screenshot data when temp export fails', () => {

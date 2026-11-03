@@ -4,12 +4,11 @@ import { UI_LANGUAGE_CHINESE, UI_LANGUAGE_ENGLISH } from '../../shared/ui-langua
 
 vi.mock('electron', () => ({ app: { getLocale: () => 'en-US' } }))
 
-import { ensureMainI18n, mainI18n, setMainUiLanguage, translateMain } from './main-i18n'
+import { mainI18n, setMainUiLanguage, translateMain } from './main-i18n'
 
 afterEach(() => vi.restoreAllMocks())
 
 it('keeps the latest English choice when an earlier Chinese catalog finishes loading', async () => {
-  await ensureMainI18n()
   const backend: BackendModule = mainI18n.services.backendConnector.backend
   const read = backend.read.bind(backend)
   let finishChinese = (): void => {}

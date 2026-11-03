@@ -1,17 +1,20 @@
 import type { LucideIcon } from 'lucide-react'
-import { FilePenLine, Hand, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { FilePenLine, Hand, ShieldAlert, ShieldCheck, Settings } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
-import type { AgentChatPermissionMode } from '../../../../shared/agent-chat-permission-mode'
+import type { AgentChatPermissionChoice } from '../../../../shared/agent-chat-permission-mode'
 
 export const NATIVE_CHAT_PERMISSION_MODE_ICONS = {
+  own: Settings,
   ask: Hand,
   'accept-edits': FilePenLine,
   auto: ShieldCheck,
   'full-access': ShieldAlert
-} as const satisfies Record<AgentChatPermissionMode, LucideIcon>
+} as const satisfies Record<AgentChatPermissionChoice, LucideIcon>
 
-export function nativeChatPermissionModeLabel(mode: AgentChatPermissionMode): string {
+export function nativeChatPermissionModeLabel(mode: AgentChatPermissionChoice): string {
   switch (mode) {
+    case 'own':
+      return translate('settings.agents.permissionOwnShort', 'Own settings')
     case 'ask':
       return translate('components.native-chat.composer.permissionAsk', 'Ask for approval')
     case 'accept-edits':
@@ -25,10 +28,12 @@ export function nativeChatPermissionModeLabel(mode: AgentChatPermissionMode): st
 
 /** `agent` absent describes the mode for every agent, as the new-chat setting does. */
 export function nativeChatPermissionModeDescription(
-  mode: AgentChatPermissionMode,
+  mode: AgentChatPermissionChoice,
   agent?: string | null
 ): string {
   switch (mode) {
+    case 'own':
+      return translate('settings.agents.permissionOwnDescription', 'Terminals and chats follow the agent’s own permission settings.')
     case 'ask':
       if (agent === 'codex') {
         return translate(

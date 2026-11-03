@@ -1,18 +1,102 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import {
+const {
   mockInspectRuntimeTerminalProcess,
-  mockSendRuntimePtyInputVerified,
   mockPasteDraftToAgentPtyWhenReady,
   mockShowAutomationPromptNotSentToast,
   mockTrack,
   store,
   storeListeners,
-  startupLeafId,
-  runtimeEnvironmentIdByWorktree
-} from './__mocks__/new-workspace'
+  startupLeafId
+} = vi.hoisted(() => ({
+  mockInspectRuntimeTerminalProcess: vi.fn(),
+  mockPasteDraftToAgentPtyWhenReady: vi.fn(),
+  mockShowAutomationPromptNotSentToast: vi.fn(),
+  mockTrack: vi.fn(),
+  storeListeners: new Set<(state: unknown, previousState: unknown) => void>(),
+  startupLeafId: '11111111-1111-4111-8111-111111111111',
+  store: {
+    settings: {},
+    activeTabIdByWorktree: { 'wt-1': 'tab-1' } as Record<string, string>,
+    tabsByWorktree: { 'wt-1': [{ id: 'tab-1' }] } as Record<string, { id: string }[]>,
+    ptyIdsByTabId: { 'tab-1': ['pty-1'] } as Record<string, string[]>,
+    pendingStartupByTabId: {} as Record<string, { launchToken?: string }>,
+    terminalLayoutsByTabId: {
+      'tab-1': {
+        root: null,
+        activeLeafId: null,
+        expandedLeafId: null,
+        ptyIdsByLeafId: { '11111111-1111-4111-8111-111111111111': 'pty-1' }
+      }
+    } as Record<
+      string,
+      {
+        root: null
+        activeLeafId: null
+        expandedLeafId: null
+        ptyIdsByLeafId?: Record<string, string>
+      }
+    >,
+    agentLaunchConfigByPaneKey: {
+      'tab-1:11111111-1111-4111-8111-111111111111': {
+        launchConfig: { agentCommand: 'codex', agentArgs: '', agentEnv: {} },
+        registeredAt: 1,
+        identity: {
+          tabId: 'tab-1',
+          leafId: '11111111-1111-4111-8111-111111111111',
+          launchToken: 'launch-token-1'
+        }
+      }
+    } as Record<
+      string,
+      {
+        launchConfig: { agentCommand: string; agentArgs: string; agentEnv: Record<string, string> }
+        registeredAt: number
+        identity: { tabId?: string; leafId?: string; launchToken?: string }
+      }
+    >
+  }
+}))
 
-import { ensureAgentStartupInTerminal, getLinkedWorkItemProvider } from './new-workspace'
+vi.mock('@/store', () => ({
+  useAppStore: {
+    getState: () => store,
+    subscribe: (listener: (state: unknown, previousState: unknown) => void) => {
+      storeListeners.add(listener)
+      return () => {
+        storeListeners.delete(listener)
+      }
+    }
+  }
+}))
+
+vi.mock('@/runtime/runtime-terminal-inspection', () => ({
+  inspectRuntimeTerminalProcess: mockInspectRuntimeTerminalProcess
+}))
+
+vi.mock('@/lib/agent-paste-draft', () => ({
+  pasteDraftToAgentPtyWhenReady: mockPasteDraftToAgentPtyWhenReady
+}))
+
+vi.mock('@/lib/browser-uuid', () => ({
+  createBrowserUuid: () => 'launch-token-1'
+}))
+
+vi.mock('@/lib/telemetry', () => ({
+  track: mockTrack
+}))
+
+vi.mock('@/lib/agent-background-session-timeout-toast', () => ({
+  showAutomationPromptNotSentToast: mockShowAutomationPromptNotSentToast
+}))
+
+import {
+  canUseIssueCommandForLinkedItemProvider,
+  ensureAgentStartupInTerminal,
+  getLinkedWorkItemProvider,
+  getWorkspaceSeedName,
+  isGitLabIssueUrl
+} from './new-workspace'
 import { resetAgentStartupDelayedDeliveryForTests } from './agent-startup-delayed-delivery'
 import { getLinkedWorkItemProvider as directGetLinkedWorkItemProvider } from './linked-work-item-provider'
 
@@ -20,14 +104,149 @@ it('keeps linked item provider selection available through the workspace module'
   expect(getLinkedWorkItemProvider).toBe(directGetLinkedWorkItemProvider)
 })
 
+describe('linked-item issue commands', () => {
+  it('keeps Jira and Linear sentinel numbers out of repository issue templates', () => {
+    expect(canUseIssueCommandForLinkedItemProvider('github')).toBe(true)
+    expect(canUseIssueCommandForLinkedItemProvider('gitlab')).toBe(true)
+    expect(canUseIssueCommandForLinkedItemProvider('jira')).toBe(false)
+    expect(canUseIssueCommandForLinkedItemProvider('linear')).toBe(false)
+  })
+})
+
+describe('getWorkspaceSeedName', () => {
+  it('prefers an explicit name', () => {
+    expect(
+      getWorkspaceSeedName({
+        explicitName: 'my-workspace',
+        prompt: 'anything',
+        linkedIssueNumber: null,
+        linkedPR: null
+      })
+    ).toBe('my-workspace')
+  })
+
+  it('uses linked issue/PR when no explicit name is provided', () => {
+    expect(
+      getWorkspaceSeedName({
+        explicitName: '',
+        prompt: '',
+        linkedIssueNumber: 7,
+        linkedPR: null
+      })
+    ).toBe('issue-7')
+    expect(
+      getWorkspaceSeedName({
+        explicitName: '',
+        prompt: '',
+        linkedIssueNumber: null,
+        linkedPR: 42
+      })
+    ).toBe('pr-42')
+  })
+
+  it('slugifies and truncates very long prompts', () => {
+    const longPrompt =
+      'Investigate the flaky login regression on iOS where the session cookie is dropped after background refresh and users get bounced to the splash screen.'
+    const seed = getWorkspaceSeedName({
+      explicitName: '',
+      prompt: longPrompt,
+      linkedIssueNumber: null,
+      linkedPR: null
+    })
+    expect(seed.length).toBeLessThanOrEqual(48)
+    expect(seed).toMatch(/^[a-z0-9._-]+$/)
+    expect(seed.startsWith('investigate-the-flaky-login')).toBe(true)
+  })
+
+  it('falls back to "workspace" when a prompt has no sluggable characters', () => {
+    expect(
+      getWorkspaceSeedName({
+        explicitName: '',
+        prompt: '🚀🚀🚀',
+        linkedIssueNumber: null,
+        linkedPR: null
+      })
+    ).toBe('workspace')
+    expect(
+      getWorkspaceSeedName({
+        explicitName: '',
+        prompt: '日本語だけ',
+        linkedIssueNumber: null,
+        linkedPR: null
+      })
+    ).toBe('workspace')
+  })
+
+  it('does not leave internal ".." in the slug (git refuses such branches)', () => {
+    // ../../ references can slugify to internal .., which git rejects as a branch name.
+    const seed = getWorkspaceSeedName({
+      explicitName: '',
+      prompt: 'For ../../ the sibling worktree from another repo',
+      linkedIssueNumber: null,
+      linkedPR: null
+    })
+    expect(seed).not.toMatch(/\.{2,}/)
+  })
+
+  it('falls back to "workspace" for empty inputs', () => {
+    expect(
+      getWorkspaceSeedName({
+        explicitName: '',
+        prompt: '',
+        linkedIssueNumber: null,
+        linkedPR: null
+      })
+    ).toBe('workspace')
+  })
+
+  it('uses the fallback name when no other seed source is available', () => {
+    expect(
+      getWorkspaceSeedName({
+        explicitName: '',
+        prompt: '',
+        linkedIssueNumber: null,
+        linkedPR: null,
+        fallbackName: 'Nautilus'
+      })
+    ).toBe('Nautilus')
+  })
+
+  it('prefers an explicit name over the fallback name', () => {
+    expect(
+      getWorkspaceSeedName({
+        explicitName: 'my-workspace',
+        prompt: '',
+        linkedIssueNumber: null,
+        linkedPR: null,
+        fallbackName: 'Nautilus'
+      })
+    ).toBe('my-workspace')
+  })
+})
+
+describe('isGitLabIssueUrl', () => {
+  it('detects canonical and self-hosted GitLab issue URLs', () => {
+    expect(isGitLabIssueUrl('https://gitlab.com/group/project/-/issues/123')).toBe(true)
+    expect(isGitLabIssueUrl('https://gitlab.example.com/group/project/-/issues/123')).toBe(true)
+  })
+
+  it('detects modern /-/work_items/<iid> issue URLs (incl. non-default port)', () => {
+    expect(isGitLabIssueUrl('https://gitlab.com/group/project/-/work_items/123')).toBe(true)
+    expect(isGitLabIssueUrl('https://gitlab.example.com:8443/group/project/-/work_items/7')).toBe(
+      true
+    )
+  })
+
+  it('does not classify GitHub issue URLs as GitLab issues', () => {
+    expect(isGitLabIssueUrl('https://github.com/group/project/issues/123')).toBe(false)
+  })
+})
+
 describe('ensureAgentStartupInTerminal prompt delivery', () => {
   beforeEach(() => {
     vi.useRealTimers()
     vi.clearAllMocks()
     storeListeners.clear()
-    for (const worktreeId of Object.keys(runtimeEnvironmentIdByWorktree)) {
-      delete runtimeEnvironmentIdByWorktree[worktreeId]
-    }
     store.settings = {}
     store.activeTabIdByWorktree = { 'wt-1': 'tab-1' }
     store.tabsByWorktree = { 'wt-1': [{ id: 'tab-1' }] }
@@ -48,17 +267,10 @@ describe('ensureAgentStartupInTerminal prompt delivery', () => {
         identity: { tabId: 'tab-1', leafId: startupLeafId, launchToken: 'launch-token-1' }
       }
     }
-    store.registerAgentLaunchConfig.mockImplementation((paneKey, launchConfig, identity) => {
-      store.agentLaunchConfigByPaneKey = {
-        ...store.agentLaunchConfigByPaneKey,
-        [paneKey]: { launchConfig, registeredAt: Date.now(), identity }
-      }
-    })
     mockInspectRuntimeTerminalProcess.mockResolvedValue({
       foregroundProcess: 'aider',
       hasChildProcesses: true
     })
-    mockSendRuntimePtyInputVerified.mockResolvedValue(true)
     mockPasteDraftToAgentPtyWhenReady.mockResolvedValue(true)
   })
 
@@ -79,16 +291,20 @@ describe('ensureAgentStartupInTerminal prompt delivery', () => {
       }
     })
 
-    expect(mockSendRuntimePtyInputVerified).toHaveBeenCalledWith(
-      'pty-1',
-      'fix the spinner\r',
-      'launch'
+    expect(mockPasteDraftToAgentPtyWhenReady).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ptyId: 'pty-1',
+        content: 'fix the spinner',
+        agent: 'aider',
+        submit: true,
+        forcePaste: true
+      })
     )
     expect(mockTrack).not.toHaveBeenCalledWith('agent_prompt_sent', expect.anything())
   })
 
   it('does not track when follow-up prompt delivery is rejected by the terminal runtime', async () => {
-    mockSendRuntimePtyInputVerified.mockResolvedValue(false)
+    mockPasteDraftToAgentPtyWhenReady.mockResolvedValue(false)
 
     await ensureAgentStartupInTerminal({
       worktreeId: 'wt-1',
@@ -105,8 +321,7 @@ describe('ensureAgentStartupInTerminal prompt delivery', () => {
   })
 
   it('surfaces the not-sent toast when a follow-up prompt is dropped', async () => {
-    // Foreground never becomes a recognized agent and there is no live child,
-    // so the readiness wait times out and the prompt is not delivered.
+    // No recognized agent or live child means readiness times out without delivering text.
     mockInspectRuntimeTerminalProcess.mockResolvedValue({
       foregroundProcess: 'zsh',
       hasChildProcesses: false
@@ -123,7 +338,7 @@ describe('ensureAgentStartupInTerminal prompt delivery', () => {
       }
     })
 
-    expect(mockSendRuntimePtyInputVerified).not.toHaveBeenCalled()
+    expect(mockPasteDraftToAgentPtyWhenReady).not.toHaveBeenCalled()
     expect(mockShowAutomationPromptNotSentToast).toHaveBeenCalledWith('aider')
   })
 
@@ -164,7 +379,7 @@ describe('ensureAgentStartupInTerminal prompt delivery', () => {
   })
 
   it('does not track when follow-up prompt delivery rejects', async () => {
-    mockSendRuntimePtyInputVerified.mockRejectedValue(new Error('runtime timeout'))
+    mockPasteDraftToAgentPtyWhenReady.mockRejectedValue(new Error('runtime timeout'))
 
     await expect(
       ensureAgentStartupInTerminal({
@@ -247,207 +462,60 @@ describe('ensureAgentStartupInTerminal prompt delivery', () => {
     })
   })
 
-  it('binds a Host-created mirrored pane to the launch token before delayed delivery', async () => {
+  it('pastes a draft after the seeded tab receives a delayed PTY', async () => {
     vi.useFakeTimers()
-    const rawTabId = 'host-agent-tab'
-    const mirroredTabId = `web-terminal-${encodeURIComponent(rawTabId)}`
-    const mirroredPaneKey = `${mirroredTabId}:${startupLeafId}`
-    runtimeEnvironmentIdByWorktree['wt-1'] = 'env-1'
-    store.tabsByWorktree = { 'wt-1': [] }
     store.ptyIdsByTabId = {}
     store.terminalLayoutsByTabId = {}
-    store.pendingStartupByTabId = {}
     store.agentLaunchConfigByPaneKey = {}
-    mockInspectRuntimeTerminalProcess.mockResolvedValue({
-      foregroundProcess: 'goose',
-      hasChildProcesses: true
-    })
-    const launchConfig = { agentCommand: 'goose', agentArgs: '', agentEnv: {} }
+    store.pendingStartupByTabId = { 'tab-1': { launchToken: 'launch-token-1' } }
 
     const delivery = ensureAgentStartupInTerminal({
       worktreeId: 'wt-1',
-      primaryTabId: rawTabId,
-      startupPaneKey: `${rawTabId}:${startupLeafId}`,
+      primaryTabId: 'tab-1',
       startup: {
-        agent: 'goose',
-        launchCommand: 'goose',
-        expectedProcess: 'goose',
-        followupPrompt: 'implement the task',
-        launchConfig,
-        launchToken: 'launch-token-1'
+        agent: 'codex',
+        launchCommand: 'codex',
+        expectedProcess: 'codex',
+        followupPrompt: null,
+        launchConfig: { agentArgs: '', agentEnv: {} },
+        draftPrompt: 'https://github.com/stablyai/orca/pull/2051'
       }
     })
 
     await vi.advanceTimersByTimeAsync(5_000)
     await delivery
-    store.tabsByWorktree = { 'wt-1': [{ id: mirroredTabId }] }
-    store.ptyIdsByTabId = { [mirroredTabId]: ['remote:env-1@@host-pty'] }
-    store.terminalLayoutsByTabId = {
-      [mirroredTabId]: {
-        root: null,
-        activeLeafId: null,
-        expandedLeafId: null,
-        ptyIdsByLeafId: { [startupLeafId]: 'remote:env-1@@host-pty' }
-      }
-    }
-    for (const listener of storeListeners) {
-      listener(store, store)
-    }
-    await vi.advanceTimersByTimeAsync(5_000)
 
-    expect(store.registerAgentLaunchConfig).toHaveBeenCalledWith(
-      mirroredPaneKey,
-      {
-        agentArgs: '',
-        agentEnv: {},
-        hostDefaultsAuthoritative: true
-      },
-      {
-        agentType: 'goose',
-        launchToken: 'launch-token-1',
-        tabId: mirroredTabId,
-        leafId: startupLeafId
-      }
-    )
-    expect(mockSendRuntimePtyInputVerified).toHaveBeenCalledWith(
-      'remote:env-1@@host-pty',
-      'implement the task\r',
-      'launch'
-    )
-  })
+    expect(mockPasteDraftToAgentPtyWhenReady).not.toHaveBeenCalled()
 
-  it('binds only the first queued launch when Host startup tokens race for one pane', async () => {
-    vi.useFakeTimers()
-    const rawTabId = 'host-agent-tab'
-    const mirroredTabId = `web-terminal-${encodeURIComponent(rawTabId)}`
-    const mirroredPaneKey = `${mirroredTabId}:${startupLeafId}`
-    runtimeEnvironmentIdByWorktree['wt-1'] = 'env-1'
-    store.tabsByWorktree = { 'wt-1': [] }
-    store.ptyIdsByTabId = {}
-    store.terminalLayoutsByTabId = {}
+    store.ptyIdsByTabId = { 'tab-1': ['pty-delayed'] }
     store.pendingStartupByTabId = {}
-    store.agentLaunchConfigByPaneKey = {}
-    mockInspectRuntimeTerminalProcess.mockResolvedValue({
-      foregroundProcess: 'goose',
-      hasChildProcesses: true
-    })
-
-    const first = ensureAgentStartupInTerminal({
-      worktreeId: 'wt-1',
-      primaryTabId: rawTabId,
-      startupPaneKey: `${rawTabId}:${startupLeafId}`,
-      startup: {
-        agent: 'goose',
-        launchCommand: 'goose',
-        expectedProcess: 'goose',
-        followupPrompt: 'first task',
-        launchConfig: { agentArgs: '', agentEnv: {} },
-        launchToken: 'launch-token-first'
-      }
-    })
-    const second = ensureAgentStartupInTerminal({
-      worktreeId: 'wt-1',
-      primaryTabId: rawTabId,
-      startupPaneKey: `${rawTabId}:${startupLeafId}`,
-      startup: {
-        agent: 'goose',
-        launchCommand: 'goose',
-        expectedProcess: 'goose',
-        followupPrompt: 'second task',
-        launchConfig: { agentArgs: '', agentEnv: {} },
-        launchToken: 'launch-token-second'
-      }
-    })
-
-    await vi.advanceTimersByTimeAsync(5_000)
-    await Promise.all([first, second])
-
-    store.tabsByWorktree = { 'wt-1': [{ id: mirroredTabId }] }
-    store.ptyIdsByTabId = { [mirroredTabId]: ['remote:env-1@@host-pty'] }
     store.terminalLayoutsByTabId = {
-      [mirroredTabId]: {
+      'tab-1': {
         root: null,
         activeLeafId: null,
         expandedLeafId: null,
-        ptyIdsByLeafId: { [startupLeafId]: 'remote:env-1@@host-pty' }
-      }
-    }
-    for (const listener of storeListeners) {
-      listener(store, store)
-    }
-    await vi.advanceTimersByTimeAsync(5_000)
-
-    expect(store.registerAgentLaunchConfig).toHaveBeenCalledTimes(1)
-    expect(store.agentLaunchConfigByPaneKey[mirroredPaneKey]?.identity.launchToken).toBe(
-      'launch-token-first'
-    )
-    expect(mockSendRuntimePtyInputVerified).toHaveBeenCalledTimes(1)
-    expect(mockSendRuntimePtyInputVerified).toHaveBeenCalledWith(
-      'remote:env-1@@host-pty',
-      'first task\r',
-      'launch'
-    )
-  })
-
-  it('does not overwrite a newer launch identity on the mirrored Host pane', async () => {
-    vi.useFakeTimers()
-    const rawTabId = 'host-agent-tab'
-    const mirroredTabId = `web-terminal-${encodeURIComponent(rawTabId)}`
-    const mirroredPaneKey = `${mirroredTabId}:${startupLeafId}`
-    runtimeEnvironmentIdByWorktree['wt-1'] = 'env-1'
-    store.tabsByWorktree = { 'wt-1': [] }
-    store.ptyIdsByTabId = {}
-    store.terminalLayoutsByTabId = {}
-    store.pendingStartupByTabId = {}
-    store.agentLaunchConfigByPaneKey = {}
-
-    const delivery = ensureAgentStartupInTerminal({
-      worktreeId: 'wt-1',
-      primaryTabId: rawTabId,
-      startupPaneKey: `${rawTabId}:${startupLeafId}`,
-      startup: {
-        agent: 'goose',
-        launchCommand: 'goose',
-        expectedProcess: 'goose',
-        followupPrompt: 'stale task',
-        launchConfig: { agentCommand: 'goose', agentArgs: '', agentEnv: {} },
-        launchToken: 'launch-token-1'
-      }
-    })
-
-    await vi.advanceTimersByTimeAsync(5_000)
-    await delivery
-    store.tabsByWorktree = { 'wt-1': [{ id: mirroredTabId }] }
-    store.ptyIdsByTabId = { [mirroredTabId]: ['remote:env-1@@host-pty'] }
-    store.terminalLayoutsByTabId = {
-      [mirroredTabId]: {
-        root: null,
-        activeLeafId: null,
-        expandedLeafId: null,
-        ptyIdsByLeafId: { [startupLeafId]: 'remote:env-1@@host-pty' }
+        ptyIdsByLeafId: { [startupLeafId]: 'pty-delayed' }
       }
     }
     store.agentLaunchConfigByPaneKey = {
-      [mirroredPaneKey]: {
-        launchConfig: { agentCommand: 'goose', agentArgs: '--newer', agentEnv: {} },
-        registeredAt: 2,
-        identity: {
-          tabId: mirroredTabId,
-          leafId: startupLeafId,
-          launchToken: 'launch-token-new'
-        }
+      [`tab-1:${startupLeafId}`]: {
+        launchConfig: { agentCommand: 'codex', agentArgs: '', agentEnv: {} },
+        registeredAt: 1,
+        identity: { tabId: 'tab-1', leafId: startupLeafId, launchToken: 'launch-token-1' }
       }
     }
-    store.registerAgentLaunchConfig.mockClear()
     for (const listener of storeListeners) {
       listener(store, store)
     }
 
-    expect(store.registerAgentLaunchConfig).not.toHaveBeenCalled()
-    expect(store.agentLaunchConfigByPaneKey[mirroredPaneKey]?.identity.launchToken).toBe(
-      'launch-token-new'
-    )
-    expect(mockSendRuntimePtyInputVerified).not.toHaveBeenCalled()
+    expect(mockPasteDraftToAgentPtyWhenReady).toHaveBeenCalledTimes(1)
+    expect(mockPasteDraftToAgentPtyWhenReady).toHaveBeenCalledWith({
+      ptyId: 'pty-delayed',
+      content: 'https://github.com/stablyai/orca/pull/2051',
+      agent: 'codex',
+      forcePaste: true,
+      onTimeout: expect.any(Function)
+    })
   })
 
   it('keeps waiting when a non-startup split PTY appears before the startup PTY', async () => {
@@ -735,6 +803,6 @@ describe('ensureAgentStartupInTerminal prompt delivery', () => {
     await vi.advanceTimersByTimeAsync(5_000)
     await delivery
 
-    expect(mockSendRuntimePtyInputVerified).not.toHaveBeenCalled()
+    expect(mockPasteDraftToAgentPtyWhenReady).not.toHaveBeenCalled()
   })
 })

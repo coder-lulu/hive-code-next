@@ -4,6 +4,7 @@ import {
   CREATE_WORKTREE_ITEM_ID
 } from '@/lib/worktree-palette-create-action'
 import { translate } from '@/i18n/i18n'
+import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
 import {
   appendPaletteListEntries,
   CONTINUED_SECTION_HEADER_ID_SUFFIX,
@@ -11,6 +12,7 @@ import {
   type PaletteListEntry
 } from './worktree-jump-palette-model'
 import { buildPaletteListEntryRenderKeys } from '@/components/cmd-j/palette-list-entry-render-keys'
+import { BROWSER_NAVIGATION_ACTION_ID } from '@/components/cmd-j/browser-navigation-action'
 import type { WorktreeJumpPaletteSections } from './use-worktree-jump-palette-sections'
 import type { WorktreeJumpPaletteWorktrees } from './use-worktree-jump-palette-worktrees'
 import type { WorktreeJumpPaletteLocalState } from './use-worktree-jump-palette-local-state'
@@ -34,12 +36,13 @@ export function useWorktreeJumpPaletteListEntries({
   middleLeadsSections,
   taskItems
 }: WorktreeJumpPaletteListEntriesInput) {
+  const languageRevision = useUiLanguageRevision()
   const listEntries = useMemo<PaletteListEntry[]>(() => {
     const entries: PaletteListEntry[] = []
     const {
       visibleWorktreeItems,
       visibleProjectTargetItems,
-      visibleMiddleItems,
+      visibleMiddleItems: middleItems,
       visibleOpenTabItems,
       worktreeOverflowCount,
       projectTargetOverflowCount,
@@ -48,6 +51,15 @@ export function useWorktreeJumpPaletteListEntries({
       multiPrimaryFirstScreen,
       multiPrimaryLayout
     } = paletteSections
+    // Exact entity matches keep priority; issue/PR URLs keep their jump and create rows first.
+    const browserNavigationItem =
+      taskSourceUrl || !paletteSections.hasExactEntityDestination
+        ? middleItems.find(
+            (item) =>
+              item.type === 'quick-action' && item.result.id === BROWSER_NAVIGATION_ACTION_ID
+          )
+        : undefined
+    const visibleMiddleItems = middleItems.filter((item) => item !== browserNavigationItem)
     const pushTasks = (): void => {
       if (taskItems.length) {
         entries.push({
@@ -155,8 +167,7 @@ export function useWorktreeJumpPaletteListEntries({
         )
       }
     }
-    // Why: a pasted issue/PR URL is decisive. Show linked worktrees first so
-    // Enter jumps; keep create available underneath when the user wants a new one.
+    // Issue/PR URLs put linked worktrees first for Enter-to-jump while keeping create underneath.
     if (taskSourceUrl) {
       if (visibleWorktreeItems.length > 0) {
         pushWorktreeSection()
@@ -164,12 +175,18 @@ export function useWorktreeJumpPaletteListEntries({
       if (showCreateAction) {
         entries.push({ id: CREATE_WORKTREE_ITEM_ID, type: 'create-worktree' })
       }
+      if (browserNavigationItem) {
+        entries.push(browserNavigationItem)
+      }
       return entries
     }
     if (!hasQuery) {
       pushOpenTabSection()
       pushWorktreeSection()
       return entries
+    }
+    if (browserNavigationItem) {
+      entries.push(browserNavigationItem)
     }
     if (multiPrimaryFirstScreen && multiPrimaryLayout) {
       const leadingSectionKey = openTabsLeadSections ? 'open-tabs' : 'worktrees'
@@ -243,6 +260,7 @@ export function useWorktreeJumpPaletteListEntries({
       entries.push({ id: CREATE_WORKTREE_ITEM_ID, type: 'create-worktree' })
     }
     return entries
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- translate() reads the UI language implicitly.
   }, [
     handleExpandSection,
     hasQuery,
@@ -251,7 +269,8 @@ export function useWorktreeJumpPaletteListEntries({
     paletteSections,
     showCreateAction,
     taskSourceUrl,
-    taskItems
+    taskItems,
+    languageRevision
   ])
   const selectableItems = useMemo<PaletteItem[]>(
     () =>
@@ -273,8 +292,7 @@ export function useWorktreeJumpPaletteListEntries({
   )
   useEffect(() => {
     autoSelectedItemIdRef.current = selectionItemIds[0] ?? null
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- the controller ref preserves its original stable identity.
-  }, [selectionItemIds])
+  }, [autoSelectedItemIdRef, selectionItemIds])
   return { listEntries, listEntryRenderKeys, selectableItems, selectionItemIds }
 }
 

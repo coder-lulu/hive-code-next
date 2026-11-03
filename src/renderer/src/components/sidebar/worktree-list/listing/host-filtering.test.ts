@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest'
 import type { FolderWorkspace } from '../../../../../../shared/folder-workspace-types'
 import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import {
-  getFolderPathStatusRouteOptionsForRows,
-  filterFolderWorkspacesForVisibleHosts,
   getFolderWorkspaceExecutionHostIdForRows,
-  getProjectGroupExecutionHostIdForRows,
+  getProjectGroupExecutionHostIdForRows
+} from '../../../../../../shared/sidebar-list/host-filtering'
+import {
+  getFolderPathStatusRouteOptionsForRows,
   getRuntimeEnvironmentIdForFolderPathStatusHost
-} from './host-filtering'
+} from './folder-path-status-routing'
 
 function group(overrides: Partial<ProjectGroup> = {}): ProjectGroup {
   return {
@@ -83,30 +84,48 @@ describe('WorktreeList host filtering ownership', () => {
     expect(getRuntimeEnvironmentIdForFolderPathStatusHost('local')).toBeNull()
   })
 
-  it('keeps same-ID local workspaces visible when a remote group follows them', () => {
-    const local = folderWorkspace()
-    const remote = folderWorkspace({ executionHostId: 'runtime:env-1' })
-    const groups = [group(), group({ executionHostId: 'runtime:env-1' })]
+  it('routes project-group path status through the owning runtime', () => {
+    const runtimeGroup = group({ executionHostId: 'runtime:env-1' })
     expect(
-      filterFolderWorkspacesForVisibleHosts([local, remote], groups, new Set(['local']), 'local')
-    ).toEqual([local])
-    expect(
-      filterFolderWorkspacesForVisibleHosts(
-        [local, remote],
-        groups,
-        new Set(['runtime:env-1']),
-        'local'
-      )
-    ).toEqual([remote])
+      getFolderPathStatusRouteOptionsForRows({
+        request: { scope: 'project-group', projectGroupId: runtimeGroup.id },
+        projectGroupsById: new Map([[runtimeGroup.id, runtimeGroup]]),
+        folderWorkspacesById: new Map()
+      })
+    ).toEqual({ runtimeEnvironmentId: 'env-1' })
   })
 
-  it('routes path-status requests using the explicit row owner rather than the focused Runtime', () => {
-    expect(getFolderPathStatusRouteOptionsForRows('local')).toEqual({ runtimeEnvironmentId: null })
-    expect(getFolderPathStatusRouteOptionsForRows('ssh:builder')).toEqual({
-      runtimeEnvironmentId: null
-    })
-    expect(getFolderPathStatusRouteOptionsForRows('runtime:env-1')).toEqual({
-      runtimeEnvironmentId: 'env-1'
-    })
+  it('routes folder-workspace path status through its project group runtime owner', () => {
+    const runtimeGroup = group({ executionHostId: 'runtime:env-1' })
+    const workspace = folderWorkspace({ connectionId: 'ssh-builder' })
+    expect(
+      getFolderPathStatusRouteOptionsForRows({
+        request: { scope: 'folder-workspace', folderWorkspaceId: workspace.id },
+        projectGroupsById: new Map([[runtimeGroup.id, runtimeGroup]]),
+        folderWorkspacesById: new Map([[workspace.id, workspace]])
+      })
+    ).toEqual({ runtimeEnvironmentId: 'env-1' })
+  })
+
+  it('forces local path status routing for local project groups while a runtime is focused', () => {
+    const localGroup = group()
+    expect(
+      getFolderPathStatusRouteOptionsForRows({
+        request: { scope: 'project-group', projectGroupId: localGroup.id },
+        projectGroupsById: new Map([[localGroup.id, localGroup]]),
+        folderWorkspacesById: new Map()
+      })
+    ).toEqual({ runtimeEnvironmentId: null })
+  })
+
+  it('forces local path status routing for SSH-owned project groups while a runtime is focused', () => {
+    const sshGroup = group({ connectionId: 'ssh-builder' })
+    expect(
+      getFolderPathStatusRouteOptionsForRows({
+        request: { scope: 'project-group', projectGroupId: sshGroup.id },
+        projectGroupsById: new Map([[sshGroup.id, sshGroup]]),
+        folderWorkspacesById: new Map()
+      })
+    ).toEqual({ runtimeEnvironmentId: null })
   })
 })

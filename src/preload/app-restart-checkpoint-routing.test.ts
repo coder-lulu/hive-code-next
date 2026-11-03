@@ -73,6 +73,15 @@ describe('native preload destructive app actions', () => {
     expect(invoke).toHaveBeenCalledExactlyOnceWith('app:await-before-unload-checkpoint')
   })
 
+  it('forwards renderer language hints through the current native app bridge', async () => {
+    const api = await loadApi()
+    const detection = { detectedTag: 'fr-FR', status: 'supported', locale: 'fr', source: 'browser' }
+    invoke.mockResolvedValue(detection)
+
+    await expect(api.app.getSystemLanguageDetection(['fr-FR'])).resolves.toBe(detection)
+    expect(invoke).toHaveBeenCalledExactlyOnceWith('app:getSystemLanguageDetection', ['fr-FR'])
+  })
+
   for (const action of ['reload', 'relaunch'] as const) {
     it(`prepares and awaits durability before ${action}`, async () => {
       const api = await loadApi()

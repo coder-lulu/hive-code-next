@@ -1,8 +1,12 @@
-import { RuntimeMobileNotificationController } from '../runtime/runtime-mobile-notification-controller'
-import { HiveMobilePushClient } from '../hive-runtime-cloud/hive-mobile-push-client'
+import {
+  createHarness as createPushHarness,
+  registration,
+  flush
+} from '../runtime/push/push-dispatcher.test-fixture'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BrowserWindow } from 'electron'
 import { createNotificationDeliveryService } from './notification-delivery-service'
+import { toWebTerminalSurfaceTabId } from '../../shared/terminal-surface-id'
 import type { NotificationDeliveryDependencies } from './notification-delivery-service'
 import type {
   NotificationDispatchRequest,
@@ -23,6 +27,8 @@ function makeSettings(overrides: Partial<NotificationSettings> = {}): Notificati
     ...overrides
   }
 }
+
+const LEAF = '11111111-1111-4111-8111-111111111111'
 
 function makeRequest(
   overrides: Partial<NotificationDispatchRequest> = {}
@@ -45,7 +51,6 @@ type Harness = {
 
 let now = 1_000
 
-/** The delivery policy only asks a window whether it is focused. */
 function makeFocusedWindowStub(): BrowserWindow {
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the service reads only isFocused(); a full BrowserWindow cannot be constructed outside Electron.
   return { isFocused: () => true } as unknown as BrowserWindow
@@ -137,7 +142,6 @@ describe('createNotificationDeliveryService', () => {
     )
     expect(harness.deliverNative).not.toHaveBeenCalled()
 
-    // Other machines, and requests whose machine is unknown, still notify.
     expect(
       service.dispatch(
         makeRequest({ notificationSourceId: 'local', worktreeId: 'wt-2', worktreeLabel: 'wt-2' })
@@ -224,58 +228,29 @@ describe('createNotificationDeliveryService', () => {
 })
 
 it.each<Partial<NotificationSettings>>([{}, { enabled: false }, { agentTaskComplete: false }])(
-  'preserves mobile content and Hive account push authority when a machine is muted (%j)',
+  'preserves mobile event content and push eligibility when a machine is muted (%j)',
   async (overrides) => {
     const events: Parameters<
       NonNullable<NotificationDeliveryDependencies['dispatchMobileNotification']>
     >[0][] = []
     for (const muted of [false, true]) {
-      const fetchImpl = vi.fn(
-        async () =>
-          new Response(JSON.stringify({ accepted: true }), {
-            status: 200,
-            headers: { 'content-type': 'application/json' }
-          })
-      )
-      const controller = new RuntimeMobileNotificationController()
-      const push = new HiveMobilePushClient({
-        apiBaseUrl: 'https://owned-hive.test',
-        getRuntimeId: () => '11111111-1111-4111-8111-111111111111',
-        getAuthorization: () => ({
-          accessToken: 'test-account-access',
-          accountId: 'fixture-account',
-          authorityId: 'fixture-authority',
-          sessionExpiresAt: now + 60000,
-          sessionGeneration: 1
-        }),
-        fetchImpl
+      const push = createPushHarness({
+        devices: [{ deviceId: 'phone', pushRegistration: registration() }]
       })
-      controller.setRemotePushSink(push)
       const harness = makeHarness(
         makeSettings({ ...overrides, mutedNotificationSourceIds: muted ? ['runtime:qa'] : [] })
       )
       harness.deps.dispatchMobileNotification = (event) => {
         events.push(event)
-        controller.dispatch(event)
+        push.dispatcher.enqueue({ ...event, notificationSeq: 1, notificationEpoch: 'epoch' })
       }
       createNotificationDeliveryService(harness.deps).dispatch(
         makeRequest({ notificationSourceId: 'runtime:qa', agentState: 'done' })
       )
-      // Desktop preferences do not authorize or suppress the account-owned phone push.
-      await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(1))
-      controller.setRemotePushSink(
-        new HiveMobilePushClient({
-          apiBaseUrl: 'https://owned-hive.test',
-          getAuthorization: () => null,
-          getRuntimeId: () => '11111111-1111-4111-8111-111111111111',
-          fetchImpl
-        })
+      await flush()
+      expect(push.sends).toHaveLength(
+        overrides.enabled === false || overrides.agentTaskComplete === false ? 0 : 1
       )
-      await expect(controller.testRemotePush()).resolves.toEqual({
-        accepted: false,
-        reason: 'unavailable'
-      })
-      expect(fetchImpl).toHaveBeenCalledTimes(1)
     }
     expect(events[1]).toEqual(events[0])
   }
@@ -303,15 +278,26 @@ it('reports a muted host before a disabled source', () => {
   ).toEqual({ delivered: false, reason: 'host-muted' })
 })
 
-it('preserves execution host provenance in the account-owned mobile notification event', () => {
-  for (const executionHost of [undefined, 'runtime:qa'] as const) {
+it("tells the phone which server and pane raised it, through the gateway's push", async () => {
+  const cases = [
+    [undefined, `tab-1:${LEAF}`, `tab-1:${LEAF}`],
+    ['runtime:qa', `${toWebTerminalSurfaceTabId('host-tab')}:${LEAF}`, `host-tab:${LEAF}`],
+    // A per-surface mirror tab encodes the server's `tab::leaf` surface id.
+    ['runtime:qa', `${toWebTerminalSurfaceTabId(`host-tab::${LEAF}`)}:${LEAF}`, `host-tab:${LEAF}`]
+  ] as const
+  for (const [executionHost, paneKey, pushedPaneKey] of cases) {
+    const push = createPushHarness({
+      devices: [{ deviceId: 'phone', pushRegistration: registration() }]
+    })
     const harness = makeHarness(makeSettings())
+    harness.deps.dispatchMobileNotification = (event) =>
+      push.dispatcher.enqueue({ ...event, notificationSeq: 1, notificationEpoch: 'epoch' })
     createNotificationDeliveryService(harness.deps).dispatch(
-      makeRequest({ agentState: 'done', ...(executionHost ? { executionHost } : {}) })
+      makeRequest({ agentState: 'done', paneKey, ...(executionHost ? { executionHost } : {}) })
     )
-    expect(harness.dispatchMobileNotification).toHaveBeenCalledOnce()
-    const [event] = harness.dispatchMobileNotification.mock.calls[0]
-    expect(event.worktreeId).toBe('wt-1')
-    expect(event.executionHost).toBe(executionHost)
+    await flush()
+    expect(push.sends[0]?.notification.worktreeId).toBe('wt-1')
+    expect(push.sends[0]?.notification.paneKey).toBe(pushedPaneKey)
+    expect(push.sends[0]?.notification.executionHost).toBe(executionHost)
   }
 })

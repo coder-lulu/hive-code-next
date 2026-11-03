@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Pressable, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
@@ -8,7 +9,7 @@ import { useMobileAuthSession } from '../auth/mobile-auth-session'
 import { hostCatalogTargetsMatch } from './host-catalog-target-match'
 import type { MobileTheme } from '../theme/mobile-theme'
 import { createMobileRuntimeSelectorStyles as createStyles } from './mobile-runtime-selector-styles'
-import { useEnsureHostConnected } from '../transport/client-context'
+import { useEnsureHostConnected } from '../transport/host-client-hooks'
 import type { HostCatalogEntry } from '../transport/types'
 import {
   projectRuntimeSelectorEntries,
@@ -35,6 +36,8 @@ export function MobileRuntimeSelector(props: {
   readonly theme: MobileTheme
   readonly visible: boolean
 }) {
+  const t = useMobileTranslation()
+
   const router = useRouter()
   const styles = useMemo(() => createStyles(props.theme), [props.theme])
   const { session } = useMobileAuthSession()
@@ -203,7 +206,16 @@ export function MobileRuntimeSelector(props: {
         return
       }
       if (!selectionIsCurrent(action)) {
-        Alert.alert('电脑信息已变化', '请重新选择电脑，当前电脑选择保持不变。')
+        Alert.alert(
+          t(
+            'auto.mobile.src.runtime.directory.MobileRuntimeSelector.fc9fad9551',
+            'Computer details changed'
+          ),
+          t(
+            'auto.mobile.src.runtime.directory.MobileRuntimeSelector.c4a29447bd',
+            'Choose the computer again. Your current selection is unchanged.'
+          )
+        )
         return
       }
       current.current.props.onSelect(action.host.id)
@@ -241,14 +253,28 @@ export function MobileRuntimeSelector(props: {
       <View style={styles.header}>
         <View style={styles.headerCopy}>
           <Text maxFontSizeMultiplier={1.3} style={styles.title}>
-            选择电脑
+            {t(
+              'auto.mobile.src.runtime.directory.MobileRuntimeSelector.2a96ce9402',
+              'Choose computer'
+            )}
           </Text>
           <Text maxFontSizeMultiplier={1.3} style={styles.description}>
-            {props.accountOnly ? '连接账号中已认领的电脑' : '任务仅在你选择的电脑上运行'}
+            {props.accountOnly
+              ? t(
+                  'auto.mobile.src.runtime.directory.MobileRuntimeSelector.6f8a808618',
+                  'Connect to a computer claimed by your account'
+                )
+              : t(
+                  'auto.mobile.src.runtime.directory.MobileRuntimeSelector.c7419d289a',
+                  'Tasks run only on the computer you choose'
+                )}
           </Text>
         </View>
         <Pressable
-          accessibilityLabel="关闭 Runtime 选择器"
+          accessibilityLabel={t(
+            'auto.mobile.src.runtime.directory.MobileRuntimeSelector.73c5cef9ba',
+            'Close Runtime selector'
+          )}
           accessibilityRole="button"
           onPress={dismiss}
           style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}
@@ -261,19 +287,36 @@ export function MobileRuntimeSelector(props: {
         <View style={styles.emptyState}>
           <Monitor color={props.theme.color.text.tertiary} size={24} strokeWidth={2} />
           <Text maxFontSizeMultiplier={1.3} style={styles.emptyTitle}>
-            {props.accountOnly ? '还没有已认领的电脑' : '还没有可用的电脑'}
+            {props.accountOnly
+              ? t(
+                  'auto.mobile.src.runtime.directory.MobileRuntimeSelector.860eeba750',
+                  'No claimed computers yet'
+                )
+              : t(
+                  'auto.mobile.src.runtime.directory.MobileRuntimeSelector.ac9185fcbb',
+                  'No computers available yet'
+                )}
           </Text>
           <Text maxFontSizeMultiplier={1.3} style={styles.emptyDescription}>
             {props.accountOnly
-              ? '在电脑端登录同一账号并发起认领。'
-              : '连接电脑后，工作区与任务状态会在这里显示。'}
+              ? t(
+                  'auto.mobile.src.runtime.directory.MobileRuntimeSelector.6a1e0f88fc',
+                  'Sign in to the same account on your computer and start a claim.'
+                )
+              : t(
+                  'auto.mobile.src.runtime.directory.MobileRuntimeSelector.3e588d26aa',
+                  'Connect to a computer to see workspaces and task status here.'
+                )}
           </Text>
         </View>
       ) : (
         <>
           <RuntimeGroup
             entries={accountEntries}
-            label="账号电脑"
+            label={t(
+              'auto.mobile.src.runtime.directory.MobileRuntimeSelector.1249d5d93f',
+              'Account computers'
+            )}
             onDelete={deleteRuntime}
             deletableIds={
               sessionScope
@@ -292,7 +335,10 @@ export function MobileRuntimeSelector(props: {
           />
           <RuntimeGroup
             entries={localEntries}
-            label="本地配对"
+            label={t(
+              'auto.mobile.src.runtime.directory.MobileRuntimeSelector.020f1585f7',
+              'Local pairing'
+            )}
             onSelect={(entry) => void selectRuntime(entry)}
             pendingRuntimeId={pendingRuntimeId}
             styles={styles}
@@ -309,7 +355,17 @@ export function MobileRuntimeSelector(props: {
 
       {!props.accountOnly || (entries.length === 0 && props.onClaim) ? (
         <Pressable
-          accessibilityLabel={props.accountOnly ? '认领电脑' : '配对新设备'}
+          accessibilityLabel={
+            props.accountOnly
+              ? t(
+                  'auto.mobile.src.runtime.directory.MobileRuntimeSelector.64a30f5a96',
+                  'Claim computer'
+                )
+              : t(
+                  'auto.mobile.src.runtime.directory.MobileRuntimeSelector.9266fad277',
+                  'Pair a new device'
+                )
+          }
           accessibilityRole="button"
           accessibilityState={{ disabled: pendingRuntimeId != null }}
           disabled={pendingRuntimeId != null}
@@ -322,7 +378,15 @@ export function MobileRuntimeSelector(props: {
         >
           <ScanLine color={props.theme.color.text.primary} size={20} strokeWidth={2} />
           <Text maxFontSizeMultiplier={1.3} style={styles.pairButtonText}>
-            {props.accountOnly ? '认领电脑' : '配对新设备'}
+            {props.accountOnly
+              ? t(
+                  'auto.mobile.src.runtime.directory.MobileRuntimeSelector.64a30f5a96',
+                  'Claim computer'
+                )
+              : t(
+                  'auto.mobile.src.runtime.directory.MobileRuntimeSelector.9266fad277',
+                  'Pair a new device'
+                )}
           </Text>
         </Pressable>
       ) : null}

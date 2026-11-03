@@ -36,12 +36,12 @@ function renderPane(settings: GlobalSettings): string {
 
 function buildSettings(overrides: Partial<GlobalSettings> = {}): GlobalSettings {
   return {
-    commitMessageAi: {
+    sourceControlAi: {
       enabled: false,
       agentId: null,
       selectedModelByAgent: {},
       selectedThinkingByModel: {},
-      customPrompt: '',
+      instructionsByOperation: { commitMessage: '' },
       customAgentCommand: ''
     },
     ...overrides
@@ -53,7 +53,15 @@ describe('CommitMessageAiPane', () => {
     useAppStore.setState({ settingsSearchQuery: '' })
   })
 
-  it('renders only the opt-in control before the feature is enabled', () => {
+  it('shows current action recipes by default without a saved configuration', () => {
+    const markup = renderPane(buildSettings({ sourceControlAi: undefined }))
+
+    expect(markup).toContain('aria-checked="true"')
+    expect(markup).toContain('Action recipes')
+    expect(markup).toContain('Command template')
+  })
+
+  it('respects an explicitly disabled current configuration', () => {
     const markup = renderPane(buildSettings())
 
     expect(markup).toContain('Source Control AI')
@@ -68,12 +76,12 @@ describe('CommitMessageAiPane', () => {
   it('renders action recipes for every Source Control AI action', () => {
     const markup = renderPane(
       buildSettings({
-        commitMessageAi: {
+        sourceControlAi: {
           enabled: true,
           agentId: 'codex',
           selectedModelByAgent: { codex: 'gpt-5.5' },
           selectedThinkingByModel: { 'gpt-5.5': 'medium' },
-          customPrompt: 'Use Conventional Commits.',
+          instructionsByOperation: { commitMessage: 'Use Conventional Commits.' },
           customAgentCommand: ''
         }
       })
@@ -116,8 +124,7 @@ describe('CommitMessageAiPane', () => {
               agentId: 'codex'
             }
           },
-          prCreationDefaults: {},
-          launchActionDefaults: {}
+          prCreationDefaults: {}
         }
       })
     )
@@ -140,8 +147,7 @@ describe('CommitMessageAiPane', () => {
           instructionsByOperation: {},
           customAgentCommand: '',
           actions: {},
-          prCreationDefaults: {},
-          launchActionDefaults: {}
+          prCreationDefaults: {}
         }
       })
     )
@@ -180,8 +186,7 @@ describe('CommitMessageAiPane', () => {
           instructionsByOperation: {},
           customAgentCommand: '',
           actions: {},
-          prCreationDefaults: {},
-          launchActionDefaults: {}
+          prCreationDefaults: {}
         }
       })
     )
@@ -209,8 +214,7 @@ describe('CommitMessageAiPane', () => {
               agentId: 'aider'
             }
           },
-          prCreationDefaults: {},
-          launchActionDefaults: {}
+          prCreationDefaults: {}
         }
       })
     )
@@ -224,12 +228,12 @@ describe('CommitMessageAiPane', () => {
   it('keeps action agent selectors constrained for long labels', () => {
     const markup = renderPane(
       buildSettings({
-        commitMessageAi: {
+        sourceControlAi: {
           enabled: true,
           agentId: 'copilot',
           selectedModelByAgent: { copilot: 'gpt-5.5' },
           selectedThinkingByModel: {},
-          customPrompt: '',
+          instructionsByOperation: { commitMessage: '' },
           customAgentCommand: ''
         }
       })
@@ -262,8 +266,7 @@ describe('CommitMessageAiPane', () => {
               commandInputTemplate: 'use /fix-ci-issue to fix the linked CI bug'
             }
           },
-          prCreationDefaults: {},
-          launchActionDefaults: {}
+          prCreationDefaults: {}
         }
       })
     )
@@ -292,8 +295,7 @@ describe('CommitMessageAiPane', () => {
               commandInputTemplate: '{basePrompt}'
             }
           },
-          prCreationDefaults: {},
-          launchActionDefaults: {}
+          prCreationDefaults: {}
         }
       })
     )
@@ -320,8 +322,7 @@ describe('CommitMessageAiPane', () => {
               commandInputTemplate: 'use /fix-ci-issue '
             }
           },
-          prCreationDefaults: {},
-          launchActionDefaults: {}
+          prCreationDefaults: {}
         }
       })
     )
@@ -333,12 +334,12 @@ describe('CommitMessageAiPane', () => {
     const markup = renderPane(
       buildSettings({
         defaultTuiAgent: 'aider',
-        commitMessageAi: {
+        sourceControlAi: {
           enabled: true,
           agentId: null,
           selectedModelByAgent: {},
           selectedThinkingByModel: {},
-          customPrompt: '',
+          instructionsByOperation: { commitMessage: '' },
           customAgentCommand: ''
         }
       })
@@ -353,12 +354,12 @@ describe('CommitMessageAiPane', () => {
   it('removes the old Gemini text-generation lockout from the settings pane', () => {
     const markup = renderPane(
       buildSettings({
-        commitMessageAi: {
+        sourceControlAi: {
           enabled: true,
           agentId: 'gemini',
           selectedModelByAgent: {},
           selectedThinkingByModel: {},
-          customPrompt: '',
+          instructionsByOperation: { commitMessage: '' },
           customAgentCommand: ''
         }
       })

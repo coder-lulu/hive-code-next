@@ -36,8 +36,7 @@ describe('install-id', () => {
       const store = makeFakeStore({
         telemetry: {
           optedIn: true,
-          installId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-          existedBeforeTelemetryRelease: false
+          installId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
         }
       })
       expect(readInstallId(store)).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')

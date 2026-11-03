@@ -1,13 +1,11 @@
 import { useState } from 'react'
-import { Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle } from 'react-native'
+import { Pressable, Text, View, type StyleProp, type TextStyle } from 'react-native'
 import { useClipboardWriter } from '../platform/clipboard'
-import {
-  AGENT_LAUNCH_STATUS_UNREADABLE_MESSAGE,
-  AGENT_LAUNCH_UPDATE_REQUIRED_MESSAGE
-} from '../session/mobile-existing-agent-launch'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import type { MobileAgentLaunchAvailability } from '../session/mobile-agent-launch-availability'
-import type { MobileTheme } from '../theme/mobile-theme'
-import { useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { colors, spacing, typography } from '../theme/mobile-theme'
+import { themedStyleSheet } from '../theme/themed-styles'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 
 type Props = {
   availability: MobileAgentLaunchAvailability
@@ -30,14 +28,24 @@ export function AgentLaunchNotice({
   undeliveredPrompt,
   errorStyle
 }: Props) {
-  const styles = useMobileThemeStyles(createStyles)
+  const t = useMobileTranslation()
+  useMobileColorScheme()
   const clipboard = useClipboardWriter()
-  const [copyState, setCopyState] = useState<{ prompt: string; label: string } | null>(null)
+  const [copyState, setCopyState] = useState<{
+    prompt: string
+    status: 'copied' | 'failed'
+  } | null>(null)
   const availabilityMessage =
     availability === 'update-required'
-      ? AGENT_LAUNCH_UPDATE_REQUIRED_MESSAGE
+      ? t(
+          'components.agentLaunchNotice.updateRequired',
+          'Update HiveCode on your computer to start an agent from your phone.'
+        )
       : availability === 'unverified'
-        ? AGENT_LAUNCH_STATUS_UNREADABLE_MESSAGE
+        ? t(
+            'components.agentLaunchNotice.statusUnreadable',
+            "Could not read this host's status. Retrying…"
+          )
         : null
   const message = availabilityMessage ?? error
   const note = availabilityMessage ? null : warning
@@ -46,7 +54,11 @@ export function AgentLaunchNotice({
     return null
   }
   const copyLabel =
-    copyState && copyState.prompt === undeliveredPrompt ? copyState.label : '复制提示词'
+    copyState && copyState.prompt === undeliveredPrompt
+      ? copyState.status === 'copied'
+        ? t('common.copied', 'Copied')
+        : t('components.agentLaunchNotice.copyFailed', "Couldn't copy")
+      : t('components.agentLaunchNotice.copyPrompt', 'Copy prompt')
   return (
     <View style={styles.notice}>
       {confirmation ? <Text style={styles.successText}>{confirmation}</Text> : null}
@@ -56,13 +68,13 @@ export function AgentLaunchNotice({
         <Pressable
           onPress={() => {
             clipboard.writeText(undeliveredPrompt).then(
-              () => setCopyState({ prompt: undeliveredPrompt, label: '已复制' }),
-              () => setCopyState({ prompt: undeliveredPrompt, label: '无法复制' })
+              () => setCopyState({ prompt: undeliveredPrompt, status: 'copied' }),
+              () => setCopyState({ prompt: undeliveredPrompt, status: 'failed' })
             )
           }}
           accessibilityRole="button"
-          accessibilityLabel={copyLabel}
-          style={({ pressed }) => [styles.copyButton, pressed && styles.copyButtonPressed]}
+          accessibilityLabel={t('components.agentLaunchNotice.copyPrompt', 'Copy prompt')}
+          hitSlop={spacing.sm}
         >
           <Text style={styles.copyText}>{copyLabel}</Text>
         </Pressable>
@@ -71,32 +83,21 @@ export function AgentLaunchNotice({
   )
 }
 
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    notice: {
-      gap: theme.spacing.space4
-    },
-    successText: {
-      ...theme.typography.meta,
-      color: theme.color.status.success
-    },
-    warningText: {
-      ...theme.typography.meta,
-      color: theme.color.text.secondary
-    },
-    copyButton: {
-      minHeight: theme.size.minimumTouchTarget,
-      justifyContent: 'center',
-      borderRadius: theme.radii.control,
-      paddingHorizontal: theme.spacing.space8
-    },
-    copyButtonPressed: {
-      backgroundColor: theme.color.bg.subtle
-    },
-    copyText: {
-      ...theme.typography.meta,
-      color: theme.color.brand.primary,
-      fontWeight: '600'
-    }
-  })
-}
+const styles = themedStyleSheet(() => ({
+  notice: {
+    gap: spacing.xs
+  },
+  successText: {
+    color: colors.statusGreen,
+    fontSize: typography.metaSize
+  },
+  warningText: {
+    color: colors.textSecondary,
+    fontSize: typography.metaSize
+  },
+  copyText: {
+    color: colors.accentBlue,
+    fontSize: typography.metaSize,
+    fontWeight: '600'
+  }
+}))

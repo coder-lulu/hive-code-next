@@ -1,3 +1,5 @@
+import { setLocalRuntimeCapabilitiesForTests } from '../../runtime/local-runtime-capabilities'
+import { toast } from 'sonner'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppState } from '../types'
@@ -34,6 +36,138 @@ vi.mock('@/components/worktree-base-fallback-notice', () => ({
 beforeEach(resetWorktreeSliceModuleMemory)
 
 describe('worktree remote runtime mutations', () => {
+  it('shows a host warning about the push destination after creating the workspace', async () => {
+    const store = createRepoTestStore()
+    seedRepoHost(store, 'runtime:env-1')
+    runtimeEnvironmentCall.mockResolvedValue({
+      id: 'create',
+      ok: true,
+      result: {
+        worktree: makeWorktree({
+          id: 'repo1::/path/warning',
+          repoId: 'repo1',
+          path: '/path/warning'
+        }),
+        warning: 'Check the push destination.'
+      }
+    })
+    await store.getState().createWorktree('repo1', 'warning', 'origin/main', 'skip')
+    expect(toast.warning).toHaveBeenCalledWith('Check the push destination.')
+  })
+
+  it.each([false, true])(
+    'requires strict reuse support before creating on a remote host (%s)',
+    async (supported) => {
+      const status = createCompatibleRuntimeStatusResponse('runtime-remote')
+      if (status.ok && !supported) {
+        status.result.capabilities = status.result.capabilities?.filter(
+          (cap) => cap !== 'worktree.open-existing-branch.v2-request.v1'
+        )
+      }
+      runtimeEnvironmentTransportCall.mockImplementation((args: RuntimeEnvironmentCallRequest) =>
+        args.method === 'status.get' ? status : runtimeEnvironmentCall(args)
+      )
+      const store = createRepoTestStore()
+      seedRepoHost(store, 'runtime:env-1')
+      const create = store.getState().createWorktree
+      const args: Parameters<typeof create> = ['repo1', 'feature/test', 'origin/main', 'skip']
+      args[12] = 'feature/test'
+      args[25] = { branchIntent: 'open-existing-v2' }
+      runtimeEnvironmentCall.mockRejectedValueOnce(new Error('Branch already has PR #42'))
+      runtimeEnvironmentCall.mockResolvedValue({
+        id: 'create',
+        ok: true,
+        result: {
+          worktree: makeWorktree({
+            id: 'repo1::/path/feature-test-2',
+            repoId: 'repo1',
+            path: '/path/feature-test-2'
+          })
+        }
+      })
+
+      if (!supported) {
+        await expect(create(...args)).rejects.toThrow('Update Orca on the workspace host')
+        expect(runtimeEnvironmentCall).not.toHaveBeenCalled()
+        return
+      }
+      await expect(create(...args)).rejects.toThrow('Branch already has PR #42')
+      expect(runtimeEnvironmentCall.mock.calls[0][0].params).toMatchObject({
+        branchIntent: 'open-existing-v2',
+        branchNameOverride: 'feature/test'
+      })
+      expect(runtimeEnvironmentCall).toHaveBeenCalledTimes(1)
+    }
+  )
+
+  it('sends picker intent through the capable local host without suffixing a Git failure', async () => {
+    setLocalRuntimeCapabilitiesForTests(['worktree.open-existing-branch.v2-request.v1'])
+    try {
+      const store = createRepoTestStore()
+      const create = store.getState().createWorktree
+      const args: Parameters<typeof create> = ['repo1', 'feature/test', 'origin/main', 'skip']
+      args[12] = 'feature/test'
+      args[25] = { branchIntent: 'open-existing-v2' }
+      mockApi.worktrees.create.mockRejectedValueOnce(new Error('Branch already exists locally'))
+      await expect(create(...args)).rejects.toThrow('Branch already exists locally')
+      expect(mockApi.worktrees.create).toHaveBeenCalledTimes(1)
+      expect(mockApi.worktrees.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          branchIntent: 'open-existing-v2',
+          branchNameOverride: 'feature/test'
+        })
+      )
+    } finally {
+      setLocalRuntimeCapabilitiesForTests(null)
+    }
+  })
+
+  it('allows create-new on a host that advertises the previous V2 capability', async () => {
+    setLocalRuntimeCapabilitiesForTests(['worktree.open-existing-branch.v2'])
+    try {
+      const store = createRepoTestStore()
+      const create = store.getState().createWorktree
+      const args: Parameters<typeof create> = ['repo1', 'feature', 'origin/main', 'skip']
+      args[25] = { branchIntent: 'create-new' }
+      mockApi.worktrees.create.mockResolvedValue({
+        worktree: makeWorktree({
+          id: 'repo1::/path/feature',
+          repoId: 'repo1',
+          path: '/path/feature'
+        })
+      })
+      await create(...args)
+      expect(mockApi.worktrees.create).toHaveBeenCalledWith(
+        expect.objectContaining({ branchIntent: 'create-new' })
+      )
+    } finally {
+      setLocalRuntimeCapabilitiesForTests(null)
+    }
+  })
+
+  it.each(['open-existing-v2', 'create-new'] as const)(
+    'refuses %s on a V1-only local host before any mutation',
+    async (branchIntent) => {
+      setLocalRuntimeCapabilitiesForTests(['worktree.open-existing-branch.v1'])
+      try {
+        const store = createRepoTestStore()
+        const create = store.getState().createWorktree
+        const args: Parameters<typeof create> = [
+          'repo1',
+          'feature/test',
+          'origin/feature/test',
+          'skip'
+        ]
+        args[12] = 'feature/test'
+        args[25] = { branchIntent }
+        await expect(create(...args)).rejects.toThrow('Update Orca on the workspace host')
+        expect(mockApi.worktrees.create).not.toHaveBeenCalled()
+      } finally {
+        setLocalRuntimeCapabilitiesForTests(null)
+      }
+    }
+  )
+
   beforeEach(() => {
     vi.clearAllMocks()
     resetRemoteRuntimeMocks()
@@ -53,9 +187,15 @@ describe('worktree remote runtime mutations', () => {
       _meta: { runtimeId: 'runtime-remote' }
     })
     store.setState({
-      settings: { activeRuntimeEnvironmentId: 'env-1' } as never,
+      settings: {
+        ...store.getState().settings!,
+        activeRuntimeEnvironmentId: 'env-1',
+        nestWorkspaces: false,
+        refreshLocalBaseRefOnWorktreeCreate: true,
+        localBaseRefSuggestionDismissed: false
+      },
       worktreesByRepo: { repo1: [] }
-    } as Partial<AppState>)
+    })
     seedRepoHost(store, 'runtime:env-1')
 
     const result = await store
@@ -83,6 +223,9 @@ describe('worktree remote runtime mutations', () => {
         baseBranch: 'origin/main',
         setupDecision: 'skip',
         sparseCheckout: { directories: ['src'], presetId: 'preset-1' },
+        nestWorkspaces: false,
+        refreshLocalBaseRefOnWorktreeCreate: true,
+        localBaseRefSuggestionDismissed: false,
         telemetrySource: 'sidebar',
         displayName: 'Feature title',
         linkedIssue: 123,
@@ -311,9 +454,9 @@ describe('worktree remote runtime mutations', () => {
       agentPermissionMode: 'yolo'
     }
     args[25] = {
-      startupPrompt: 'implement the task',
+      startupDraft: 'implement the task',
       startupLaunchPreferences: { model: 'gpt-5.6-sol', effort: 'high' }
-    } as never
+    }
 
     await createWorktree(...args)
 
@@ -326,54 +469,58 @@ describe('worktree remote runtime mutations', () => {
           startupLaunchToken: 'launch-token',
           startupPermissionMode: 'yolo',
           startupAgent: 'goose',
-          startupPrompt: 'implement the task',
+          startupDraft: 'implement the task',
           startupLaunchPreferences: { model: 'gpt-5.6-sol', effort: 'high' }
         })
       })
     )
   })
 
-  it('does not create a partial workspace when the Host lacks semantic permission startup', async () => {
-    const oldRuntimeStatus = createCompatibleRuntimeStatusResponse('runtime-old')
-    if (oldRuntimeStatus.ok) {
-      oldRuntimeStatus.result.capabilities = oldRuntimeStatus.result.capabilities?.filter(
-        (capability) => capability !== 'agent-session.launch-permission.v1'
+  it.each(['agent-session.launch-permission.v1', 'agent-session.host-authority.v1'])(
+    'does not create a partial workspace without %s',
+    async (missingCapability) => {
+      const oldRuntimeStatus = createCompatibleRuntimeStatusResponse('runtime-old')
+      if (oldRuntimeStatus.ok) {
+        oldRuntimeStatus.result.capabilities = oldRuntimeStatus.result.capabilities?.filter(
+          (capability) => capability !== missingCapability
+        )
+      }
+      runtimeEnvironmentTransportCall.mockImplementation(
+        (request: RuntimeEnvironmentCallRequest) =>
+          request.method === 'status.get' ? oldRuntimeStatus : runtimeEnvironmentCall(request)
       )
-    }
-    runtimeEnvironmentTransportCall.mockImplementation((request: RuntimeEnvironmentCallRequest) =>
-      request.method === 'status.get' ? oldRuntimeStatus : runtimeEnvironmentCall(request)
-    )
-    const store = createRepoTestStore()
-    const wt = makeWorktree({ id: 'repo1::/path/legacy', repoId: 'repo1' })
-    runtimeEnvironmentCall.mockResolvedValue({
-      id: 'rpc-create',
-      ok: true,
-      result: { worktree: wt },
-      _meta: { runtimeId: 'runtime-old' }
-    })
-    store.setState({
-      settings: { activeRuntimeEnvironmentId: 'env-1' } as never,
-      worktreesByRepo: { repo1: [] }
-    } as Partial<AppState>)
-    seedRepoHost(store, 'runtime:env-1')
-    const createWorktree = store.getState().createWorktree
-    const args: Parameters<typeof createWorktree> = ['repo1', 'legacy']
-    args[10] = 'goose'
-    args[16] = {
-      command: 'goose',
-      env: { GOOSE_MODE: 'auto' },
-      launchAgent: 'goose',
-      launchToken: 'launch-token',
-      agentPermissionMode: 'yolo'
-    }
-    args[25] = { startupPrompt: 'implement the task' }
+      const store = createRepoTestStore()
+      const wt = makeWorktree({ id: 'repo1::/path/legacy', repoId: 'repo1' })
+      runtimeEnvironmentCall.mockResolvedValue({
+        id: 'rpc-create',
+        ok: true,
+        result: { worktree: wt },
+        _meta: { runtimeId: 'runtime-old' }
+      })
+      store.setState({
+        settings: { activeRuntimeEnvironmentId: 'env-1' } as never,
+        worktreesByRepo: { repo1: [] }
+      } as Partial<AppState>)
+      seedRepoHost(store, 'runtime:env-1')
+      const createWorktree = store.getState().createWorktree
+      const args: Parameters<typeof createWorktree> = ['repo1', 'legacy']
+      args[10] = 'goose'
+      args[16] = {
+        command: 'goose',
+        env: { GOOSE_MODE: 'auto' },
+        launchAgent: 'goose',
+        launchToken: 'launch-token',
+        agentPermissionMode: 'yolo'
+      }
+      args[25] = { startupDraft: 'implement the task' }
 
-    await expect(createWorktree(...args)).rejects.toThrow(/permission-aware agent launches/i)
+      await expect(createWorktree(...args)).rejects.toThrow(/permission-aware agent launches/i)
 
-    expect(
-      runtimeEnvironmentCall.mock.calls.some(([request]) => request.method === 'worktree.create')
-    ).toBe(false)
-  })
+      expect(
+        runtimeEnvironmentCall.mock.calls.some(([request]) => request.method === 'worktree.create')
+      ).toBe(false)
+    }
+  )
 
   it('preflights a Renderer-owned permission launch before creating the workspace', async () => {
     const oldRuntimeStatus = createCompatibleRuntimeStatusResponse('runtime-old')
@@ -394,7 +541,7 @@ describe('worktree remote runtime mutations', () => {
     const createWorktree = store.getState().createWorktree
     const args: Parameters<typeof createWorktree> = ['repo1', 'renderer-owned']
     args[10] = 'goose'
-    args[25] = { requiresAgentLaunchPermissionCapability: true } as never
+    args[25] = { requiresAgentLaunchPermissionCapability: true }
 
     await expect(createWorktree(...args)).rejects.toThrow(/permission-aware agent launches/i)
 

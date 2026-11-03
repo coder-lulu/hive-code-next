@@ -1,5 +1,8 @@
 import type { TabDropZone } from './tab-drag-data'
 
+/** Matches TabGroupPanel tab row height (`h-[32px]`). */
+export const TAB_GROUP_TAB_STRIP_HEIGHT_PX = 32
+
 type PaneRect = { left: number; top: number; width: number; height: number }
 
 export function resolveDropZone(
@@ -12,9 +15,7 @@ export function resolveDropZone(
   const edgeHeightThreshold = rect.height * 0.1
   const splitWidthThreshold = rect.width / 3
 
-  // Why: VS Code keeps a center "merge" zone while biasing side-by-side drops
-  // toward left/right, which feels much more stable than a generic nearest-edge
-  // calculation once a workspace has nested splits.
+  // Keep a center merge zone and favor horizontal splits so nested layouts have stable drop targets.
   if (
     localX > edgeWidthThreshold &&
     localX < rect.width - edgeWidthThreshold &&
@@ -37,8 +38,9 @@ export function resolveDropZone(
 export function resolvePaneColumnEdgeZone(
   panelRect: PaneRect,
   point: { x: number; y: number },
-  options: {
-    bodyRect: PaneRect | null
+  options?: {
+    bodyRect?: PaneRect | null
+    tabStripHeightPx?: number
   }
 ): Exclude<TabDropZone, 'center'> | null {
   const localX = point.x - panelRect.left
@@ -51,10 +53,23 @@ export function resolvePaneColumnEdgeZone(
     return 'right'
   }
 
-  const bodyRect = options.bodyRect
-  // Why: the tab strip is for reorder/insertion targets. Vertical pane splits
-  // belong on the terminal/editor body edges only.
-  if (!bodyRect || point.y < bodyRect.top || bodyRect.height <= 0) {
+  const tabStripHeight = options?.tabStripHeightPx ?? TAB_GROUP_TAB_STRIP_HEIGHT_PX
+  const tabStripBottom = panelRect.top + tabStripHeight
+  // Reserve the strip for reordering; vertical split targets belong to the pane body.
+  if (point.y < tabStripBottom) {
+    return null
+  }
+
+  const bodyRect =
+    options?.bodyRect ??
+    ({
+      left: panelRect.left,
+      top: tabStripBottom,
+      width: panelRect.width,
+      height: Math.max(0, panelRect.height - tabStripHeight)
+    } satisfies PaneRect)
+
+  if (bodyRect.height <= 0) {
     return null
   }
 

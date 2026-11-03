@@ -5,11 +5,10 @@ import { PairedE2EEV2ClientSession } from './paired-e2ee-v2-client-session'
 
 export type PairedE2EEFraming = 'legacy' | 'v2'
 
-// Why a union: device-key and ticket credentials (signed over the v2 transcript) join this.
+// Device-key/ticket credentials signed over the v2 transcript join this union.
 export type PairedE2EEAuthCredential = { kind: 'token'; deviceToken: string }
 
-// Signs encodeDeviceProofMessage('auth', transcriptHash) with the installation's Ed25519 key.
-// Async so a non-extractable WebCrypto key can sign; valid only inside E2EE v2.
+// Sign the v2 auth transcript proof asynchronously so non-extractable WebCrypto keys can participate.
 export type PairedE2EEDeviceKeyCredential = {
   kind: 'device-key'
   deviceId: string
@@ -57,8 +56,7 @@ export type PairedE2EEClientHandshake = {
   // Throws PairedE2EEDowngradeError for a legacy hello to a latched host.
   helloText: () => string
   acceptReadyText: (frame: string) => PairedE2EEReadyVerdict
-  // Async so a WebCrypto signer can produce a device-key proof.
-  // This connection's v2 transcript hash once the ready is accepted; null for legacy framing.
+  // This v2 connection’s transcript hash after ready; null for legacy framing.
   transcriptHashB64: () => string | null
   sealAuth: (
     credential: PairedE2EEAuthCredential | PairedE2EEDeviceKeyCredential,
@@ -120,7 +118,7 @@ function createLegacyHandshake(args: PairedE2EEClientHandshakeArgs): PairedE2EEC
       if (readStringField(ready, 'type') !== 'e2ee_ready') {
         return 'unexpected'
       }
-      // Why: re-checked here because another socket may have latched while this one dialed.
+      // Another socket may have latched v2 while this one dialed; recheck downgrade policy.
       return mayUseLegacy() ? 'accepted' : 'downgrade_refused'
     },
     transcriptHashB64: () => null,
@@ -192,9 +190,14 @@ function createV2Handshake(args: PairedE2EEClientHandshakeArgs): PairedE2EEClien
       // Why read first: throws before the ready, so nothing is signed without a transcript.
       const transcriptHashB64 = session.transcriptHashB64
       if (credential.kind === 'token') {
-        // Why no capabilities: v2 token auth is an exact key set on every host.
+        // Capabilities are declarations inside the authenticated v2 transcript-bound envelope.
         return session.sealText(
-          serializeJson(pairedE2EEV2TokenAuth(transcriptHashB64, credential.deviceToken))
+          serializeJson({
+            ...pairedE2EEV2TokenAuth(transcriptHashB64, credential.deviceToken),
+            ...(options?.clientCapabilities
+              ? { clientCapabilities: options.clientCapabilities }
+              : {})
+          })
         )
       }
       const signature = await credential.sign(

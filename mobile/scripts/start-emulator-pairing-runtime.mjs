@@ -24,8 +24,7 @@ export async function startHeadlessPairingRuntime({
   logStep('0', 'Starting temporary desktop runtime for mobile pairing...')
   const runDir = mkdtempSync(path.join(os.tmpdir(), 'orca-mobile-run.'))
   const userData = path.join(runDir, 'userData')
-  // Why: the main-process E2E boot guard refuses to start with the real user
-  // home, so the pairing runtime must hand it a matching disposable HOME.
+  // Give pairing runtime disposable HOME matching main-process E2E boot guard.
   const homeDir = path.join(runDir, 'home')
   mkdirSync(homeDir, { recursive: true, mode: 0o700 })
   const pairingAddress = primaryLanIp(lanIpCandidates)
@@ -53,7 +52,7 @@ export async function registerWorktreeForPairingRuntime(runtime, worktree, tools
     return
   }
   tools.logStep('0.1', 'Registering current worktree in temporary runtime...')
-  await tools.hive(['repo', 'add', '--path', worktree, '--json'], {
+  await tools.orca(['repo', 'add', '--path', worktree, '--json'], {
     cwd: worktree,
     env: runtime.env,
     timeout: 60000
@@ -86,9 +85,7 @@ async function waitForPairingRuntime({ child, userData, pairingAddress, logSucce
     env: {
       ...process.env,
       ORCA_USER_DATA_PATH: userData,
-      // Why: the legacy `orca-dev` alias derives its own profile and ignores
-      // ORCA_USER_DATA_PATH, so selecting that compatibility alias would address
-      // the dev profile instead of this disposable runtime. The primary CLI ignores it.
+      // orca-dev ignores ORCA_USER_DATA_PATH; override derived profile so CLI addresses disposable runtime. Plain orca ignores this.
       ORCA_DEV_USER_DATA_PATH: userData
     },
     stop

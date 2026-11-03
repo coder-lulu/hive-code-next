@@ -2,11 +2,10 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import { View, Text, Pressable } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import * as Clipboard from 'expo-clipboard'
-import { useAccountVisibleHostCatalog } from '../src/runtime-directory/use-account-visible-host-catalog'
-import { selectConnectableHostProfiles } from '../src/transport/host-catalog-selection'
-import { useMobileThemeStyles } from '../src/theme/mobile-theme-provider'
+import { loadHosts } from '../src/transport/host-store'
 import { connectionLogStore } from '../src/transport/persisted-connection-log-store'
-import { useHostClient, usePrimeHosts, useRpcClientContext } from '../src/transport/client-context'
+import { useRpcClientContext } from '../src/transport/client-context'
+import { useHostClient } from '../src/transport/host-client-hooks'
 import {
   useConnectionPathStatus,
   useReconnectAttempt
@@ -19,36 +18,43 @@ import {
   resolveDiagnosticsHostId,
   type DiagnosticsHostSelection
 } from '../src/diagnostics/connection-diagnostics-screen-data'
-import { createConnectionDiagnosticsScreenStyles } from '../src/diagnostics/connection-diagnostics-screen-styles'
-import type { ConnectionLogEntry } from '../src/transport/types'
+import { connectionDiagnosticsScreenStyles as styles } from '../src/diagnostics/connection-diagnostics-screen-styles'
+import { useMobileColorScheme } from '../src/theme/use-mobile-color-scheme'
+import { NATIVE_APP_LOG_ID } from '../src/diagnostics/native-render-log'
+import type { ConnectionLogEntry, HostProfile } from '../src/transport/types'
 
-// Why: getSnapshot must be referentially stable when there's no data —
-// a fresh [] per call would make useSyncExternalStore re-render forever.
+// Keep empty snapshot identity stable or useSyncExternalStore rerenders forever.
 const EMPTY_ENTRIES: readonly ConnectionLogEntry[] = []
+const subscribeAppLog = (listener: () => void) =>
+  connectionLogStore.subscribe(NATIVE_APP_LOG_ID, listener)
+const getAppLog = () => connectionLogStore.get(NATIVE_APP_LOG_ID)
 
-// Why: reading the log is most needed while a host is failing, so this
-// route also *acquires* the host client — opening it kicks a dial and the
-// log fills live instead of showing a stale tail.
+// Acquire client here so opening logs during host failure starts dialing and live logging.
 export default function NativeConnectionLogRoute() {
+  useMobileColorScheme()
   const clientContext = useRpcClientContext()
   const router = useRouter()
   const params = useLocalSearchParams<{ hostId?: string }>()
   const routeKey = useMemo(() => ({}), [params.hostId])
-  const styles = useMobileThemeStyles(createConnectionDiagnosticsScreenStyles)
-  const { catalog } = useAccountVisibleHostCatalog()
-  const hosts = useMemo(() => selectConnectableHostProfiles(catalog), [catalog])
+  const [hosts, setHosts] = useState<HostProfile[]>([])
   const [manualSelection, setManualSelection] = useState<DiagnosticsHostSelection | null>(null)
+
+  useEffect(() => {
+    let stale = false
+    void loadHosts().then((loaded) => {
+      if (!stale) {
+        setHosts(loaded)
+      }
+    })
+    return () => {
+      stale = true
+    }
+  }, [])
 
   const selectedId = resolveDiagnosticsHostId(hosts, params.hostId, manualSelection, routeKey)
   const selected = hosts.find((host) => host.id === selectedId) ?? null
-  const primeHosts = usePrimeHosts()
-  useEffect(() => {
-    if (selected) {
-      primeHosts([selected])
-    }
-  }, [primeHosts, selected])
   const { client, state } = useHostClient(selected?.id)
-  const { desktopAppVersion } = useHostStatusGates({
+  const { desktopAppVersion, statusPending } = useHostStatusGates({
     hostId: selected?.id,
     client,
     connState: state
@@ -57,6 +63,7 @@ export default function NativeConnectionLogRoute() {
   const { activePath, pendingPath } = useConnectionPathStatus(selected?.id)
 
   useEffect(() => {
+    void readHydratedConnectionLog(connectionLogStore, NATIVE_APP_LOG_ID)
     if (selectedId) {
       void readHydratedConnectionLog(connectionLogStore, selectedId)
     }
@@ -71,13 +78,20 @@ export default function NativeConnectionLogRoute() {
     () => (selectedId ? connectionLogStore.get(selectedId) : EMPTY_ENTRIES),
     [selectedId]
   )
-  const entries = useSyncExternalStore(subscribe, getSnapshot)
+  const hostEntries = useSyncExternalStore(subscribe, getSnapshot)
+  const appEntries = useSyncExternalStore(subscribeAppLog, getAppLog)
+  const entries = useMemo(
+    () => [...hostEntries, ...appEntries].sort((a, b) => a.ts - b.ts),
+    [hostEntries, appEntries]
+  )
   const device = useMemo(
     () =>
-      selected
-        ? createNativeDiagnosticsOperations(selected, clientContext, desktopAppVersion)
-        : null,
-    [selected, clientContext, desktopAppVersion]
+      createNativeDiagnosticsOperations(
+        selected,
+        clientContext,
+        statusPending ? null : desktopAppVersion
+      ),
+    [selected, clientContext, desktopAppVersion, statusPending]
   )
 
   return (
@@ -97,9 +111,6 @@ export default function NativeConnectionLogRoute() {
             {hosts.map((host) => (
               <Pressable
                 key={host.id}
-                accessibilityRole="button"
-                accessibilityLabel={host.name}
-                accessibilityState={{ selected: host.id === selectedId }}
                 style={[styles.hostChip, host.id === selectedId && styles.hostChipActive]}
                 onPress={() =>
                   setManualSelection({ hostId: host.id, requestedHostId: params.hostId, routeKey })

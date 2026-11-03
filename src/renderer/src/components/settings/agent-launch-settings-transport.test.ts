@@ -1,3 +1,4 @@
+import { AGENT_LAUNCH_PERMISSION_CHOICE_CAPABILITY } from '../../../../shared/agent-launch-runtime-capability'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { projectAgentLaunchSettings } from '../../../../shared/agent-launch-settings'
 const rpc = vi.hoisted(() => ({ call: vi.fn(), supports: vi.fn() }))
@@ -49,10 +50,7 @@ describe('host agent launch settings transport', () => {
     rpc.supports.mockResolvedValue(false)
     expect(await readHostAgentLaunchSettings({ environmentId: 'old' })).toBeNull()
     await expect(
-      mutateHostAgentLaunchSettings(
-        { environmentId: 'old' },
-        { type: 'permissions', mode: 'manual' }
-      )
+      mutateHostAgentLaunchSettings({ environmentId: 'old' }, { type: 'permissions', mode: 'ask' })
     ).rejects.toThrow('unsupported')
     expect(rpc.call).not.toHaveBeenCalled()
   })
@@ -65,4 +63,37 @@ describe('host agent launch settings transport', () => {
     expect(rpc.call).toHaveBeenCalledTimes(1)
     expect(rpc.call.mock.calls[0]?.[0]).toEqual({ kind: 'environment', environmentId: 'offline' })
   })
+})
+
+it('sends scoped reset with the captured peer runtime identity', async () => {
+  const mutation = {
+    type: 'permissions' as const,
+    agent: 'claude' as const,
+    mode: 'default' as const
+  }
+  await mutateHostAgentLaunchSettings(
+    { environmentId: 'host', pairingRevision: 4, runtimeId: 'runtime-4' },
+    mutation
+  )
+  expect(rpc.call).toHaveBeenCalledWith(
+    { kind: 'environment', environmentId: 'host' },
+    'settings.mutateAgentLaunch',
+    mutation,
+    expect.objectContaining({
+      expectedEnvironmentPairingRevision: 4,
+      expectedEnvironmentRuntimeId: 'runtime-4'
+    })
+  )
+})
+it('refuses typed permission writes without the current permission-choice capability', async () => {
+  rpc.supports.mockImplementation(
+    async (_host, capability) => capability !== AGENT_LAUNCH_PERMISSION_CHOICE_CAPABILITY
+  )
+  await expect(
+    mutateHostAgentLaunchSettings(
+      { environmentId: 'old' },
+      { type: 'permissions', agent: 'claude', mode: 'default' }
+    )
+  ).rejects.toThrow('permission_choice_unsupported')
+  expect(rpc.call).not.toHaveBeenCalled()
 })

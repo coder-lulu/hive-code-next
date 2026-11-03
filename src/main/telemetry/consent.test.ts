@@ -54,8 +54,7 @@ describe('resolveConsent', () => {
       resolveConsent(
         settingsWithTelemetry({
           optedIn: true,
-          installId: 'x',
-          existedBeforeTelemetryRelease: false
+          installId: 'x'
         })
       )
     ).toEqual({
@@ -70,8 +69,7 @@ describe('resolveConsent', () => {
       resolveConsent(
         settingsWithTelemetry({
           optedIn: true,
-          installId: 'x',
-          existedBeforeTelemetryRelease: false
+          installId: 'x'
         })
       )
     ).toEqual({
@@ -86,8 +84,7 @@ describe('resolveConsent', () => {
       resolveConsent(
         settingsWithTelemetry({
           optedIn: true,
-          installId: 'x',
-          existedBeforeTelemetryRelease: false
+          installId: 'x'
         })
       )
     ).toEqual({
@@ -103,8 +100,7 @@ describe('resolveConsent', () => {
       resolveConsent(
         settingsWithTelemetry({
           optedIn: true,
-          installId: 'x',
-          existedBeforeTelemetryRelease: false
+          installId: 'x'
         })
       )
     ).toEqual({
@@ -128,8 +124,7 @@ describe('resolveConsent', () => {
       resolveConsent(
         settingsWithTelemetry({
           optedIn: true,
-          installId: 'x',
-          existedBeforeTelemetryRelease: false
+          installId: 'x'
         })
       )
     ).toEqual({
@@ -144,8 +139,7 @@ describe('resolveConsent', () => {
       resolveConsent(
         settingsWithTelemetry({
           optedIn: true,
-          installId: 'x',
-          existedBeforeTelemetryRelease: false
+          installId: 'x'
         })
       )
     ).toEqual({ effective: 'enabled' })
@@ -159,15 +153,13 @@ describe('resolveConsent', () => {
       resolveConsent(
         settingsWithTelemetry({
           optedIn: true,
-          installId: 'x',
-          existedBeforeTelemetryRelease: false
+          installId: 'x'
         })
       )
       resolveConsent(
         settingsWithTelemetry({
           optedIn: true,
-          installId: 'x',
-          existedBeforeTelemetryRelease: false
+          installId: 'x'
         })
       )
       expect(spy).toHaveBeenCalledTimes(1)
@@ -187,8 +179,7 @@ describe('resolveConsent', () => {
       resolveConsent(
         settingsWithTelemetry({
           optedIn: true,
-          installId: 'x',
-          existedBeforeTelemetryRelease: false
+          installId: 'x'
         })
       )
     ).toEqual({ effective: 'enabled' })
@@ -201,8 +192,7 @@ describe('resolveConsent', () => {
       resolveConsent(
         settingsWithTelemetry({
           optedIn: true,
-          installId: 'x',
-          existedBeforeTelemetryRelease: false
+          installId: 'x'
         })
       )
     ).toEqual({ effective: 'enabled' })
@@ -213,26 +203,24 @@ describe('resolveConsent', () => {
       resolveConsent(
         settingsWithTelemetry({
           optedIn: false,
-          installId: 'x',
-          existedBeforeTelemetryRelease: true
+          installId: 'x'
         })
       )
     ).toEqual({ effective: 'disabled', reason: 'user_opt_out' })
   })
 
-  it('returns pending_banner when optedIn is null (existing-user cohort awaiting banner)', () => {
+  it('returns pending_banner when optedIn is null (undecided consent awaiting banner)', () => {
     expect(
       resolveConsent(
         settingsWithTelemetry({
           optedIn: null,
-          installId: 'x',
-          existedBeforeTelemetryRelease: true
+          installId: 'x'
         })
       )
     ).toEqual({ effective: 'pending_banner' })
   })
 
-  it('returns pending_banner when telemetry settings are absent (pre-migration defensive path)', () => {
+  it('returns pending_banner when telemetry settings are absent (defensive read)', () => {
     expect(resolveConsent(settingsWithTelemetry(undefined))).toEqual({
       effective: 'pending_banner'
     })
@@ -240,14 +228,13 @@ describe('resolveConsent', () => {
 
   // ── Env-var precedence beats persisted preference ───────────────────
 
-  it('env-var override wins over a stored pending_banner state', () => {
+  it('env-var override wins over a stored undecided state', () => {
     process.env.ORCA_TELEMETRY_DISABLED = '1'
     expect(
       resolveConsent(
         settingsWithTelemetry({
           optedIn: null,
-          installId: 'x',
-          existedBeforeTelemetryRelease: true
+          installId: 'x'
         })
       )
     ).toEqual({ effective: 'disabled', reason: 'orca_disabled' })

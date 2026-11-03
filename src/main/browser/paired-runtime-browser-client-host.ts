@@ -4,8 +4,8 @@ import type {
   BrowserClientHostCommandResult,
   BrowserClientHostLeaseAuthority
 } from '../../shared/browser-client-host-protocol'
-import type { PairingOffer } from '../../shared/pairing'
-import type { RemoteRuntimeSubscriptionOptions } from '../../shared/remote-runtime-client'
+import type { PairedRuntimeConnection } from '../../shared/paired-runtime-connection'
+import type { RemoteRuntimeSubscriptionOptions } from '../../shared/remote-runtime/requests/remote-runtime-subscription-contract'
 import type { RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
 import type { BrowserClientFileChannelAvailability } from './browser-client-file-channel-transport'
 import { BrowserClientHostCommandDispatcher } from './browser-client-host-command-dispatcher'
@@ -15,7 +15,7 @@ import { PairedRuntimeBrowserHostLease } from './paired-runtime-browser-host-lea
 type DispatcherLimits = Omit<DispatcherOptions, 'authority' | 'handler'>
 
 export type PairedRuntimeBrowserClientHostOptions = {
-  connection: PairingOffer
+  connection: PairedRuntimeConnection
   authorityRuntimeId: string
   browserHostClientId: string
   hostCapabilities: readonly string[]
@@ -99,9 +99,7 @@ export class PairedRuntimeBrowserClientHost {
     return !this.closed && this.lease.fileChannelNegotiated
   }
 
-  // An attached authority that never named the file channel is an older host, the one case a
-  // download may keep its desktop destination. Anything else — no lease yet, transport lost, host
-  // closed — is merely unavailable, and guessing "local" there would silently move the bytes.
+  // Only unsupported file channels permit desktop download fallback; outages must not move the destination.
   get fileChannelAvailability(): BrowserClientFileChannelAvailability {
     if (this.fileChannelNegotiated) {
       return 'negotiated'

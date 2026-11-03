@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Activity, PowerOff, RefreshCw } from 'lucide-react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -9,7 +10,7 @@ import { useMobileHomeContext } from '../home/mobile-home-context'
 import { useAccountRuntimeDirectory } from '../runtime-directory/account-runtime-directory-provider'
 import { hostCatalogEntryHasLocalPairing } from '../runtime-directory/account-runtime-catalog'
 import { useMobileTheme } from '../theme/mobile-theme-provider'
-import { useDisconnectHostClient, useForceReconnect } from '../transport/client-context'
+import { useDisconnectHostClient, useForceReconnect } from '../transport/host-client-hooks'
 import type { HostCatalogEntry } from '../transport/types'
 import { MobileDeviceAddMenu, MobileDeviceHelpSheet } from './MobileDeviceMenus'
 import { MobileDevicesScreen } from './MobileDevicesScreen'
@@ -17,6 +18,8 @@ import { projectMobileDevices } from './mobile-devices-model'
 import { useMobileDeviceOperations } from './use-mobile-device-operations'
 
 export function MobileDeviceManagementScreen() {
+  const t = useMobileTranslation()
+
   const { data, selectedRuntime, openHostActions } = useMobileHomeContext()
   const theme = useMobileTheme()
   const { contentMaxWidth } = useResponsiveLayout()
@@ -168,7 +171,10 @@ export function MobileDeviceManagementScreen() {
           accountTarget
             ? [
                 {
-                  label: '重试连接',
+                  label: t(
+                    'auto.mobile.src.devices.MobileDeviceManagementScreen.4f90533d0a',
+                    'Retry connection'
+                  ),
                   icon: RefreshCw,
                   closeBeforePress: true,
                   onPress: () => retry(accountTarget)
@@ -178,7 +184,7 @@ export function MobileDeviceManagementScreen() {
                 )
                   ? [
                       {
-                        label: '断开连接',
+                        label: t('hostScreen.hostListActionSheetActions.disconnect', 'Disconnect'),
                         icon: PowerOff,
                         closeBeforePress: true,
                         onPress: () => {
@@ -190,7 +196,10 @@ export function MobileDeviceManagementScreen() {
                     ]
                   : []),
                 {
-                  label: '连接详情',
+                  label: t(
+                    'auto.mobile.src.devices.MobileDeviceManagementScreen.3d62ed9b74',
+                    'Connection details'
+                  ),
                   icon: Activity,
                   closeBeforePress: true,
                   onPress: () => details(accountTarget)

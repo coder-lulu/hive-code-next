@@ -57,7 +57,8 @@ export const FloatingWorkspacePane = lazyWithRetry(
   { reloadKey: 'settings.floating-workspace' }
 )
 export const RepositoryPane = lazyWithRetry(
-  () => import('./RepositoryPane').then((module) => ({ default: module.RepositoryPane })),
+  () =>
+    import('./repository/RepositoryPane').then((module) => ({ default: module.RepositoryPane })),
   { reloadKey: 'settings.repository' }
 )
 export const GitPane = lazyWithRetry(

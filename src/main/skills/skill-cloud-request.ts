@@ -1,15 +1,6 @@
 import { getProductArtifactCloudConfig } from '../product/product-artifact-cloud-config'
 import { createSkillCloudDeadline } from './skill-cloud-deadline'
-
-export class SkillCloudRequestError extends Error {
-  constructor(
-    readonly statusCode: number,
-    readonly code: string,
-    message: string
-  ) {
-    super(message)
-  }
-}
+import { SkillCloudRequestError } from './skill-cloud-request-error'
 
 export async function skillCloudRequest<T>(input: {
   apiUrl?: string

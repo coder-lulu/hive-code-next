@@ -1,10 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { PipedProcessSpawner } from '@orca/process-host/process-spec'
-import {
-  openCodexAppServerConnection,
-  type CodexAppServerConnection
-} from './codex-app-server-connection'
-import { CodexAppServerFrameSizeError } from './codex-app-server-frame-size-error'
+import { openCodexAppServerConnection } from './codex-app-server-connection'
+import type { CodexAppServerConnection } from './app-server/codex-app-server-connection-types'
+
+import { CodexAppServerFrameSizeError } from './app-server/codex-app-server-frame-size-error'
 
 const opened = new Set<CodexAppServerConnection>()
 afterEach(async () => {

@@ -40,13 +40,17 @@ export type ChatSettingsRenderContext = {
   model: Pick<
     SettingsRenderContext['model'],
     | 'settings'
+    | 'fontSuggestions'
     | 'updateSettings'
     | 'setHasUnsavedChatPromptChanges'
     | 'sourceControlAiPromptDiscardSignal'
     | 'hasUnsavedChatPromptChanges'
     | 'showDesktopOnlySettings'
   >
-  interactions: Pick<SettingsRenderContext['interactions'], 'writeSourceControlAiSettingsOrThrow'>
+  interactions: Pick<
+    SettingsRenderContext['interactions'],
+    'writeSourceControlAiSettingsOrThrow' | 'requestFontSuggestions'
+  >
   navigation: Pick<SettingsRenderContext['navigation'], 'getSectionSearchEntries'>
   view: Pick<SettingsRenderContext['view'], 'isSectionMounted'>
 }

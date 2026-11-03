@@ -1,4 +1,3 @@
-import { applyProductBranding } from './brand'
 // The sentences a chat notice is made of, each whole so desktop can translate it on its own.
 
 import type { AgentSessionFailureFact } from './agent-session-failure'
@@ -17,8 +16,7 @@ import type {
   AgentSessionFailureWordsContext
 } from './agent-session-failure-words'
 
-/** Every sentence a notice is made of. Desktop translates each whole sentence with this as its
- *  fallback; mobile shows it as is. */
+/** Translate whole sentences on desktop with English fallbacks; mobile displays them directly. */
 export const AGENT_SESSION_WRITE_NOTICE_COPY = {
   notDoneReadHistory: "This chat's history couldn't be loaded.",
   notDoneSend: 'Your message was not sent.',
@@ -30,33 +28,30 @@ export const AGENT_SESSION_WRITE_NOTICE_COPY = {
   notDoneAnswer: 'Your answer was not sent.',
   notDoneOption: "The setting wasn't changed.",
   notDoneCommand: "The command didn't run.",
-  notDoneGoal: "The goal wasn't changed.",
+  notDoneGoalChangeIncomplete: "Couldn't finish changing the goal. Check the chat.",
   notDoneQueuedEdit: "Your edit wasn't saved.",
   restartFailed: "The agent couldn't restart.",
-  capacity: applyProductBranding(
-    'Orca on the computer running this chat has hit a request limit. Update Orca there, then try again.'
-  ),
-  outcomeUnknown: applyProductBranding("Orca couldn't confirm what happened. Check the chat."),
-  sendOutcomeLost: applyProductBranding(
-    "Orca couldn't confirm your message reached the agent. Check the chat, then send it again if needed."
-  ),
+  capacity:
+    'Orca on the computer running this chat has hit a request limit. Update Orca there, then try again.',
+  outcomeUnknown: "Orca couldn't confirm what happened. Check the chat.",
+  sendOutcomeLost:
+    "Orca couldn't confirm your message reached the agent. Check the chat, then send it again if needed.",
   continuationSuperseded: 'This chat has moved on. Check the latest messages before continuing.',
   questionChanged: 'This question was already answered or has changed.',
   cancelNotSaved: "Couldn't cancel this question or approval.",
-  historyUnreadable: applyProductBranding("Orca couldn't read this chat's saved history."),
+  historyUnreadable: "Orca couldn't read this chat's saved history.",
   historyUnusable: 'Unable to load this chat.',
-  historyUnavailable: applyProductBranding("Orca couldn't open this chat's history right now."),
-  savedByNewerOrca: applyProductBranding('Chats were saved by a newer Orca.'),
-  updateOrcaToKeepUsing: applyProductBranding('Update Orca to keep using them.'),
-  chatSavedByNewerOrca: applyProductBranding('This chat was saved by a newer Orca.'),
-  updateOrcaToOpenChat: applyProductBranding('Update Orca to open it.'),
-  unsupported: applyProductBranding(
-    'This needs a newer Orca on the computer running this chat. Update Orca there, then try again.'
-  ),
+  historyUnavailable: "Orca couldn't open this chat's history right now.",
+  savedByNewerOrca: 'Chats were saved by a newer Orca.',
+  updateOrcaToKeepUsing: 'Update Orca to keep using them.',
+  chatSavedByNewerOrca: 'This chat was saved by a newer Orca.',
+  updateOrcaToOpenChat: 'Update Orca to open it.',
+  unsupported:
+    'This needs a newer Orca on the computer running this chat. Update Orca there, then try again.',
   notAvailable: "This isn't available in this chat.",
-  cannotRunHere: applyProductBranding("Orca can't run this agent in a chat here."),
-  unreachable: applyProductBranding("Orca couldn't reach the agent."),
-  recordFailed: applyProductBranding("Orca couldn't save this to the chat's history."),
+  cannotRunHere: "Orca can't run this agent in a chat here.",
+  unreachable: "Orca couldn't reach the agent.",
+  recordFailed: "Orca couldn't save this to the chat's history.",
   attachmentExpired: 'This attachment expired.',
   reattachFile: 'Remove it and attach it again.',
   conversationCleared: 'This conversation has been cleared.',
@@ -83,6 +78,7 @@ export const AGENT_SESSION_WRITE_NOTICE_COPY = {
   compactAfterRetry: 'Retry your earlier message, then run /compact.',
   clearAfterSending: 'Your earlier message is still being sent. Run /clear once it has gone.',
   compactAfterSending: 'Your earlier message is still being sent. Run /compact once it has gone.',
+  pendingWork: 'Wait for pending work and messages to finish before using this command.',
   queueTooLarge: 'Too much text is waiting in the queue.',
   shrinkQueue: 'Delete a queued message, or wait for one to go through, then try again.',
   messageTooLarge: 'It is over the 256 KB limit for one message.',
@@ -94,10 +90,10 @@ export const AGENT_SESSION_WRITE_NOTICE_COPY = {
   reopenChat: 'Reopen the chat to check again.',
   terminalAgentHoldsChat: TERMINAL_AGENT_HOLDS_CHAT,
   quitTerminalAgent: QUIT_TERMINAL_AGENT,
-  hostReconciling: applyProductBranding('Orca is still checking on this chat after restarting.'),
+  hostReconciling: 'Orca is still checking on this chat after restarting.',
   waitMoment: 'Wait a moment.',
-  recordUnreadable: applyProductBranding("Orca couldn't read this chat's saved state."),
-  chatNotFound: applyProductBranding("Orca can't find this chat."),
+  recordUnreadable: "Orca couldn't read this chat's saved state.",
+  chatNotFound: "Orca can't find this chat.",
   startNewChat: START_NEW_CHAT,
   tryAgain: 'Try again.'
 } as const
@@ -109,8 +105,7 @@ export type AgentSessionWriteNoticeFailurePart = {
   surface: AgentSessionFailureSurface
   context: AgentSessionFailureWordsContext
 }
-/** A notice as whole sentences, each translated on its own; `text` is words someone else wrote: a
- *  provider's, or a host's sentence with no fact beside it. */
+/** Translate each notice sentence independently; text is provider/host wording without a typed fact. */
 export type AgentSessionWriteNoticePart =
   | AgentSessionWriteNoticeSentence
   | { text: string }

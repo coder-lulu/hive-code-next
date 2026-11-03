@@ -773,6 +773,12 @@ describe('worktree RPC methods', () => {
   })
 
   it('forwards push target clears through worktree.set', async () => {
+    const githubLinkBase = {
+      hostId: 'local',
+      instanceId: null,
+      linkedPR: null,
+      suppressedGitHubPR: null
+    }
     const runtime = {
       getRuntimeId: () => 'test-runtime',
       dedupeWorktreeCreate: passthroughDedupe,
@@ -784,7 +790,8 @@ describe('worktree RPC methods', () => {
       makeRequest('worktree.set', {
         worktree: 'id:wt-1',
         linkedPR: null,
-        pushTarget: null
+        pushTarget: null,
+        githubLinkBase
       })
     )
 
@@ -793,7 +800,8 @@ describe('worktree RPC methods', () => {
       'id:wt-1',
       expect.objectContaining({
         linkedPR: null,
-        pushTarget: null
+        pushTarget: null,
+        githubLinkBase
       })
     )
   })

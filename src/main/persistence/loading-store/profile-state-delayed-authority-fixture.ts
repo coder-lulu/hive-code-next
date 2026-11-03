@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, vi } from 'vitest'
 import type { AutomationRun } from '../../../shared/automations-types'
+import type { GlobalSettings } from '../../../shared/global-settings-types'
 import { buildProfileStateCutoverFixture } from '../profile-state-cutover-fixture'
 import { ProfileStateSqliteAuthority } from '../profile-state/profile-state-sqlite-authority'
 import { writeVersionedProfileStateExport } from '../profile-state/legacy-json/profile-state-versioned-export'
@@ -111,7 +112,7 @@ afterEach(async () => {
   vi.restoreAllMocks()
 })
 
-export async function fixture(legacyOpenCodeGoApiKey?: string) {
+export async function fixture(initialSettings: Partial<GlobalSettings> = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'orca-worker-coordination-'))
   const path = join(directory, 'profile-state.db')
   const inner = new ProfileStateSqliteAuthority(path, 'coordination-test')
@@ -122,7 +123,7 @@ export async function fixture(legacyOpenCodeGoApiKey?: string) {
         ...initial,
         settings: {
           ...initial.settings,
-          ...(legacyOpenCodeGoApiKey ? { opencodeGoApiKey: legacyOpenCodeGoApiKey } : {})
+          ...initialSettings
         }
       })
     )

@@ -1,50 +1,42 @@
 import { Pressable, Text } from 'react-native'
-import type { AuthFailedBannerActionProps } from './auth-failed-banner-styles'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
+import { colors } from '../theme/mobile-theme'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
+import { authFailedBannerStyles as styles } from './auth-failed-banner-styles'
 
+// Native offers reconnect/re-pair/remove; web sibling offers only shell-routed re-pair because reconnect is null and removal refuses.
 export function AuthFailedBannerActions({
   canRetry,
-  copy,
-  styles,
   onRetry,
   onRepair,
   onRemove
-}: AuthFailedBannerActionProps) {
+}: {
+  canRetry: boolean
+  onRetry: () => void
+  onRepair: () => void
+  onRemove?: () => void
+}) {
+  const t = useMobileTranslation()
+  useMobileColorScheme()
   return (
     <>
-      {canRetry ? (
-        <Pressable
-          accessibilityLabel={copy.retryAccessibility}
-          accessibilityRole="button"
-          style={({ pressed }) => [styles.action, styles.retryAction, pressed && styles.pressed]}
-          onPress={onRetry}
-        >
-          <Text maxFontSizeMultiplier={1.3} style={styles.retryText}>
-            {copy.retry}
-          </Text>
+      {canRetry && (
+        <Pressable style={styles.action} onPress={onRetry}>
+          <Text style={styles.actionText}>{t('common.retry', 'Retry')}</Text>
         </Pressable>
-      ) : null}
-      <Pressable
-        accessibilityLabel={copy.repairAccessibility}
-        accessibilityRole="button"
-        style={({ pressed }) => [styles.action, styles.secondaryAction, pressed && styles.pressed]}
-        onPress={onRepair}
-      >
-        <Text maxFontSizeMultiplier={1.3} style={styles.secondaryText}>
-          {copy.repair}
+      )}
+      <Pressable style={styles.action} onPress={onRepair}>
+        <Text style={styles.actionText}>
+          {t('components.authFailedBannerActions.repair', 'Re-pair')}
         </Text>
       </Pressable>
-      {onRemove ? (
-        <Pressable
-          accessibilityLabel={copy.removeAccessibility}
-          accessibilityRole="button"
-          style={({ pressed }) => [styles.action, pressed && styles.pressed]}
-          onPress={onRemove}
-        >
-          <Text maxFontSizeMultiplier={1.3} style={styles.removeText}>
-            {copy.remove}
+      {onRemove && (
+        <Pressable style={styles.action} onPress={onRemove}>
+          <Text style={[styles.actionText, { color: colors.statusRed }]}>
+            {t('common.remove', 'Remove')}
           </Text>
         </Pressable>
-      ) : null}
+      )}
     </>
   )
 }

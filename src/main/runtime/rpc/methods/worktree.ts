@@ -21,6 +21,7 @@ import {
 } from '../../../../shared/rpc-contract/worktree-create-params'
 import {
   WorktreeActivate,
+  WorktreeSleepParams,
   WorktreeForceDeleteBranch,
   WorktreeRemove,
   WorktreeResolveMrBase,
@@ -67,8 +68,9 @@ export const WORKTREE_METHODS = [
   defineMethod({
     name: 'worktree.sleep',
     permission: 'workspace',
-    params: WorktreeSelector,
-    handler: async (params, { runtime }) => runtime.sleepManagedWorktree(params.worktree)
+    params: WorktreeSleepParams,
+    handler: async (params, { runtime }) =>
+      runtime.sleepManagedWorktree(params.worktree, { markChatsAsleep: params.markChatsAsleep })
   }),
   defineMethod({
     name: 'worktree.activate',
@@ -156,6 +158,7 @@ export const WORKTREE_METHODS = [
     permission: 'workspace',
     params: WorktreeSet,
     handler: async (params, { runtime }) => {
+      const linkedItemsBase = params.linkedItemsBase
       const worktree = await runtime.updateManagedWorktreeMeta(params.worktree, {
         displayName: params.displayName,
         ...(params.displayName !== undefined
@@ -164,6 +167,7 @@ export const WORKTREE_METHODS = [
         linkedIssue: params.linkedIssue,
         linkedPR: params.linkedPR,
         suppressedGitHubPR: params.suppressedGitHubPR,
+        githubLinkBase: params.githubLinkBase,
         linkedLinearIssue: params.linkedLinearIssue,
         linkedLinearIssueWorkspaceId: params.linkedLinearIssueWorkspaceId,
         linkedLinearIssueOrganizationUrlKey: params.linkedLinearIssueOrganizationUrlKey,
@@ -174,9 +178,7 @@ export const WORKTREE_METHODS = [
         linkedGiteaPR: params.linkedGiteaPR,
         linkedWorkItem: params.linkedWorkItem,
         linkedItems: params.linkedItems,
-        ...(params.linkedItemsBase !== undefined
-          ? { linkedItemsBase: params.linkedItemsBase }
-          : {}),
+        ...(linkedItemsBase === undefined ? {} : { linkedItemsBase }),
         ...(params.linkedItemsSelectionChanged !== undefined
           ? { linkedItemsSelectionChanged: params.linkedItemsSelectionChanged }
           : {}),
@@ -196,6 +198,12 @@ export const WORKTREE_METHODS = [
         workspaceStatus: params.workspaceStatus,
         pushTarget: params.pushTarget,
         diffComments: params.diffComments,
+        ...(params.diffCommentsBase !== undefined
+          ? { diffCommentsBase: params.diffCommentsBase }
+          : {}),
+        ...(params.firstAgentMessageRenameError === null
+          ? { firstAgentMessageRenameError: null }
+          : {}),
         mobileDiffReview: params.mobileDiffReview,
         lineage:
           params.parentWorktree || params.noParent === true

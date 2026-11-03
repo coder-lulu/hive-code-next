@@ -1,17 +1,28 @@
-import { describe, expect, it, vi } from 'vitest'
+import { createElement } from 'react'
+import { act, create, type ReactTestRenderer } from 'react-test-renderer'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ActionSheetModal } from './components/ActionSheetModal'
 import { getHostListActionSheetActions } from './host-list-action-sheet-actions'
-import type { ConnectionState, HostCatalogEntry, HostProfile } from './transport/types'
+import type { ConnectionState, HostProfile } from './transport/types'
+
+vi.mock('react-native', () => ({
+  ActivityIndicator: 'ActivityIndicator',
+  Pressable: 'Pressable',
+  StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
+  Text: 'Text',
+  View: 'View'
+}))
+vi.mock('./components/BottomDrawer', () => ({ BottomDrawer: 'BottomDrawer' }))
 
 vi.mock('lucide-react-native', () => ({
   Activity: vi.fn(),
   Edit3: vi.fn(),
   PowerOff: vi.fn(),
   RefreshCw: vi.fn(),
-  Trash2: vi.fn(),
-  Users: vi.fn()
+  Trash2: vi.fn()
 }))
 
-const PROFILE: HostProfile = {
+const HOST: HostProfile = {
   id: 'host-1',
   name: 'Host 1',
   endpoint: 'ws://192.168.21.4:6768',
@@ -19,23 +30,18 @@ const PROFILE: HostProfile = {
   publicKeyB64: 'key',
   lastConnected: 0
 }
-const HOST: HostCatalogEntry = { ...PROFILE, credentialStatus: 'ready', profile: PROFILE }
 
-function build(
-  overrides: { host?: HostCatalogEntry; state?: ConnectionState; hasEverConnected?: boolean } = {}
-) {
+function build(overrides: { state?: ConnectionState; hasEverConnected?: boolean } = {}) {
   const spies = {
     onDismiss: vi.fn(),
     onReconnect: vi.fn(),
     onDisconnect: vi.fn(),
     onDiagnostics: vi.fn(),
     onEdit: vi.fn(),
-    onSessions: vi.fn(),
-    onUnclaim: vi.fn(),
     onRemove: vi.fn()
   }
   const actions = getHostListActionSheetActions({
-    host: overrides.host ?? HOST,
+    host: HOST,
     state: overrides.state ?? 'connected',
     hasEverConnected: overrides.hasEverConnected ?? true,
     ...spies
@@ -43,117 +49,87 @@ function build(
   return { actions, spies }
 }
 
-describe('getHostListActionSheetActions', () => {
-  it('offers cloud alias and scoped sessions for an account Runtime without local removal', () => {
-    const { actions, spies } = build({
-      host: {
-        ...HOST,
-        runtimeRecordId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-        accessSources: ['account-claimed']
-      }
-    })
-    expect(actions.map((action) => action.label)).toEqual([
-      '重新连接',
-      '断开当前手机连接',
-      '网络诊断',
-      '修改云端别名',
-      '会话管理',
-      '删除 Runtime'
-    ])
-    for (const label of ['修改云端别名', '会话管理', '删除 Runtime']) {
-      const action = actions.find((entry) => entry.label === label)!
-      expect(action.closeBeforePress).toBe(true)
-      action.onPress()
-    }
-    expect(spies.onEdit).toHaveBeenCalledWith(HOST.id)
-    expect(spies.onSessions).toHaveBeenCalledWith(HOST.id)
-    expect(spies.onUnclaim).toHaveBeenCalledWith(HOST.id, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')
-    expect(spies.onRemove).not.toHaveBeenCalled()
-  })
+let renderer: ReactTestRenderer | null = null
 
-  it('keeps cloud alias and sessions available when the Runtime has no connectable profile', () => {
-    const { actions } = build({
-      host: {
-        ...HOST,
-        runtimeRecordId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-        accessSources: ['account-claimed'],
-        profile: null,
-        credentialStatus: 'cloud-offline'
-      },
-      state: 'disconnected'
+afterEach(() => {
+  act(() => renderer?.unmount())
+  renderer = null
+})
+
+describe('getHostListActionSheetActions', () => {
+  it.each([
+    ['Network diagnostics', 'onDiagnostics'],
+    ['Edit host', 'onEdit'],
+    ['Remove', 'onRemove']
+  ] as const)('delivers %s only after the action sheet closes', (label, callback) => {
+    const { actions, spies } = build()
+    const held: { tree: ReactTestRenderer | null } = { tree: null }
+    act(() => {
+      held.tree = create(
+        createElement(ActionSheetModal, {
+          visible: true,
+          actions,
+          onClose: spies.onDismiss
+        })
+      )
+      renderer = held.tree
     })
-    expect(actions.find((action) => action.label === '连接')).toMatchObject({
-      disabled: true,
-      hint: expect.any(String)
-    })
-    expect(actions.find((action) => action.label === '网络诊断')?.disabled).toBe(true)
-    expect(actions.find((action) => action.label === '修改云端别名')?.disabled).not.toBe(true)
-    expect(actions.find((action) => action.label === '会话管理')?.disabled).toBe(false)
-    expect(actions.find((action) => action.label === '删除 Runtime')).toMatchObject({
-      destructive: true,
-      disabled: false,
-      closeBeforePress: true
-    })
-    expect(actions.some((action) => action.label === '断开当前手机连接')).toBe(false)
-  })
-  // Why: these navigate or open a second drawer. Presenting while this sheet's native
-  // Modal is still up freezes the whole screen on iOS — issue #8791.
-  it.each(['网络诊断', '修改别名与连接地址', '移除本地配对'])(
-    'defers %s until the action sheet has closed',
-    (label) => {
-      const { actions } = build()
-      expect(actions.find((action) => action.label === label)).toMatchObject({
-        closeBeforePress: true
-      })
+    const rendered = held.tree
+    if (!rendered) {
+      throw new Error('Action sheet did not render')
     }
-  )
+    const button = rendered.root
+      .findAll((node) => String(node.type) === 'Pressable')
+      .find((node) =>
+        node
+          .findAll((text) => String(text.type) === 'Text')
+          .some((text) => text.props.children === label)
+      )
+    if (!button) {
+      throw new Error(`Missing action ${label}`)
+    }
+    act(() => button.props.onPress())
+    expect(spies.onDismiss).toHaveBeenCalledOnce()
+    expect(spies.onDiagnostics).not.toHaveBeenCalled()
+    expect(spies.onEdit).not.toHaveBeenCalled()
+    expect(spies.onRemove).not.toHaveBeenCalled()
+
+    const closed = rendered.root.find((node) => String(node.type) === 'BottomDrawer').props
+      .onAfterClose
+    act(() => closed())
+    expect(spies[callback]).toHaveBeenCalledExactlyOnceWith(label === 'Remove' ? HOST : HOST.id)
+    act(() => closed())
+    expect(spies[callback]).toHaveBeenCalledOnce()
+  })
 
   it('leaves the in-place actions undeferred so they fire on tap', () => {
     const { actions, spies } = build()
-    const disconnect = actions.find((action) => action.label === '断开当前手机连接')
+    const disconnect = actions.find((action) => action.label === 'Disconnect')
     expect(disconnect?.closeBeforePress).toBeUndefined()
     disconnect?.onPress()
     expect(spies.onDisconnect).toHaveBeenCalledWith(HOST.id)
     expect(spies.onDismiss).toHaveBeenCalled()
   })
 
-  it('hands Remove the whole host so the confirm sheet can name it', () => {
-    const { actions, spies } = build()
-    actions.find((action) => action.label === '移除本地配对')?.onPress()
-    expect(spies.onRemove).toHaveBeenCalledWith(HOST)
-  })
-
-  it('routes Edit host to the edit screen', () => {
-    const { actions, spies } = build()
-    actions.find((action) => action.label === '修改别名与连接地址')?.onPress()
-    expect(spies.onEdit).toHaveBeenCalledWith(HOST.id)
-  })
-
-  it('routes Network diagnostics with the selected host', () => {
-    const { actions, spies } = build()
-    actions.find((action) => action.label === '网络诊断')?.onPress()
-    expect(spies.onDiagnostics).toHaveBeenCalledWith(HOST.id)
-  })
-
   it('offers Disconnect only while the socket is live', () => {
     expect(build({ state: 'reconnecting' }).actions.map((action) => action.label)).toEqual([
-      '重新连接',
-      '断开当前手机连接',
-      '网络诊断',
-      '修改别名与连接地址',
-      '移除本地配对'
+      'Reconnect',
+      'Disconnect',
+      'Network diagnostics',
+      'Edit host',
+      'Remove'
     ])
     expect(build({ state: 'disconnected' }).actions.map((action) => action.label)).toEqual([
-      '连接',
-      '网络诊断',
-      '修改别名与连接地址',
-      '移除本地配对'
+      'Connect',
+      'Network diagnostics',
+      'Edit host',
+      'Remove'
     ])
   })
 
   it('says Connect until the host has connected at least once this session', () => {
-    expect(build({ hasEverConnected: false }).actions[0]?.label).toBe('连接')
-    expect(build({ hasEverConnected: true }).actions[0]?.label).toBe('重新连接')
+    expect(build({ hasEverConnected: false }).actions[0]?.label).toBe('Connect')
+    expect(build({ hasEverConnected: true }).actions[0]?.label).toBe('Reconnect')
   })
 
   it('renders nothing without a target host', () => {

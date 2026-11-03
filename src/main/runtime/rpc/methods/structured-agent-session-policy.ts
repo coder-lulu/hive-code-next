@@ -1,3 +1,4 @@
+import { AGENT_SESSION_COMMANDS_ON_REQUEST_CAPABILITY } from '../../../../shared/structured-agent-session-surface-capabilities'
 import {
   CLAUDE_STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY,
   PI_STRUCTURED_DIALOGS_RUNTIME_CAPABILITY,
@@ -7,8 +8,12 @@ import {
   type RuntimeCapability
 } from '../../../../shared/protocol-version'
 import { AGENT_SESSION_OPTIONAL_MODEL_CLIENT_CAPABILITY } from '../../../../shared/agent-session-optional-model-capability'
-import { isNativeChatEnabled } from '../../../../shared/structured-native-chat-launch-route'
+import {
+  isNativeChatDefaultFor,
+  normalizeNativeChatProviders
+} from '../../../../shared/structured-native-chat-launch-route'
 import { isAgentSessionHandleProvider } from '../../../../shared/agent-session-provider-handle'
+import { isTuiAgent } from '../../../../shared/tui-agent-config'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { RpcContext } from '../core'
 
@@ -113,13 +118,40 @@ export function createSupportFollowsHostSetting(
   )
 }
 
-/** An unreadable settings store reads as off, the default. */
+/** Only known settings can supply a default; unreadable or malformed settings refuse. */
 export function isStructuredNativeChatEnabled(
-  runtime: Pick<OrcaRuntimeService, 'getClientSettings'>
+  runtime: Pick<OrcaRuntimeService, 'getClientSettings'>,
+  agent: string
 ): boolean {
   try {
-    return isNativeChatEnabled(runtime.getClientSettings())
+    if (!isTuiAgent(agent)) {
+      return false
+    }
+    const settings = runtime.getClientSettings()
+    if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+      return false
+    }
+    const providers = Object.hasOwn(settings, 'nativeChatProviders')
+      ? settings.nativeChatProviders
+      : undefined
+    if (
+      providers !== undefined &&
+      (!providers ||
+        typeof providers !== 'object' ||
+        Array.isArray(providers) ||
+        Object.values(providers).some((enabled) => typeof enabled !== 'boolean'))
+    ) {
+      return false
+    }
+    return isNativeChatDefaultFor(
+      { nativeChatProviders: normalizeNativeChatProviders(providers) },
+      agent
+    )
   } catch {
     return false
   }
+}
+
+export function clientRequestsCommands(ctx: Pick<RpcContext, 'clientCapabilities'>): boolean {
+  return ctx.clientCapabilities?.includes(AGENT_SESSION_COMMANDS_ON_REQUEST_CAPABILITY) === true
 }

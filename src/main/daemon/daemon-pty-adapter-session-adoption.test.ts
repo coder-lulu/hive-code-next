@@ -1,5 +1,4 @@
 import './mock-descendant-sweep'
-/* Adopting daemon sessions that already exist: reattach, attach-only, inventory, tombstones, startup reconcile. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { join } from 'node:path'
 import { rmSync, writeFileSync } from 'node:fs'
@@ -100,11 +99,9 @@ describe('DaemonPtyAdapter (IPtyProvider)', () => {
       expect(first.isReattach).toBeUndefined()
       expect(first.launchAgent).toBe('droid')
 
-      // Write data so the headless emulator captures it
       lastSubprocess._simulateData('hello from shell\r\n')
       await new Promise((r) => setTimeout(r, 50))
 
-      // Spawn again with the same sessionId — should reattach
       const second = await adapter.spawn({ cols: 80, rows: 24, sessionId })
       expect(second.id).toBe(sessionId)
       expect(second.isReattach).toBe(true)
@@ -121,7 +118,6 @@ describe('DaemonPtyAdapter (IPtyProvider)', () => {
       const sessionId = 'rehydrate-test'
       await adapter.spawn({ cols: 80, rows: 24, sessionId })
 
-      // Enable bracketed paste mode, then write visible output
       lastSubprocess._simulateData('\x1b[?2004h')
       lastSubprocess._simulateData('prompt$ ')
       await new Promise((r) => setTimeout(r, 50))
@@ -157,6 +153,15 @@ describe('DaemonPtyAdapter (IPtyProvider)', () => {
           generation: 'continued'
         }
       })
+    })
+
+    it('returns the session title from attach-only adoption', async () => {
+      const sessionId = 'attach-title-handoff'
+      await adapter.spawn({ cols: 80, rows: 24, sessionId })
+      lastSubprocess._simulateData('\x1b]0;first\x07\x1b]0;⠋ Claude\x07')
+      await new Promise((r) => setTimeout(r, 50))
+
+      await expect(adapter.attach(sessionId)).resolves.toMatchObject({ lastTitle: '⠋ Claude' })
     })
 
     it('returns plain result for new sessionId', async () => {
@@ -296,7 +301,6 @@ describe('DaemonPtyAdapter (IPtyProvider)', () => {
     it('reattaches to existing session and receives events', async () => {
       const { id } = await adapter.spawn({ cols: 80, rows: 24 })
 
-      // Create a second adapter simulating app restart
       const adapter2 = new DaemonPtyAdapter({ socketPath, tokenPath })
       const dataPayloads: { id: string; data: string }[] = []
       adapter2.onData((payload) => dataPayloads.push(payload))
@@ -316,7 +320,6 @@ describe('DaemonPtyAdapter (IPtyProvider)', () => {
       const adapter2 = new DaemonPtyAdapter({ socketPath, tokenPath })
       await adapter2.attach(id)
 
-      // The running TUI keeps its geometry: no resize, size unchanged.
       expect(lastSubprocess.resize).not.toHaveBeenCalled()
       expect(await adapter2.getAppliedSize(id)).toEqual({ cols: 137, rows: 41 })
       adapter2.dispose()
@@ -384,7 +387,6 @@ describe('DaemonPtyAdapter (IPtyProvider)', () => {
         'Session not found: wt-x@@deadbeef'
       )
 
-      // No shell was spawned as a side effect of the refused attach.
       expect(lastSpawnOpts).toBeNull()
       adapter2.dispose()
     })
@@ -496,9 +498,7 @@ describe('DaemonPtyAdapter (IPtyProvider)', () => {
   })
 
   describe('listProcesses', () => {
-    // Why: hasPty reads the activeSessionIds cache; an exit missed while the
-    // socket was down must not survive an authoritative inventory, or absence
-    // proofs (terminal list demotion, send guard) are defeated forever.
+    // Reconcile missed disconnect-time exits so cached hasPty results cannot block absence proofs.
     it('drops cached session ids an authoritative inventory omits', async () => {
       const { id } = await adapter.spawn({ cols: 80, rows: 24 })
       const staleId = 'repo::/repo/stale@@deadbeef'
@@ -755,7 +755,6 @@ describe('DaemonPtyAdapter (IPtyProvider)', () => {
     })
 
     it('evicts oldest tombstone when exceeding limit', async () => {
-      // Why: MAX_TOMBSTONES is 1000; spawning that many is slow, so verify eviction with a small batch via the public spawn API.
       const ids: string[] = []
       for (let i = 0; i < 5; i++) {
         const id = `evict-${i}`
@@ -764,19 +763,16 @@ describe('DaemonPtyAdapter (IPtyProvider)', () => {
         await adapter.shutdown(id, { immediate: true })
       }
 
-      // All 5 should be tombstoned
       for (const id of ids) {
         await expect(adapter.spawn({ cols: 80, rows: 24, sessionId: id })).rejects.toThrow(
           'was explicitly killed'
         )
       }
 
-      // clearTombstone the first one, then re-kill it — it should still work
       adapter.clearTombstone(ids[0])
       await adapter.spawn({ cols: 80, rows: 24, sessionId: ids[0] })
       await adapter.shutdown(ids[0], { immediate: true })
 
-      // First tombstone was re-added at the Map's end, so eviction order is now [evict-1, evict-2, evict-3, evict-4, evict-0]
       await expect(adapter.spawn({ cols: 80, rows: 24, sessionId: ids[0] })).rejects.toThrow(
         'was explicitly killed'
       )
@@ -825,7 +821,6 @@ describe('DaemonPtyAdapter (IPtyProvider)', () => {
     })
 
     it('kills sessions whose id does not match the minted format, even if id is in valid set', async () => {
-      // Why: parsePtySessionId rejects ids with no worktree shape, so they're orphaned regardless of valid-set membership.
       const sessionId = 'bare-uuid-no-separators'
       await adapter.spawn({ cols: 80, rows: 24, sessionId })
 

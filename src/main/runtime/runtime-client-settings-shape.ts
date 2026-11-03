@@ -22,7 +22,9 @@ export type RuntimeClientSettings = Pick<
   | 'defaultLinearTeamSelection'
   | 'githubProjects'
   | 'experimentalNewWorktreeCardStyle'
-  | 'experimentalNativeChat'
+  | 'nativeChatProviders'
+  | 'agentPermissionDefault'
+  | 'agentPermissionOverrides'
   | 'compactWorktreeCards'
   | 'minimaxGroupId'
   | 'minimaxUsageModels'
@@ -33,7 +35,6 @@ export type RuntimeClientSettings = Pick<
   | 'worktreeVisibilityDefaults'
   | 'agentSkillSharingEnabled'
   | 'machineName'
-  | 'nativeChatPermissionMode'
 > & {
   hostSettingOverrides: RuntimeHostDisplayLabelOverrides
   sourceControlAi: RuntimeClientSourceControlAi
@@ -49,6 +50,9 @@ export type RuntimeHostDisplayLabelOverrides = Partial<
 
 export type RuntimeClientSettingsUpdate = Pick<
   Partial<GlobalSettings>,
+  | 'nativeChatProviders'
+  | 'agentPermissionDefault'
+  | 'agentPermissionOverrides'
   | 'agentStatusHooksEnabled'
   | 'defaultTuiAgent'
   | 'disabledTuiAgents'
@@ -70,5 +74,4 @@ export type RuntimeClientSettingsUpdate = Pick<
   | 'prBotAuthorOverrides'
   | 'worktreeVisibilityDefaults'
   | 'machineName'
-  | 'nativeChatPermissionMode'
 >

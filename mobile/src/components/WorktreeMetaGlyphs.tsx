@@ -1,70 +1,47 @@
-import { CircleDot, GitMerge, StickyNote } from 'lucide-react-native'
-import { StyleSheet, Text, View } from 'react-native'
-import type { MobileTheme } from '../theme/mobile-theme'
+import { CalendarClock, CircleDot, GitMerge, SquareTerminal, StickyNote } from 'lucide-react-native'
+import { Text, View } from 'react-native'
+import { colors } from '../theme/mobile-theme'
+import { themedStyleSheet } from '../theme/themed-styles'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
+import { TaskProviderLogo } from './TaskProviderLogo'
+import type { WorktreeMetaGlyphPresence } from '../worktree/worktree-meta-glyph-presence'
 import { prStateToken } from './pr-state-token'
-import { statusColor, statusTextColor } from './pr-sidebar/pr-sidebar-status-color'
+import { statusColor } from './pr-sidebar/pr-sidebar-status-color'
 
-// PR chip color by state, resolved through the shared prStateToken so it always
-// matches the PR sidebar's state badge: merged = purple, open = green, closed =
-// red, draft/unknown = muted.
-export function prStateColor(state: string, theme: MobileTheme): string {
-  return statusColor(prStateToken(state), theme)
+// Use shared prStateToken to match sidebar badge: merged purple, open green, closed red, draft/unknown muted.
+export function prStateColor(state: string): string {
+  return statusColor(prStateToken(state))
 }
 
-export function prStateTextColor(state: string, theme: MobileTheme): string {
-  return statusTextColor(prStateToken(state), theme)
-}
-
-type Props = {
-  theme: MobileTheme
-  comment?: string | null
-  linkedLinearIssue?: string | null
-  linkedGitLabMR?: number | null
-  linkedIssue?: number | null
-  linkedGitLabIssue?: number | null
-}
-
-// Presence glyphs for linked notes / Linear / GitLab MR / issue, matching the
-// desktop WorktreeCardMetaBadges row. Mobile shows presence only; the full
-// detail (title/state/labels) is a follow-up detail sheet.
-export function WorktreeMetaGlyphs({
-  theme,
-  comment,
-  linkedLinearIssue,
-  linkedGitLabMR,
-  linkedIssue,
-  linkedGitLabIssue
-}: Props) {
-  const styles = createStyles(theme)
-  const hasNotes = (comment ?? '').trim().length > 0
-  const hasLinear = Boolean(linkedLinearIssue)
-  const hasGitLabMR = linkedGitLabMR != null
-  const hasIssue = linkedIssue != null || linkedGitLabIssue != null
-  if (!hasNotes && !hasLinear && !hasGitLabMR && !hasIssue) {
+// Match desktop metadata order; mobile glyphs show presence, with full details reserved for sheet.
+export function WorktreeMetaGlyphs({ presence }: { presence: WorktreeMetaGlyphPresence }) {
+  useMobileColorScheme()
+  if (!Object.values(presence).some(Boolean)) {
     return null
   }
   return (
     <View style={styles.metaGlyphs}>
-      {hasNotes && <StickyNote size={11} color={theme.color.text.secondary} />}
-      {hasIssue && <CircleDot size={11} color={theme.color.text.secondary} />}
-      {hasLinear && <Text style={styles.linearGlyph}>L</Text>}
-      {hasGitLabMR && <GitMerge size={11} color={theme.color.text.secondary} />}
+      {presence.notes && <StickyNote size={11} color={colors.textMuted} />}
+      {presence.automation && <CalendarClock size={11} color={colors.textMuted} />}
+      {presence.cli && <SquareTerminal size={11} color={colors.textMuted} />}
+      {presence.issue && <CircleDot size={11} color={colors.textMuted} />}
+      {presence.jira && <TaskProviderLogo provider="jira" size={10} color={colors.textMuted} />}
+      {presence.linear && <Text style={styles.linearGlyph}>L</Text>}
+      {presence.gitLabMR && <GitMerge size={11} color={colors.textMuted} />}
     </View>
   )
 }
 
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    metaGlyphs: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.space4,
-      marginLeft: theme.spacing.space4
-    },
-    linearGlyph: {
-      ...theme.typography.caption,
-      fontWeight: '700',
-      color: theme.color.text.secondary
-    }
-  })
-}
+const styles = themedStyleSheet(() => ({
+  metaGlyphs: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginLeft: 2
+  },
+  linearGlyph: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.textMuted
+  }
+}))

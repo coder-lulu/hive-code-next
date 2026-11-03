@@ -1,4 +1,6 @@
+import { launchRecordStore } from './structured-agent-launch-composition.test-support'
 import { createAcpStructuredLaunchResolver } from './structured-agent-launch-composition.test-support'
+import { createStructuredAgentSessionLogger } from '../native-chat/agent-session-wire/structured-agent-session-logger'
 import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -36,23 +38,23 @@ async function fakeOmp(dir: string, version: string): Promise<string> {
 }
 
 function runtimeWith(settings: Settings) {
-  return {
-    requireStore: () => ({ getSettings: () => settings }),
-    resolveRuntimeFileTarget: async () => ({ worktree: { path: root } })
-  }
+  return { requireStore: () => ({ getSettings: () => settings }) }
 }
+const workspace = async () => root
 
 function launchWith(settings: Settings) {
   return createAcpStructuredLaunchResolver(acpLaunchSpecFor('omp')!, {
-    store: {
-      getRecord: () => ({
+    dataDirectory: root,
+    logger: createStructuredAgentSessionLogger(),
+    store: launchRecordStore(
+      () => ({
         ...agentSessionRecordFixture(),
         provider: 'omp',
         providerHandleChain: [],
         accountHome: { variable: 'PI_CODING_AGENT_DIR', path: join(root, '.omp', 'agent') }
       }),
-      pinLaunchDirectory: vi.fn()
-    },
+      vi.fn()
+    ),
     readJournal: () => null,
     resolveWorkspacePath: async () => root,
     resolveEnvironment: async () => loginShell.env,
@@ -91,7 +93,7 @@ describe.skipIf(process.platform === 'win32')('OMP create check and launch, real
       agentDefaultEnv: {},
       agentCmdOverrides: { omp: join(privateBin, 'omp') }
     }
-    expect(await structuredAgentSupportsLaunch('omp', 'id:w', runtimeWith(settings))).toBe(true)
+    expect(await structuredAgentSupportsLaunch('omp', workspace, runtimeWith(settings))).toBe(true)
     const launch = await launchWith(settings)
     expect(launch.command).toBe(join(privateBin, 'omp'))
     expect(launch.args).toEqual(['acp'])
@@ -99,13 +101,13 @@ describe.skipIf(process.platform === 'win32')('OMP create check and launch, real
 
   it('asks the OMP the per-agent PATH names, not the one first on the shell PATH', async () => {
     const settings = { ...base, agentDefaultEnv: { omp: { PATH: `${privateBin}:/usr/bin:/bin` } } }
-    expect(await structuredAgentSupportsLaunch('omp', 'id:w', runtimeWith(settings))).toBe(true)
+    expect(await structuredAgentSupportsLaunch('omp', workspace, runtimeWith(settings))).toBe(true)
     expect((await launchWith(settings)).command).toBe(join(privateBin, 'omp'))
   })
 
   it('keeps an OMP older than 17.0.5 on its terminal-backed chat', async () => {
     const settings = { ...base, agentDefaultEnv: {} }
-    expect(await structuredAgentSupportsLaunch('omp', 'id:w', runtimeWith(settings))).toBe(false)
+    expect(await structuredAgentSupportsLaunch('omp', workspace, runtimeWith(settings))).toBe(false)
   })
 
   it('refuses the launch with the setting named when the Command is not runnable', async () => {
@@ -115,7 +117,7 @@ describe.skipIf(process.platform === 'win32')('OMP create check and launch, real
       agentCmdOverrides: { omp: join(root, 'missing', 'omp') }
     }
     // Admitted, so the chat states why rather than silently opening a terminal.
-    expect(await structuredAgentSupportsLaunch('omp', 'id:w', runtimeWith(settings))).toBe(true)
+    expect(await structuredAgentSupportsLaunch('omp', workspace, runtimeWith(settings))).toBe(true)
     await expect(launchWith(settings)).rejects.toMatchObject({
       name: 'AgentSessionPreSpawnError',
       reason: 'agentCommandNotRunnable'

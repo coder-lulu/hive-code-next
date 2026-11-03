@@ -437,7 +437,9 @@ describe('host-store list mutations', () => {
   })
 
   it('awaits cleanup scheduling after metadata commit', async () => {
-    let resolveSchedule: (() => void) | null = null
+    let resolveSchedule: () => void = () => {
+      throw new Error('Expected pending cleanup scheduling')
+    }
     scheduleCleanupMock.mockReturnValue(
       new Promise<void>((resolve) => {
         resolveSchedule = resolve
@@ -456,13 +458,15 @@ describe('host-store list mutations', () => {
       asyncStorageMock.setItem.mock.invocationCallOrder[0]!
     )
 
-    resolveSchedule?.()
+    resolveSchedule()
     await removal
     expect(settled).toBe(true)
   })
 
   it('applies concurrent rename and remove without clobbering either', async () => {
-    let releaseReads: (() => void) | null = null
+    let releaseReads: () => void = () => {
+      throw new Error('Expected pending storage reads')
+    }
     const readsReleased = new Promise<void>((resolve) => {
       releaseReads = resolve
     })
@@ -485,7 +489,7 @@ describe('host-store list mutations', () => {
     await vi.waitFor(() => {
       expect(pendingReads).toBeGreaterThanOrEqual(1)
     })
-    releaseReads?.()
+    releaseReads()
     await Promise.all([rename, remove])
 
     expect(JSON.parse(storedHostsRaw)).toEqual([

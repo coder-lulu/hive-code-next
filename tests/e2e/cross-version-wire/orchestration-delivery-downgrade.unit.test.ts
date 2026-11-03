@@ -1,27 +1,22 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { beforeAll, expect, test } from 'vitest'
+import { expect, test } from 'vitest'
 import { OrchestrationDb } from '../../../src/main/runtime/orchestration/db'
 import { SCHEMA_VERSION } from '../../../src/main/runtime/orchestration/db/contract-constants'
 import { importReleaseCheckoutModule, materializeReleaseCheckout } from './release-checkout'
 
 // Pin the last pre-v41 implementation: this contract specifically exercises status-only readers.
 const PRE_V41 = 'aac38d698ff75ac4c8658addab48ef5a83617619'
-let OldDb: typeof OrchestrationDb
 
-beforeAll(async () => {
-  // Prepare the exact released implementation before exercising the database
-  // round trip. Keep the existing checkout process deadline and test timeout.
+// Allow cold checkout extraction, whose 45s deadline exceeds the default test timeout.
+test('pre-v41 code opens, acknowledges and writes a current-schema database, then current code reopens it', async () => {
   const checkout = await materializeReleaseCheckout(PRE_V41)
   const baseline = await importReleaseCheckoutModule(
     checkout,
     'src/main/runtime/orchestration/db.ts'
   )
-  OldDb = baseline.OrchestrationDb as typeof OrchestrationDb
-})
-
-test('pre-v41 code opens, acknowledges and writes a current-schema database, then current code reopens it', () => {
+  const OldDb = baseline.OrchestrationDb as typeof OrchestrationDb
   const directory = mkdtempSync(join(tmpdir(), 'orca-delivery-downgrade-'))
   const path = join(directory, 'orchestration.db')
   let db: OrchestrationDb | undefined

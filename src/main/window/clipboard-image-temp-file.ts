@@ -8,16 +8,22 @@ import {
   assertClipboardImageByteLengthWithinLimit,
   CLIPBOARD_IMAGE_TEMP_FILE_PREFIX
 } from '../../shared/clipboard-image'
-import type { AgentSessionAttachmentClipboardTarget } from '../../shared/agent-session-attachments'
+import {
+  sanitizeAgentSessionAttachmentName,
+  type AgentSessionAttachmentClipboardTarget
+} from '../../shared/agent-session-attachments'
 import { nativeChatPasteFolder } from './native-chat-paste-files'
 
 export type SaveClipboardImageAsTempFileArgs = {
   connectionId?: string | null
+  /** Original picked-file name; retained only after shell-safe basename sanitization. */
+  fileName?: string
   runtimeEnvironmentId?: string | null
   /** With `runtimeEnvironmentId`: store the image as an attachment of this structured chat. */
   agentSessionAttachment?: AgentSessionAttachmentClipboardTarget
   /** A native-chat composer paste: kept in Orca's paste folder so its draft can bring it back. */
   forNativeChatDraft?: boolean
+  forStructuredChat?: boolean
 }
 
 export async function saveClipboardImageBufferAsTempFile(
@@ -39,7 +45,15 @@ export async function saveClipboardImageBufferAsTempFile(
     folder = nativeChatPasteFolder()
     await fs.mkdir(folder, { recursive: true })
   }
-  const tempPath = path.join(folder, fileName)
+  const pickedName = args?.fileName
+    ? sanitizeAgentSessionAttachmentName(args.fileName).replace(/[^\p{L}\p{M}\p{N} ._-]/gu, '_')
+    : null
+  const tempPath = pickedName
+    ? path.join(folder, `${CLIPBOARD_IMAGE_TEMP_FILE_PREFIX}-${randomUUID()}`, pickedName)
+    : path.join(folder, fileName)
+  if (pickedName) {
+    await fs.mkdir(path.dirname(tempPath), { recursive: true })
+  }
   await fs.writeFile(tempPath, buffer)
   return tempPath
 }

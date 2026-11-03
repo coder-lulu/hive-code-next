@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ConnectionState } from '../transport/types'
 import type { RpcClient } from '../transport/rpc-client'
 import {
@@ -18,7 +18,10 @@ import {
   type PrSidebarLoadDeps,
   type PrSidebarState
 } from './mobile-pr-sidebar-state'
-import { fetchWorktreeLinkedPR } from '../source-control/mobile-pr-link'
+import {
+  clearMobileWorktreeReviewLink,
+  fetchWorktreeGitHubPRLink
+} from '../source-control/mobile-pr-link'
 
 type PrSidebarControllerInput = {
   client: RpcClient | null
@@ -64,13 +67,60 @@ export function useMobilePrSidebarController(input: PrSidebarControllerInput) {
   const probeReady = client !== null && connState === 'connected'
   const identity = buildMobilePrSidebarIdentity({ worktreeId, branch })
 
+  const ownerEpoch = useRef(0)
+  const mounted = useRef(false)
+  const scope = useRef({ client, identity, headSha, connState })
+  useLayoutEffect(() => {
+    scope.current = { client, identity, headSha, connState }
+  }, [client, identity, headSha, connState])
+  useLayoutEffect(() => {
+    mounted.current = true
+    const retire = () => {
+      ownerEpoch.current += 1
+      loadSeqRef.current += 1
+      detailsSeqRef.current += 1
+      detailsInFlightRef.current = null
+      stateIdentityRef.current = null
+      setState({ kind: 'hidden' })
+    }
+    retire()
+    const unsubscribe = client?.onStateChange?.(retire)
+    return () => {
+      mounted.current = false
+      ownerEpoch.current += 1
+      loadSeqRef.current += 1
+      detailsSeqRef.current += 1
+      unsubscribe?.()
+    }
+  }, [client, identity, connState])
+  const captureOwner = useCallback(() => {
+    if (!client || connState !== 'connected' || client.getState() !== 'connected') {
+      return null
+    }
+    const epoch = ownerEpoch.current
+    const generation = client.getGeneration?.()
+    const connectedAt = client.getLastConnectedAt()
+    return () =>
+      mounted.current &&
+      epoch === ownerEpoch.current &&
+      scope.current.client === client &&
+      scope.current.identity === identity &&
+      scope.current.headSha === headSha &&
+      scope.current.connState === 'connected' &&
+      client.getState() === 'connected' &&
+      client.getGeneration?.() === generation &&
+      client.getLastConnectedAt() === connectedAt
+  }, [client, connState, identity, headSha])
+
   const buildDeps = useCallback((): PrSidebarLoadDeps | null => {
     if (!client) {
       return null
     }
     return {
       fetchForBranch: (wt, args) => fetchHostedReviewForBranch(client, wt, args),
-      fetchWorktreeLinkedPR: (wt) => fetchWorktreeLinkedPR(client, wt),
+      fetchWorktreeGitHubPRLink: (wt) => fetchWorktreeGitHubPRLink(client, wt),
+      clearWorktreeReviewLink: (wt, expected, isCurrent) =>
+        clearMobileWorktreeReviewLink(client, wt, expected, isCurrent),
       fetchPRForBranch: (wt, args) => fetchPRForBranch(client, wt, args),
       fetchWorkItemDetails: (wt, args) => fetchWorkItemDetails(client, wt, args),
       fetchPRChecks: (wt, args) => fetchPRChecks(client, wt, args)
@@ -107,29 +157,13 @@ export function useMobilePrSidebarController(input: PrSidebarControllerInput) {
     }
   }, [probeReady, client, worktreeId])
 
-  useEffect(() => {
-    if (!identity) {
-      loadSeqRef.current += 1
-      detailsSeqRef.current += 1
-      stateIdentityRef.current = null
-      setState({ kind: 'hidden' })
-      return
-    }
-    if (stateIdentityRef.current !== null && stateIdentityRef.current !== identity) {
-      // Why: data is scoped to branch; a branch switch must not keep rendering the previous PR as "fresh."
-      loadSeqRef.current += 1
-      detailsSeqRef.current += 1
-      stateIdentityRef.current = null
-      setState({ kind: 'hidden' })
-    }
-  }, [identity])
-
   const load = useCallback(
     async (options?: PrSidebarLoadOptions) => {
       const includeDetails = options?.includeDetails ?? true
       const deps = buildDeps()
       const loadIdentity = identity
-      if (!deps || !branch || !loadIdentity) {
+      const ownsScope = captureOwner()
+      if (!deps || !branch || !loadIdentity || !ownsScope) {
         return
       }
       const seq = loadSeqRef.current + 1
@@ -147,11 +181,9 @@ export function useMobilePrSidebarController(input: PrSidebarControllerInput) {
         setState({ kind: 'loading' })
       }
       // Phase 1: PR + checks (fast); linkedPR read runs in parallel with forBranch so a closed/merged linked PR still resolves.
-      const next = await loadPrSidebarData(deps, { worktreeId, branch, headSha })
-      if (
-        !shouldApplyResult(seq, loadSeqRef.current) ||
-        stateIdentityRef.current !== loadIdentity
-      ) {
+      const isCurrent = () => ownsScope() && shouldApplyResult(seq, loadSeqRef.current)
+      const next = await loadPrSidebarData(deps, { worktreeId, branch, headSha, isCurrent })
+      if (!isCurrent() || stateIdentityRef.current !== loadIdentity) {
         return
       }
       stateIdentityRef.current = loadIdentity
@@ -188,6 +220,7 @@ export function useMobilePrSidebarController(input: PrSidebarControllerInput) {
       }
       // Ownership keyed on detailsSeq (not loadSeq): a chip-only soft refresh bumps loadSeq without detailsSeq and must not discard these details.
       if (
+        !ownsScope() ||
         detailsSeq !== detailsSeqRef.current ||
         stateIdentityRef.current !== loadIdentity ||
         stateRef.current.kind !== 'ready' ||
@@ -203,7 +236,7 @@ export function useMobilePrSidebarController(input: PrSidebarControllerInput) {
       })
       setState({ kind: 'ready', data: { ...stateRef.current.data, details } })
     },
-    [buildDeps, branch, headSha, identity, worktreeId]
+    [buildDeps, branch, headSha, identity, worktreeId, captureOwner]
   )
 
   // Phase-2-only fill-in; uses detailsSeqRef so it can't cancel a concurrent phase-1, and re-fetches non-null placeholders too.
@@ -214,7 +247,8 @@ export function useMobilePrSidebarController(input: PrSidebarControllerInput) {
     }
     const deps = buildDeps()
     const loadIdentity = identity
-    if (!deps || !loadIdentity || stateIdentityRef.current !== loadIdentity) {
+    const ownsScope = captureOwner()
+    if (!deps || !loadIdentity || !ownsScope || stateIdentityRef.current !== loadIdentity) {
       return
     }
     const prNumber = current.data.pr.number
@@ -231,6 +265,7 @@ export function useMobilePrSidebarController(input: PrSidebarControllerInput) {
       detailsInFlightRef.current = null
     }
     if (
+      !ownsScope() ||
       detailsSeq !== detailsSeqRef.current ||
       stateIdentityRef.current !== loadIdentity ||
       stateRef.current.kind !== 'ready' ||
@@ -247,7 +282,7 @@ export function useMobilePrSidebarController(input: PrSidebarControllerInput) {
       kind: 'ready',
       data: { ...stateRef.current.data, details }
     })
-  }, [buildDeps, identity, worktreeId])
+  }, [buildDeps, identity, worktreeId, captureOwner])
 
   // Soft-refresh on same-branch HEAD advance; restart in-flight load so the advance isn't applied with a stale SHA.
   useEffect(() => {

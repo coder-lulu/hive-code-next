@@ -38,7 +38,8 @@ export function buildShortcutRowVisibility(options: {
     rows: group.items
       .filter(
         (item) =>
-          (options.managedBrowserCreationEnabled || item.id !== 'tab.newBrowser') &&
+          (options.managedBrowserCreationEnabled ||
+            (item.id !== 'tab.newBrowser' && item.id !== 'tab.newBrowserSplitRight')) &&
           (options.mobileEmulatorCreationEnabled || item.id !== 'tab.newSimulator')
       )
       .map((item) => {

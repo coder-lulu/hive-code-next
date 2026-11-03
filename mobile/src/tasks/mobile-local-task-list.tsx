@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { APP_DISPLAY_NAME } from '@/product-brand'
 import { useMemo } from 'react'
 import { ActivityIndicator, Pressable, RefreshControl, SectionList, Text, View } from 'react-native'
@@ -79,6 +80,8 @@ function MobileLocalTaskRowView({
   now: number
   onOpen: MobileLocalTaskListProps['onOpen']
 }) {
+  const t = useMobileTranslation()
+
   const styles = useMemo(() => createMobileLocalTaskStyles(theme), [theme])
   const statusLabel = mobileLocalTaskStatusLabel(row)
   const statusTextStyle = !row.verifiable
@@ -94,7 +97,7 @@ function MobileLocalTaskRowView({
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
       accessibilityRole="button"
       accessibilityLabel={`${row.title}，${statusLabel}，${rowMetadata(row, now)}`}
-      accessibilityHint="打开对应工作区会话"
+      accessibilityHint={t('tasks.local.openSession', 'Open the corresponding workspace session')}
       onPress={() => onOpen(row.worktreeId, row.tabId)}
     >
       <View style={styles.statusIcon} accessibilityElementsHidden>
@@ -146,16 +149,20 @@ function MobileLocalTaskState({
   onCreate?: () => void
   onSelectRuntime?: () => void
 }) {
+  const t = useMobileTranslation()
+
   const styles = useMemo(() => createMobileLocalTaskStyles(theme), [theme])
   if (feed.phase === 'loading') {
     return (
       <View style={styles.state} accessibilityLiveRegion="polite">
         <ActivityIndicator size="small" color={theme.color.text.secondary} />
         <Text style={styles.stateTitle} maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}>
-          {scope === 'all' ? '正在加载任务' : '正在加载本地任务'}
+          {scope === 'all'
+            ? t('tasks.local.loadingAll', 'Loading tasks')
+            : t('tasks.local.loading', 'Loading local tasks')}
         </Text>
         <Text style={styles.stateText} maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}>
-          正在读取当前 Runtime 的终端会话。
+          {t('tasks.local.reading', 'Reading terminal sessions from the current Runtime.')}
         </Text>
       </View>
     )
@@ -174,52 +181,73 @@ function MobileLocalTaskState({
       <Text style={styles.stateTitle} maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}>
         {searchEmpty
           ? scope === 'all'
-            ? '没有匹配的任务'
-            : '没有匹配的本地任务'
+            ? t('tasks.local.noMatchesAll', 'No matching tasks')
+            : t('tasks.local.noMatches', 'No matching local tasks')
           : filterEmpty
             ? scope === 'all'
-              ? '没有符合筛选的任务'
-              : '没有符合筛选的本地任务'
+              ? t('tasks.local.filterEmptyAll', 'No tasks match the filter')
+              : t('tasks.local.filterEmpty', 'No local tasks match the filter')
             : disconnected
-              ? 'Runtime 未连接'
+              ? t('tasks.local.disconnected', 'Runtime disconnected')
               : failed
                 ? scope === 'all'
-                  ? '无法加载任务'
-                  : '无法加载本地任务'
+                  ? t('tasks.local.loadFailedAll', 'Could not load tasks')
+                  : t('tasks.local.loadFailed', 'Could not load local tasks')
                 : scope === 'all'
-                  ? '还没有任务'
-                  : '还没有本地任务'}
+                  ? t('tasks.local.emptyAll', 'No tasks yet')
+                  : t('tasks.local.empty', 'No local tasks yet')}
       </Text>
       <Text style={styles.stateText} maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}>
         {searchEmpty
-          ? '换个标题、仓库、分支或 Agent 试试。'
+          ? t('tasks.local.searchHint', 'Try a different title, repository, branch, or agent.')
           : filterEmpty
-            ? '切换到全部状态查看其他任务。'
+            ? t('tasks.local.filterHint', 'Switch to all statuses to see other tasks.')
             : disconnected
               ? scope === 'all'
-                ? '连接恢复前无法验证任务状态。'
-                : '连接恢复前无法验证本地任务状态。'
+                ? t(
+                    'tasks.local.unverifiedAll',
+                    'Task status cannot be verified until the connection recovers.'
+                  )
+                : t(
+                    'tasks.local.unverified',
+                    'Local task status cannot be verified until the connection recovers.'
+                  )
               : failed
-                ? (feed.error ?? 'Runtime 未返回可用的会话数据。')
+                ? (feed.error ??
+                  t('tasks.local.noSessionData', 'The Runtime returned no usable session data.'))
                 : scope === 'all'
-                  ? `从一个清晰目标开始，${APP_DISPLAY_NAME} 会在已连接的 Runtime 上执行。`
-                  : '当前 Runtime 中没有来源为本地且带真实 Agent 状态的终端会话。'}
+                  ? t(
+                      'tasks.local.startHintAll',
+                      'Start with a clear goal. {{value0}} will run on the connected Runtime.',
+                      { value0: APP_DISPLAY_NAME }
+                    )
+                  : t(
+                      'tasks.local.startHint',
+                      'The current Runtime has no local terminal sessions with a verified agent status.'
+                    )}
       </Text>
       {!searchEmpty && !filterEmpty && !disconnected ? (
         <Text style={styles.limitationText} maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}>
-          最近完成只包含仍保留在会话列表中的记录。
+          {t(
+            'tasks.local.recentHint',
+            'Recently completed includes only records still in the session list.'
+          )}
         </Text>
       ) : null}
       {failed ? (
         <Pressable
           style={({ pressed }) => [styles.retryButton, pressed && styles.retryButtonPressed]}
           accessibilityRole="button"
-          accessibilityLabel={scope === 'all' ? '重试加载任务' : '重试加载本地任务'}
+          accessibilityLabel={
+            scope === 'all'
+              ? t('tasks.local.retryAll', 'Retry loading tasks')
+              : t('tasks.local.retry', 'Retry loading local tasks')
+          }
           onPress={feed.reload}
         >
           <RefreshCw size={17} color={theme.color.text.inverse} strokeWidth={2} />
           <Text style={styles.retryText} maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}>
-            重试
+            {t('common.retry', 'Retry')}
           </Text>
         </Pressable>
       ) : null}
@@ -227,12 +255,12 @@ function MobileLocalTaskState({
         <Pressable
           style={({ pressed }) => [styles.retryButton, pressed && styles.retryButtonPressed]}
           accessibilityRole="button"
-          accessibilityLabel="新建任务"
+          accessibilityLabel={t('tasks.local.newTask', 'New task')}
           onPress={onCreate}
         >
           <Plus size={18} color={theme.color.text.inverse} strokeWidth={2} />
           <Text style={styles.retryText} maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}>
-            新建任务
+            {t('tasks.local.newTask', 'New task')}
           </Text>
         </Pressable>
       ) : null}
@@ -240,11 +268,11 @@ function MobileLocalTaskState({
         <Pressable
           style={({ pressed }) => [styles.runtimeButton, pressed && styles.runtimeButtonPressed]}
           accessibilityRole="button"
-          accessibilityLabel="连接或切换电脑"
+          accessibilityLabel={t('tasks.local.selectComputer', 'Connect or switch computer')}
           onPress={onSelectRuntime}
         >
           <Text style={styles.runtimeButtonText} maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}>
-            连接或切换电脑
+            {t('tasks.local.selectComputer', 'Connect or switch computer')}
           </Text>
         </Pressable>
       ) : null}
@@ -265,23 +293,29 @@ export function MobileLocalTaskList({
   onCreate,
   onSelectRuntime
 }: MobileLocalTaskListProps) {
+  const t = useMobileTranslation()
+
   const styles = useMemo(() => createMobileLocalTaskStyles(theme), [theme])
   const liveNow = useNow(30_000, now === undefined)
   const displayedNow = now ?? liveNow
   const sections = useMemo<MobileLocalTaskSection[]>(() => {
     const result: MobileLocalTaskSection[] = []
     if (feed.inProgress.length > 0) {
-      result.push({ key: 'in-progress', title: '进行中', data: feed.inProgress })
+      result.push({
+        key: 'in-progress',
+        title: t('worktree.workspaceListSections.inProgress', 'In progress'),
+        data: feed.inProgress
+      })
     }
     if (feed.recentCompleted.length > 0) {
       result.push({
         key: 'recent-completed',
-        title: '最近完成',
+        title: t('tasks.local.recent', 'Recently completed'),
         data: feed.recentCompleted
       })
     }
     return result
-  }, [feed.inProgress, feed.recentCompleted])
+  }, [feed.inProgress, feed.recentCompleted, t])
 
   if (sections.length === 0) {
     return (
@@ -361,7 +395,10 @@ export function MobileLocalTaskList({
       ListFooterComponent={
         <View style={styles.footer}>
           <Text style={styles.limitationText} maxFontSizeMultiplier={MAX_FONT_SIZE_MULTIPLIER}>
-            最近完成来自当前 Runtime 仍保留的会话，并非持久任务历史。
+            {t(
+              'tasks.local.recentFooter',
+              'Recently completed shows sessions retained by the current Runtime, not persistent task history.'
+            )}
           </Text>
         </View>
       }

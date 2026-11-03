@@ -25,61 +25,13 @@ import {
 } from './windows-process-tree-gyp-rebuild.mjs'
 
 const sourceScriptPath = fileURLToPath(new URL('./ensure-native-runtime.mjs', import.meta.url))
-// The import walk sees `from './x.mjs'` only, so the createRequire'd CJS
-// siblings have to be named. Without them the temp project cannot even load.
+// Fixture import walk misses createRequire CJS edges; name siblings explicitly or temp project cannot load.
 const REQUIRED_CJS_SIBLINGS = [
   'node-pty-job-ownership.cjs',
   'windows-process-tree-creation-time.cjs'
 ]
 
 describe('ensure-native-runtime', () => {
-  it('prepares macOS binding before Node compilation and leaves successful checks read-only', () => {
-    const projectDir = mkTempProject()
-    try {
-      writeFakeNativeModules(projectDir)
-      writeNodePtyPatchFile(projectDir)
-      writeFakeNodeGyp(projectDir)
-      const bindingPath = join(projectDir, 'node_modules', 'node-pty', 'binding.gyp')
-      const binding = "{ 'target_defaults': {}, 'targets': [] }\n"
-      writeFileSync(bindingPath, binding)
-      const snapshotPath = join(projectDir, 'compile-binding.gyp')
-      const markerPath = join(projectDir, 'rebuilt.marker')
-      const logPath = join(projectDir, 'native-runtime.log')
-      const scriptPath = join(projectDir, 'config', 'scripts', 'ensure-native-runtime.mjs')
-      const options = {
-        cwd: projectDir,
-        env: envForNativeFixture(projectDir, {
-          ORCA_NATIVE_TEST_LOG: logPath,
-          ORCA_NATIVE_TEST_MARKER: markerPath,
-          ORCA_NATIVE_TEST_BINDING_SNAPSHOT: snapshotPath
-        })
-      }
-      const rebuilt = runProcessSync({
-        program: process.execPath,
-        args: [scriptPath, '--runtime=node'],
-        ...options
-      })
-      expect(rebuilt.code, rebuilt.stderr).toBe(0)
-      const compiledBinding = readFileSync(snapshotPath, 'utf8')
-      expect(compiledBinding !== binding).toBe(process.platform === 'darwin')
-      expect(readFileSync(bindingPath, 'utf8')).toBe(compiledBinding)
-      writePatchedNodePtyBuildArtifacts(projectDir)
-      writeFileSync(snapshotPath, 'no further compilation')
-      for (const args of [['--runtime=node'], ['--runtime=node', '--check-only']]) {
-        const checked = runProcessSync({
-          program: process.execPath,
-          args: [scriptPath, ...args],
-          ...options
-        })
-        expect(checked.code, checked.stderr).toBe(0)
-        expect(readFileSync(snapshotPath, 'utf8')).toBe('no further compilation')
-        expect(readFileSync(bindingPath, 'utf8')).toBe(compiledBinding)
-      }
-    } finally {
-      rmSync(projectDir, { recursive: true, force: true })
-    }
-  })
-
   it('rechecks Node native modules in fresh child processes after rebuilding', () => {
     const projectDir = mkTempProject()
 
@@ -320,8 +272,7 @@ describe('ensure-native-runtime', () => {
 
 function mkTempProject() {
   const projectDir = mkdtempSync(join(tmpdir(), 'orca-native-runtime-'))
-  // Walked, not listed: the script imports windows-process-tree-gyp-rebuild.mjs, and a fixture
-  // missing it fails every case with a module-resolution error instead of the defect under test.
+  // Copy walked windows-process-tree-gyp-rebuild dependency or every case fails before its intended check.
   copyScriptWithLocalModules(sourceScriptPath, join(projectDir, 'config', 'scripts'))
   const processPackage = join(projectDir, 'node_modules', '@orca', 'process-host')
   mkdirSync(processPackage, { recursive: true })
@@ -349,11 +300,9 @@ export function runProcessSync(options) {
 }
 
 function envForNativeFixture(projectDir, extraEnv) {
-  // Inherited case variants would mask the Windows tracking default or fixture node-gyp.
+  // An inherited tracking preference would mask the Windows default under test.
   const inherited = Object.fromEntries(
-    Object.entries(process.env).filter(
-      ([key]) => !['trackfileaccess', 'npm_config_node_gyp'].includes(key.toLowerCase())
-    )
+    Object.entries(process.env).filter(([key]) => key.toLowerCase() !== 'trackfileaccess')
   )
   return {
     ...inherited,
@@ -371,9 +320,6 @@ function writeFakeNativeModules(projectDir, { windowsRegistryRequiresMarker = fa
   )
   mkdirSync(join(nodePtyDir, 'scripts'), { recursive: true })
   writeFileSync(join(nodePtyDir, 'scripts', 'post-install.js'), '')
-  if (process.platform === 'win32') {
-    writePatchedNodePtyBuildArtifacts(projectDir)
-  }
 
   writeFileSync(join(nodePtyDir, 'index.js'), 'module.exports = {}\n')
   writeFileSync(
@@ -395,7 +341,8 @@ exports.loadNativeModule = function loadNativeModule(nativeName) {
     module: {
       listJobProcessIds() {},
       terminateJob() {},
-      assignCurrentProcessToJob() {}
+      assignCurrentProcessToJob() {},
+      assignCurrentProcessToStrictJob() {}
     }
   }
 }
@@ -405,7 +352,13 @@ exports.loadNativeModule = function loadNativeModule(nativeName) {
   if (process.platform === 'win32') {
     const buildDir = join(nodePtyDir, 'build', 'Release')
     writePatchedNodePtyBuildArtifacts(projectDir)
-    writeFileSync(join(buildDir, 'conpty.node'), '')
+    writeFileSync(
+      join(buildDir, 'conpty.node'),
+      Buffer.concat([
+        Buffer.from('msys-2.0.dll', 'utf16le'),
+        Buffer.from('assignCurrentProcessToStrictJob')
+      ])
+    )
   }
 }
 
@@ -418,9 +371,6 @@ function writeLoadableNativeModules(projectDir, { nativeDir = null } = {}) {
   )
   mkdirSync(join(nodePtyDir, 'scripts'), { recursive: true })
   writeFileSync(join(nodePtyDir, 'scripts', 'post-install.js'), '')
-  if (process.platform === 'win32') {
-    writePatchedNodePtyBuildArtifacts(projectDir)
-  }
 
   writeFileSync(join(nodePtyDir, 'index.js'), 'module.exports = {}\n')
   writeFileSync(
@@ -438,7 +388,8 @@ exports.loadNativeModule = function loadNativeModule(nativeName) {
     module: {
       listJobProcessIds: () => [],
       terminateJob: () => true,
-      assignCurrentProcessToJob: () => true
+      assignCurrentProcessToJob: () => true,
+      assignCurrentProcessToStrictJob: () => true
     }
   }
 }
@@ -467,16 +418,15 @@ function writeFakeWindowsRegistry(projectDir, { requiresMarker = false } = {}) {
   const processTreeDir = join(projectDir, 'node_modules', '@vscode', 'windows-process-tree')
   mkdirSync(processTreeDir, { recursive: true })
   writeFileSync(
-    join(processTreeDir, 'package.json'),
-    '{"name":"@vscode/windows-process-tree","version":"0.8.0","main":"index.js"}\n'
-  )
-  writeFileSync(
     join(processTreeDir, 'index.js'),
-    'exports.supportedProcessDataFlags = 4; exports.getProcessCreationTime = () => 1; exports.terminateProcessIfCreationTimeMatches = () => false\n'
+    'exports.supportedProcessDataFlags = 4; exports.getProcessCreationTime = () => 1\n'
   )
   const securityDir = join(projectDir, 'node_modules', '@orca', 'windows-security')
   mkdirSync(securityDir, { recursive: true })
-  writeFileSync(join(securityDir, 'index.js'), "exports.currentUserSid = () => 'S-1-5-18'\n")
+  writeFileSync(
+    join(securityDir, 'index.js'),
+    "exports.currentUserSid = () => 'S-1-5-18'; exports.hasNativeExport = () => true\n"
+  )
 }
 
 function writeNodePtyPatchFile(projectDir) {
@@ -488,8 +438,7 @@ function writePatchedNodePtyBuildArtifacts(projectDir) {
   const buildDir = join(projectDir, 'node_modules', 'node-pty', 'build', 'Release')
   mkdirSync(buildDir, { recursive: true })
   if (process.platform === 'win32') {
-    // Fake native payloads still satisfy the current strict ownership marker read by the child.
-    writeFileSync(join(buildDir, 'conpty.node'), 'strictPtyJobOwnership')
+    writeFileSync(join(buildDir, 'conpty.node'), '')
     mkdirSync(join(buildDir, 'conpty'), { recursive: true })
     writeFileSync(join(buildDir, 'conpty', 'conpty.dll'), '')
     writeFileSync(join(buildDir, 'conpty', 'OpenConsole.exe'), '')
@@ -507,8 +456,7 @@ function writeFakeNodeGyp(projectDir) {
   writeFileSync(
     join(toolDir, 'node-gyp.js'),
     `
-const { appendFileSync, copyFileSync, writeFileSync, writeSync } = require('node:fs')
-const { join } = require('node:path')
+const { appendFileSync, writeFileSync, writeSync } = require('node:fs')
 appendFileSync(process.env.ORCA_NATIVE_TEST_LOG, \`node-gyp \${process.argv.slice(2).join(' ')}\\n\`)
 appendFileSync(process.env.ORCA_NATIVE_TEST_LOG, \`cwd=\${process.cwd()}\\n\`)
 appendFileSync(process.env.ORCA_NATIVE_TEST_LOG, \`cxxflags=\${process.env.CXXFLAGS || ''}\\n\`)
@@ -521,13 +469,7 @@ if (process.env.ORCA_NATIVE_TEST_VERBOSE_OUTPUT_BYTES) {
   writeSync(1, 'node-gyp stdout complete\\n')
   writeSync(2, 'node-gyp stderr complete\\n')
 }
-if (process.env.ORCA_NATIVE_TEST_BINDING_SNAPSHOT) {
-  copyFileSync(join(process.cwd(), 'binding.gyp'), process.env.ORCA_NATIVE_TEST_BINDING_SNAPSHOT)
-}
 writeFileSync(process.env.ORCA_NATIVE_TEST_MARKER, 'rebuilt')
-if (process.platform === 'win32' && process.cwd().endsWith('node-pty')) {
-  writeFileSync(join(process.cwd(), 'build', 'Release', 'conpty.node'), 'strictPtyJobOwnership')
-}
 `
   )
 }

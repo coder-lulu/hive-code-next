@@ -1,3 +1,4 @@
+import { findAllByHostType, findByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -51,7 +52,7 @@ describe('MobileTasksSourceTabs', () => {
 
   it('keeps All and Local available while gating hosted providers on Runtime readiness', () => {
     const { onSelectView } = renderTabs({ taskUiReady: false })
-    const tabs = renderer!.root.findAllByType('Pressable')
+    const tabs = findAllByHostType(renderer!.root, 'Pressable')
 
     expect(tabs).toHaveLength(5)
     expect(tabs[0]!.props.accessibilityState).toEqual({ disabled: false, selected: true })
@@ -69,7 +70,7 @@ describe('MobileTasksSourceTabs', () => {
       view: 'hosted',
       visibleProviders: ['github', 'gitlab']
     })
-    const tabs = renderer!.root.findAllByType('Pressable')
+    const tabs = findAllByHostType(renderer!.root, 'Pressable')
 
     expect(tabs).toHaveLength(4)
     expect(tabs[3]!.props.accessibilityState.selected).toBe(true)
@@ -81,8 +82,8 @@ describe('MobileTasksSourceTabs', () => {
 
   it('retains provider picker metadata and 1.3x text scaling', () => {
     renderTabs({ providerPickerVisible: true, visibleProviders: ['linear'] })
-    const picker = renderer!.root.findByType('PickerModal')
-    const labels = renderer!.root.findAllByType('Text')
+    const picker = findByHostType(renderer!.root, 'PickerModal')
+    const labels = findAllByHostType(renderer!.root, 'Text')
 
     expect(MOBILE_TASK_PROVIDER_OPTIONS.map(({ value, label }) => [value, label])).toEqual([
       ['github', 'GitHub'],

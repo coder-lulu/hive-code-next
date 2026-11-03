@@ -5,7 +5,7 @@ import type {
 import type {
   PluginMarketplaceCachedSnapshot,
   PluginMarketplaceRegisteredSource
-} from './plugin-marketplace-store'
+} from './catalog/plugin-marketplace-store'
 
 export type PluginMarketplaceSourceState = {
   id: string

@@ -1,8 +1,6 @@
-import {
-  openCodexAppServerConnection,
-  type CodexAppServerConnection,
-  type CodexAppServerConnectionHandlers
-} from './codex-app-server-connection'
+import { openCodexAppServerConnection } from './codex-app-server-connection'
+import type { CodexAppServerConnection } from './app-server/codex-app-server-connection-types'
+import type { CodexAppServerConnectionHandlers } from './app-server/codex-app-server-connection-types'
 
 /**
  * A real `node -e` child speaking the same JSONL framing Codex does. Slower than

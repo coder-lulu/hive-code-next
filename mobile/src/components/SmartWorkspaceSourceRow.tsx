@@ -1,8 +1,11 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, Text, View } from 'react-native'
 import { CaseSensitive, GitBranch, Sparkles } from 'lucide-react-native'
 import type { SmartWorkspaceSourceRow as SourceRow } from '../../../src/shared/new-workspace/smart-workspace-source-results'
-import type { MobileTheme } from '../theme/mobile-theme'
-import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { colors, radii, spacing, typography } from '../theme/mobile-theme'
+import { themedStyleSheet } from '../theme/themed-styles'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
+import type { Translate } from '../i18n/mobile-i18n'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { TaskProviderLogo } from './TaskProviderLogo'
 
 type Props = {
@@ -17,70 +20,83 @@ type RowContent = {
   status?: string
 }
 
-function resolveRowContent(row: SourceRow, theme: MobileTheme): RowContent {
+function resolveRowContent(row: SourceRow, t: Translate): RowContent {
   switch (row.kind) {
     case 'use-name':
       return {
-        icon: <Sparkles size={16} color={theme.color.text.secondary} />,
-        title: `Use "${row.name}"`,
-        subtitle: 'Name this workspace'
+        icon: <Sparkles size={16} color={colors.textSecondary} />,
+        title: t('components.smartWorkspaceSourceRow.useName', 'Use "{{name}}"', {
+          name: row.name
+        }),
+        subtitle: t('components.smartWorkspaceSourceRow.nameWorkspace', 'Name this workspace')
       }
     case 'create-branch':
       return {
-        icon: <GitBranch size={16} color={theme.color.brand.primary} />,
-        title: `Create branch "${row.name}"`,
-        subtitle: 'New branch'
+        icon: <GitBranch size={16} color={colors.accentBlue} />,
+        title: t('components.smartWorkspaceSourceRow.createBranch', 'Create branch "{{name}}"', {
+          name: row.name
+        }),
+        subtitle: t('components.smartWorkspaceSourceRow.newBranch', 'New branch')
       }
     case 'github':
       return {
-        icon: <TaskProviderLogo provider="github" size={16} color={theme.color.text.secondary} />,
+        icon: <TaskProviderLogo provider="github" size={16} color={colors.textSecondary} />,
         title: row.item.title,
-        subtitle: `${row.item.type === 'pr' ? 'PR #' : 'Issue #'}${row.item.number}`,
+        subtitle:
+          row.item.type === 'pr'
+            ? t('components.smartWorkspaceSourceRow.pullRequest', 'PR #{{number}}', {
+                number: row.item.number
+              })
+            : t('components.smartWorkspaceSourceRow.issue', 'Issue #{{number}}', {
+                number: row.item.number
+              }),
         status: row.item.state
       }
     case 'gitlab':
       return {
-        icon: <TaskProviderLogo provider="gitlab" size={16} color={theme.color.text.secondary} />,
+        icon: <TaskProviderLogo provider="gitlab" size={16} color={colors.textSecondary} />,
         title: row.item.title,
-        subtitle: `${row.item.type === 'mr' ? 'MR !' : 'Issue #'}${row.item.number}`,
+        subtitle:
+          row.item.type === 'mr'
+            ? t('components.smartWorkspaceSourceRow.mergeRequest', 'MR !{{number}}', {
+                number: row.item.number
+              })
+            : t('components.smartWorkspaceSourceRow.issue', 'Issue #{{number}}', {
+                number: row.item.number
+              }),
         status: row.item.state
       }
     case 'branch':
       return {
-        icon: <GitBranch size={16} color={theme.color.text.secondary} />,
+        icon: <GitBranch size={16} color={colors.textSecondary} />,
         title: row.localBranchName || row.refName,
         subtitle: row.refName
       }
     case 'linear':
       return {
-        icon: <TaskProviderLogo provider="linear" size={16} color={theme.color.text.secondary} />,
+        icon: <TaskProviderLogo provider="linear" size={16} color={colors.textSecondary} />,
         title: row.issue.title,
         subtitle: `${row.issue.identifier} · ${row.issue.team?.key ?? 'Linear'}`,
         status: row.issue.state?.name
       }
     case 'jira':
       return {
-        icon: <TaskProviderLogo provider="jira" size={16} color={theme.color.text.secondary} />,
+        icon: <TaskProviderLogo provider="jira" size={16} color={colors.textSecondary} />,
         title: row.issue.title,
         subtitle: `${row.issue.key} · ${row.issue.project?.key ?? 'Jira'}`,
         status: row.issue.status?.name
       }
     default:
-      return {
-        icon: <CaseSensitive size={16} color={theme.color.text.secondary} />,
-        title: ''
-      }
+      return { icon: <CaseSensitive size={16} color={colors.textSecondary} />, title: '' }
   }
 }
 
 export function SmartWorkspaceSourceRow({ row, onPress }: Props) {
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createStyles)
-  const content = resolveRowContent(row, theme)
+  useMobileColorScheme()
+  const t = useMobileTranslation()
+  const content = resolveRowContent(row, t)
   return (
     <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={content.title}
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
       onPress={onPress}
     >
@@ -106,47 +122,44 @@ export function SmartWorkspaceSourceRow({ row, onPress }: Props) {
   )
 }
 
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    row: {
-      minHeight: theme.size.groupedListRowMinHeight,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.space12,
-      paddingVertical: theme.spacing.space12,
-      paddingHorizontal: theme.spacing.space16
-    },
-    rowPressed: {
-      backgroundColor: theme.color.bg.subtle
-    },
-    icon: {
-      width: 20,
-      alignItems: 'center'
-    },
-    copy: {
-      flex: 1,
-      minWidth: 0
-    },
-    title: {
-      ...theme.typography.body,
-      color: theme.color.text.primary
-    },
-    subtitle: {
-      ...theme.typography.caption,
-      color: theme.color.text.tertiary,
-      marginTop: theme.spacing.space4
-    },
-    pill: {
-      backgroundColor: theme.color.bg.subtle,
-      borderRadius: theme.radii.control,
-      paddingHorizontal: theme.spacing.space8,
-      paddingVertical: theme.spacing.space4
-    },
-    pillText: {
-      ...theme.typography.caption,
-      fontWeight: '600',
-      color: theme.color.text.secondary,
-      textTransform: 'capitalize'
-    }
-  })
-}
+const styles = themedStyleSheet(() => ({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md + 2
+  },
+  rowPressed: {
+    backgroundColor: colors.bgRaised
+  },
+  icon: {
+    width: 18,
+    alignItems: 'center'
+  },
+  copy: {
+    flex: 1,
+    minWidth: 0
+  },
+  title: {
+    fontSize: typography.bodySize,
+    color: colors.textPrimary
+  },
+  subtitle: {
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: 1
+  },
+  pill: {
+    backgroundColor: colors.bgRaised,
+    borderRadius: radii.button,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2
+  },
+  pillText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    textTransform: 'capitalize'
+  }
+}))

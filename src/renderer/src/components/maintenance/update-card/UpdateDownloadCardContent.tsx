@@ -4,6 +4,7 @@ import { getReleaseNotesUrlForVersion } from '../../../../../shared/release-chan
 import { Button } from '../../ui/button'
 import { Progress } from '../../ui/progress'
 import { translate } from '@/i18n/i18n'
+import { openAppHttpLink } from '@/lib/app-http-link-open'
 
 function isAnimatedGif(url: string | undefined): boolean {
   return typeof url === 'string' && url.toLowerCase().endsWith('.gif')
@@ -29,11 +30,10 @@ export function UpdateDownloadingContent({
   mediaLoaded: boolean
   onMediaError: () => void
   onMediaLoad: () => void
-  onCollapse?: () => void
+  onCollapse: () => void
   showReleaseNotes: boolean
 }): React.JSX.Element {
   const release = changelog?.release
-  const releaseNotesUrl = release?.releaseNotesUrl ?? getReleaseNotesUrlForVersion(version)
   const showMedia =
     release?.mediaUrl && !mediaFailed && !(prefersReducedMotion && isAnimatedGif(release.mediaUrl))
   return (
@@ -48,20 +48,15 @@ export function UpdateDownloadingContent({
             {translate('auto.components.UpdateCard.558842597d', 'Downloading Update')}
           </h3>
         )}
-        {onCollapse && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-7 shrink-0 min-w-[44px] min-h-[44px] -m-2"
-            onClick={onCollapse}
-            aria-label={translate(
-              'auto.components.UpdateCard.8acbdd3961',
-              'Minimize to status bar'
-            )}
-          >
-            <Minus className="size-3.5" />
-          </Button>
-        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7 shrink-0 min-w-[44px] min-h-[44px] -m-2"
+          onClick={onCollapse}
+          aria-label={translate('auto.components.UpdateCard.8acbdd3961', 'Minimize to status bar')}
+        >
+          <Minus className="size-3.5" />
+        </Button>
       </div>
       {showMedia && release?.mediaUrl && (
         <div className="relative overflow-hidden rounded-md">
@@ -88,11 +83,16 @@ export function UpdateDownloadingContent({
               value0: version
             })}
       </p>
-      {showReleaseNotes && releaseNotesUrl && (
+      {showReleaseNotes && (
         <button
           type="button"
           className="text-xs text-muted-foreground underline hover:text-foreground self-start"
-          onClick={() => void window.api.shell.openUrl(releaseNotesUrl)}
+          onClick={(event) =>
+            openAppHttpLink(
+              release ? release.releaseNotesUrl : (getReleaseNotesUrlForVersion(version) ?? ''),
+              { event }
+            )
+          }
         >
           {release
             ? translate('auto.components.UpdateCard.aad383aecc', 'Read the full release notes')
@@ -102,7 +102,13 @@ export function UpdateDownloadingContent({
       <div className="flex flex-col gap-2 mt-1">
         <Progress value={percent} className="h-1.5" />
         <p className="text-xs text-muted-foreground">
-          {translate('auto.components.UpdateCard.6e45bfa2e0', 'Downloading...')} {percent}%
+          {translate(
+            'auto.components.UpdateCard.downloadingPercent',
+            'Downloading... {{percent}}%',
+            {
+              percent
+            }
+          )}
         </p>
       </div>
     </div>
@@ -116,7 +122,7 @@ export function UpdateReadyToInstallContent({
 }: {
   version: string
   onRestart: () => void
-  onClose?: () => void
+  onClose: () => void
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-3 p-4">
@@ -124,20 +130,15 @@ export function UpdateReadyToInstallContent({
         <h3 className="text-sm font-semibold">
           {translate('auto.components.UpdateCard.17412483da', 'Ready to Install')}
         </h3>
-        {onClose && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-7 shrink-0 min-w-[44px] min-h-[44px] -m-2"
-            onClick={onClose}
-            aria-label={translate(
-              'auto.components.UpdateCard.8acbdd3961',
-              'Minimize to status bar'
-            )}
-          >
-            <Minus className="size-3.5" />
-          </Button>
-        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7 shrink-0 min-w-[44px] min-h-[44px] -m-2"
+          onClick={onClose}
+          aria-label={translate('auto.components.UpdateCard.8acbdd3961', 'Minimize to status bar')}
+        >
+          <Minus className="size-3.5" />
+        </Button>
       </div>
       <p className="text-sm text-muted-foreground">
         {translate(

@@ -1,5 +1,7 @@
-import type { RuntimeTerminalResolvePane, RuntimeTerminalSend } from '../../../shared/runtime-types'
+import { useAppStore } from '@/store'
 import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
+import { resolvePaneKeyForPtyId } from './runtime-terminal-pane-owner'
+import type { RuntimeTerminalResolvePane, RuntimeTerminalSend } from '../../../shared/runtime-types'
 import type { TerminalInputKind } from '../../../shared/terminal-input-kind'
 import { isTerminalInputTooLargeWithDeferredMeasurement } from '../../../shared/terminal-input'
 import { readTerminalSendAcknowledgment } from '../../../shared/terminal-send-acknowledgment'
@@ -10,9 +12,10 @@ import { recordRuntimeTerminalInputForPtyId } from './runtime-terminal-input-rec
 
 const DESKTOP_RUNTIME_CLIENT = { id: 'orca-desktop', type: 'desktop' } as const
 
-import { useAppStore } from '@/store'
-import { resolvePaneKeyForPtyId } from './runtime-terminal-pane-owner'
-
+/**
+ * True means accepted, false means refusal. `requireWriteSettlement` asks the local provider or a
+ * current host for its acknowledgment; a lost one rejects.
+ */
 export async function sendRuntimePtyInputVerified(
   ptyId: string,
   data: string,
@@ -27,11 +30,9 @@ export async function sendRuntimePtyInputVerified(
     return false
   }
   const owner = getRemoteRuntimePtyOwner(ptyId)
-  const local = !owner
-  let target: RuntimeClientTarget = owner?.target ?? { kind: 'local' }
-  let terminal = owner?.terminal ?? null
-  if (local && !options?.requireAgentStatus) {
+  if (!owner && !options?.requireAgentStatus) {
     if (options?.requireWriteSettlement) {
+      // Why: an answer that dismisses its card must not fall back to an unacknowledged write.
       const accepted = await window.api.pty.writeAccepted(ptyId, data, inputKind, {
         requireWriteSettlement: true
       })
@@ -43,13 +44,18 @@ export async function sendRuntimePtyInputVerified(
     const accepted = await window.api.pty.writeAccepted(ptyId, data, inputKind)
     if (!accepted) {
       window.api.pty.write(ptyId, data, inputKind)
+      // SSH/local fallback writes are fire-and-forget; boolean advances UX while hook telemetry proves actual turns.
+      recordRuntimeTerminalInputForPtyId(ptyId)
+      return true
     }
     recordRuntimeTerminalInputForPtyId(ptyId)
-    return true
+    return accepted
   }
+
+  const target: RuntimeClientTarget = owner?.target ?? { kind: 'local' }
+  let terminal = owner?.terminal ?? null
   try {
-    if (local) {
-      target = { kind: 'local' }
+    if (!owner) {
       const paneKey = resolvePaneKeyForPtyId(useAppStore.getState().terminalLayoutsByTabId, ptyId)
       if (!paneKey) {
         return false
@@ -85,15 +91,14 @@ export async function sendRuntimePtyInputVerified(
       },
       { timeoutMs: 15_000, ...(options?.signal ? { signal: options.signal } : {}) }
     )
-    const acknowledgment = readTerminalSendAcknowledgment(result)
-    if (acknowledgment === 'accepted') {
+    if (result.send.accepted === true) {
       recordRuntimeTerminalInputForPtyId(ptyId)
-      return true
     }
+    const acknowledgment = readTerminalSendAcknowledgment(result)
     if (acknowledgment === 'unverifiable' && !options?.requireAgentStatus) {
       throw new Error('PTY write acknowledgment unavailable')
     }
-    return false
+    return acknowledgment === 'accepted'
   } catch (error) {
     if (
       options?.requireAgentStatus ||

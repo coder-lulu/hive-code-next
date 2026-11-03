@@ -1,10 +1,9 @@
-import { RuntimeE2EEClientSession } from '../../shared/runtime-e2ee-client-session'
 import { Buffer } from 'node:buffer'
 import { EventEmitter } from 'node:events'
 import { describe, expect, it, vi } from 'vitest'
 
-import { generateKeyPair } from '../../shared/e2ee-crypto'
-import { REMOTE_RUNTIME_MAX_OUTBOUND_BINARY_FRAME_BYTES } from '../../shared/remote-runtime-memory-limits'
+import { deriveSharedKey, encrypt, generateKeyPair } from '../../shared/e2ee-crypto'
+import { REMOTE_RUNTIME_MAX_OUTBOUND_BINARY_FRAME_BYTES } from '../../shared/remote-runtime/remote-runtime-memory-limits'
 import { startBrowserScreencast } from '../browser/browser-screencast-stream'
 import { E2EEChannel } from './rpc/e2ee-channel'
 import { sendRemoteBrowserScreencastFrame } from './remote-browser-screencast-frame-admission'
@@ -29,14 +28,14 @@ function createMockWebContents() {
   return { isDestroyed: vi.fn(() => false), debugger: dbg }
 }
 
-// Why: exercises the real E2EE channel so the oracle fails if an over-limit frame ever reaches
-// the transport that answers it with close code 1013.
+// Use real E2EE admission to catch oversized frames before they close the transport with 1013.
 function createRuntimeBinarySender() {
   const serverKeys = generateKeyPair()
+  const clientKeys = generateKeyPair()
   const ws = {
     OPEN: 1 as const,
     readyState: 1,
-    send: vi.fn((_frame: string | Uint8Array) => {}),
+    send: vi.fn(),
     close: vi.fn()
   }
   const onTransportError = vi.fn((code: number, reason: string) => ws.close(code, reason))
@@ -56,19 +55,21 @@ function createRuntimeBinarySender() {
     onReady: vi.fn(),
     onError: onTransportError
   })
-  const session = RuntimeE2EEClientSession.create({
-    desktopPublicKeyB64: Buffer.from(serverKeys.publicKey).toString('base64'),
-    transport: 'direct'
-  })
-  channel.handleRawMessage(JSON.stringify(session.hello))
-  expect(session.acceptReady(JSON.parse(ws.send.mock.calls[0]![0] as string))).toBe(true)
-  channel.handleRawMessage(session.sealText(session.authMessage('valid-token')))
-  expect(session.isAuthenticated(session.openText(ws.send.mock.calls[1]![0] as string)!)).toBe(true)
+  const sharedKey = deriveSharedKey(clientKeys.secretKey, serverKeys.publicKey)
+  channel.handleRawMessage(
+    JSON.stringify({
+      type: 'e2ee_hello',
+      publicKeyB64: Buffer.from(clientKeys.publicKey).toString('base64')
+    })
+  )
+  channel.handleRawMessage(
+    encrypt(JSON.stringify({ type: 'e2ee_auth', deviceToken: 'valid-token' }), sharedKey)
+  )
   let sendBinary: RpcBinarySender | undefined
   channel.onMessage((_plaintext, _sendText, sendBinaryReply) => {
     sendBinary = sendBinaryReply
   })
-  channel.handleRawMessage(session.sealText('start-screencast'))
+  channel.handleRawMessage(encrypt('start-screencast', sharedKey))
   if (!sendBinary) {
     throw new Error('Runtime binary sender was not established')
   }

@@ -9,11 +9,15 @@
 // too), and `via` derived from main-owned state — never passed over the wire, so a
 // compromised renderer can't misreport it.
 
-import { ipcMain } from 'electron'
+import { ipcMain, BrowserWindow } from 'electron'
 import { consumeConsentMutationToken } from '../telemetry/burst-cap'
-import { persistBannerAcknowledgeWithoutEmitting, setOptIn, track } from '../telemetry/client'
+import {
+  hasTrackedAgentDashboardActiveToday,
+  persistBannerAcknowledgeWithoutEmitting,
+  setOptIn,
+  track
+} from '../telemetry/client'
 import { getCohortAtEmit } from '../telemetry/cohort-classifier'
-import { getOnboardingCohortAtEmit } from '../telemetry/onboarding-cohort-classifier'
 import { resolveConsent, type ConsentState } from '../telemetry/consent'
 import type { Store } from '../persistence'
 import { isCohortExtendedEvent, isOnboardingEvent } from '../../shared/telemetry-events'
@@ -41,17 +45,15 @@ const MAIN_OWNED_TELEMETRY_EVENTS = new Set<EventName>([
 /**
  * Derive the `via` discriminator for `telemetry:setOptIn` from main-owned state.
  * Called BEFORE any mutation so the snapshot reflects the pre-click world.
- * Existing-user notice "Turn off" → `first_launch_banner`; any other flip → `settings`
- * (new users have no first-launch surface, so their opt-outs always tag `settings`; see telemetry-plan.md).
+ * Pending consent notice "Turn off" → `first_launch_banner`; other changes → `settings`.
  * (The ✕ silent-acknowledge path routes through `telemetry:acknowledgeBanner`, not here.)
  */
 function deriveOptInVia(store: Store, incomingOptedIn: boolean): OptInVia {
   const telemetry = store.getSettings().telemetry
-  const existedBefore = telemetry?.existedBeforeTelemetryRelease === true
   const currentOptedIn = telemetry?.optedIn
 
   // The `incomingOptedIn === false` narrow stops a compromised renderer synthesizing a spurious first_launch_banner opt-in.
-  if (existedBefore && currentOptedIn === null && incomingOptedIn === false) {
+  if (currentOptedIn === null && incomingOptedIn === false) {
     return 'first_launch_banner'
   }
 
@@ -61,30 +63,45 @@ function deriveOptInVia(store: Store, incomingOptedIn: boolean): OptInVia {
 export function registerTelemetryHandlers(store: Store): void {
   storeRef = store
 
-  ipcMain.handle('telemetry:track', (_event, name: unknown, props: unknown): void => {
+  ipcMain.handle('telemetry:track', (event, name: unknown, props: unknown): boolean => {
     // Drop non-string names at the boundary so a flood of bogus payloads never reaches the Zod validator.
     if (typeof name !== 'string') {
-      return
+      return false
     }
     // `props` is optional (undefined/null → {} below); reject any other non-object at the boundary.
     if (props !== null && props !== undefined && typeof props !== 'object') {
-      return
+      return false
     }
     const eventName = name as EventName
     // Why: these events are main-owned; renderer IPC emitting them would let compromised content spoof product outcomes.
     if (MAIN_OWNED_TELEMETRY_EVENTS.has(eventName)) {
-      return
+      return false
+    }
+    if (eventName === 'agent_dashboard_active') {
+      const window = BrowserWindow.fromWebContents(event.sender)
+      if (!window || window.isDestroyed() || !window.isVisible() || window.isMinimized())
+        return false
     }
     // Inject cohort props only for schemas that declare them: schemas are `.strict()`, so an extra prop on any other event fails Zod and drops it.
     const baseProps = (props ?? {}) as Record<string, unknown>
     const withRepoCohort = isCohortExtendedEvent(eventName)
       ? { ...baseProps, ...getCohortAtEmit() }
       : baseProps
-    const finalProps = isOnboardingEvent(eventName)
-      ? { ...withRepoCohort, ...getOnboardingCohortAtEmit() }
-      : withRepoCohort
+    let currentProps = withRepoCohort
+    if (
+      isOnboardingEvent(eventName) &&
+      withRepoCohort !== null &&
+      typeof withRepoCohort === 'object' &&
+      Object.getPrototypeOf(withRepoCohort) === Object.prototype
+    ) {
+      const { cohort: _retired, ...current } = withRepoCohort
+      currentProps = current
+    }
     // Casts are pass-through only; `track()`'s validator is the single runtime enforcement point, not these casts.
-    track(eventName, finalProps as EventProps<EventName>)
+    return (
+      track(eventName, currentProps as EventProps<EventName>) ||
+      (eventName === 'agent_dashboard_active' && hasTrackedAgentDashboardActiveToday(currentProps))
+    )
   })
 
   ipcMain.handle('telemetry:setOptIn', (_event, optedIn: unknown): Promise<void> | void => {
@@ -119,9 +136,9 @@ export function registerTelemetryHandlers(store: Store): void {
     if (!storeRef) {
       return
     }
-    // Only valid while the notice is pending (existedBefore=true, optedIn=null); any other state is a renderer silently flipping optedIn after opt-out.
+    // Only a pending consent choice may acknowledge the notice; an opt-out cannot be reversed silently.
     const telemetry = storeRef.getSettings().telemetry
-    if (telemetry?.existedBeforeTelemetryRelease !== true || telemetry?.optedIn !== null) {
+    if (telemetry?.optedIn !== null) {
       return
     }
     // Rate-limit even this silent path: unbounded acknowledge calls are a disk-write amplification vector.

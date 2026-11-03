@@ -8,13 +8,13 @@ import {
   openTestJournalHostDatabase
 } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import type { AgentSessionRecordStore } from './agent-session-record-store'
-import { AGENT_SESSION_CLAIM_KEY_RETENTION_MS } from './agent-session-claim-key-retention'
+import { AGENT_SESSION_CLAIM_KEY_RETENTION_MS } from './agent-session/ownership/agent-session-claim-key-retention'
 import {
   openTestAgentSessionRecordStore,
   readPersistedTestAgentSessionStoreText
 } from './agent-session-record-store-test-harness'
 
-import type { AgentSessionReserveRequest } from './agent-session-reservation-admission'
+import type { AgentSessionReserveRequest } from './agent-session/ownership/agent-session-reservation-admission'
 const NOW = 1_800_000_000_000
 
 type Outcome = 'commit' | 'rollback'

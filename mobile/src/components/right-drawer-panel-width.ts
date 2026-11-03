@@ -1,5 +1,4 @@
-// Pure X-axis panel-width resolution for RightDrawer, kept native-import-free so
-// it is unit-testable under the node Vitest config (no RN render harness exists).
+// Keep RightDrawer width resolution RN-free for Node tests.
 
 // Graphite drawer contract: 80% on phones, capped at 400dp on larger canvases.
 export const NARROW_PANEL_WIDTH_RATIO = 0.8

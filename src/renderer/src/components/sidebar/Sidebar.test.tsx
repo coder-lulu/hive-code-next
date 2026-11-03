@@ -3,29 +3,20 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { tmpdir } from 'node:os'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../../shared/constants'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 
 const mocks = vi.hoisted(() => ({
   state: {} as Record<string, unknown>,
-  // Stable callback identities so companion-board Effects only re-run on real state changes.
+  // Keep callback identities stable so companion-board effects track real state changes only.
   closeWorkspaceBoard: vi.fn(),
   dropOwnerRef: vi.fn(),
   panel: {
     workspaceBoardOpen: false,
     workspaceBoardRenderedOpen: true,
-    workspaceBoardDragPreviewOpen: false,
-    workspaceBoardMenuOpen: false,
-    openWorkspaceBoard: vi.fn(),
-    closeWorkspaceBoard: vi.fn(),
-    toggleWorkspaceBoard: vi.fn(),
-    handleWorkspaceBoardOpenChange: vi.fn(),
-    setWorkspaceBoardMenuOpen: vi.fn(),
-    previewWorkspaceBoardFromDrag: vi.fn(),
-    solidifyWorkspaceBoardFromDrag: vi.fn(),
-    cancelWorkspaceBoardDragPreview: vi.fn()
+    workspaceBoardDragPreviewOpen: false
   }
 }))
 
@@ -57,11 +48,7 @@ vi.mock('./SidebarAgentsList', () => ({
 }))
 
 vi.mock('./SidebarNav', () => ({
-  default: ({ onNavigate }: { onNavigate?: () => void }) => (
-    <button data-testid="sidebar-nav" onClick={onNavigate}>
-      Sessions
-    </button>
-  )
+  default: () => <div data-testid="sidebar-nav" />
 }))
 
 vi.mock('./SetupScriptPromptCard', () => ({
@@ -72,8 +59,10 @@ vi.mock('./WorktreeList', () => ({
   default: () => <div data-testid="worktree-list" />
 }))
 
-vi.mock('./SidebarFooter', () => ({
-  default: () => <div data-testid="sidebar-footer" />
+vi.mock('./WslMovedProjectsSection', () => ({ default: () => null }))
+
+vi.mock('./SidebarToolbar', () => ({
+  default: () => <div data-testid="sidebar-toolbar" />
 }))
 
 vi.mock('./WorkspaceBoardDrawer', () => ({
@@ -100,14 +89,29 @@ vi.mock('./useSidebarProjectDrop', () => ({
   })
 }))
 
+vi.mock('./useWorkspaceBoardPanel', () => ({
+  useWorkspaceBoardPanel: () => ({
+    ...mocks.panel,
+    workspaceBoardMenuOpen: false,
+    toggleWorkspaceBoard: vi.fn(),
+    handleWorkspaceBoardOpenChange: vi.fn(),
+    setWorkspaceBoardMenuOpen: vi.fn(),
+    closeWorkspaceBoard: mocks.closeWorkspaceBoard,
+    previewWorkspaceBoardFromDrag: vi.fn(),
+    solidifyWorkspaceBoardFromDrag: vi.fn(),
+    cancelWorkspaceBoardDragPreview: vi.fn()
+  })
+}))
+
 import Sidebar from './index'
 
 function setSidebarState(settings: GlobalSettings, statusBarVisible = true): void {
   mocks.state = {
     activeModal: null,
+    agentDashboardDrawerOpen: false,
+    setAgentDashboardDrawerOpen: vi.fn(),
     fetchAllWorktrees: vi.fn(),
     repos: [],
-    // The toolchain banner indexes this map. The real store always has one.
     detectedWorktreesByRepo: {},
     setSidebarWidth: vi.fn(),
     settings,
@@ -119,21 +123,13 @@ function setSidebarState(settings: GlobalSettings, statusBarVisible = true): voi
 
 function renderSidebar(): string {
   return renderToStaticMarkup(
-    <Sidebar
-      worktreeScrollOffsetRef={{ current: 0 }}
-      worktreeScrollAnchorRef={{ current: null }}
-      workspaceBoardPanel={mocks.panel}
-    />
+    <Sidebar worktreeScrollOffsetRef={{ current: 0 }} worktreeScrollAnchorRef={{ current: null }} />
   )
 }
 
 function sidebarElement(): ReactNode {
   return (
-    <Sidebar
-      worktreeScrollOffsetRef={{ current: 0 }}
-      worktreeScrollAnchorRef={{ current: null }}
-      workspaceBoardPanel={mocks.panel}
-    />
+    <Sidebar worktreeScrollOffsetRef={{ current: 0 }} worktreeScrollAnchorRef={{ current: null }} />
   )
 }
 
@@ -143,47 +139,38 @@ beforeEach(() => {
   mocks.panel = {
     workspaceBoardOpen: false,
     workspaceBoardRenderedOpen: true,
-    workspaceBoardDragPreviewOpen: false,
-    workspaceBoardMenuOpen: false,
-    openWorkspaceBoard: vi.fn(),
-    closeWorkspaceBoard: mocks.closeWorkspaceBoard,
-    toggleWorkspaceBoard: vi.fn(),
-    handleWorkspaceBoardOpenChange: vi.fn(),
-    setWorkspaceBoardMenuOpen: vi.fn(),
-    previewWorkspaceBoardFromDrag: vi.fn(),
-    solidifyWorkspaceBoardFromDrag: vi.fn(),
-    cancelWorkspaceBoardDragPreview: vi.fn()
+    workspaceBoardDragPreviewOpen: false
   }
 })
 
 afterEach(cleanup)
 
 describe('Sidebar', () => {
-  it('wires primary navigation to the complete board close action', () => {
-    setSidebarState(getDefaultSettings(tmpdir()))
-    const view = render(sidebarElement())
-
-    fireEvent.click(view.getByTestId('sidebar-nav'))
-
-    expect(mocks.closeWorkspaceBoard).toHaveBeenCalledOnce()
+  it('explains the incomplete workspace list until startup discovery finishes', () => {
+    vi.useFakeTimers()
+    try {
+      setSidebarState(getDefaultSettings(tmpdir()))
+      mocks.state = { ...mocks.state, startupWorktreeRefreshCompleted: false }
+      const view = render(sidebarElement())
+      expect(view.queryByRole('status')).toBeNull()
+      act(() => vi.advanceTimersByTime(200))
+      expect(view.getByRole('status').textContent).toContain('Discovering workspaces')
+      expect(view.getByRole('status').textContent).toContain('More workspaces may appear')
+      mocks.state = { ...mocks.state, startupWorktreeRefreshCompleted: true }
+      view.rerender(sidebarElement())
+      expect(view.queryByRole('status')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
-  it('moves workspaces out of the sidebar without a duplicate recent-session section', () => {
-    setSidebarState(getDefaultSettings(tmpdir()))
-    mocks.state = { ...mocks.state, activeView: 'sessions' }
-    const view = render(sidebarElement())
-    expect(view.queryByTestId('session-navigation')).toBeNull()
-    expect(view.queryByTestId('worktree-list')).toBeNull()
-    expect(view.getByTestId('sidebar-footer')).toBeTruthy()
-  })
-
-  it('anchors the setup script popup to the bottom footer', () => {
+  it('anchors the setup script popup to the bottom toolbar', () => {
     setSidebarState(getDefaultSettings(tmpdir()))
     const view = render(sidebarElement())
     const prompt = view.getByTestId('setup-script-prompt-card')
-    const footer = view.getByTestId('sidebar-footer')
+    const toolbar = view.getByTestId('sidebar-toolbar')
 
-    expect(prompt.parentElement).toBe(footer.parentElement)
+    expect(prompt.parentElement).toBe(toolbar.parentElement)
     expect(prompt.parentElement?.classList.contains('relative')).toBe(true)
     expect(prompt.parentElement?.classList.contains('shrink-0')).toBe(true)
   })
@@ -199,9 +186,11 @@ describe('Sidebar', () => {
     })
 
     const markup = renderSidebar()
+    const sidebarRootTag = markup.slice(0, markup.indexOf('>'))
 
-    expect(markup).toContain('--worktree-sidebar:#101820')
-    expect(markup).toContain('--worktree-sidebar-foreground:#f0f4f8')
+    expect(sidebarRootTag).toContain('--worktree-sidebar:#101820')
+    expect(sidebarRootTag).toContain('--worktree-sidebar-foreground:#f0f4f8')
+    expect(sidebarRootTag).toMatch(/[;"]color:#f0f4f8/)
     expect(markup).toContain('data-testid="workspace-kanban-drawer"')
     expect(markup.match(/--worktree-sidebar:#101820/g)).toHaveLength(2)
   })
@@ -262,6 +251,21 @@ describe('Sidebar', () => {
 
     expect(fetchAllWorktrees).not.toHaveBeenCalled()
   })
+
+  it('keeps the completed dashboard available with default settings', () => {
+    setSidebarState(getDefaultSettings(tmpdir()))
+    const setAgentDashboardDrawerOpen = vi.fn()
+    mocks.state = {
+      ...mocks.state,
+      agentDashboardDrawerOpen: true,
+      setAgentDashboardDrawerOpen
+    }
+
+    render(sidebarElement())
+
+    expect(setAgentDashboardDrawerOpen).not.toHaveBeenCalled()
+  })
+
   it('detaches the project-drop owner while the sidebar is collapsed', () => {
     setSidebarState(getDefaultSettings(tmpdir()))
     const view = render(sidebarElement())

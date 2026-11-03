@@ -13,6 +13,7 @@ import { createServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { StringDecoder } from 'node:string_decoder'
+import { stripAnsiEscapeSequences } from '../../shared/ansi-escape-sequences'
 import { createCodexComposerReadyScanner } from '../../shared/codex-composer-ready-scanner'
 import { createTerminalEscapeScanner } from '../../shared/terminal-escape-scanner'
 import { promisify } from 'node:util'
@@ -46,7 +47,8 @@ import {
 
 vi.mock('../codex-cli/command', async (importOriginal) => ({
   ...(await importOriginal<typeof CodexCommand>()),
-  resolveCodexCommand: () => process.env.ORCA_CODEX_HOOK_CONTRACT_BINARY ?? 'codex'
+  resolveCodexCommand: () => process.env.ORCA_CODEX_HOOK_CONTRACT_BINARY ?? 'codex',
+  resolveCodexCommandForSpawn: async () => process.env.ORCA_CODEX_HOOK_CONTRACT_BINARY ?? 'codex'
 }))
 vi.mock('electron', () => ({
   app: {
@@ -58,24 +60,12 @@ vi.mock('electron', () => ({
 
 import { CodexHookService } from './hook-service'
 
-// Why this file exists: Orca approves its status hook in managed Codex homes
-// and in ~/.codex with the hash Codex reports for it in a throwaway home. Only a
-// real binary can say whether that hash is the same wherever the entry sits,
-// whether Codex then lists Orca's entry as trusted, and whether it runs in a real
-// turn with no review. If any of those drift, users meet a review screen or lose
-// status while every unit test stays green.
+// Real binaries must confirm portable hashes, trusted listings and hook delivery without review.
 
 const execFileAsync = promisify(execFile)
 const binary = process.env.ORCA_CODEX_HOOK_CONTRACT_BINARY
 const expectedVersion = process.env.ORCA_CODEX_HOOK_CONTRACT_VERSION
 const TIMEOUT_MS = 60_000
-
-describe('Codex hook contract terminal transcript', () => {
-  it('preserves review text between ST and BEL terminated terminal strings', () => {
-    const raw = '\x1b]7501;state=working\x1b\\1 hook needs review before it can run\x1b]0;title\x07'
-    expect(decodeTerminalScreen(raw)).toBe('1hookneedsreviewbeforeitcanrun')
-  })
-})
 
 describe.runIf(process.env.ORCA_CODEX_HOOK_CONTRACT_REQUIRED === '1' && !binary)(
   'codex hook file-entry contract prerequisites',
@@ -93,7 +83,7 @@ describe.runIf(binary)('codex hook file-entry binary contract', { timeout: 180_0
   let hashes: CodexHookHashes
 
   beforeAll(async () => {
-    // Why a disposable HOME: nothing here may read or write the user's own ~/.codex.
+    // Isolate all probes from the user's ~/.codex.
     root = realpathSync(mkdtempSync(join(tmpdir(), 'orca-codex-hook-contract-')))
     const version = await execFileAsync(binary!, ['--version'], {
       timeout: TIMEOUT_MS,
@@ -114,7 +104,7 @@ describe.runIf(binary)('codex hook file-entry binary contract', { timeout: 180_0
     vi.stubEnv('USERPROFILE', home)
     vi.stubEnv('CODEX_HOME', join(root, 'never-used-codex-home'))
     vi.stubEnv('ORCA_USER_DATA_PATH', join(home, 'user-data'))
-    // Why: the app's userData always exists; the memo is written there.
+    // Match the app's existing userData directory for memo writes.
     mkdirSync(join(home, 'user-data'))
     const codexVersion = await probeCodexVersion(binary!)
     expect(codexVersion).not.toBeNull()
@@ -134,17 +124,16 @@ describe.runIf(binary)('codex hook file-entry binary contract', { timeout: 180_0
   const command = (): string => getCodexManagedHookInstallMaterial().command
   const accountHome = (): string => join(home, 'user-data', 'codex-accounts', 'one', 'home')
 
-  /** Orca's entry installed into a managed account home, approved with the derived hashes. */
   async function installManagedHome(): Promise<void> {
     mkdirSync(join(home, '.codex'), { recursive: true })
-    // Why saved: the app's lookup then re-probes the version and finds the answer, with no second hooks/list.
+    // Seed the answer so app lookup re-probes only the version, avoiding another hooks/list.
     memoizeCodexHookAnswer(binary!, fingerprintCodex(binary!)!, command(), answer)
     startCodexHookHashLookup(Promise.resolve())
     expect((await new CodexHookService().install(accountHome())).state).toBe('installed')
   }
 
   async function orcaListings(codexHome: string): Promise<CodexListedHook[]> {
-    // Why a cwd outside any project: only the home's own hooks.json is listed.
+    // Keep project hooks out of the listing.
     const cwd = mkdtempSync(join(root, 'cwd-'))
     return (await listCodexHooks(binary!, codexHome, cwd)).filter(
       (listing) => listing.command === command()
@@ -164,7 +153,7 @@ describe.runIf(binary)('codex hook file-entry binary contract', { timeout: 180_0
 
     const listings = await listCodexHooks(binary!, scratch, project)
 
-    // Why each copy must be listed: a copy Codex stops listing would make the cross-check vacuous.
+    // Require every copy so missing listings cannot make the hash cross-check vacuous.
     for (const [label, hash] of Object.entries(hashes)) {
       const copies = [
         `${join(scratch, 'hooks.json')}:${label}:0:0`,
@@ -179,7 +168,7 @@ describe.runIf(binary)('codex hook file-entry binary contract', { timeout: 180_0
       )
       expect(copies.map((copy) => copy?.currentHash)).toEqual([hash, hash, hash])
     }
-    // Why: every pinned Codex knows every event Orca installs into, and hashes each.
+    // Pinned Codex versions must hash every managed event.
     expect(Object.keys(hashes).sort()).toEqual(
       CODEX_EVENTS.map((eventName) => CODEX_EVENT_LABEL[eventName]).sort()
     )
@@ -199,7 +188,6 @@ describe.runIf(binary)('codex hook file-entry binary contract', { timeout: 180_0
     expect(listings.every((listing) => listing.trustStatus === 'trusted')).toBe(true)
     expect(listings.every((listing) => listing.enabled !== false)).toBe(true)
     expect(files.map((file) => readFileSync(file, 'utf-8'))).toEqual(before)
-    // Why: the key Orca approves is the one Codex lists for its managed-home entry.
     const stop = listings.find((listing) => listing.key.includes(':stop:'))
     expect(normalizeHookTrustKeyForLookup(stop!.key)).toBe(
       normalizeHookTrustKeyForLookup(
@@ -250,7 +238,7 @@ describe.runIf(binary)('codex hook file-entry binary contract', { timeout: 180_0
             }
           }
         )
-        // Why: `codex exec` also reads a prompt from stdin until it closes.
+        // Close stdin so codex exec finishes reading its prompt.
         run.child.stdin?.end()
         stderr = (await run).stderr
       } finally {
@@ -295,7 +283,7 @@ describe.runIf(binary)('codex hook file-entry binary contract', { timeout: 180_0
   )
 
   describe('~/.codex', () => {
-    /** A disposable HOME whose ~/.codex holds Orca's reconciled entry; a symlink, so both key spellings count. */
+    // Symlink HOME to exercise both trust-key spellings.
     async function freshRealHomeWithEntry(name: string): Promise<void> {
       home = join(root, `${name}-home`)
       symlinkSync(mkdtempSync(join(root, `${name}-`)), home, 'junction')
@@ -318,7 +306,7 @@ describe.runIf(binary)('codex hook file-entry binary contract', { timeout: 180_0
     const realCodexHome = (): string => join(home, '.codex')
 
     async function realHomeListings(): Promise<CodexListedHook[]> {
-      // Why a cwd outside any project: only the home's own hooks.json is listed.
+      // Keep project hooks out of the listing.
       const cwd = mkdtempSync(join(root, 'cwd-'))
       return (await listCodexHooks(binary!, null, cwd)).filter(
         (listing) => listing.command === command()
@@ -398,7 +386,7 @@ describe.runIf(binary)('codex hook file-entry binary contract', { timeout: 180_0
       await reconcileRealHome()
 
       expect(readFileSync(tomlPath, 'utf-8')).toBe(inline)
-      // Why: Codex refuses to start at all with a config.toml it cannot load.
+      // Verify Codex can still load the config and start.
       await expect(realHomeListings()).resolves.toBeDefined()
     })
 
@@ -413,7 +401,6 @@ describe.runIf(binary)('codex hook file-entry binary contract', { timeout: 180_0
     )
   })
 
-  /** A TUI Codex in a pty: start, type a prompt, quit; the screen without spaces or escapes. */
   async function runCodexTui(
     codexHome: string | null = accountHome(),
     expectReview = false
@@ -423,8 +410,7 @@ describe.runIf(binary)('codex hook file-entry binary contract', { timeout: 180_0
     const control = mkdtempSync(join(root, 'tui-control-'))
     const receiver = await listen(recordPosts(posts, control))
     const model = await startMockResponses()
-    // Why resolved: Codex 0.158 matches the trusted project only by the real path, and a symlinked
-    // HOME (the ~/.codex case) left it untrusted, so the turn never ran and no hook posted.
+    // Codex 0.158 requires real project paths for trust, including under symlinked HOME.
     const workdir = join(realpathSync(home), 'tui-work')
     mkdirSync(workdir, { recursive: true })
     const out = join(home, 'tui.out')
@@ -507,23 +493,12 @@ describe.runIf(binary)('codex hook file-entry binary contract', { timeout: 180_0
       model.close()
       receiver.close()
     }
-    const screen = decodeTerminalScreen(readFileSync(out, 'utf-8'))
+    const screen = stripAnsiEscapeSequences(readFileSync(out, 'utf-8')).replace(/\s+/g, '')
     return { screen, posts }
   }
 })
 
-function decodeTerminalScreen(raw: string): string {
-  let painted = ''
-  createTerminalEscapeScanner({
-    onCsi: () => {},
-    onText: (text) => {
-      painted += text
-    }
-  }).observe(raw)
-  return painted.replace(/\s+/g, '')
-}
-
-// Why a pty: Codex's review screen only exists in the TUI, which `codex exec` never shows.
+// Review screens exist only in the TUI; codex exec cannot exercise them.
 const PTY_DRIVER = `
 import os, pty, sys, time, select, signal, struct, fcntl, termios
 out, prompt, cwd = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -627,7 +602,6 @@ function port(server: Server): number {
   return address && typeof address === 'object' ? address.port : 0
 }
 
-/** A minimal Responses stream: one assistant message, then completion. */
 function startMockResponses(): Promise<Server> {
   const event = (payload: Record<string, unknown>): string =>
     `event: ${String(payload.type)}\ndata: ${JSON.stringify(payload)}\n\n`

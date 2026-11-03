@@ -1,192 +1,183 @@
-import { mkdtemp, rm } from 'node:fs/promises'
-import { readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { afterEach, beforeEach, expect, it } from 'vitest'
-import { readNativeSessionOptions } from '../native-chat/agent-session-wire/structured-agent-session-option-restoration'
-import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import {
-  openTestAgentSessionRecordStore,
-  seedTestAgentSessionRecordStore
-} from './agent-session-record-store-test-harness'
-import { codexProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
-import { agentSessionRecordFixture } from '../../shared/agent-session-record.test-fixture'
-import { AcpStructuredOptions } from '../acp/acp-structured-options'
-import { NewSessionResponseSchema } from '../acp/generated/acp-protocol.generated'
+  createRestTestRig,
+  acceptedDispatch,
+  restTestSend,
+  REST_TEST_CALLER as CALLER,
+  REST_TEST_SESSION as SESSION,
+  type RestTestRig
+} from '../native-chat/agent-session-wire/structured-agent-session-rest-test-rig'
+import {
+  hostTestAttachParams,
+  HOST_TEST_NOW as NOW
+} from '../native-chat/agent-session-wire/structured-agent-session-host-test-data'
+import type { AgentSessionOptionsResult } from '../../shared/agent-session-wire'
+import { openTestAgentSessionRecordStore } from './agent-session-record-store-test-harness'
 
-const NOW = 1_800_000_000_000
-const SESSION = 'session-options'
-let directory: string
-
+let rig: RestTestRig
 beforeEach(async () => {
-  directory = ''
-  directory = await mkdtemp(join(tmpdir(), 'orca-agent-session-options-'))
+  rig = await createRestTestRig()
 })
-
 afterEach(async () => {
-  if (directory) {
-    closeTestJournalHostDatabase(directory)
-    await rm(directory, { recursive: true, force: true })
+  await rig.dispose()
+})
+
+async function attach(reportedOptions: AgentSessionOptionsResult['current'] = {}) {
+  rig.adapter.open = async () => ({ reportedOptions })
+  await rig.restart()
+  const attached = await rig.host.attach(
+    CALLER,
+    hostTestAttachParams(rig.store.getRecord(SESSION)?.lease.runtimeFence ?? null)
+  )
+  if (!attached.ok) {
+    throw new Error(JSON.stringify(attached.refusal))
   }
-})
+  expect(attached).toMatchObject({ ok: true })
+  await vi.waitFor(() =>
+    expect(rig.host.collaboratorsForTests().sessions.get(SESSION)?.child?.phase).toBe('ready')
+  )
+}
+async function save(options: Record<string, string>) {
+  const fence = rig.store.getRecord(SESSION)!.lease.runtimeFence
+  await rig.store.replaceSessionOptions({ sessionId: SESSION, fence, options, now: NOW })
+  await rig.store.replaceSessionOptions({
+    sessionId: SESSION,
+    fence,
+    permissionMode: 'own',
+    now: NOW
+  })
+}
+async function report(
+  reportedOptions: AgentSessionOptionsResult['current'],
+  fence?: number,
+  generation?: string
+) {
+  const child = rig.host.collaboratorsForTests().sessions.get(SESSION)?.child
+  if (!child) {
+    throw new Error('expected acquired child')
+  }
+  await rig.host.handleAdapterEvent({
+    type: 'options-reported',
+    sessionId: SESSION,
+    fence: fence ?? child.fence,
+    acquisitionGeneration: generation ?? child.generation!,
+    reportedOptions
+  })
+}
+async function persisted() {
+  return (await openTestAgentSessionRecordStore(rig.root)).getRecord(SESSION)
+}
 
-it('fails option hydration before ownership can be proved', async () => {
-  await expect(
-    readNativeSessionOptions({
-      adapter: {
-        readOptions: async () => {
-          throw new Error('model list unavailable')
-        }
-      },
-      sessionId: SESSION,
-      fence: 2
-    })
-  ).rejects.toThrow('model list unavailable')
-})
-
-it('drops provider-rejected persisted options before the next owner proof', async () => {
-  await expect(
-    readNativeSessionOptions({
-      adapter: {
-        readOptions: async () => ({ models: [], current: { model: 'provider-model' } }),
-        readOptionRestoreFailures: () => ['permissionMode']
-      },
-      sessionId: SESSION,
-      fence: 2,
-      priorOptions: { permissionMode: 'retired-mode', other: 'keep' }
-    })
-  ).resolves.toEqual({ model: 'provider-model', other: 'keep' })
-})
-
-it('omits empty model values from other option producers', async () => {
-  await expect(
-    readNativeSessionOptions({
-      adapter: { readOptions: async () => ({ models: [], current: { model: '', effort: 'off' } }) },
-      sessionId: SESSION,
-      fence: 2,
-      priorOptions: { model: 'old-model', other: 'keep' }
-    })
-  ).resolves.toEqual({ effort: 'off', other: 'keep' })
-})
-
-it('durably replaces model-less ACP options when a later report reaches the option writer', async () => {
-  const response = NewSessionResponseSchema.parse(
-    JSON.parse(
-      readFileSync(
-        new URL('../acp/fixtures/omp-v17-windows-new-no-model.json', import.meta.url),
-        'utf8'
-      )
+it('refuses failed startup without dispatching or replacing saved intent with defaults', async () => {
+  await attach()
+  const picked = { model: 'gpt-picked', effort: 'high', fastMode: 'false' }
+  await save(picked)
+  await rig.host.close(SESSION, 'evict')
+  rig.adapter.open = async () => {
+    throw new Error('model list unavailable')
+  }
+  await rig.restart()
+  const attached = await rig.host.attach(
+    CALLER,
+    hostTestAttachParams(rig.store.getRecord(SESSION)?.lease.runtimeFence ?? null)
+  )
+  if (!attached.ok) {
+    throw new Error(JSON.stringify(attached.refusal))
+  }
+  expect(attached).toMatchObject({ ok: true })
+  await vi.waitFor(() =>
+    expect(rig.host.collaboratorsForTests().sessions.get(SESSION)?.child?.phase).not.toBe(
+      'starting'
     )
   )
-  const reader = new AcpStructuredOptions()
-  reader.adoptSession(response)
-  const fixture = agentSessionRecordFixture()
-  const record = {
-    ...fixture,
-    provider: 'omp',
-    options: reader.reported(),
-    providerHandleChain: fixture.providerHandleChain.map((link) => ({
-      ...link,
-      handle: { transport: 'acp', agent: 'omp', nativeId: response.sessionId }
-    }))
-  }
-  await seedTestAgentSessionRecordStore(directory, { records: [record] })
-  const store = await openTestAgentSessionRecordStore(directory)
-  expect(store.getRecord(record.sessionId)?.options).toEqual({ effort: 'off' })
-
-  reader.adoptConfigOptions([
-    ...(response.configOptions ?? []),
-    {
-      id: 'model',
-      name: 'Model',
-      category: 'model',
-      type: 'select',
-      currentValue: 'reported-model',
-      options: [{ value: 'reported-model', name: 'Reported Model' }]
-    }
-  ])
-  const options = await readNativeSessionOptions({
-    adapter: { readOptions: async () => reader.read() },
-    sessionId: record.sessionId,
-    fence: record.lease.runtimeFence,
-    priorOptions: store.getRecord(record.sessionId)?.options
-  })
-  if (!options) {
-    throw new Error('The later ACP report must provide options')
-  }
-  await store.replaceSessionOptions({
-    sessionId: record.sessionId,
-    fence: record.lease.runtimeFence,
-    options,
-    now: NOW
-  })
-  const reopened = await openTestAgentSessionRecordStore(directory)
-  expect(reopened.getRecord(record.sessionId)?.options).toEqual({
-    model: 'reported-model',
-    effort: 'off'
-  })
+  expect(rig.adapter.dispatch).not.toHaveBeenCalled()
+  expect(await persisted()).toMatchObject({ options: picked, permissionMode: 'own' })
 })
 
-it('persists resumed provider options atomically with owner proof', async () => {
-  const store = await openTestAgentSessionRecordStore(directory)
-  const reserved = await store.reserveOwner({
-    sessionId: SESSION,
-    location: {
-      executionHostId: 'local',
-      wslDistro: null,
-      workspaceId: 'workspace-1',
-      workspaceKind: 'folder'
-    },
-    provider: 'codex',
-    accountHome: { variable: 'CODEX_HOME', path: '/accounts/codex' },
-    expectedFence: null,
-    spawnToken: 'spawn-options',
-    claimKeyId: 'key-1',
-    handoffOperationId: null,
-    probe: { outcome: 'indeterminate', reason: 'new session' },
-    operation: {
-      callerKey: 'client-1',
-      operationId: '1800000000000-00000000000000000000000000000000',
-      fingerprint: 'options-create'
-    },
-    now: NOW
+it('keeps typed Own and explicit false while publishing the current runtime permission separately', async () => {
+  await attach()
+  const picked = { model: 'gpt-picked', effort: 'high', fastMode: 'false' }
+  await save(picked)
+  await report({ model: 'gpt-runtime', effort: 'low', reportedPermissionMode: 'full-access' })
+  expect(rig.host.readStatusSummary(SESSION)?.runtimePermission).toMatchObject({
+    mode: 'full-access'
   })
-  const fence = reserved.record.lease.runtimeFence
-  await store.commitProcessIdentity({
-    sessionId: SESSION,
-    fence,
-    process: {
-      hostId: 'local',
-      pid: 4242,
-      processStartTimeMs: NOW - 1,
-      spawnToken: 'spawn-options'
-    },
-    now: NOW
-  })
-  const options = await readNativeSessionOptions({
-    adapter: {
-      readOptions: async () => ({
-        models: [],
-        current: { model: 'gpt-tui', effort: 'low' }
-      })
-    },
-    sessionId: SESSION,
-    fence
-  })
-  await store.proveOwner({
-    sessionId: SESSION,
-    fence,
-    link: {
-      linkId: 'codex-options-1',
-      handle: codexProviderHandle('thread-options'),
-      origin: 'created',
-      mintedAtFence: fence,
-      observedAt: NOW
-    },
-    now: NOW,
-    ...(options ? { options } : {})
-  })
+  expect(await persisted()).toMatchObject({ options: picked, permissionMode: 'own' })
+})
 
-  const reopened = await openTestAgentSessionRecordStore(directory)
-  expect(reopened.getRecord(SESSION)?.options).toEqual({ model: 'gpt-tui', effort: 'low' })
+it.each([
+  { model: '' },
+  { model: 'default' },
+  { model: 'gpt-default', defaulted: ['model'] as const }
+])('does not save startup/config defaults or clear a picked model: %j', async (current) => {
+  await attach(current)
+  expect(rig.store.getRecord(SESSION)?.options ?? {}).toEqual({})
+  const picked = { model: 'gpt-picked', effort: 'high', fastMode: 'false' }
+  await save(picked)
+  await report(current)
+  expect(await persisted()).toMatchObject({ options: picked, permissionMode: 'own' })
+})
+
+it('fills only missing execution options after actual handover and delayed current-generation evidence', async () => {
+  await attach()
+  await save({ fastMode: 'false' })
+  await report({ model: 'gpt-config', effort: 'low' })
+  expect(rig.store.getRecord(SESSION)?.options).toEqual({ fastMode: 'false' })
+  const accepted = acceptedDispatch()
+  if (accepted.state !== 'accepted') {
+    throw new Error('expected accepted provider execution')
+  }
+  rig.adapter.dispatch.mockResolvedValueOnce({
+    ...accepted,
+    ranOptions: { effort: 'high' }
+  })
+  // Restart picks up this adapter callback through the existing host fixture wrapper.
+  await rig.host.close(SESSION, 'evict')
+  await attach()
+  const fence = rig.store.getRecord(SESSION)!.lease.runtimeFence
+  expect(
+    await rig.host.send(CALLER, restTestSend('run with provider evidence', fence))
+  ).toMatchObject({ ok: true })
+  await vi.waitFor(() => expect(rig.adapter.dispatch).toHaveBeenCalledOnce())
+  await rig.host.collaboratorsForTests().serialize(SESSION, async () => {})
+  expect(rig.store.getRecord(SESSION)?.options).toEqual({ fastMode: 'false' })
+  await report({ model: 'gpt-execution', effort: 'low' })
+  await vi.waitFor(() =>
+    expect(rig.store.getRecord(SESSION)?.options).toEqual({
+      model: 'gpt-execution',
+      effort: 'high',
+      fastMode: 'false'
+    })
+  )
+  expect(await persisted()).toMatchObject({ permissionMode: 'own' })
+})
+
+it('rejects replaced-child evidence and preserves a concurrent model pick across store reopen', async () => {
+  await attach()
+  await save({ effort: 'high', fastMode: 'false' })
+  const previous = rig.host.collaboratorsForTests().sessions.get(SESSION)!.child!
+  await rig.host.close(SESSION, 'evict')
+  await attach()
+  await save({ model: 'gpt-picked', effort: 'high', fastMode: 'false' })
+  await report({ model: 'gpt-stale', effort: 'low' }, previous.fence, previous.generation!)
+  const accepted = acceptedDispatch()
+  if (accepted.state !== 'accepted') {
+    throw new Error('expected accepted provider execution')
+  }
+  rig.adapter.dispatch.mockResolvedValueOnce({
+    ...accepted,
+    ranOptions: { model: 'gpt-old', effort: 'low' }
+  })
+  expect(
+    await rig.host.send(
+      CALLER,
+      restTestSend('concurrent pick wins', rig.store.getRecord(SESSION)!.lease.runtimeFence)
+    )
+  ).toMatchObject({ ok: true })
+  await vi.waitFor(() => expect(rig.adapter.dispatch).toHaveBeenCalledOnce())
+  await rig.host.collaboratorsForTests().serialize(SESSION, async () => {})
+  expect(await persisted()).toMatchObject({
+    options: { model: 'gpt-picked', effort: 'high', fastMode: 'false' },
+    permissionMode: 'own'
+  })
 })

@@ -13,7 +13,7 @@ const getSystemTrayEntryCatalog = createLocalizedCatalog((): SettingsSearchEntry
     ),
     description: translate(
       'auto.components.settings.appearance.search.4d5b9427b5',
-      'When enabled, closing the window keeps Orca running in the system tray instead of quitting.'
+      'When enabled, closing the window keeps HiveCode running in the system tray instead of quitting.'
     ),
     keywords: [
       ...translateSearchKeyword('auto.components.settings.appearance.search.tray.tray', 'tray', {
@@ -61,10 +61,7 @@ const getMenuBarIconEntryCatalog = createLocalizedCatalog((): SettingsSearchEntr
       ...translateSearchKeyword('auto.components.settings.appearance.search.tray.tray', 'tray', {
         englishOnly: true
       }),
-      ...translateSearchKeyword(
-        'auto.components.settings.appearance.search.1f2880a9d5',
-        'hivecode'
-      ),
+      ...translateSearchKeyword('auto.components.settings.appearance.search.1f2880a9d5', 'hive'),
       ...translateSearchKeyword(
         'settings.appearance.menuBarIcon.keyword.statusItem',
         'status item',
@@ -92,7 +89,7 @@ export function getSystemTrayEntries(
 ): SettingsSearchEntry[] {
   const show =
     options.showSystemTray ??
-    // Why: a Windows web client can report win32, but it has no local tray.
+    // Windows web clients report win32 but have no local tray.
     (getRendererAppPlatform() === 'win32' && !isWebClientLocation())
   return show ? getSystemTrayEntryCatalog() : []
 }

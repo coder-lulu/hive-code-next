@@ -1,9 +1,8 @@
+import { readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { readGoldenRaw, type GoldenRecording } from './golden-recording'
-import { hiveGoldenReferences } from '../../../rpc-foundation/hive-recording-reference'
+import { readGolden } from './golden-recording'
 import { OBSERVATION_FIELDS } from './golden-value-pool'
-import { readHiveGoldenDomain } from '../hive-golden-domain'
 import type { Observation } from './recording-scenario'
 import type { RecordedValue } from './recording-values'
 
@@ -37,17 +36,14 @@ function failures(at: string, observation: Observation): string[] {
   return found
 }
 
-/**
- * A refused projection settles as data — the throw is captured as an effect and the action stays
- * `pending` — so `--record` writes it and the suite goes green over it. Two adapters shipped that
- * way (#20667, and the worktree catalog), and a revert plus a re-record would restore either one
- * silently. A detached rejection is not banned here: recording one is how a real main bug gets
- * pinned, and `unhandled-recording.test.ts` pins the capture itself.
- */
+// Projection refusals can be captured as data and re-recorded green; reject those while allowing real detached product failures.
 describe('recorder failures never reach a golden', () => {
-  it('detects a refused projection in every observation field that can carry one', () => {
-    // Positive control: absence proves nothing unless the detector fires. `effects` carries the
-    // shape both real defects took — the refusal captured as the message of a recorded error.
+  it('records no refused projection in any observation field', () => {
+    const ids = readdirSync(directory)
+      .filter((file) => file.endsWith('.json'))
+      .map((file) => file.replace(/\.json$/, ''))
+
+    // Seed a captured refusal to prove absence checking detects the real failure shape.
     const seeded: Observation = {
       sender: [],
       payloads: [],
@@ -61,41 +57,16 @@ describe('recorder failures never reach a golden', () => {
       'seeded.state: recorder refused to project a value',
       'seeded.effects: recorder refused to project a value'
     ])
-  })
 
-  function scan(
-    ids: readonly string[],
-    read: (directory: string, id: string) => GoldenRecording
-  ): { found: string[]; checkpoints: number } {
     let checkpoints = 0
     const found = ids.flatMap((id) =>
-      read(directory, id).recording.checkpoints.flatMap((checkpoint) => {
+      readGolden(directory, id).recording.checkpoints.flatMap((checkpoint) => {
         checkpoints++
         return failures(`${id}/${checkpoint.id}`, checkpoint.observation)
       })
     )
-    return { found, checkpoints }
-  }
-
-  const domain = readHiveGoldenDomain(directory)
-
-  it('keeps every raw reference free of recorder projection failures', () => {
-    const result = scan(domain.upstreamIds, readGoldenRaw)
-    if (domain.kind === 'hive-overlay') {
-      expect(domain.upstreamIds).toHaveLength(796)
-    }
-    expect(result.found).toEqual([])
-    expect(result.checkpoints).toBeGreaterThan(domain.upstreamIds.length)
-  })
-
-  it('keeps every product materialized reference free of projection failures', () => {
-    const goldens = hiveGoldenReferences(directory, domain.supportedIds, readGoldenRaw)
-    const byId = new Map(domain.supportedIds.map((id, index) => [id, goldens[index]]))
-    const result = scan(domain.supportedIds, (_directory, id) => byId.get(id)!)
-    if (domain.kind === 'hive-overlay') {
-      expect(domain.supportedIds).toHaveLength(757)
-    }
-    expect(result.found).toEqual([])
-    expect(result.checkpoints).toBeGreaterThan(domain.supportedIds.length)
+    expect(found).toEqual([])
+    expect(ids.length).toBeGreaterThan(0)
+    expect(checkpoints).toBeGreaterThan(ids.length)
   })
 })

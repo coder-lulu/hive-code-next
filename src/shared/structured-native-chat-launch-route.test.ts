@@ -5,37 +5,58 @@
 
 import { describe, expect, it } from 'vitest'
 import {
+  STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY,
   STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY,
   STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY
 } from './protocol-version'
 import {
-  isNativeChatEnabled,
+  isNativeChatDefaultFor,
+  normalizeNativeChatProviders,
   resolveStructuredNativeChatSupport,
   type StructuredNativeChatSupportInput
 } from './structured-native-chat-launch-route'
-
-const ON = { experimentalNativeChat: true }
 
 function support(overrides: Partial<StructuredNativeChatSupportInput> = {}) {
   return resolveStructuredNativeChatSupport({
     agent: 'claude',
     executionHostId: 'local',
-    hostCapabilities: [STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY],
+    hostCapabilities: [
+      STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY,
+      STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY
+    ],
+    hostStructuredAgents: ['claude', 'codex'],
     workspaceKind: 'git-worktree',
     ...overrides
   })
 }
 
-describe('the Chat UI switch', () => {
-  it('selects structured chat from the one persisted setting', () => {
-    const oldSelectorOff = { experimentalNativeChat: true, openAgentTabsInChatByDefault: false }
-    expect(isNativeChatEnabled(ON)).toBe(true)
-    expect(isNativeChatEnabled({ experimentalNativeChat: false })).toBe(false)
-    expect(isNativeChatEnabled(oldSelectorOff)).toBe(true)
+describe('current per-agent chat preference', () => {
+  it('honors explicit false only for the selected provider', () => {
+    const settings = { nativeChatProviders: { claude: false } }
+    expect(isNativeChatDefaultFor(settings, 'claude')).toBe(false)
+    expect(isNativeChatDefaultFor(settings, 'codex')).toBe(true)
+    expect(isNativeChatDefaultFor({ nativeChatProviders: { claude: true } }, 'claude')).toBe(true)
   })
 
-  it.each([null, undefined, {}])('reads %s as no preference', (settings) => {
-    expect(isNativeChatEnabled(settings)).toBe(false)
+  it.each([null, undefined, {}])(
+    'uses the enabled default for %s without granting host support',
+    (settings) => {
+      expect(isNativeChatDefaultFor(settings, 'claude')).toBe(true)
+      expect(support({ hostCapabilities: null, hostStructuredAgents: undefined })).toEqual({
+        supported: false,
+        blocker: 'runtime-capability-unknown'
+      })
+    }
+  )
+
+  it('normalizes only own known-provider boolean choices', () => {
+    const input = Object.assign(Object.create({ claude: false }), {
+      codex: false,
+      pi: true,
+      grok: 'false',
+      unknown: false
+    })
+    expect(normalizeNativeChatProviders(input)).toEqual({ codex: false, pi: true })
   })
 })
 
@@ -116,7 +137,13 @@ describe('agents beyond Claude and Codex', () => {
   )
 
   it('are not offered by a host that does not advertise its registered agents', () => {
-    expect(support({ agent: 'grok', hostStructuredAgents: ['grok'] })).toEqual({
+    expect(
+      support({
+        agent: 'grok',
+        hostCapabilities: [STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY],
+        hostStructuredAgents: ['grok']
+      })
+    ).toEqual({
       supported: false,
       blocker: 'runtime-capability'
     })
@@ -132,8 +159,34 @@ describe('agents beyond Claude and Codex', () => {
     ).toEqual({ supported: false, blocker: 'agent-without-structured-session' })
   })
 
-  it('leave Claude and Codex offered by hosts that predate the capability', () => {
-    expect(support({ agent: 'claude' })).toEqual({ supported: true })
-    expect(support({ agent: 'codex' })).toEqual({ supported: true })
+  it.each(['claude', 'codex', 'grok'] as const)(
+    'requires actual inventory evidence for %s too',
+    (agent) => {
+      expect(support({ agent, hostStructuredAgents: undefined })).toEqual({
+        supported: false,
+        blocker: 'runtime-capability-unknown'
+      })
+      expect(support({ agent, hostStructuredAgents: [] })).toEqual({
+        supported: false,
+        blocker: 'agent-without-structured-session'
+      })
+      expect(
+        support({
+          agent,
+          hostStructuredAgents: [agent],
+          hostCapabilities: [STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY]
+        })
+      ).toEqual({ supported: false, blocker: 'runtime-capability' })
+    }
+  )
+
+  it('requires the paired host and client launch contract independently of provider preference', () => {
+    const hostCapabilities = [...REGISTERED, STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY]
+    const input = { executionHostId: 'runtime:paired-host', hostCapabilities }
+    expect(support(input)).toEqual({ supported: false, blocker: 'client-capability' })
+    expect(support({ ...input, clientCapabilities: hostCapabilities })).toEqual({ supported: true })
+    expect(
+      support({ ...input, hostCapabilities: REGISTERED, clientCapabilities: hostCapabilities })
+    ).toEqual({ supported: false, blocker: 'runtime-capability' })
   })
 })

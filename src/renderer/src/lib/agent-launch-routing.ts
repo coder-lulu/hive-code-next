@@ -1,7 +1,7 @@
 import type { GlobalSettings } from '../../../shared/global-settings-types'
 import type { ProjectExecutionRuntimeResolution } from '../../../shared/project-execution-runtime'
 import {
-  isNativeChatEnabled,
+  isNativeChatDefaultFor,
   resolveStructuredNativeChatSupport,
   type StructuredNativeChatBlocker
 } from '../../../shared/structured-native-chat-launch-route'
@@ -13,13 +13,14 @@ export type AgentLaunchRoute = 'structured-native-chat' | 'terminal-tui'
 
 export type AgentLaunchRoutingInput = {
   agent: TuiAgent
-  settings: Pick<GlobalSettings, 'experimentalNativeChat'> | null | undefined
+  settings: Pick<GlobalSettings, 'nativeChatProviders'> | null | undefined
   executionHostId: string
   /** Capabilities of the target host; `null` = not yet established. */
   hostCapabilities: readonly string[] | null
   /** What this client advertises to a paired host. */
   clientCapabilities?: readonly string[]
   workspaceKind?: WorkspaceLaunchKind
+  projectExecutionKind?: 'host' | 'ssh'
   projectRuntime?: ProjectExecutionRuntimeResolution | null
   promptDelivery?: NativeChatLaunchPromptDelivery
   launchText?: string
@@ -31,25 +32,28 @@ export type AgentLaunchRoutingInput = {
 }
 
 export function resolveAgentLaunchRoute(input: AgentLaunchRoutingInput): AgentLaunchRoute {
-  return isNativeChatEnabled(input.settings) && structuredAgentLaunchSupported(input)
+  return input.settings &&
+    isNativeChatDefaultFor(input.settings, input.agent) &&
+    structuredAgentLaunchSupported(input)
     ? 'structured-native-chat'
     : 'terminal-tui'
 }
 
-// Explicit chat requests (resume history in a new chat) do not depend on the Chat UI switch.
+// Explicit chat requests (resume history in a new chat) do not depend on the default launch preference.
 export function structuredAgentLaunchSupported(
   input: Omit<AgentLaunchRoutingInput, 'launchText'>
 ): boolean {
   return structuredAgentLaunchSupport(input).supported
 }
 
-function structuredAgentLaunchSupport(input: Omit<AgentLaunchRoutingInput, 'launchText'>) {
+export function structuredAgentLaunchSupport(input: Omit<AgentLaunchRoutingInput, 'launchText'>) {
   return resolveStructuredNativeChatSupport({
     agent: input.agent,
     executionHostId: input.executionHostId,
     hostCapabilities: input.hostCapabilities,
     ...(input.clientCapabilities ? { clientCapabilities: input.clientCapabilities } : {}),
     workspaceKind: input.workspaceKind,
+    projectExecutionKind: input.projectExecutionKind,
     projectRuntime: input.projectRuntime,
     requiresTuiLaunchCommand: input.requiresTuiLaunchCommand,
     startsOutsideWorkspaceRoot: input.startsOutsideWorkspaceRoot,
@@ -63,7 +67,11 @@ export function structuredAgentLaunchDowngrade(
   input: AgentLaunchRoutingInput,
   route: AgentLaunchRoute
 ): StructuredNativeChatBlocker | null {
-  if (route === 'structured-native-chat' || !isNativeChatEnabled(input.settings)) {
+  if (
+    route === 'structured-native-chat' ||
+    !input.settings ||
+    !isNativeChatDefaultFor(input.settings, input.agent)
+  ) {
     return null
   }
   const support = structuredAgentLaunchSupport(input)

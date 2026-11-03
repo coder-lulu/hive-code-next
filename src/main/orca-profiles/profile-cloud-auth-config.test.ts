@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   allowsPlaintextOrcaCloudSession,
   getOrcaCloudAuthConfig,
+  getOrcaPushGatewayUrl,
   isOrcaCloudDevAuthEnabled,
   type ProductCloudDefaults
 } from './profile-cloud-auth-config'
@@ -40,6 +41,9 @@ describe('Orca cloud auth config', () => {
     expect(state).toEqual({
       configured: true,
       config: {
+        relayTokenEndpoint: null,
+        relayDirectorUrl: null,
+        connectorTokenEndpoint: null,
         apiBaseUrl: 'https://orca-cloud.example',
         authorizeEndpoint: 'https://orca-cloud.example/v1/desktop/auth/authorize',
         sessionEndpoint: 'https://orca-cloud.example/v1/desktop/auth/session',
@@ -58,6 +62,9 @@ describe('Orca cloud auth config', () => {
     expect(getOrcaCloudAuthConfig({}, true, TEST_PRODUCT_DEFAULTS)).toEqual({
       configured: true,
       config: {
+        relayTokenEndpoint: null,
+        relayDirectorUrl: null,
+        connectorTokenEndpoint: null,
         apiBaseUrl: 'https://login.example.test',
         authorizeEndpoint: 'https://login.example.test/v1/desktop/auth/authorize',
         sessionEndpoint: 'https://login.example.test/v1/desktop/auth/session',
@@ -97,6 +104,9 @@ describe('Orca cloud auth config', () => {
     expect(state).toMatchObject({
       configured: true,
       config: {
+        relayTokenEndpoint: null,
+        relayDirectorUrl: null,
+        connectorTokenEndpoint: null,
         apiBaseUrl: 'https://login.example.test',
         clientId: 'desktop-client'
       }
@@ -167,4 +177,11 @@ describe('Orca cloud auth config', () => {
       })
     ).toBe(false)
   })
+})
+
+it('keeps packaged host-key push unavailable despite environment overrides', () => {
+  expect(
+    getOrcaPushGatewayUrl({ ORCA_PUSH_GATEWAY_URL: 'https://push.example.test' }, true)
+  ).toBeNull()
+  expect(getOrcaPushGatewayUrl({}, false)).toBeNull()
 })

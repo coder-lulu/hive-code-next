@@ -7,12 +7,7 @@ import type * as NewWorkspaceModule from '@/lib/new-workspace'
 
 const mocks = vi.hoisted(() => ({
   activateAndRevealFolderWorkspace: vi.fn(),
-  ensureAgentStartupInTerminal: vi.fn(),
-  assertRuntimeEnvironmentCapability: vi.fn()
-}))
-
-vi.mock('@/runtime/runtime-rpc-client', () => ({
-  assertRuntimeEnvironmentCapability: mocks.assertRuntimeEnvironmentCapability
+  ensureAgentStartupInTerminal: vi.fn()
 }))
 
 vi.mock('@/lib/worktree-activation', async (importOriginal) => {
@@ -34,11 +29,15 @@ import {
   submitFolderWorkspaceCreate
 } from './folder-workspace-composer-submit'
 
-beforeEach(() => {
-  Object.assign(window, {
-    api: { agentTrust: { markTrusted: vi.fn().mockResolvedValue(undefined) } }
-  })
-})
+const ISSUE_URL = 'https://github.com/stablyai/orca/issues/42'
+const linkedIssue = {
+  provider: 'github' as const,
+  type: 'issue' as const,
+  number: 42,
+  title: 'Restore linked quick-create',
+  url: ISSUE_URL,
+  repoId: 'repo-1'
+}
 
 describe('submitFolderWorkspaceCreate', () => {
   it.each(['347', '002'])('keeps manual folder name %s with its linked source', async (name) => {
@@ -73,42 +72,12 @@ describe('submitFolderWorkspaceCreate', () => {
 
   beforeEach(() => {
     mocks.activateAndRevealFolderWorkspace.mockReturnValue({ primaryTabId: 'tab-1' })
-    mocks.assertRuntimeEnvironmentCapability.mockResolvedValue(undefined)
   })
 
   afterEach(() => {
     mocks.activateAndRevealFolderWorkspace.mockReset()
     mocks.ensureAgentStartupInTerminal.mockReset()
-    mocks.assertRuntimeEnvironmentCapability.mockReset()
-    Reflect.deleteProperty(window, 'api')
     vi.restoreAllMocks()
-  })
-
-  it('preflights explicit permissions before creating a Runtime-owned folder workspace', async () => {
-    const createFolderWorkspace = vi.fn(async () => makeFolderWorkspace())
-    mocks.assertRuntimeEnvironmentCapability.mockRejectedValue(
-      new Error('Update the remote Runtime Host to use permission-aware agent launches.')
-    )
-
-    await expect(
-      submitFolderWorkspaceCreate({
-        projectGroup: makeProjectGroup(),
-        name: 'safe launch',
-        lastAutoName: '',
-        linkedWorkItem: null,
-        note: '',
-        quickAgent: 'goose',
-        autoRenameBranchFromWork: false,
-        agentCmdOverrides: {},
-        agentPermissionMode: 'manual',
-        runtimeEnvironmentId: 'env-1',
-        createFolderWorkspace,
-        onOpenChange: vi.fn()
-      })
-    ).rejects.toThrow(/permission-aware agent launches/i)
-
-    expect(createFolderWorkspace).not.toHaveBeenCalled()
-    expect(mocks.activateAndRevealFolderWorkspace).not.toHaveBeenCalled()
   })
 
   it('closes the composer after creation even when reveal fails', async () => {
@@ -334,7 +303,7 @@ describe('submitFolderWorkspaceCreate', () => {
       createdWithAgent: 'codex'
     })
     const startup = mocks.activateAndRevealFolderWorkspace.mock.calls[0]?.[1]?.startup
-    expect(startup?.command).toBe('codex')
+    expect(startup?.command).toBe("codex '-c' 'disable_paste_burst=true'")
     expect(startup?.command).not.toContain(linkedWorkItem.url)
     expect(startup?.command).not.toContain('Review this before starting')
     expect(mocks.ensureAgentStartupInTerminal).toHaveBeenCalledWith({
@@ -342,7 +311,7 @@ describe('submitFolderWorkspaceCreate', () => {
       primaryTabId: 'tab-1',
       startup: expect.objectContaining({
         agent: 'codex',
-        launchCommand: 'codex',
+        launchCommand: "codex '-c' 'disable_paste_burst=true'",
         followupPrompt: null,
         draftPrompt: `Review this before starting\n\n${linkedWorkItem.url}`
       })
@@ -734,5 +703,145 @@ describe('submitFolderWorkspaceCreate', () => {
 
     expect(onOpenChange).not.toHaveBeenCalled()
     expect(mocks.activateAndRevealFolderWorkspace).not.toHaveBeenCalled()
+  })
+})
+
+describe('submitFolderWorkspaceCreate native-chat launch draft', () => {
+  function seededDraftFor(tabId: string): { text: string } | undefined {
+    return useAppStore.getState().nativeChatLaunchDraftByTabId[tabId]
+  }
+
+  beforeEach(() => {
+    mocks.activateAndRevealFolderWorkspace.mockReturnValue({ primaryTabId: 'tab-1' })
+    useAppStore.setState({ nativeChatLaunchDraftByTabId: {} })
+  })
+
+  afterEach(() => {
+    mocks.activateAndRevealFolderWorkspace.mockReset()
+    mocks.ensureAgentStartupInTerminal.mockReset()
+    useAppStore.setState({ nativeChatLaunchDraftByTabId: {} })
+    vi.restoreAllMocks()
+  })
+
+  it('mirrors a startup-paste draft into the chat composer', async () => {
+    await submitFolderWorkspaceCreate({
+      projectGroup: makeProjectGroup(),
+      name: '',
+      lastAutoName: '',
+      linkedWorkItem: linkedIssue,
+      note: '',
+      quickAgent: 'codex',
+      autoRenameBranchFromWork: false,
+      agentCmdOverrides: {},
+      createFolderWorkspace: vi.fn(async () => makeFolderWorkspace()),
+      onOpenChange: vi.fn()
+    })
+
+    expect(seededDraftFor('tab-1')?.text).toBe(ISSUE_URL)
+  })
+
+  it('mirrors an argv-prefill draft, which never lands in startupPlan.draftPrompt', async () => {
+    await submitFolderWorkspaceCreate({
+      projectGroup: makeProjectGroup(),
+      name: '',
+      lastAutoName: '',
+      linkedWorkItem: linkedIssue,
+      note: '',
+      quickAgent: 'claude',
+      autoRenameBranchFromWork: false,
+      agentCmdOverrides: {},
+      createFolderWorkspace: vi.fn(async () => makeFolderWorkspace()),
+      onOpenChange: vi.fn()
+    })
+
+    // Argv prefill carries no draftPrompt, so it cannot decide whether chat should mirror the draft.
+    const startup = mocks.activateAndRevealFolderWorkspace.mock.calls[0]?.[1]?.startup
+    expect(startup?.draftPrompt).toBeUndefined()
+    expect(startup?.command).toContain(ISSUE_URL)
+    expect(seededDraftFor('tab-1')?.text).toBe(ISSUE_URL)
+  })
+
+  it('mirrors a multi-line draft into chat', async () => {
+    await submitFolderWorkspaceCreate({
+      projectGroup: makeProjectGroup(),
+      name: '',
+      lastAutoName: '',
+      linkedWorkItem: linkedIssue,
+      note: 'Reproduce on Windows first',
+      quickAgent: 'codex',
+      autoRenameBranchFromWork: false,
+      agentCmdOverrides: {},
+      createFolderWorkspace: vi.fn(async () => makeFolderWorkspace()),
+      onOpenChange: vi.fn()
+    })
+
+    expect(mocks.ensureAgentStartupInTerminal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        startup: expect.objectContaining({
+          draftPrompt: `Reproduce on Windows first\n\n${ISSUE_URL}`
+        })
+      })
+    )
+    expect(seededDraftFor('tab-1')?.text).toBe(`Reproduce on Windows first\n\n${ISSUE_URL}`)
+  })
+
+  it('does not mirror an unlinked note, which is submitted rather than drafted', async () => {
+    await submitFolderWorkspaceCreate({
+      projectGroup: makeProjectGroup(),
+      name: '',
+      lastAutoName: '',
+      linkedWorkItem: null,
+      note: 'Fix the flaky checkout flow',
+      quickAgent: 'codex',
+      autoRenameBranchFromWork: false,
+      agentCmdOverrides: {},
+      createFolderWorkspace: vi.fn(async () => makeFolderWorkspace()),
+      onOpenChange: vi.fn()
+    })
+
+    expect(seededDraftFor('tab-1')).toBeUndefined()
+  })
+})
+
+describe('folder-workspace draft: seeded set == chat-opening set', () => {
+  beforeEach(() => {
+    mocks.activateAndRevealFolderWorkspace.mockReturnValue({ primaryTabId: 'tab-1' })
+    useAppStore.setState({ nativeChatLaunchDraftByTabId: {} })
+  })
+
+  afterEach(() => {
+    mocks.activateAndRevealFolderWorkspace.mockReset()
+    mocks.ensureAgentStartupInTerminal.mockReset()
+    useAppStore.setState({ nativeChatLaunchDraftByTabId: {} })
+    vi.restoreAllMocks()
+  })
+
+  // Mirror both argv prefill and startup paste for an explicit switch to terminal chat.
+  it.each([
+    ['argv-prefill', 'claude' as const, '', true],
+    ['argv-prefill multi-line', 'claude' as const, 'Reproduce on Windows first', true],
+    ['startup-paste', 'codex' as const, '', true],
+    ['startup-paste multi-line', 'codex' as const, 'Reproduce on Windows first', true]
+  ])('%s', async (_label, quickAgent, note, expectMirrored) => {
+    await submitFolderWorkspaceCreate({
+      projectGroup: makeProjectGroup(),
+      name: '',
+      lastAutoName: '',
+      linkedWorkItem: linkedIssue,
+      note,
+      quickAgent,
+      autoRenameBranchFromWork: false,
+      agentCmdOverrides: {},
+      createFolderWorkspace: vi.fn(async () => makeFolderWorkspace()),
+      onOpenChange: vi.fn()
+    })
+
+    const startup = mocks.activateAndRevealFolderWorkspace.mock.calls[0]?.[1]?.startup
+    const seededDraft = useAppStore.getState().nativeChatLaunchDraftByTabId['tab-1']
+    expect(`${startup?.command ?? ''}${startup?.draftPrompt ?? ''}`).toContain(ISSUE_URL)
+    expect(seededDraft != null).toBe(expectMirrored)
+    if (expectMirrored) {
+      expect(seededDraft?.text).toBe(note ? `${note}\n\n${ISSUE_URL}` : ISSUE_URL)
+    }
   })
 })

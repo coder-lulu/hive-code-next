@@ -10,7 +10,7 @@ const secureStore = vi.hoisted(() => ({
     secureValues.set(key, value)
   })
 }))
-const linking = vi.hoisted(() => ({ openURL: vi.fn(async () => undefined) }))
+const linking = vi.hoisted(() => ({ openURL: vi.fn(async (_url: string) => undefined) }))
 const auth = vi.hoisted(() => ({
   parseSession: vi.fn((value: unknown) => value),
   saveMobileSession: vi.fn(async () => undefined)
@@ -89,7 +89,7 @@ describe('mobile provider authentication', () => {
       'hivecode.mobile.auth.pending-provider-flow',
       expect.stringContaining('verifier-value')
     )
-    const opened = new URL(linking.openURL.mock.calls[0]![0] as string)
+    const opened = new URL(linking.openURL.mock.calls[0]![0])
     expect(`${opened.origin}${opened.pathname}`).toBe(
       'https://cloud.example.test/hive/v1/auth/provider-authorizations/github'
     )

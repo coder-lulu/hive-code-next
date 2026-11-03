@@ -9,70 +9,65 @@ vi.mock('@/lib/telemetry', () => ({ track: vi.fn() }))
 
 const initialState = useAppStore.getInitialState()
 
-describe('useCompleteGitRepoAdd space routing', () => {
+vi.mock('./project-added-default-checkout', () => ({
+  finishProjectAddWithDefaultCheckout: vi.fn().mockResolvedValue(undefined)
+}))
+
+const { finishProjectAddWithDefaultCheckout } = await import('./project-added-default-checkout')
+
+describe('useCompleteGitRepoAdd completion ownership', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     useAppStore.setState(initialState, true)
     useAppStore.setState({ worktreesByRepo: { 'repo-1': [] } })
   })
-
   afterEach(() => {
     cleanup()
     useAppStore.setState(initialState, true)
   })
 
-  it('associates a scoped project before completing the add flow', async () => {
+  it('forwards the originating host and imported group outcome to the hosted composer', async () => {
+    const closeModal = vi.fn()
     const moveProjectToGroup = vi.fn().mockResolvedValue(true)
     const finishProjectAdd = vi.fn().mockResolvedValue(undefined)
     useAppStore.setState({ moveProjectToGroup })
     const { result } = renderHook(() =>
       useCompleteGitRepoAdd({
-        closeModal: vi.fn(),
-        setHideDefaultBranchWorkspace: vi.fn(),
-        finishProjectAdd,
-        projectGroupId: 'space-1'
-      })
-    )
-
-    await act(async () => {
-      await result.current('repo-1', 'local_folder_picker', 'local')
-    })
-
-    expect(moveProjectToGroup).toHaveBeenCalledWith('repo-1', 'space-1')
-    expect(finishProjectAdd).toHaveBeenCalledWith('repo-1', 'local_folder_picker', 'local')
-    expect(moveProjectToGroup.mock.invocationCallOrder[0]).toBeLessThan(
-      finishProjectAdd.mock.invocationCallOrder[0]
-    )
-  })
-
-  it('keeps an explicit Ungrouped target distinct from a global add', async () => {
-    const moveProjectToGroup = vi.fn().mockResolvedValue(true)
-    const finishProjectAdd = vi.fn().mockResolvedValue(undefined)
-    useAppStore.setState({ moveProjectToGroup })
-    const scoped = renderHook(() =>
-      useCompleteGitRepoAdd({
-        closeModal: vi.fn(),
-        setHideDefaultBranchWorkspace: vi.fn(),
-        finishProjectAdd,
-        projectGroupId: null
-      })
-    )
-
-    await act(async () => {
-      await scoped.result.current('repo-1', 'local_folder_picker')
-    })
-    expect(moveProjectToGroup).toHaveBeenCalledWith('repo-1', null)
-
-    moveProjectToGroup.mockClear()
-    const global = renderHook(() =>
-      useCompleteGitRepoAdd({
-        closeModal: vi.fn(),
+        closeModal,
         setHideDefaultBranchWorkspace: vi.fn(),
         finishProjectAdd
       })
     )
+    const outcome = { importedProjectGroupId: 'space-1' }
     await act(async () => {
-      await global.result.current('repo-1', 'local_folder_picker')
+      await result.current('repo-1', 'local_folder_picker', 'runtime:remote', outcome)
     })
+    expect(finishProjectAdd).toHaveBeenCalledWith(
+      'repo-1',
+      'local_folder_picker',
+      'runtime:remote',
+      outcome
+    )
     expect(moveProjectToGroup).not.toHaveBeenCalled()
+    expect(closeModal).not.toHaveBeenCalled()
+    expect(finishProjectAddWithDefaultCheckout).not.toHaveBeenCalled()
+  })
+
+  it('delegates standalone completion to the default checkout owner with the originating host', async () => {
+    const closeModal = vi.fn()
+    const setHideDefaultBranchWorkspace = vi.fn()
+    const { result } = renderHook(() =>
+      useCompleteGitRepoAdd({ closeModal, setHideDefaultBranchWorkspace })
+    )
+    await act(async () => {
+      await result.current('repo-1', 'local_folder_picker', 'local')
+    })
+    expect(finishProjectAddWithDefaultCheckout).toHaveBeenCalledExactlyOnceWith({
+      repoId: 'repo-1',
+      source: 'local_folder_picker',
+      executionHostId: 'local',
+      closeModal,
+      setHideDefaultBranchWorkspace
+    })
   })
 })

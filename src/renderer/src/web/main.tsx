@@ -40,9 +40,14 @@ const reloadAccountPage = (): void => window.location.reload()
 
 document.title = `${APP_DISPLAY_NAME} Web`
 import { installOsFileDropCancellationGuard } from '../lib/os-file-drop-cancellation-guard'
+import { installBodyOverlayAttributes } from '../lib/body-overlay-attributes'
+import { installAppKeyboardRouter } from '../lib/app-keyboard-router'
 
 const disposeOsFileDropGuard = installOsFileDropCancellationGuard()
 import.meta.hot?.dispose(disposeOsFileDropGuard)
+const disposeBodyOverlayAttributes = installBodyOverlayAttributes()
+import.meta.hot?.dispose(disposeBodyOverlayAttributes)
+installAppKeyboardRouter()
 const App = lazy(() => import('../App'))
 const initialCloudLaunch = readCloudLaunchFragment(window.location)
 if (initialCloudLaunch.kind !== 'absent') {
@@ -214,7 +219,10 @@ function RuntimeMetadataSyncNotice({ state }: { state: string }): React.JSX.Elem
       role="status"
       className="fixed inset-x-2 bottom-2 z-50 rounded-md border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-sm sm:inset-x-auto sm:left-3 sm:max-w-lg"
     >
-      {t('web.runtime.nameSyncUnverified', '名称同步暂不可验证，显示上次已确认名称。')}
+      {t(
+        'web.runtime.nameSyncUnverified',
+        'Name sync could not be verified. Showing the last confirmed name.'
+      )}
     </div>
   )
 }
@@ -255,10 +263,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   </I18nProvider>
 )
 
-// Why: the web client is its own entry point and hosts terminals too, so it has
-// to start the deferred WebGL addon load itself (see main.tsx). Dynamic because
-// this entry deliberately keeps the whole App graph — pane manager included —
-// out of its own startup chunk.
+// Prime WebGL here because web hosts terminals too; dynamic import keeps the App/pane-manager graph out of startup.
 void import('../lib/pane-manager/pane-webgl-renderer').then((module) =>
   module.primeTerminalWebglAddon()
 )

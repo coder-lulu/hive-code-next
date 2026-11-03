@@ -1,11 +1,11 @@
 import type { StoreRuntimeState } from './store-runtime-state'
 import type { Store } from './store'
 import { LoadedStateAdaptationOperations } from './loaded-state-adaptation'
-import { LoadedCohortMigrationOperations } from './loaded-cohort-migrations'
 import { LoadedStateParsingOperations } from './loaded-state-parsing'
 import { StateSerializationSecretHandlingOperations } from './state-serialization-secret-handling'
 import { PrimaryStateWriteOperations } from './primary-state-writes'
-import { WriteSchedulingOperations } from './write-scheduling'
+import { scheduleSave, WriteSchedulingOperations } from './write-scheduling'
+import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../shared/layout-owner-switch'
 import { WriteFlushBarrierOperations } from './write-flush-barriers'
 import { ProfilePreferences } from './profile-preferences'
 import { RepoLifecycleOperations } from './repo-lifecycle-operations'
@@ -16,9 +16,10 @@ import { MetadataLineageOperations } from './metadata-lineage-operations'
 import { ProjectCollectionOperations } from './project-collection-operations'
 import { AutomationPersistence } from './automation-persistence'
 import { MobileTabSelectionPersistence } from './mobile-tab-selection-persistence'
-import { RemoteLayoutSnapshotPersistence } from '../../remote-layout-snapshot'
+import { RemoteLayoutSnapshotPersistence } from '../../remote-layout-snapshot/remote-layout-snapshot-persistence'
 import { SparsePresetPersistence } from './sparse-preset-persistence'
 import { PtyBindingPersistenceOperations } from './pty-binding-persistence'
+import { LayoutCommandPersistence } from '../terminal-topology/layout-command-persistence'
 import { SshProfileOperations } from './ssh-profile-operations'
 import { RetiredWorktreeNamePersistence } from './retired-worktree-name-persistence'
 import { SshLeaseRecoveryOperations } from './ssh-lease-recovery-operations'
@@ -39,6 +40,7 @@ export type StoreDomainOperations = WriteSchedulingOperations &
   SessionHostPartitionOperations &
   SessionSnapshotOperations &
   PtyBindingPersistenceOperations &
+  LayoutCommandPersistence &
   SshProfileOperations &
   RetiredWorktreeNamePersistence &
   SshLeaseRecoveryOperations &
@@ -49,7 +51,6 @@ export type StoreDomainOperations = WriteSchedulingOperations &
 
 export type StoreDomains = {
   adaptation: LoadedStateAdaptationOperations
-  cohorts: LoadedCohortMigrationOperations
   loader: LoadedStateParsingOperations
   serialization: StateSerializationSecretHandlingOperations
   writes: PrimaryStateWriteOperations
@@ -67,6 +68,7 @@ export type StoreDomains = {
   remoteLayoutSnapshots: RemoteLayoutSnapshotPersistence
   sparsePresets: SparsePresetPersistence
   ptyBindings: PtyBindingPersistenceOperations
+  layoutCommands: LayoutCommandPersistence
   sshProfiles: SshProfileOperations
   retiredWorktreeNames: RetiredWorktreeNamePersistence
   sshLeases: SshLeaseRecoveryOperations
@@ -89,6 +91,7 @@ export const STORE_DOMAIN_OPERATION_CLASSES = [
   SessionHostPartitionOperations,
   SessionSnapshotOperations,
   PtyBindingPersistenceOperations,
+  LayoutCommandPersistence,
   SshProfileOperations,
   RetiredWorktreeNamePersistence,
   SshLeaseRecoveryOperations,
@@ -110,8 +113,7 @@ export function installStoreDomainContexts(target: Store, domains: StoreDomains)
 
 export function createStoreDomains(runtime: StoreRuntimeState): StoreDomains {
   const adaptation = new LoadedStateAdaptationOperations(runtime)
-  const cohorts = new LoadedCohortMigrationOperations(runtime)
-  const loader = new LoadedStateParsingOperations(runtime, cohorts)
+  const loader = new LoadedStateParsingOperations(runtime)
   const serialization = new StateSerializationSecretHandlingOperations(runtime)
   const writes = new PrimaryStateWriteOperations(runtime, serialization)
   const scheduling = new WriteSchedulingOperations(runtime, writes)
@@ -144,7 +146,6 @@ export function createStoreDomains(runtime: StoreRuntimeState): StoreDomains {
   const orcadCatalogImports = new OrcadCatalogImportPersistence(runtime, repos, scheduling)
   return {
     adaptation,
-    cohorts,
     loader,
     serialization,
     writes,
@@ -162,6 +163,11 @@ export function createStoreDomains(runtime: StoreRuntimeState): StoreDomains {
     remoteLayoutSnapshots,
     sparsePresets,
     ptyBindings,
+    layoutCommands: new LayoutCommandPersistence(
+      runtime,
+      sessions,
+      ORCA_LAYOUT_OWNER_IS_MAIN ? () => scheduleSave(scheduling) : undefined
+    ),
     sshProfiles,
     retiredWorktreeNames,
     sshLeases,

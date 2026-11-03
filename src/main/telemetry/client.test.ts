@@ -70,8 +70,7 @@ describe('track()', () => {
     ;(store.getSettings as ReturnType<typeof vi.fn>).mockReturnValue({
       telemetry: {
         optedIn: false,
-        installId: BASE_COMMON.install_id,
-        existedBeforeTelemetryRelease: false
+        installId: BASE_COMMON.install_id
       }
     })
     for (let i = 0; i < 30; i++) {

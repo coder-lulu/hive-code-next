@@ -1,7 +1,6 @@
 import { getIntlLocale } from './i18n'
 
-// Plugin packs use synthetic tags Intl rejects; resolve their locale and cache
-// the formatter so relative labels follow live UI language changes.
+// Relative-time words follow the UI language; resolve plugin tags through getIntlLocale and cache per locale for live switches.
 let cached: { locale: string; formatter: Intl.RelativeTimeFormat } | null = null
 
 export function getUiRelativeTimeFormatter(): Intl.RelativeTimeFormat {
@@ -12,7 +11,6 @@ export function getUiRelativeTimeFormatter(): Intl.RelativeTimeFormat {
   return cached.formatter
 }
 
-/** Format a signed millisecond delta (future positive, past negative) at minute/hour/day granularity. */
 export function formatUiRelativeTime(diffMs: number): string {
   const formatter = getUiRelativeTimeFormatter()
   const diffMinutes = Math.round(diffMs / 60_000)
@@ -26,11 +24,39 @@ export function formatUiRelativeTime(diffMs: number): string {
   return formatter.format(Math.round(diffHours / 24), 'day')
 }
 
-/** Parse a date string and format it relative to now; returns `fallback` when the input is invalid. */
 export function formatUiRelativeTimeFromDate(input: string, fallback = 'recently'): string {
   const date = new Date(input)
   if (Number.isNaN(date.getTime())) {
     return fallback
   }
   return formatUiRelativeTime(date.getTime() - Date.now())
+}
+
+type NarrowTimeUnit = 'second' | 'minute' | 'hour' | 'day'
+
+let narrowRelativeCache: { locale: string; formatter: Intl.RelativeTimeFormat } | null = null
+const narrowDurationCache = new Map<string, Intl.NumberFormat>()
+
+// Compact relative time ("in 5m", "8h ago") in the UI language.
+export function formatUiNarrowRelativeTime(value: number, unit: NarrowTimeUnit): string {
+  const locale = getIntlLocale()
+  if (!narrowRelativeCache || narrowRelativeCache.locale !== locale) {
+    narrowRelativeCache = {
+      locale,
+      formatter: new Intl.RelativeTimeFormat(locale, { numeric: 'always', style: 'narrow' })
+    }
+  }
+  return narrowRelativeCache.formatter.format(value, unit)
+}
+
+// Compact duration ("5m", "3h") in the UI language.
+export function formatUiNarrowDuration(value: number, unit: NarrowTimeUnit): string {
+  const locale = getIntlLocale()
+  const key = `${locale}\0${unit}`
+  let formatter = narrowDurationCache.get(key)
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(locale, { style: 'unit', unit, unitDisplay: 'narrow' })
+    narrowDurationCache.set(key, formatter)
+  }
+  return formatter.format(value)
 }

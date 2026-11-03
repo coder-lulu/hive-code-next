@@ -5,7 +5,7 @@ import {
   withPlatform,
   writeDataFile,
   readDataFile
-} from './persistence-test-harness'
+} from './persistence/persistence-test-harness'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { rmSync, mkdtempSync } from 'node:fs'
 import { join, win32 } from 'node:path'
@@ -91,8 +91,7 @@ describe('Store', () => {
   })
   // ── terminalMacOptionAsAlt migration (issue #903) ───────────────────
 
-  it('migrates legacy "true" terminalMacOptionAsAlt to "auto" on first load', async () => {
-    // Why: legacy 'true' (old default) is indistinguishable from an explicit choice; flip un-migrated installs to 'auto' so non-US layouts keep @ / € / [ ].
+  it('preserves explicit both Option keys without a migration marker', async () => {
     writeDataFile({
       schemaVersion: 1,
       repos: [],
@@ -103,11 +102,10 @@ describe('Store', () => {
       workspaceSession: {}
     })
     const store = await createStore()
-    expect(store.getSettings().terminalMacOptionAsAlt).toBe('auto')
-    expect(store.getSettings().terminalMacOptionAsAltMigrated).toBe(true)
+    expect(store.getSettings().terminalMacOptionAsAlt).toBe('true')
   })
 
-  it('migrates inherited right-click paste to each platform default once', async () => {
+  it('defaults right-click paste for each platform when unset', async () => {
     for (const [platform, expected] of [
       ['win32', true],
       ['darwin', false],
@@ -118,19 +116,18 @@ describe('Store', () => {
           schemaVersion: 1,
           repos: [],
           worktreeMeta: {},
-          settings: { terminalRightClickToPaste: true },
+          settings: {},
           ui: {},
           githubCache: { pr: {}, issue: {} },
           workspaceSession: {}
         })
         const store = await createStore()
         expect(store.getSettings().terminalRightClickToPaste).toBe(expected)
-        expect(store.getSettings().terminalRightClickToPasteDefaultedForPlatform).toBe(true)
       })
     }
   })
 
-  it('preserves an explicit Windows right-click paste opt-out during migration', async () => {
+  it('preserves an explicit Windows right-click paste opt-out across load', async () => {
     await withProfileDatabasePlatform('win32', async () => {
       writeDataFile({
         schemaVersion: 1,
@@ -143,19 +140,17 @@ describe('Store', () => {
       })
       const store = await createStore()
       expect(store.getSettings().terminalRightClickToPaste).toBe(false)
-      expect(store.getSettings().terminalRightClickToPasteDefaultedForPlatform).toBe(true)
     })
   })
 
-  it('preserves right-click paste choices after the platform migration', async () => {
+  it('preserves right-click paste choices across load', async () => {
     await withPlatform('darwin', async () => {
       writeDataFile({
         schemaVersion: 1,
         repos: [],
         worktreeMeta: {},
         settings: {
-          terminalRightClickToPaste: true,
-          terminalRightClickToPasteDefaultedForPlatform: true
+          terminalRightClickToPaste: true
         },
         ui: {},
         githubCache: { pr: {}, issue: {} },
@@ -166,7 +161,21 @@ describe('Store', () => {
     })
   })
 
-  it('migrates inherited terminal bar cursor defaults to block on first load', async () => {
+  it('defaults the terminal cursor to block when unset', async () => {
+    writeDataFile({
+      schemaVersion: 1,
+      repos: [],
+      worktreeMeta: {},
+      settings: {},
+      ui: {},
+      githubCache: { pr: {}, issue: {} },
+      workspaceSession: {}
+    })
+    const store = await createStore()
+    expect(store.getSettings().terminalCursorStyle).toBe('block')
+  })
+
+  it('preserves terminal cursor choices across load', async () => {
     writeDataFile({
       schemaVersion: 1,
       repos: [],
@@ -177,31 +186,15 @@ describe('Store', () => {
       workspaceSession: {}
     })
     const store = await createStore()
-    expect(store.getSettings().terminalCursorStyle).toBe('block')
-    expect(store.getSettings().terminalCursorStyleDefaultedToBlock).toBe(true)
-  })
-
-  it('preserves terminal cursor choices after the block-default migration', async () => {
-    writeDataFile({
-      schemaVersion: 1,
-      repos: [],
-      worktreeMeta: {},
-      settings: { terminalCursorStyle: 'bar', terminalCursorStyleDefaultedToBlock: true },
-      ui: {},
-      githubCache: { pr: {}, issue: {} },
-      workspaceSession: {}
-    })
-    const store = await createStore()
     expect(store.getSettings().terminalCursorStyle).toBe('bar')
-    expect(store.getSettings().terminalCursorStyleDefaultedToBlock).toBe(true)
   })
 
-  it('replaces an invalid persisted terminal cursor choice after migration', async () => {
+  it('replaces an invalid persisted terminal cursor choice across load', async () => {
     writeDataFile({
       schemaVersion: 1,
       repos: [],
       worktreeMeta: {},
-      settings: { terminalCursorStyle: 'beam', terminalCursorStyleDefaultedToBlock: true },
+      settings: { terminalCursorStyle: 'beam' },
       ui: {},
       githubCache: { pr: {}, issue: {} },
       workspaceSession: {}
@@ -212,8 +205,7 @@ describe('Store', () => {
     expect((readDataFile() as PersistedState).settings.terminalCursorStyle).toBe('block')
   })
 
-  it('preserves explicit "false" terminalMacOptionAsAlt through migration', async () => {
-    // 'false' never matched the old default — it was an explicit choice.
+  it('preserves explicit "false" terminalMacOptionAsAlt across load', async () => {
     writeDataFile({
       schemaVersion: 1,
       repos: [],
@@ -225,50 +217,49 @@ describe('Store', () => {
     })
     const store = await createStore()
     expect(store.getSettings().terminalMacOptionAsAlt).toBe('false')
-    expect(store.getSettings().terminalMacOptionAsAltMigrated).toBe(true)
   })
 
-  it('preserves explicit "left" / "right" terminalMacOptionAsAlt through migration', async () => {
+  it.each(['left', 'right'] as const)(
+    'preserves explicit %s terminalMacOptionAsAlt across save and reload',
+    async (choice) => {
+      writeDataFile({
+        schemaVersion: 1,
+        repos: [],
+        worktreeMeta: {},
+        settings: { terminalMacOptionAsAlt: choice },
+        ui: {},
+        githubCache: { pr: {}, issue: {} },
+        workspaceSession: {}
+      })
+      const store = await createStore()
+      expect(store.getSettings().terminalMacOptionAsAlt).toBe(choice)
+      store.flush()
+      await closeTestStores()
+      expect((await createStore()).getSettings().terminalMacOptionAsAlt).toBe(choice)
+      expect(readDataFile()).not.toHaveProperty('settings.terminalMacOptionAsAltMigrated')
+    }
+  )
+
+  it('respects current settings with explicit "true"', async () => {
     writeDataFile({
       schemaVersion: 1,
       repos: [],
       worktreeMeta: {},
-      settings: { terminalMacOptionAsAlt: 'left' },
-      ui: {},
-      githubCache: { pr: {}, issue: {} },
-      workspaceSession: {}
-    })
-    const store = await createStore()
-    expect(store.getSettings().terminalMacOptionAsAlt).toBe('left')
-    expect(store.getSettings().terminalMacOptionAsAltMigrated).toBe(true)
-  })
-
-  it('respects already-migrated settings with explicit "true"', async () => {
-    // A deliberate 'true' ('Both') choice post-migration is preserved on later launches.
-    writeDataFile({
-      schemaVersion: 1,
-      repos: [],
-      worktreeMeta: {},
-      settings: { terminalMacOptionAsAlt: 'true', terminalMacOptionAsAltMigrated: true },
+      settings: { terminalMacOptionAsAlt: 'true' },
       ui: {},
       githubCache: { pr: {}, issue: {} },
       workspaceSession: {}
     })
     const store = await createStore()
     expect(store.getSettings().terminalMacOptionAsAlt).toBe('true')
-    expect(store.getSettings().terminalMacOptionAsAltMigrated).toBe(true)
   })
 
-  it('fresh install defaults terminalMacOptionAsAlt to "auto" and marks migrated', async () => {
-    // No data file: 'auto' is the new default and migration is complete (nothing legacy to migrate).
+  it('fresh install defaults terminalMacOptionAsAlt to "auto"', async () => {
     const store = await createStore()
     expect(store.getSettings().terminalMacOptionAsAlt).toBe('auto')
-    // Fresh install: migrated stays false (migration code never ran); a later load with legacy 'true' still migrates correctly.
-    expect(store.getSettings().terminalMacOptionAsAltMigrated).toBe(false)
   })
 
-  it('missing terminalMacOptionAsAlt in persisted file defaults to "auto" and flags migrated', async () => {
-    // Existing file predates the setting: land on 'auto' and mark migrated so we don't re-examine.
+  it('missing terminalMacOptionAsAlt in persisted file defaults to "auto"', async () => {
     writeDataFile({
       schemaVersion: 1,
       repos: [],
@@ -280,31 +271,14 @@ describe('Store', () => {
     })
     const store = await createStore()
     expect(store.getSettings().terminalMacOptionAsAlt).toBe('auto')
-    expect(store.getSettings().terminalMacOptionAsAltMigrated).toBe(true)
   })
 
-  it('migrates the legacy experimentalSidekick setting to experimentalPet', async () => {
+  it('persists the current compact worktree cards choice', async () => {
     writeDataFile({
       schemaVersion: 1,
       repos: [],
       worktreeMeta: {},
-      settings: { experimentalSidekick: true },
-      ui: {},
-      githubCache: { pr: {}, issue: {} },
-      workspaceSession: {}
-    })
-
-    const store = await createStore()
-
-    expect(store.getSettings().experimentalPet).toBe(true)
-  })
-
-  it('migrates the legacy experimental compact worktree cards setting', async () => {
-    writeDataFile({
-      schemaVersion: 1,
-      repos: [],
-      worktreeMeta: {},
-      settings: { experimentalCompactWorktreeCards: true },
+      settings: { compactWorktreeCards: true },
       ui: {},
       githubCache: { pr: {}, issue: {} },
       workspaceSession: {}
@@ -313,42 +287,7 @@ describe('Store', () => {
     const store = await createStore()
 
     expect(store.getSettings().compactWorktreeCards).toBe(true)
-    expect(store.getSettings().experimentalCompactWorktreeCards).toBeUndefined()
-  })
-
-  it('defaults legacy experimentalActivity profiles off once', async () => {
-    writeDataFile({
-      schemaVersion: 1,
-      repos: [],
-      worktreeMeta: {},
-      settings: { experimentalActivity: true },
-      ui: {},
-      githubCache: { pr: {}, issue: {} },
-      workspaceSession: {}
-    })
-
-    const store = await createStore()
-
-    expect(store.getSettings().experimentalActivity).toBe(false)
-    expect(store.getSettings().experimentalActivityDefaultedOffForAllUsers).toBe(true)
-  })
-
-  it('preserves experimentalActivity after the default-off migration has run', async () => {
-    writeDataFile({
-      schemaVersion: 1,
-      repos: [],
-      worktreeMeta: {},
-      settings: {
-        experimentalActivity: true,
-        experimentalActivityDefaultedOffForAllUsers: true
-      },
-      ui: {},
-      githubCache: { pr: {}, issue: {} },
-      workspaceSession: {}
-    })
-
-    const store = await createStore()
-
-    expect(store.getSettings().experimentalActivity).toBe(true)
+    store.flush()
+    expect((readDataFile() as PersistedState).settings.compactWorktreeCards).toBe(true)
   })
 })

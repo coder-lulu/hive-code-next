@@ -1,4 +1,8 @@
-import type { CommitMessageAiSettings } from '../../../../shared/commit-message-ai-types'
+import {
+  getDefaultSourceControlAiSettings,
+  normalizeSourceControlAiSettings
+} from '../../../../shared/source-control-ai'
+import type { SourceControlAiSettings } from '../../../../shared/source-control-ai-types'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import {
@@ -10,17 +14,10 @@ import {
 } from '../../../../shared/commit-message-agent-spec'
 import { getAgentCatalog } from '@/lib/agent-catalog'
 
-export const EMPTY_COMMIT_MESSAGE_AI_SETTINGS: CommitMessageAiSettings = {
-  enabled: false,
-  agentId: null,
-  selectedModelByAgent: {},
-  selectedThinkingByModel: {},
-  customPrompt: '',
-  customAgentCommand: ''
-}
+export const DEFAULT_SOURCE_CONTROL_AI_SETTINGS = getDefaultSourceControlAiSettings()
 
-export function readCommitMessageAiSettings(settings: GlobalSettings): CommitMessageAiSettings {
-  return settings.commitMessageAi ?? EMPTY_COMMIT_MESSAGE_AI_SETTINGS
+export function readSourceControlAiSettings(settings: GlobalSettings): SourceControlAiSettings {
+  return normalizeSourceControlAiSettings(settings.sourceControlAi)
 }
 
 export function commitMessageAgentLabel(
@@ -31,7 +28,7 @@ export function commitMessageAgentLabel(
 }
 
 export function resolveCommitMessageSelectedModel(
-  config: CommitMessageAiSettings,
+  config: SourceControlAiSettings,
   capability: CommitMessageAgentCapability
 ): CommitMessageModelCapability {
   const persisted = config.selectedModelByAgent[capability.id]
@@ -45,7 +42,7 @@ export function resolveCommitMessageSelectedModel(
 }
 
 export function resolveCommitMessageSelectedThinking(
-  config: CommitMessageAiSettings,
+  config: SourceControlAiSettings,
   model: CommitMessageModelCapability
 ): string | undefined {
   if (!model.thinkingLevels) {
@@ -58,10 +55,10 @@ export function resolveCommitMessageSelectedThinking(
   return model.defaultThinkingLevel
 }
 
-export function seedCommitMessageAiEnablePatch(
-  config: CommitMessageAiSettings,
+export function seedSourceControlAiEnablePatch(
+  config: SourceControlAiSettings,
   seedAgentId: CommitMessageAgentChoice
-): Partial<CommitMessageAiSettings> {
+): Partial<SourceControlAiSettings> {
   const seedCapability = isCustomAgentId(seedAgentId)
     ? undefined
     : getCommitMessageAgentCapability(seedAgentId)

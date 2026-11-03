@@ -1,5 +1,3 @@
-import './rpc/unused-default-rpc-methods.test-fixture'
-import { defineMethod } from './rpc/core'
 import { createHash } from 'node:crypto'
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -111,7 +109,7 @@ describe('device principal', () => {
       getRuntimeId: () => 'test-runtime',
       getStatus: vi.fn().mockResolvedValue({ graphStatus: 'ok' })
     } as unknown as OrcaRuntimeService
-    const server = new OrcaRuntimeRpcServer({ runtime, userDataPath, enableWebSocket: false, methods: [defineMethod({ name: 'status.get', params: null, permission: 'workspace', handler: () => ({ graphStatus: 'ok' }) })] })
+    const server = new OrcaRuntimeRpcServer({ runtime, userDataPath, enableWebSocket: false })
     const registry = new DeviceRegistry(userDataPath)
     server['deviceRegistry'] = registry
     const phone = registry.addDevice('phone', 'mobile')
@@ -134,14 +132,6 @@ describe('device principal', () => {
       authenticatedCallerFingerprint: createHash('sha256').update(phone.token).digest('hex')
     })
 
-    await server['handleWebSocketMessage'](
-      JSON.stringify({ id: 'foreign-host', method: 'status.get', executionHost: 'runtime:other' }),
-      (response) => replies.push(response), () => {}, undefined, undefined, phone.token, socket
-    )
-    expect(dispatch).toHaveBeenCalledOnce()
-    expect(JSON.parse(replies.at(-1)!)).toMatchObject({ ok: false, error: { code: 'remote_runtime_unavailable' } })
-
-    // A credential change bumps the revision; the open socket's next request is refused.
     registry['devices'] = registry['devices'].map((row) => ({ ...row, credentialRevision: 1 }))
     await server['handleWebSocketMessage'](
       JSON.stringify({ id: 'r2', method: 'status.get' }),

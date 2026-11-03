@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { OrcaRuntimeService } from './orca-runtime'
 import { OrcaRuntimeRpcServer } from './runtime-rpc'
 import { parsePairingCode } from '../../shared/pairing'
-import { RuntimeE2EEClientSession } from '../../shared/runtime-e2ee-client-session'
+import { generateKeyPair } from '../../shared/e2ee-crypto'
 import { waitFor } from './runtime-rpc-test-harness'
 import {
   connectWs,
@@ -55,13 +55,14 @@ describe('OrcaRuntimeRpcServer', () => {
       }
       const parsed = parsePairingCode(offer.pairingUrl)!
       const ws = await connectWs(parsed.endpoint)
-      const session = RuntimeE2EEClientSession.create({
-        desktopPublicKeyB64: parsed.publicKeyB64,
-        transport: 'direct'
-      })
-      const ready = nextWsMessage(ws)
-      ws.send(JSON.stringify(session.hello))
-      expect(session.acceptReady(JSON.parse(await ready))).toBe(true)
+      const mobileKeys = generateKeyPair()
+      ws.send(
+        JSON.stringify({
+          type: 'e2ee_hello',
+          publicKeyB64: Buffer.from(mobileKeys.publicKey).toString('base64')
+        })
+      )
+      expect(JSON.parse(await nextWsMessage(ws))).toEqual({ type: 'e2ee_ready' })
       expect(server['mobileSocketWiring']?.channelCount).toBe(1)
       expect(server['mobileSocketWiring']?.connectionCount).toBe(1)
 

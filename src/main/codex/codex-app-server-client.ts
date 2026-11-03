@@ -3,16 +3,7 @@ import { spawnProcess } from '@orca/process-host'
 import { normalizeHookTrustKeyForLookup } from './config-toml-trust'
 import { runCodexAppServerSession, type CodexAppServerInvocation } from './codex-app-server-session'
 
-// Why: Codex gates hooks on a `trusted_hash` it computes from a private
-// canonical-JSON identity. Orca used to replicate that algorithm
-// (computeTrustedHash), which drifted from the real one across Codex releases
-// (#7896, #7110, #8699). `codex app-server` exposes the same sanctioned RPCs
-// the Codex TUI "Trust all" button uses — hooks/list (returns Codex's own
-// currentHash per hook) and config/batchWrite (upserts hooks.state through
-// Codex's comment-preserving writer) — so this client grants trust with
-// Codex as the only hash authority. See upstream codex-rs/tui/src/hooks_rpc.rs
-// and codex-rs/tui/src/startup_hooks_review.rs.
-
+// Codex owns hook hash computation; its trust RPCs also preserve user config comments.
 export {
   CodexAppServerTimeoutError,
   CodexAppServerUnsupportedError,
@@ -22,13 +13,9 @@ export {
 
 export type CodexHookTrustGrantRequest = {
   invocation: CodexAppServerInvocation
-  /** cwd passed to hooks/list. Discovery of the managed CODEX_HOME's
-   *  hooks.json is cwd-independent (user scope); this only scopes which
-   *  project hooks appear, which the key filter below ignores anyway. */
+  /** Scopes project listings; managed home hooks are user-scoped and discovered independently. */
   hooksListCwd: string
-  /** Lookup-normalized trust keys (normalizeHookTrustKeyForLookup shape) for
-   *  the managed entries Orca just wrote. Grants are restricted to hooks whose
-   *  reported key normalizes into this set — user hooks are never touched. */
+  /** Lookup-normalized keys of the managed entries; grants must never include user hooks. */
   expectedTrustKeys: string[]
   expectedEnabledByTrustKey?: Record<string, boolean>
   /** Exact command string written to the managed hooks.json entries. */
@@ -43,8 +30,7 @@ export type CodexGrantedHookTrust = {
   trustedHash: string
 }
 
-/** Closed verify-failure taxonomy, so telemetry never has to parse the
- *  free-form `reason` diagnostics string. */
+/** Stable telemetry categories independent of free-form diagnostics. */
 export type CodexTrustGrantSessionVerifyClass =
   | 'list-mismatch'
   | 'post-grant-untrusted'
@@ -59,9 +45,12 @@ export type CodexHookTrustGrantSessionResult =
     }
   | { outcome: 'verify-failed'; reason: string; reasonClass: CodexTrustGrantSessionVerifyClass }
 
-type CodexHookListing = CodexListedHook & {
+type CodexHookListing = {
+  key: string
+  command: string | null
   currentHash: string
   trustStatus: string
+  enabled: boolean | null
 }
 
 /** A hooks/list entry; a Codex with no hook approvals (before 0.129) reports no hash or status. */
@@ -74,7 +63,6 @@ export type CodexListedHook = {
   enabled: boolean | null
 }
 
-/** Every hook a hooks/list result names, each key once. */
 export function collectListedHooks(result: unknown): CodexListedHook[] {
   const data =
     result && typeof result === 'object' && Array.isArray((result as { data?: unknown }).data)
@@ -88,8 +76,7 @@ export function collectListedHooks(result: unknown): CodexListedHook[] {
       if (typeof hook?.key !== 'string') {
         continue
       }
-      // Why: hooks/list repeats user-scope hooks per requested cwd; grants
-      // must consider each key once.
+      // hooks/list repeats user-scoped hooks per cwd; grant each key only once.
       if (seenKeys.has(hook.key)) {
         continue
       }
@@ -116,11 +103,6 @@ function collectHookListings(result: unknown): CodexHookListing[] {
   )
 }
 
-/**
- * Runs one short-lived `codex app-server` session over stdio JSON-RPC (JSONL)
- * and grants trust for exactly the expected managed entries:
- * initialize → initialized → hooks/list → config/batchWrite → hooks/list.
- */
 export async function runCodexHookTrustGrantSession(
   request: CodexHookTrustGrantRequest,
   spawnImpl: (
@@ -154,13 +136,11 @@ export async function runCodexHookTrustGrantSession(
 
       const expectedEnabled = (listing: CodexHookListing): boolean =>
         request.expectedEnabledByTrustKey?.[normalizeHookTrustKeyForLookup(listing.key)] ?? true
-      const needingTrust = managedListings.filter(
-        (listing) =>
-          listing.trustStatus !== 'trusted' || listing.enabled !== expectedEnabled(listing)
-      )
+      const needsUpdate = (listing: CodexHookListing): boolean =>
+        listing.trustStatus !== 'trusted' || listing.enabled !== expectedEnabled(listing)
+      const needingTrust = managedListings.filter(needsUpdate)
       if (needingTrust.length > 0) {
-        // Why: same wire shape as the Codex TUI "Trust all" flow — one upsert
-        // edit under hooks.state with each key's Codex-computed current hash.
+        // Match the TUI's Trust all upsert using Codex-computed hashes.
         const value: Record<string, { trusted_hash: string; enabled?: boolean }> = {}
         for (const listing of needingTrust) {
           value[listing.key] = {
@@ -179,10 +159,7 @@ export async function runCodexHookTrustGrantSession(
       const verifyResult = await rpc.request('hooks/list', { cwds: [request.hooksListCwd] })
       const verifiedListings = collectHookListings(verifyResult).filter(matchManaged)
       const verifiedKeyCoverage = normalizedKeyCoverage(verifiedListings)
-      const untrusted = verifiedListings.filter(
-        (listing) =>
-          listing.trustStatus !== 'trusted' || listing.enabled !== expectedEnabled(listing)
-      )
+      const untrusted = verifiedListings.filter(needsUpdate)
       if (
         verifiedListings.length !== expectedKeys.size ||
         !setContainsEvery(verifiedKeyCoverage, expectedKeys) ||
@@ -191,7 +168,7 @@ export async function runCodexHookTrustGrantSession(
         return untrusted.length > 0
           ? {
               outcome: 'verify-failed',
-              reason: `post-grant verify left ${untrusted.length} entries untrusted or with an unexpected enabled state`,
+              reason: `post-grant verify left ${untrusted.length} entries ${untrusted[0].trustStatus}`,
               reasonClass: 'post-grant-untrusted'
             }
           : {

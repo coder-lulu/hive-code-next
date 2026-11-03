@@ -1,3 +1,4 @@
+import { TUI_AGENT_AUTO_PICK_ORDER } from '../../../shared/tui-agent-selection'
 // @vitest-environment happy-dom
 
 import { act, cleanup, renderHook } from '@testing-library/react'
@@ -21,7 +22,7 @@ import { resetLocalStructuredChatsForTests } from './local-structured-chats'
 
 function setStructuredChat(enabled: boolean): void {
   useAppStore.setState({
-    settings: { ...useAppStore.getState().settings!, experimentalNativeChat: enabled }
+    settings: { ...useAppStore.getState().settings!, nativeChatProviders: enabled ? {} : Object.fromEntries(TUI_AGENT_AUTO_PICK_ORDER.map((agent) => [agent, false])) }
   })
 }
 

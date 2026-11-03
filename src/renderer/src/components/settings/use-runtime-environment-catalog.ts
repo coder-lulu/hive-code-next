@@ -20,12 +20,9 @@ import {
   type PublicKnownRuntimeEnvironment
 } from '../../../../shared/runtime-environments'
 import type { RuntimeStatus } from '../../../../shared/runtime-types'
-import {
-  evaluateHostDetails,
-  getRuntimeEnvironmentInitialDetails,
-  supportsLocalRuntimeEnvironmentRemoval,
-  type RuntimeHostDetails
-} from './runtime-environment-host-details'
+import { evaluateHostDetails, type RuntimeHostDetails } from './runtime-environment-host-details'
+import { supportsLocalRuntimeEnvironmentRemoval } from './runtime-environment-host-details-account'
+import { getRuntimeEnvironmentInitialDetails } from './runtime-environment-host-details-account'
 
 type RuntimeEnvironmentCatalog = {
   environments: PublicKnownRuntimeEnvironment[]
@@ -39,6 +36,18 @@ type RuntimeEnvironmentCatalog = {
   }) => Promise<void>
 }
 
+// Retain failed probes across Settings remounts to avoid flashing Checking during re-probes.
+const lastSettledDetails = new Map<string, RuntimeHostDetails>()
+
+// Cache only failures; Connected must come from live store state.
+function isCacheableDetails(details: RuntimeHostDetails): boolean {
+  return details.status === 'error' && details.remoteControl?.state !== 'ready'
+}
+
+export function forgetCachedRuntimeHostDetails(environmentId: string): void {
+  lastSettledDetails.delete(environmentId)
+}
+
 export function useRuntimeEnvironmentCatalog(): RuntimeEnvironmentCatalog {
   const savedEnvironments = useAppStore((state) => state.runtimeEnvironments)
   const environments = useMemo(
@@ -48,7 +57,21 @@ export function useRuntimeEnvironmentCatalog(): RuntimeEnvironmentCatalog {
   const [isLoading, setIsLoading] = useState(false)
   const [detailsByEnvironmentId, setDetailsByEnvironmentId] = useState<
     Record<string, RuntimeHostDetails>
-  >({})
+  >(() => Object.fromEntries(lastSettledDetails))
+  useEffect(() => {
+    for (const environmentId of lastSettledDetails.keys()) {
+      if (!(environmentId in detailsByEnvironmentId)) {
+        lastSettledDetails.delete(environmentId)
+      }
+    }
+    for (const [environmentId, details] of Object.entries(detailsByEnvironmentId)) {
+      if (isCacheableDetails(details)) {
+        lastSettledDetails.set(environmentId, details)
+      } else {
+        lastSettledDetails.delete(environmentId)
+      }
+    }
+  }, [detailsByEnvironmentId])
   const mountedRef = useMountedRef()
   const loadGenerationRef = useRef(0)
 
@@ -76,8 +99,7 @@ export function useRuntimeEnvironmentCatalog(): RuntimeEnvironmentCatalog {
           return
         }
         const visibleEnvironments = nextEnvironments.filter(isListedRemoteServer)
-        // Why: drop store status for servers no longer saved so stale hosts don't
-        // linger in the sidebar registry.
+        // Prune removed servers from store status so they cannot linger in sidebar pickers.
         useAppStore.getState().setRuntimeEnvironments(nextEnvironments)
         if (verified) {
           await useAppStore.getState().readRuntimeHostStatusSnapshots()
@@ -88,6 +110,7 @@ export function useRuntimeEnvironmentCatalog(): RuntimeEnvironmentCatalog {
             for (const environment of visibleEnvironments) {
               next[environment.id] = getRuntimeEnvironmentInitialDetails(
                 environment,
+                evaluateHostDetails,
                 current[environment.id],
                 verified?.environmentId === environment.id ? verified.runtimeStatus : undefined
               )
@@ -109,8 +132,7 @@ export function useRuntimeEnvironmentCatalog(): RuntimeEnvironmentCatalog {
                   timeoutMs: 10_000
                 })
                 const runtimeStatus = unwrapRuntimeRpcResult<RuntimeStatus>(response)
-                // Why: feed the live status into the store so sidebar host pickers
-                // reflect manual refreshes, not just the settings pane.
+                // Publish manual refreshes to sidebar pickers as well as Settings.
                 await useAppStore.getState().readRuntimeHostStatusSnapshots()
                 if (!isCurrent()) {
                   return
@@ -126,8 +148,7 @@ export function useRuntimeEnvironmentCatalog(): RuntimeEnvironmentCatalog {
                   }
                 }))
               } catch (error) {
-                // Why: record the failed probe (null status) so the sidebar can
-                // distinguish unreachable from never-checked.
+                // Record null status so sidebar pickers distinguish unreachable from unprobed.
                 const remoteControl = extractRuntimeTransportDiagnostics(error)
                 await useAppStore.getState().readRuntimeHostStatusSnapshots()
                 if (!isCurrent()) {
@@ -178,6 +199,7 @@ export function useRuntimeEnvironmentCatalog(): RuntimeEnvironmentCatalog {
       for (const environment of visibleEnvironments) {
         next[environment.id] = getRuntimeEnvironmentInitialDetails(
           environment,
+          evaluateHostDetails,
           current[environment.id]
         )
       }

@@ -265,7 +265,7 @@ describe('account Web metadata uses the current authenticated BFF Runtime', () =
     const session = new WebAccountSession(fetchImpl, 'https://console.hivekernel.com')
     await session.restore()
     const close = vi.fn()
-    const client = { call: mocks.call, close, subscribe: vi.fn() }
+    const client = { call: mocks.call, close, subscribe: vi.fn(), connectionEpoch: 0 }
     const account = { runtime, session, client }
     configureWebRuntimeBootstrap(undefined, account)
     const reload = vi.fn()

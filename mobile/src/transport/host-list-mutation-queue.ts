@@ -26,8 +26,7 @@ export async function mutateStoredHosts(
   return enqueueHostListMutation(async () => {
     const current = await readStoredHostProfilesForMutation()
     const next = await update(current)
-    // Why: an update handing back the list it read changed nothing; a per-connect descriptor
-    // read must not rewrite storage and invalidate every shared host-list load.
+    // Identity-preserving updates must not rewrite storage or invalidate shared loads on each descriptor read.
     if (next === current) {
       return
     }
@@ -39,7 +38,6 @@ export async function mutateStoredHosts(
   })
 }
 
-/** Test-only: drain the mutation chain between cases. */
 export function resetHostListMutationQueueForTests(): void {
   hostListMutation = Promise.resolve()
 }

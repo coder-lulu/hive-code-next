@@ -1,14 +1,7 @@
 import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import type { Repo } from '../../../../../../shared/repo-types'
-import { OFFLINE_RUNTIME_GROUP_KEY, getProjectGroupHeaderKey } from '../grouping/group-keys'
-import { getRepoExecutionHostId } from '../../../../../../shared/execution-host'
-import {
-  getProjectSetupRuntimeOwnerEnvironmentId,
-  isOfflineRuntimeOwner
-} from '@/lib/runtime-offline-directory'
-import type { ProjectGroupingModel } from '../grouping/project-grouping'
-import { getProjectGroupIdentity } from '../grouping/folder-workspace-lanes'
-import { getProjectGroupHostId } from '@/store/slices/project-group-owner-routing'
+import { getProjectGroupHeaderKey } from '../../../../../../shared/sidebar-list/group-keys'
+import type { ProjectGroupingModel } from '../../../../../../shared/project-section-grouping'
 
 function getProjectIdFromHeaderRowKey(rowKey: string): string | null {
   if (!rowKey.startsWith('project:')) {
@@ -53,22 +46,19 @@ function getRepoIdsFromHeaderRowKey(
 
 function getProjectGroupAncestorKeys(
   projectGroupId: string | null | undefined,
-  projectGroups: readonly ProjectGroup[],
-  owner?: Pick<ProjectGroup, 'id' | 'executionHostId' | 'connectionId'>
+  projectGroups: readonly ProjectGroup[]
 ): string[] {
-  const groupsById = new Map(projectGroups.map((group) => [getProjectGroupIdentity(group), group]))
+  const groupsById = new Map(projectGroups.map((group) => [group.id, group]))
   const keys: string[] = []
   const seen = new Set<string>()
   let currentGroupId = projectGroupId ?? null
   while (currentGroupId && !seen.has(currentGroupId)) {
-    const group = groupsById.get(
-      getProjectGroupIdentity(owner ?? { id: currentGroupId }, currentGroupId)
-    )
+    const group = groupsById.get(currentGroupId)
     if (!group) {
       break
     }
     seen.add(currentGroupId)
-    keys.unshift(getProjectGroupHeaderKey(group.id, group))
+    keys.unshift(getProjectGroupHeaderKey(group.id))
     currentGroupId = group.parentGroupId
   }
   return keys
@@ -79,47 +69,21 @@ export function getSidebarRowRevealAncestorKeys(args: {
   repoMap: Map<string, Repo>
   projectGroups: readonly ProjectGroup[]
   projectGrouping?: ProjectGroupingModel
-  offlineRuntimeEnvironmentIds: ReadonlySet<string>
 }): string[] {
-  const offlinePrefix = `${OFFLINE_RUNTIME_GROUP_KEY}:`
-  const explicitOffline = args.rowKey.startsWith(offlinePrefix)
-  const rowKey = explicitOffline ? args.rowKey.slice(offlinePrefix.length) : args.rowKey
-  const keys = new Set<string>(explicitOffline ? [OFFLINE_RUNTIME_GROUP_KEY] : [])
-  if (rowKey.startsWith('project-group:')) {
-    const group = args.projectGroups.find(
-      (candidate) => getProjectGroupHeaderKey(candidate.id, candidate) === rowKey
-    )
-    if (
-      group &&
-      isOfflineRuntimeOwner(getProjectGroupHostId(group), args.offlineRuntimeEnvironmentIds)
-    ) {
-      keys.add(OFFLINE_RUNTIME_GROUP_KEY)
-    }
-    return [
-      ...keys,
-      ...getProjectGroupAncestorKeys(group?.parentGroupId, args.projectGroups, group)
-    ]
+  if (args.rowKey.startsWith('project-group:')) {
+    const groupId = args.rowKey.slice('project-group:'.length)
+    // Why the last copy: same-id host copies render as that one (getDistinctProjectGroups).
+    const group = args.projectGroups.findLast((candidate) => candidate.id === groupId)
+    return getProjectGroupAncestorKeys(group?.parentGroupId, args.projectGroups)
   }
-  const repoIds = getRepoIdsFromHeaderRowKey(rowKey, args.repoMap, args.projectGrouping)
-  if (
-    repoIds.some((repoId) => {
-      const repo = args.repoMap.get(repoId)
-      const setup = args.projectGrouping?.projectHostSetups.find((setup) => setup.repoId === repoId)
-      return (
-        repo &&
-        isOfflineRuntimeOwner(
-          getRepoExecutionHostId(repo),
-          args.offlineRuntimeEnvironmentIds,
-          getProjectSetupRuntimeOwnerEnvironmentId(setup)
-        )
-      )
-    })
-  ) {
-    keys.add(OFFLINE_RUNTIME_GROUP_KEY)
-  }
-  for (const repoId of repoIds) {
+  const keys = new Set<string>()
+  for (const repoId of getRepoIdsFromHeaderRowKey(
+    args.rowKey,
+    args.repoMap,
+    args.projectGrouping
+  )) {
     const repo = args.repoMap.get(repoId)
-    for (const key of getProjectGroupAncestorKeys(repo?.projectGroupId, args.projectGroups, repo)) {
+    for (const key of getProjectGroupAncestorKeys(repo?.projectGroupId, args.projectGroups)) {
       keys.add(key)
     }
   }

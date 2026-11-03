@@ -147,16 +147,54 @@ export abstract class OrcaRuntimeWithFileCommands extends OrcaRuntimeWithPreserv
     // Why (#17828 review follow-up): RuntimeGitSyncCommands materializes with no store to
     // avoid unrelated side effects; this is its only way back into the persisted
     // `pushTarget.remoteCreated` flag that #17842's orphan sweep relies on.
-    persistMaterializedPushTarget: (worktreeId, pushTarget) => {
+    captureMaterializedPushTargetPersistence: (target) => {
       const store = this.store
-      if (!store?.setWorktreeMeta) {
-        return
+      const { id, hostId, instanceId, path, repoId } = target.worktree
+      const executionHostId = target.executionHostId
+      const wslDistro = target.localGitOptions?.wslDistro
+      if (!store || !hostId || !instanceId || hostId !== executionHostId) {
+        return undefined
       }
-      // Bookkeeping incidental to the push: a project a WSL move is taking skips it, not the push.
-      if (isWslMoveWorktreeBlocked(worktreeId, store.getWorktreeMeta?.(worktreeId)?.hostId)) {
-        return
+      return async (pushTarget) => {
+        if (this.store !== store) {
+          return
+        }
+        this.invalidateResolvedWorktreeCache()
+        let current
+        try {
+          current = await this.resolveRuntimeGitTarget(`id:${id}`)
+        } catch {
+          return
+        }
+        if (
+          this.store !== store ||
+          current.executionHostId !== executionHostId ||
+          current.worktree.id !== id ||
+          current.worktree.hostId !== hostId ||
+          current.worktree.instanceId !== instanceId ||
+          current.worktree.path !== path ||
+          current.worktree.repoId !== repoId ||
+          current.localGitOptions?.wslDistro !== wslDistro
+        ) {
+          return
+        }
+        const meta = store.getWorktreeMetaForHost
+          ? store.getWorktreeMetaForHost(id, hostId)
+          : hostId === LOCAL_EXECUTION_HOST_ID
+            ? store.getWorktreeMeta(id)
+            : undefined
+        if (
+          !meta ||
+          meta.instanceId !== instanceId ||
+          (meta.hostId !== hostId &&
+            !(hostId === LOCAL_EXECUTION_HOST_ID && meta.hostId === undefined)) ||
+          isWslMoveWorktreeBlocked(id, hostId, path)
+        ) {
+          return
+        }
+        // The ownership check and write stay synchronous; no reconnect can interleave.
+        store.setWorktreeMeta({ id, hostId }, { pushTarget })
       }
-      store.setWorktreeMeta(worktreeId, { pushTarget })
     }
   })
 

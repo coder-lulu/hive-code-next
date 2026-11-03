@@ -1,4 +1,4 @@
-import { WEB_RUNTIME_CLIENT_CAPABILITIES } from './web-runtime-client-capabilities'
+import { WEB_RUNTIME_CLIENT_CAPABILITIES } from '../../../shared/web-runtime-client-capabilities'
 import type { RuntimeRpcResponse, RuntimeRpcSuccess } from '../../../shared/runtime-rpc-envelope'
 import type { WebPairingOffer } from './web-pairing'
 import type { CloudLaunchBootstrap } from './cloud-launch-bootstrap'

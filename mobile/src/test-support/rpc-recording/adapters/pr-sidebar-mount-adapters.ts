@@ -31,27 +31,44 @@ export function prSidebarMountAdapters(
       const deps: PrSidebarLoadDeps = {
         fetchForBranch: (worktreeId, args) =>
           reads.fetchHostedReviewForBranch(client, worktreeId, args),
-        fetchWorktreeLinkedPR: (worktreeId) => link.fetchWorktreeLinkedPR(client, worktreeId),
+        fetchWorktreeGitHubPRLink: (worktreeId) =>
+          link.fetchWorktreeGitHubPRLink(client, worktreeId),
+        clearWorktreeReviewLink: (worktreeId, expected, isCurrent) =>
+          link.clearMobileWorktreeReviewLink(client, worktreeId, expected, isCurrent),
         fetchPRForBranch: (worktreeId, args) => reads.fetchPRForBranch(client, worktreeId, args),
         fetchWorkItemDetails: (worktreeId, args) =>
           reads.fetchWorkItemDetails(client, worktreeId, args),
         fetchPRChecks: (worktreeId, args) => reads.fetchPRChecks(client, worktreeId, args)
       }
       let state: unknown = 'unloaded'
+      let generation = 0
+      let disposed = false
       return {
-        action(name) {
+        action(name, args) {
           if (name === 'load') {
+            const owner = ++generation
+            const isCurrent = () => !disposed && owner === generation
             return sidebar
-              .loadPrSidebarData(deps, { worktreeId: WORKTREE, branch: BRANCH })
+              .loadPrSidebarData(deps, {
+                worktreeId: WORKTREE,
+                branch: BRANCH,
+                headSha: typeof args.headSha === 'string' ? args.headSha : null,
+                isCurrent
+              })
               .then((next) => {
-                state = next
+                if (isCurrent()) {
+                  state = next
+                }
                 return next
               })
           }
           throw new Error(`Unknown pr sidebar action: ${name}`)
         },
         state: () => state,
-        dispose: () => {}
+        dispose: () => {
+          disposed = true
+          generation += 1
+        }
       }
     }
   }

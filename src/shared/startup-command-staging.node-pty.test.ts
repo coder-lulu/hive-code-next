@@ -1,12 +1,4 @@
-/**
- * Real shells in real PTYs: the line a host types for a long or multi-line launch
- * must reach the agent's argv byte for byte, run it as its own foreground job as a
- * typed line would, and leave no script behind.
- *
- * The line is written the moment the shell spawns, while the TTY is still in
- * canonical mode — the window where a typed line past MAX_CANON is truncated
- * and a raw newline submits early.
- */
+/** Real PTYs must preserve argv, foreground job control and script cleanup when input arrives in canonical mode before the reader. */
 import { execFileSync } from 'node:child_process'
 import {
   chmodSync,
@@ -46,11 +38,11 @@ function discoverShells(): LiveShell[] {
   add('dash', '/usr/bin/dash', ['-i'])
   add('sh', '/bin/sh', ['-i'])
   add('ksh', '/bin/ksh', ['-i'])
-  // Why tcsh: no staging shell; its line runs the POSIX script through /bin/sh.
+  // tcsh cannot source the staging dialect; its launch uses /bin/sh.
   add('tcsh', '/bin/tcsh', ['-f', '-i'])
   const fish = resolveFishBinary(3)
   if (fish.available) {
-    // Why absolute: the sandbox PATH would not resolve a bare `fish`.
+    // Sandbox PATH cannot resolve bare fish.
     const fishPath = fish.path.includes('/')
       ? fish.path
       : execFileSync('/bin/sh', ['-c', `command -v ${fish.path}`], { encoding: 'utf8' }).trim()
@@ -116,8 +108,7 @@ async function launchInRealShell(shell: LiveShell, prompt: string): Promise<Agen
   })
   const typeLine = (): void =>
     proc.write(buildStartupCommandSubmission(staging.command, { bracketedPasteSafe: false }))
-  // Why fish differs: it blocks on terminal queries and drops input typed before its prompt, which
-  // is why hosts wait for its ready marker; the other shells get the harsher at-spawn write.
+  // Fish drops input during startup queries; await its ready marker while other shells receive input at spawn.
   let typed = false
   let fishCarry = ''
   const onData = proc.onData((data) => {
@@ -154,7 +145,7 @@ async function launchInRealShell(shell: LiveShell, prompt: string): Promise<Agen
     const deadline = Date.now() + 10_000
     while (Date.now() < deadline) {
       if (existsSync(capture)) {
-        // Why a beat: the agent's redirect creates the file before printf fills it.
+        // Redirect creates the file before printf fills it.
         await new Promise((resolve) => setTimeout(resolve, 100))
         const [pgid, foregroundPgid] = readFileSync(`${capture}.job`, 'utf8').trim().split(/\s+/)
         return {
@@ -184,8 +175,7 @@ describeShells('a staged launch line in a real shell', () => {
       async (_, prompt) => {
         const run = await launchInRealShell(shell, prompt)
         expect(run?.argv).toBe(`${prompt}\0`)
-        // Why: in the shell's own group, Ctrl-Z never stops the agent and the shell-in-front check
-        // cannot tell the two apart.
+        // Separate foreground job control is required for Ctrl-Z and shell-in-front detection.
         expect(run?.pgid).not.toBe(run?.shellPid)
         expect(run?.pgid).toBe(run?.foregroundPgid)
       },

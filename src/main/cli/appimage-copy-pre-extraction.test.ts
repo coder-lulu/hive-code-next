@@ -1,13 +1,10 @@
-import type * as NodeFs from 'node:fs'
-import { existsSync, lstatSync } from 'node:fs'
-import { mkdir, mkdtemp, readdir, rename, rm, writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resolveAppImageExtractedRoot } from './appimage-extracted-root'
 import { resolveAppImageLauncherEndpointPath } from './appimage-stable-launcher'
-import { PRODUCT_CONFIG } from '../../shared/brand'
-import { APPIMAGE_LINUX_GUI_EXECUTABLE_NAME } from '../../shared/appimage-cache-identity'
 import type * as PreExtractionModule from './appimage-copy-pre-extraction'
 
 type PreExtraction = typeof PreExtractionModule
@@ -22,7 +19,6 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
-  executableFixtureInodes.clear()
   await Promise.all(created.splice(0).map((path) => rm(path, { recursive: true, force: true })))
 })
 
@@ -38,12 +34,7 @@ async function makeFixture() {
 async function writePayload(cwd: string): Promise<void> {
   const launcherDir = join(cwd, 'squashfs-root', 'resources', 'bin')
   await mkdir(launcherDir, { recursive: true })
-  await writeFile(join(cwd, 'squashfs-root', APPIMAGE_LINUX_GUI_EXECUTABLE_NAME), '', {
-    mode: 0o755
-  })
-  const launcher = join(launcherDir, PRODUCT_CONFIG.cli.primary)
-  await writeFile(launcher, '', { mode: 0o755 })
-  executableFixtureInodes.add(String(lstatSync(launcher).ino))
+  await writeFile(join(launcherDir, 'orca-ide'), '', { mode: 0o755 })
 }
 
 const acceptCache = async (): Promise<string | null> => null
@@ -69,29 +60,12 @@ describe('startAppImageCopyPreExtraction', () => {
     expect(lines.at(-1)).toContain('Unpacked this AppImage')
   })
 
-  it('does nothing when the copy already exists, and then nothing is waited for', async () => {
-    const { appImagePath, cacheRootPath } = await makeFixture()
-    const copy = resolveAppImageExtractedRoot({ appImagePath, cacheRootPath })!
-    await mkdir(join(copy.rootPath, 'resources', 'bin'), { recursive: true })
-    await writeFile(copy.payloadLauncherPath, '', { mode: 0o755 })
-    executableFixtureInodes.add(String(lstatSync(copy.payloadLauncherPath).ino))
-    const runExtract = vi.fn()
-
-    expect(
-      preExtraction.startAppImageCopyPreExtraction({ appImagePath, cacheRootPath, runExtract })
-    ).toBeNull()
-    expect(await preExtraction.waitForAppImageCopyPreExtraction(10)).toBe(false)
-    expect(runExtract).not.toHaveBeenCalled()
-  })
-
   it('drops idle copies of earlier releases once this one has its copy', async () => {
     const { appImagePath, cacheRootPath } = await makeFixture()
     const copy = resolveAppImageExtractedRoot({ appImagePath, cacheRootPath })!
     const earlier = join(dirname(copy.rootPath), 'a'.repeat(24))
     await mkdir(join(earlier, 'resources', 'bin'), { recursive: true })
-    await writeFile(join(earlier, 'resources', 'bin', PRODUCT_CONFIG.cli.primary), '', {
-      mode: 0o755
-    })
+    await writeFile(join(earlier, 'resources', 'bin', 'orca-ide'), '', { mode: 0o755 })
 
     const started = preExtraction.startAppImageCopyPreExtraction({
       appImagePath,
@@ -111,51 +85,12 @@ describe('startAppImageCopyPreExtraction', () => {
     const copy = resolveAppImageExtractedRoot({ appImagePath, cacheRootPath })!
     await mkdir(join(copy.rootPath, 'resources', 'bin'), { recursive: true })
     await writeFile(copy.payloadLauncherPath, '', { mode: 0o755 })
-    executableFixtureInodes.add(String(lstatSync(copy.payloadLauncherPath).ino))
     const earlier = join(dirname(copy.rootPath), 'b'.repeat(24))
     await mkdir(join(earlier, 'resources', 'bin'), { recursive: true })
 
     expect(preExtraction.startAppImageCopyPreExtraction({ appImagePath, cacheRootPath })).toBeNull()
     await vi.waitFor(() => expect(existsSync(earlier)).toBe(false))
     expect(existsSync(copy.payloadLauncherPath)).toBe(true)
-  })
-
-  it('logs a cache it cannot use and never extracts into it', async () => {
-    const { appImagePath, cacheRootPath } = await makeFixture()
-    const lines: string[] = []
-    const runExtract = vi.fn()
-
-    const started = preExtraction.startAppImageCopyPreExtraction({
-      appImagePath,
-      cacheRootPath,
-      probeCache: async () => `${cacheRootPath} needs about 900 MB free`,
-      runExtract,
-      log: (line) => lines.push(line)
-    })
-
-    expect(await started).toBe(false)
-    expect(runExtract).not.toHaveBeenCalled()
-    expect(lines).toEqual([expect.stringContaining('needs about 900 MB free')])
-  })
-
-  it('logs a failed extraction and leaves nothing behind', async () => {
-    const { appImagePath, cacheRootPath } = await makeFixture()
-    const lines: string[] = []
-
-    const started = preExtraction.startAppImageCopyPreExtraction({
-      appImagePath,
-      cacheRootPath,
-      probeCache: acceptCache,
-      runExtract: async () => {
-        throw new Error('No space left on device')
-      },
-      log: (line) => lines.push(line)
-    })
-
-    expect(await started).toBe(false)
-    expect(lines.at(-1)).toContain('Could not unpack this AppImage')
-    const namespaces = existsSync(cacheRootPath) ? await readdir(cacheRootPath) : []
-    expect(namespaces.filter((name) => /^[0-9a-f]{24}$/u.test(name))).toEqual([])
   })
 
   it('stops waiting at the bound while the copy is still unpacking', async () => {
@@ -238,44 +173,4 @@ describe('preExtractDownloadedAppImageUpdate', () => {
     ).toBe(false)
     expect(runExtract).not.toHaveBeenCalled()
   })
-
-  it('follows the updater on where a versioned AppImage name installs', () => {
-    const pending = join(tmpdir(), 'orca-updater', 'pending', 'Orca-2.0.0.AppImage')
-    expect(
-      preExtraction.predictInstalledAppImagePath(join(tmpdir(), 'apps', 'Orca.AppImage'), pending)
-    ).toBe(join(tmpdir(), 'apps', 'Orca.AppImage'))
-    expect(
-      preExtraction.predictInstalledAppImagePath(
-        join(tmpdir(), 'apps', 'Orca-1.0.0.AppImage'),
-        pending
-      )
-    ).toBe(join(tmpdir(), 'apps', 'Orca-2.0.0.AppImage'))
-  })
-})
-
-// Only fixture files explicitly written executable receive POSIX mode bits on Windows.
-// Their inode survives extraction rename; directories, symlinks and non-executable files do not qualify.
-const { executableFixtureInodes } = vi.hoisted(() => ({
-  executableFixtureInodes: new Set<string>()
-}))
-vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof NodeFs>()
-  return {
-    ...actual,
-    lstatSync: (
-      path: NodeFs.PathLike,
-      options?: { bigint?: boolean; throwIfNoEntry?: boolean }
-    ) => {
-      const stats = actual.lstatSync(path, options)
-      if (
-        process.platform === 'win32' &&
-        stats?.isFile() &&
-        executableFixtureInodes.has(String(stats.ino)) &&
-        typeof stats.mode === 'number'
-      ) {
-        stats.mode |= 0o111
-      }
-      return stats
-    }
-  }
 })

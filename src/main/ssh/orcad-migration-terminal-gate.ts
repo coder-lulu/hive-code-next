@@ -1,3 +1,4 @@
+import { PtyExitProof } from '../pty-exit-proof'
 /** A complete host-wide census must prove exit before ownership can move to orcad. */
 import { isLiveSshPtyLease, type SshRemotePtyLease } from '../../shared/ssh-types'
 import type { Store } from '../persistence'
@@ -68,9 +69,10 @@ async function hostWideVerdict(
   }
   return {
     verdict: hostProof.verdict,
-    reason: hostProof.verdict === 'live'
-      ? 'terminals on this host are still running'
-      : 'the host-wide census could not confirm every terminal exited',
+    reason:
+      hostProof.verdict === 'live'
+        ? 'terminals on this host are still running'
+        : 'the host-wide census could not confirm every terminal exited',
     ptyIds: leases.filter((lease) => lease.state !== 'terminated').map((l) => l.ptyId),
     hostTerminals: hostProof.count
   }
@@ -103,8 +105,12 @@ export function retireProvenExitedLeases(
   }
   const proven = new Set(proof.provenPtyIds)
   for (const lease of store.getSshRemotePtyLeases(targetId)) {
-    if ((lease.state === 'detached' || lease.state === 'expired') && proven.has(lease.ptyId)) {
-      store.markSshRemotePtyLease(targetId, lease.ptyId, 'terminated')
+    if (lease.state !== 'terminated' && proven.has(lease.ptyId)) {
+      store.markSshRemotePtyLease(
+        targetId,
+        lease.ptyId,
+        PtyExitProof.from('host-census', undefined)
+      )
     }
   }
 }

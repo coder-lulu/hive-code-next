@@ -617,17 +617,19 @@ it('preserves confirmed MCP identity and the raw name through projection', () =>
   })
 })
 
-it.each([
-  ['success', 'completed'],
-  ['failure', 'error'],
-  ['cancellation', undefined]
-] as const)('retains explicit %s in host summaries', (outcome, activity) => {
-  const items = [
-    item('user', 1, { kind: 'message', role: 'user', blocks: [] }),
-    item('turn', 2, { kind: 'turn', turnId: 't', state: 'completed', outcome })
-  ]
-  expect(projectStructuredAgentSessionStatusSummary(items).activity).toBe(activity)
-})
+it.each(['success', 'failure', 'cancellation'] as const)(
+  'retains explicit %s in host summaries',
+  (outcome) => {
+    const items = [
+      item('user', 1, { kind: 'message', role: 'user', blocks: [] }),
+      item('turn', 2, { kind: 'turn', turnId: 't', state: 'completed', outcome })
+    ]
+    expect(projectStructuredAgentSessionStatusSummary(items)).toMatchObject({
+      status: 'idle',
+      turnOutcome: outcome
+    })
+  }
+)
 it('preserves pending approval detail in the host summary', () => {
   const items = [
     item('user', 1, { kind: 'message', role: 'user', blocks: [] }),
@@ -640,19 +642,19 @@ it('preserves pending approval detail in the host summary', () => {
     })
   ]
   expect(projectStructuredAgentSessionStatusSummary(items)).toMatchObject({
-    status: 'attention',
-    activity: 'permission'
+    status: 'attention'
   })
+  expect(projectStructuredAgentSessionStatusState(items).pendingPromptIds).toEqual(['approval'])
 })
 
-it('retains the first rejected send before any message is persisted', () => {
+it('keeps a rejected send idle without inventing a completed turn before any message is persisted', () => {
   expect(
     projectStructuredAgentSessionStatusSummary(
       [],
       [{ ...submission('m', 'rejected'), resolvedAt: 2, reason: 'Rejected' }],
       1
     )
-  ).toMatchObject({ activity: 'error', activityReason: 'Rejected' })
+  ).toEqual({ status: 'idle', latestPrompt: '' })
 })
 
 describe("producer linkage — a subagent's output never speaks for the parent", () => {
@@ -706,8 +708,7 @@ describe("producer linkage — a subagent's output never speaks for the parent",
     expect(summary.status).toBe('working')
     expect(summary.lastAssistantMessage).toBe('delegating')
     expect(summary.toolName).toBe('Task')
-    // The row does not go blank while a child runs: the spawn call is still the
-    // parent's own live work.
+    // Keep the parent’s spawn-call preview while its child runs.
     expect(summary.toolInput).toBeTruthy()
   })
 
@@ -731,8 +732,7 @@ describe("producer linkage — a subagent's output never speaks for the parent",
   })
 
   it("still renders the child's output in the transcript", () => {
-    // The other direction: scoping the STATUS readers must not delete subagent
-    // output from the chat.
+    // Status scoping must still preserve all child output in the transcript.
     const prose = projectStructuredItemsToNativeChat(items).flatMap((message) =>
       message.blocks.flatMap((block) => (block.type === 'text' ? [block.text] : []))
     )
@@ -741,8 +741,7 @@ describe("producer linkage — a subagent's output never speaks for the parent",
   })
 
   it("keeps the child's output as the child's: the transcript message names its producer", () => {
-    // Rendering the child's rows is not enough; unless the message still says who
-    // wrote it, the transcript can only present it as the parent speaking.
+    // Keep producer identity or child output would appear to be the parent speaking.
     const messages = projectStructuredItemsToNativeChat(items)
     const byId = new Map(messages.map((message) => [message.id, message]))
     expect(byId.get('child-prose')).toMatchObject({ agentId: 'task-1', producerKind: 'agent' })
@@ -765,11 +764,7 @@ describe("producer linkage — a subagent's output never speaks for the parent",
   })
 
   it('attributes rows without reading their neighbours', () => {
-    // A window holding only the child's own rows: no spawn call, no turn record.
-    // Nothing here is re-derived from a start row, so attribution does not
-    // depend on how much of the timeline a reader happens to hold. (This store
-    // has no compaction and paginates complete-or-reset, so such a window is not
-    // reachable today — the point is that the rule does not rely on that.)
+    // Attribution must survive a window without spawn/turn rows; derive it from each row’s own linkage.
     const windowed = [childProse, childCall]
     expect(latestStructuredAgentSessionAssistantMessage(windowed)).toBe('')
     expect(statusStructuredAgentSessionToolCall(windowed)).toBeNull()
@@ -801,12 +796,10 @@ describe("producer linkage — a subagent's output never speaks for the parent",
     }
     const nested = [...items, grandchild]
     expect(latestStructuredAgentSessionAssistantMessage(nested)).toBe('delegating')
-    // Naming a parent does not make the row that parent's: the summary the
-    // sidebar reads still shows the session's own line.
+    // A named parent does not make child prose part of the root summary.
     expect(projectStructuredAgentSessionStatusSummary(nested).lastAssistantMessage).toBe(
       'delegating'
     )
-    // And the transcript still renders it, so naming a parent is not a filter.
     expect(
       projectStructuredItemsToNativeChat(nested).some((block) =>
         JSON.stringify(block).includes('deeper')
@@ -827,9 +820,7 @@ describe("producer linkage — a subagent's output never speaks for the parent",
   })
 
   it("reads a row written before linkage existed as the parent's own", () => {
-    // A journal open across the upgrade has unmarked child rows below marked
-    // ones. Absence means root, which reproduces exactly what those journals
-    // always showed — it is never "unknown".
+    // Legacy unmarked child rows retain historical root attribution across upgrades; absence is never unknown.
     const legacyChildProse = item('legacy-child', 5, {
       kind: 'message',
       role: 'assistant',

@@ -45,6 +45,9 @@ vi.mock('@/store', () => ({
   }
 }))
 
+// Why: the background mount's sleeping-agent scan reads store state these launches never seed.
+vi.mock('@/lib/sleeping-agent-wake-requests', () => ({ requestSleepingAgentWakeOnMount: vi.fn() }))
+
 vi.mock('@/lib/telemetry', () => ({
   track: vi.fn(),
   tuiAgentToAgentKind: (agent: string) => agent
@@ -98,7 +101,31 @@ describe('launchAgentBackgroundSession', () => {
     })
   })
 
+  it.each(['own', 'full-access'] as const)(
+    'keeps automation launch permissions at the authorized %s setting',
+    async (permission) => {
+      state.settings.agentPermissionDefault = permission
+      const { launchAgentBackgroundSession } = await import('./launch-agent-background-session')
+      await launchAgentBackgroundSession({
+        agent: 'claude',
+        worktreeId: 'wt-1',
+        prompt: 'run audit',
+        launchSource: 'unknown',
+        title: 'Audit run 1'
+      })
+      expect(mockSpawn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command:
+            permission === 'full-access'
+              ? "claude '--dangerously-skip-permissions' 'run audit'"
+              : "claude 'run audit'"
+        })
+      )
+    }
+  )
+
   it('spawns a PTY first and creates the inactive tab already bound to it', async () => {
+    state.settings.agentPermissionDefault = 'full-access'
     const { launchAgentBackgroundSession } = await import('./launch-agent-background-session')
     mockSpawn.mockResolvedValue({ id: 'pty-1', incarnationId: 'inc-fresh' })
 
@@ -135,7 +162,8 @@ describe('launchAgentBackgroundSession', () => {
         command: "claude '--dangerously-skip-permissions' 'run the automation'",
         env: expect.objectContaining({
           ORCA_TAB_ID: tabId,
-          ORCA_WORKTREE_ID: 'wt-1'
+          ORCA_WORKTREE_ID: 'wt-1',
+          DISABLE_AUTOUPDATER: '1'
         }),
         connectionId: null,
         worktreeId: 'wt-1',
@@ -170,8 +198,7 @@ describe('launchAgentBackgroundSession', () => {
       recordInteraction: false
     })
     expect(mockUpdateTabPtyId).toHaveBeenCalledWith(tabId, 'pty-1')
-    // The incarnation rides along so a relay-recycled id cannot drain the previous owner's exit
-    // into this handler and tear the session down right after launch.
+    // Keep incarnation so recycled relay IDs cannot deliver a prior owner’s exit into the new session.
     expect(mockRegisterEagerPtyBuffer).toHaveBeenCalledWith(
       'pty-1',
       expect.any(Function),
@@ -266,6 +293,7 @@ describe('launchAgentBackgroundSession', () => {
   })
 
   it('launches a local WSL folder through wsl.exe', async () => {
+    state.settings.agentPermissionDefault = 'full-access'
     const folderPath = '\\\\wsl.localhost\\Ubuntu\\home\\me\\project'
     state.worktreesByRepo['repo-1'] = []
     state.folderWorkspaces = [
@@ -318,6 +346,7 @@ describe('launchAgentBackgroundSession', () => {
   })
 
   it('uses WSL launch quoting for Windows-path projects forced to WSL', async () => {
+    state.settings.agentPermissionDefault = 'full-access'
     state.projects = [
       {
         id: 'repo-1',
@@ -357,8 +386,7 @@ describe('launchAgentBackgroundSession', () => {
   })
 
   it('stamps hidden SSH status from renderer fallback when the kill switch is off', async () => {
-    // Why: with main side-effect authority disabled, this sidecar is the only
-    // OSC 9999 → store path for hidden SSH sessions.
+    // With main authority disabled, this hidden SSH sidecar is the sole OSC 9999 store writer.
     state.settings.terminalMainSideEffectAuthority = false
     state.repos = [{ id: 'repo-1', connectionId: 'ssh-a', path: '/repo' }]
     state.sshConnectionStates = new Map([['ssh-a', { status: 'connected' }]])
@@ -386,9 +414,7 @@ describe('launchAgentBackgroundSession', () => {
   })
 
   it('skips the duplicate OSC store write under main side-effect authority', async () => {
-    // Why: main already routes OSC 9999 through the hook server to the store
-    // (agentStatus:set); a second write here would race the authoritative
-    // path. The automation onAgentStatus callback must still fire.
+    // Main already owns OSC 9999 store writes; avoid races while retaining automation completion callbacks.
     const onAgentStatus = vi.fn()
     const { launchAgentBackgroundSession } = await import('./launch-agent-background-session')
 
@@ -409,6 +435,7 @@ describe('launchAgentBackgroundSession', () => {
   })
 
   it('stamps a working status for SSH Command Code prompt launches', async () => {
+    state.settings.agentPermissionDefault = 'full-access'
     state.repos = [{ id: 'repo-1', connectionId: 'ssh-a', path: '/repo' }]
     state.sshConnectionStates = new Map([['ssh-a', { status: 'connected' }]])
     mockSpawn.mockResolvedValue({ id: toAppSshPtyId('ssh-a', 'pty-1') })
@@ -471,9 +498,7 @@ describe('launchAgentBackgroundSession', () => {
   })
 
   it('keeps the tab bound to its PTY when contact was lost rather than observed', async () => {
-    // Same rule the terminal panes follow: a -1 sentinel retires the transport
-    // only. Clearing the binding would leave a reconnect with nothing to adopt
-    // and let orphan cleanup sweep a tab whose agent may still be running.
+    // Synthetic -1 loss retires transport only; retain bindings for reconnect adoption and orphan-cleanup protection.
     mockSubscribeToPtyExit.mockReturnValue(vi.fn())
     const onExit = vi.fn()
     const { launchAgentBackgroundSession } = await import('./launch-agent-background-session')
@@ -566,6 +591,7 @@ describe('launchAgentBackgroundSession', () => {
   })
 
   it('submits prompts for stdin-after-start agents in background mode', async () => {
+    state.settings.agentPermissionDefault = 'full-access'
     const { launchAgentBackgroundSession } = await import('./launch-agent-background-session')
 
     await launchAgentBackgroundSession({
@@ -575,7 +601,9 @@ describe('launchAgentBackgroundSession', () => {
     })
 
     expect(mockSpawn).toHaveBeenCalledWith(
-      expect.objectContaining({ command: "aider '--yes-always'" })
+      expect.objectContaining({
+        command: "aider '--yes-always' '--no-check-update' '--no-show-release-notes'"
+      })
     )
     expect(mockPasteDraftWhenAgentReady).toHaveBeenCalledWith(
       expect.objectContaining({

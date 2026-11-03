@@ -17,6 +17,12 @@ vi.mock('./mobile-runtime-capability-negotiation', () => ({
   negotiateMobileRuntimeCapabilities: (args: { onReady: () => void }) => args.onReady()
 }))
 
+import {
+  hydrateE2EEV2HostLatch,
+  isHostLatchedToE2EEV2,
+  latchHostToE2EEV2,
+  resetE2EEV2HostLatchForTests
+} from './e2ee-v2-host-latch'
 import { connect } from './rpc-client'
 
 const desktopKeys = nacl.box.keyPair()
@@ -61,13 +67,31 @@ const sockets: MockWebSocket[] = []
 const originalWebSocket = globalThis.WebSocket
 const flush = () => vi.advanceTimersByTimeAsync(0)
 
+async function nextSocket(): Promise<MockWebSocket> {
+  const count = sockets.length
+  for (let elapsed = 0; sockets.length === count && elapsed < 60_000; elapsed += 100) {
+    await vi.advanceTimersByTimeAsync(100)
+  }
+  expect(sockets).toHaveLength(count + 1)
+  return sockets.at(-1)!
+}
+
 function firstFrame(socket: MockWebSocket): unknown {
   return JSON.parse(String(socket.sent[0]))
 }
 
 function requestIdOf(plaintext: string | null): string {
   const value: unknown = JSON.parse(plaintext ?? 'null')
-  return value && typeof value === 'object' && 'id' in value ? String(value.id) : ''
+  expect(value).toEqual({
+    id: expect.any(String),
+    deviceToken: 'device-token',
+    method: 'status.get',
+    params: {}
+  })
+  if (!value || typeof value !== 'object' || !('id' in value) || typeof value.id !== 'string') {
+    throw new Error('Expected the sealed request ID')
+  }
+  return value.id
 }
 
 // Plays the current host's direct v2 handshake with real crypto.
@@ -104,6 +128,8 @@ describe('direct connections use E2EE v2 framing', () => {
     vi.useFakeTimers()
     sockets.length = 0
     storage.clear()
+    resetE2EEV2HostLatchForTests()
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: This socket fixture supplies the constructor, states, handlers, send and close consumed by the real client.
     globalThis.WebSocket = MockWebSocket as unknown as typeof WebSocket
   })
 
@@ -131,10 +157,26 @@ describe('direct connections use E2EE v2 framing', () => {
     const id = requestIdOf(host.openText(String(socket.sent.at(-1))))
     socket.receive(host.sealText(JSON.stringify({ id, ok: true, result: { up: 1 } })))
     await expect(pending).resolves.toMatchObject({ ok: true, result: { up: 1 } })
+    expect(isHostLatchedToE2EEV2(desktopPublicKeyB64)).toBe(true)
     client.close()
   })
 
-  it('never falls back to legacy after a current-v2 hello refusal', async () => {
+  it('falls back to legacy framing only for a never-latched host that refuses the v2 hello', async () => {
+    await hydrateE2EEV2HostLatch()
+    const client = connect('ws://desktop.invalid', 'device-token', desktopPublicKeyB64)
+    sockets[0]!.open()
+    sockets[0]!.serverClose(4001)
+    await vi.advanceTimersByTimeAsync(2_000)
+
+    const retry = sockets[1]!
+    retry.open()
+    expect(firstFrame(retry)).toEqual({ type: 'e2ee_hello', publicKeyB64: expect.any(String) })
+    client.close()
+  })
+
+  it('never falls back to legacy for a host already seen speaking v2 (relay then LAN)', async () => {
+    await hydrateE2EEV2HostLatch()
+    latchHostToE2EEV2(desktopPublicKeyB64)
     const client = connect('ws://desktop.invalid', 'device-token', desktopPublicKeyB64)
     sockets[0]!.open()
     sockets[0]!.serverClose(4001)
@@ -158,7 +200,64 @@ describe('direct connections use E2EE v2 framing', () => {
     client.close()
   })
 
-  it('bounds the auth retry budget when a re-keyed host answers', async () => {
+  it('does not exhaust the auth budget on an old host while the latch store is still loading', async () => {
+    let releaseStorage!: () => void
+    const { default: AsyncStorage } = await import('@react-native-async-storage/async-storage')
+    vi.mocked(AsyncStorage.getItem).mockImplementationOnce(
+      () => new Promise((resolve) => (releaseStorage = () => resolve(null)))
+    )
+    const client = connect('ws://desktop.invalid', 'device-token', desktopPublicKeyB64)
+    let socket = sockets[0]!
+    for (let attempt = 0; attempt < 4; attempt++) {
+      socket.open()
+      expect(firstFrame(socket)).toMatchObject({ v: 2 })
+      socket.serverClose(4001)
+      socket = await nextSocket()
+    }
+    expect(client.getState()).not.toBe('auth-failed')
+
+    releaseStorage()
+    await flush()
+    socket.serverClose(1006)
+    socket = await nextSocket()
+    socket.open()
+    expect(firstFrame(socket)).toEqual({ type: 'e2ee_hello', publicKeyB64: expect.any(String) })
+    client.close()
+  })
+
+  it('applies a latch recorded while a legacy dial was pending', async () => {
+    await hydrateE2EEV2HostLatch()
+    const client = connect('ws://desktop.invalid', 'device-token', desktopPublicKeyB64)
+    sockets[0]!.open()
+    sockets[0]!.serverClose(4001)
+    await vi.advanceTimersByTimeAsync(2_000)
+
+    // The retry chose legacy, but another connection proves v2 before this one opens.
+    latchHostToE2EEV2(desktopPublicKeyB64)
+    sockets[1]!.open()
+    expect(firstFrame(sockets[1]!)).toMatchObject({ type: 'e2ee_hello', v: 2 })
+    client.close()
+  })
+
+  it('sends no legacy credential when the host latches between hello and ready', async () => {
+    await hydrateE2EEV2HostLatch()
+    const client = connect('ws://desktop.invalid', 'device-token', desktopPublicKeyB64)
+    sockets[0]!.open()
+    sockets[0]!.serverClose(4001)
+    await vi.advanceTimersByTimeAsync(2_000)
+    const legacy = sockets[1]!
+    legacy.open()
+    expect(firstFrame(legacy)).toEqual({ type: 'e2ee_hello', publicKeyB64: expect.any(String) })
+
+    latchHostToE2EEV2(desktopPublicKeyB64)
+    legacy.receive(JSON.stringify({ type: 'e2ee_ready' }))
+    await flush()
+    expect(legacy.sent).toHaveLength(1)
+    expect(legacy.close).toHaveBeenCalled()
+    client.close()
+  })
+
+  it('latches auth-failed when a re-keyed host answers, as a legacy 4001 did', async () => {
     const client = connect('ws://desktop.invalid', 'device-token', desktopPublicKeyB64)
     const rekeyed = nacl.box.keyPair()
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -177,6 +276,16 @@ describe('direct connections use E2EE v2 framing', () => {
       expect(socket.sent).toHaveLength(1)
     }
     expect(client.getState()).toBe('auth-failed')
+    expect(isHostLatchedToE2EEV2(desktopPublicKeyB64)).toBe(false)
     client.close()
+  })
+
+  it('persists the latch so a later app session refuses to fall back', async () => {
+    await hydrateE2EEV2HostLatch()
+    latchHostToE2EEV2(desktopPublicKeyB64)
+    await flush()
+    resetE2EEV2HostLatchForTests()
+    await hydrateE2EEV2HostLatch()
+    expect(isHostLatchedToE2EEV2(desktopPublicKeyB64)).toBe(true)
   })
 })

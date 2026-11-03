@@ -21,7 +21,7 @@ import {
 } from './orchestration-worker-start-mode'
 
 const STRUCTURED_PREFERENCE = {
-  experimentalNativeChat: true
+  nativeChatProviders: {}
 } as const
 
 function structuredReceipt(): WorkerStartModeReceipt {
@@ -39,7 +39,12 @@ function downgradeSentence(why: string): string {
 
 describe('worker-start mode receipt wording', () => {
   it('states the settings default when the user has no structured preference', () => {
-    expect(decideWorkerStartMode({ params: { agent: 'claude' }, settings: null })).toEqual({
+    expect(
+      decideWorkerStartMode({
+        params: { agent: 'claude' },
+        settings: { nativeChatProviders: { claude: false } }
+      })
+    ).toEqual({
       mode: 'terminal',
       preferred: 'terminal',
       reason: 'user_default',

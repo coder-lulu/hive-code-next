@@ -11,8 +11,7 @@ import type { AgentSessionStatusEvent } from '../../../shared/agent-session-wire
 import { ClaudeStructuredSessionAdapter } from '../../claude/claude-structured-session-adapter'
 import {
   fakeClaude,
-  PROVIDER_SESSION_ID,
-  claudeStartupSettled
+  PROVIDER_SESSION_ID
 } from '../../claude/claude-structured-session-test-support'
 import type { AgentSessionRecordStore } from '../../runtime/agent-session-record-store'
 import { openTestAgentSessionRecordStore } from '../../runtime/agent-session-record-store-test-harness'
@@ -38,10 +37,7 @@ const CLAUDE_MODELS = [
   { value: 'claude-sonnet', displayName: 'Sonnet' },
   { value: 'claude-opus-9', displayName: 'Opus 9' }
 ]
-const LISTED = [
-  expect.objectContaining({ id: 'claude-sonnet' }),
-  expect.objectContaining({ id: 'claude-opus-9' })
-]
+const LISTED = expect.arrayContaining([expect.objectContaining({ id: 'claude-opus-9' })])
 const INIT_DELAY_MS = 40
 
 let root: string
@@ -75,6 +71,7 @@ beforeEach(async () => {
   adapter = new ClaudeStructuredSessionAdapter({
     resolveLaunch: async () => ({
       pathToClaudeCodeExecutable: 'claude',
+      cliFlag: async () => 'supported' as const,
       options: {},
       cwd: root,
       claudeConfigDir: join(root, 'claude-home'),
@@ -106,6 +103,12 @@ beforeEach(async () => {
     claimKeyId: 'key-1',
     mintSpawnToken: () => 'spawn-a',
     modelCatalog: {
+      snapshot: () => ({ origin: 'unknown' }),
+      demand: async () => {},
+      prepareSaved: async () => ({ origin: 'unknown' }),
+      captureSource: () => () => true,
+      retireContext: () => {},
+      peek: () => null,
       read: async () => ({ origin: 'unknown' }),
       recordLiveListing: (sessionId, listing) => savedListings.push({ sessionId, listing }),
       prewarm: async () => {},
@@ -139,17 +142,27 @@ function lastPhase(): string | undefined {
 }
 
 describe('a publish-first Claude create whose init is slow', () => {
-  it('never persists the catalog default, and persists the reported model once started', async () => {
+  it('keeps reported defaults out of durable user choices after startup', async () => {
     await expect(host.attach(CALLER, claudeParams())).resolves.toMatchObject({ ok: true })
 
     // Published, not yet answering: the record holds no model rather than a guessed one.
     expect(store.getRecord(SESSION)?.options?.model).toBeUndefined()
     expect(lastPhase()).toBe('starting')
 
-    await claudeStartupSettled(adapter, SESSION)
+    await vi.waitFor(() => expect(lastPhase()).toBe('ready'))
     await Promise.all(lifecycle)
 
-    expect(store.getRecord(SESSION)?.options?.model).toBe('claude-opus-9')
+    expect(store.getRecord(SESSION)?.options?.model).toBeUndefined()
+    await vi.waitFor(async () =>
+      expect(
+        (
+          await adapter.readOptions({
+            sessionId: SESSION,
+            fence: store.getRecord(SESSION)?.lease.runtimeFence ?? 0
+          })
+        ).current.model
+      ).toBe('claude-opus-9')
+    )
     expect(lastPhase()).toBe('ready')
   })
 
@@ -160,7 +173,7 @@ describe('a publish-first Claude create whose init is slow', () => {
     ).resolves.toMatchObject({ ok: true })
     expect(store.getRecord(SESSION)?.options?.model).toBe('opus')
 
-    await claudeStartupSettled(adapter, SESSION)
+    await vi.waitFor(() => expect(lastPhase()).toBe('ready'))
     await Promise.all(lifecycle)
 
     expect(store.getRecord(SESSION)?.options?.model).toBe('opus')
@@ -170,7 +183,7 @@ describe('a publish-first Claude create whose init is slow', () => {
   it('keeps the picked model across a resume whose new child starts on its own default', async () => {
     const params = claudeParams()
     await host.attach(CALLER, { ...params, options: { model: 'opus' } })
-    await claudeStartupSettled(adapter, SESSION)
+    await vi.waitFor(() => expect(lastPhase()).toBe('ready'))
     await Promise.all(lifecycle)
     await host.close(SESSION, 'evict')
     const releasedFence = store.getRecord(SESSION)?.lease.runtimeFence ?? 0
@@ -184,31 +197,24 @@ describe('a publish-first Claude create whose init is slow', () => {
     expect(store.getRecord(SESSION)?.options?.model).toBe('opus')
     expect(lastPhase()).toBe('starting')
 
-    await claudeStartupSettled(adapter, SESSION)
+    await vi.waitFor(() => expect(lastPhase()).toBe('ready'))
     await Promise.all(lifecycle)
 
     expect(store.getRecord(SESSION)?.options?.model).toBe('opus')
     expect(lastPhase()).toBe('ready')
   })
-  it('saves the account listing the child read at startup, though no view asks for options', async () => {
+  it('shows the observed model without treating startup as an account catalog probe', async () => {
     await host.attach(CALLER, claudeParams())
-    expect(savedListings).toEqual([])
-
-    await claudeStartupSettled(adapter, SESSION)
-    await Promise.all(lifecycle)
-
-    // `started` hands over the listing; the settings readback after it, what the config resolved.
-    expect(savedListings).toEqual([
-      { sessionId: SESSION, listing: expect.objectContaining({ models: LISTED }) },
-      {
-        sessionId: SESSION,
-        listing: expect.objectContaining({
-          models: LISTED,
-          configuredDefault: expect.objectContaining({ modelId: 'claude-opus-9' })
+    await vi.waitFor(() => expect(lastPhase()).toBe('ready'))
+    expect(
+      (
+        await adapter.readOptions({
+          sessionId: SESSION,
+          fence: store.getRecord(SESSION)?.lease.runtimeFence ?? 0
         })
-      }
-    ])
-    expect(savedListings[0]?.listing).not.toHaveProperty('configuredDefault')
+      ).models
+    ).toEqual(LISTED)
+    expect(savedListings).toEqual([])
   })
   it('reports the configured default from a chat created with its first message and no pick', async () => {
     const first = { clientMessageId: 'opening', body: hostTestMessage('hello') }
@@ -216,28 +222,30 @@ describe('a publish-first Claude create whose init is slow', () => {
       host.create(CALLER, createTestParams(first, claudeParams()), { firstMessage: first })
     ).resolves.toMatchObject({ ok: true })
 
-    // Delivery, not create, starts the CLI. Its `started` event carries the account listing; the
-    // settings read after it (`options-reported`) resolves the configured model and says so once.
-    await vi.waitFor(() => expect(savedListings.length).toBeGreaterThanOrEqual(1))
-    expect(savedListings[0]).toEqual({
-      sessionId: SESSION,
-      listing: expect.objectContaining({ models: LISTED })
-    })
-    await claudeStartupSettled(adapter, SESSION)
-    await Promise.all(lifecycle)
-    expect(store.getRecord(SESSION)?.options?.model).toBe('claude-opus-9')
-    expect(savedListings.at(-1)).toEqual({
-      sessionId: SESSION,
-      listing: expect.objectContaining({
-        configuredDefault: expect.objectContaining({ modelId: 'claude-opus-9' })
-      })
-    })
-    // A later options read lists the models and says nothing more about the default.
-    await host.readOptions(SESSION)
-    expect(savedListings.at(-1)?.listing).not.toHaveProperty('configuredDefault')
+    await vi.waitFor(() => expect(lastPhase()).toBe('ready'))
+    await vi.waitFor(async () =>
+      expect(
+        (
+          await adapter.readOptions({
+            sessionId: SESSION,
+            fence: store.getRecord(SESSION)?.lease.runtimeFence ?? 0
+          })
+        ).current.model
+      ).toBe('claude-opus-9')
+    )
+    expect(
+      (
+        await adapter.readOptions({
+          sessionId: SESSION,
+          fence: store.getRecord(SESSION)?.lease.runtimeFence ?? 0
+        })
+      ).models
+    ).toEqual(LISTED)
+    expect(store.getRecord(SESSION)?.options?.model).toBeUndefined()
+    expect(savedListings).toEqual([])
   })
 
-  it('saves the configured default when the settings readback beats the attach', async () => {
+  it('does not turn early settings readback into a persisted user model choice', async () => {
     // The attach is slow to prove the owner, so the child's readback lands before the host indexes it.
     const proveOwner = store.proveOwner.bind(store)
     store.proveOwner = async (input) => {
@@ -245,13 +253,20 @@ describe('a publish-first Claude create whose init is slow', () => {
       return proveOwner(input)
     }
     await expect(host.attach(CALLER, claudeParams())).resolves.toMatchObject({ ok: true })
-    await claudeStartupSettled(adapter, SESSION)
+    await vi.waitFor(() => expect(lastPhase()).toBe('ready'))
     await Promise.all(lifecycle)
 
-    await vi.waitFor(() =>
-      expect(savedListings.at(-1)?.listing).toMatchObject({
-        configuredDefault: expect.objectContaining({ modelId: 'claude-opus-9' })
-      })
+    await vi.waitFor(async () =>
+      expect(
+        (
+          await adapter.readOptions({
+            sessionId: SESSION,
+            fence: store.getRecord(SESSION)?.lease.runtimeFence ?? 0
+          })
+        ).current.model
+      ).toBe('claude-opus-9')
     )
+    expect(store.getRecord(SESSION)?.options?.model).toBeUndefined()
+    expect(savedListings).toEqual([])
   })
 })

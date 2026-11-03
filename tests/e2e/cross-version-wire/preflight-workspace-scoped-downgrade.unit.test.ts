@@ -1,14 +1,5 @@
-// Workspace-scoped agent detection, paired across two builds: current code against the newest
-// published v1.4.186 source before scoped detection.
-//
-// `preflight.detectAgents` / `refreshAgents` gained an optional `{ worktreeId }` so the host probes
-// the workspace's own runtime (a WSL distro on a Windows host). Each skew must keep today's answer:
-//
-//  - an old client sends nothing, and a new host answers with its own default as it always did;
-//  - a current Hive client refuses workspace detection when the capability is absent; an
-//    old host that is sent the field anyway (mobile does not gate) discards it rather than refusing.
-//
-// The old side uses its unmodified real registry and original dispatcher parser.
+// Pair workspace-scoped preflight across builds: old clients keep host defaults; old hosts strip unsupported worktreeId.
+// Remove the capability from released lists so rolling releases cannot erase the downgrade case.
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -19,10 +10,13 @@ import { RPC_PARAMS_BY_METHOD } from '../../../src/shared/rpc-contract/rpc-param
 import { parseRpcRequestParams } from '../../../src/main/runtime/rpc/dispatcher-request-parsing'
 import type { RpcAnyMethodDeclaration, RpcRequest } from '../../../src/main/runtime/rpc/core'
 import { getRuntimeAgentInventoryKey } from '../../../src/renderer/src/store/slices/runtime-agent-inventory-key'
-import { resolveReleaseCheckoutCommit } from './release-checkout'
-import { loadReleasedRpcParams } from './released-rpc-params'
+import {
+  importReleaseCheckoutModule,
+  materializeReleaseCheckout,
+  resolveBaselineReleaseRef,
+  releaseModuleExport
+} from './release-checkout'
 
-// Why: a cold CI run extracts the baseline checkout before the first pairing.
 const SUITE_TIMEOUT_MS = 180_000
 const WORKTREE = 'repo-1::\\\\wsl.localhost\\Ubuntu\\home\\me\\repo'
 
@@ -66,7 +60,8 @@ vi.mock('@/runtime/runtime-rpc-client', async (importOriginal) => {
   }
 })
 
-vi.stubGlobal('window', { api: {} })
+// @ts-expect-error -- minimal window.api stub for the store under test
+globalThis.window = { api: {} }
 
 const { createTestStore } =
   await import('../../../src/renderer/src/store/slices/store-test-helpers')
@@ -94,10 +89,24 @@ let oldHost: HostBuild
 let newHost: HostBuild
 
 beforeAll(async () => {
-  const released = await loadReleasedRpcParams('v1.4.186')
-  expect(released.commit).toBe(resolveReleaseCheckoutCommit('v1.4.186'))
-  expect(released.capabilities).not.toContain(PREFLIGHT_WORKSPACE_SCOPED_RUNTIME_CAPABILITY)
-  oldHost = hostBuild(released.capabilities, released.catalog, released.parse)
+  const checkout = await materializeReleaseCheckout(resolveBaselineReleaseRef())
+  const [protocol, catalog, parsing] = await Promise.all([
+    importReleaseCheckoutModule(checkout, 'src/shared/protocol-version.ts'),
+    importReleaseCheckoutModule(
+      checkout,
+      'src/shared/rpc-contract/rpc-params-catalog.generated.ts'
+    ),
+    importReleaseCheckoutModule(checkout, 'src/main/runtime/rpc/dispatcher-request-parsing.ts')
+  ])
+  const oldCatalog = releaseModuleExport<Record<string, unknown>>(catalog, 'RPC_PARAMS_BY_METHOD')
+  oldHost = hostBuild(
+    releaseModuleExport<readonly string[]>(protocol, 'RUNTIME_CAPABILITIES').filter(
+      (capability) => capability !== PREFLIGHT_WORKSPACE_SCOPED_RUNTIME_CAPABILITY
+    ),
+    // Why null: once a release ships the schema, the old side must still be the pre-schema host.
+    { ...oldCatalog, 'preflight.detectAgents': null, 'preflight.refreshAgents': null },
+    releaseModuleExport<ParseParams>(parsing, 'parseRpcRequestParams')
+  )
   newHost = hostBuild(RUNTIME_CAPABILITIES, RPC_PARAMS_BY_METHOD, (request, method, meta) =>
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the parser only reads `params` from the declaration.
     parseRpcRequestParams(request, method as RpcAnyMethodDeclaration, meta as never)
@@ -109,19 +118,22 @@ beforeEach(() => {
 })
 
 describe('workspace-scoped agent detection across versions', () => {
-  it('a new client refuses workspace detection on a host without scoped support', async () => {
+  it('a new client asks an old host only for its default list', async () => {
     wire.host = oldHost
     const store = createTestStore()
 
     const detected = await store.getState().ensureRuntimeDetectedAgents('env-1', WORKTREE)
     const refreshed = await store.getState().refreshRuntimeDetectedAgents('env-1', WORKTREE)
 
-    expect(wire.sent).toEqual([])
-    expect(detected).toEqual([])
-    expect(refreshed).toEqual([])
+    expect(wire.sent.map(({ method, params }) => ({ method, params }))).toEqual([
+      { method: 'preflight.detectAgents', params: undefined },
+      { method: 'preflight.refreshAgents', params: undefined }
+    ])
+    expect(detected).toEqual(['claude'])
+    expect(refreshed).toEqual(['claude'])
     expect(
       store.getState().runtimeDetectedAgentIds[getRuntimeAgentInventoryKey('env-1', WORKTREE)]
-    ).toEqual([])
+    ).toEqual(['claude'])
   })
 
   it('an old host discards the field from an ungated client instead of refusing it', () => {

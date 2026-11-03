@@ -21,9 +21,7 @@ import { isPairedWebClientWindow } from '@/lib/desktop-window-chrome'
 import { CodexTerminalServerIsolationSetting } from './CodexTerminalServerIsolationSetting'
 import {
   getTuiAgentDefaultArgs,
-  getTuiAgentDefaultEnv,
-  resolveTuiAgentLaunchArgs,
-  resolveTuiAgentLaunchEnv
+  getTuiAgentDefaultEnv
 } from '../../../../shared/tui-agent-launch-defaults'
 import {
   isTuiAgentEnabled,
@@ -40,7 +38,7 @@ import {
 } from './agent-availability-settings'
 import { AgentAvailabilityControl, type AgentCatalogRowProps } from './AgentCatalogRow'
 import { AgentDefaultSetting } from './AgentDefaultSetting'
-import { AgentDetectionCatalog } from './AgentDetectionCatalog'
+import { AgentLaunchSettingsDetectionCatalog } from './AgentLaunchSettingsDetectionCatalog'
 import { AgentRunPreferences, AgentPermissionsSetting } from './AgentRunPreferences'
 import { AgentWorkspaceTrustSetting } from './AgentWorkspaceTrustSetting'
 export { AgentWorkspaceTrustSetting } from './AgentWorkspaceTrustSetting'
@@ -53,41 +51,34 @@ import { useAgentInstallation } from './use-agent-installation'
 import { AgentNpmRegistrySetting } from './AgentNpmRegistrySetting'
 import './agents-settings.css'
 import { AgentLaunchSettingsSection } from './AgentLaunchSettingsSection'
+import type { AgentEnvironmentWriter } from './AgentLaunchSettingsCatalog'
 import type { SettingsHostScope } from './settings-host-scope'
 import type {
   AgentLaunchSettings,
   AgentLaunchSettingsMutation
 } from '../../../../shared/agent-launch-settings'
 import { HostAgentEnvironmentEditor } from './HostAgentEnvironmentEditor'
-
 export {
   buildAgentAvailabilitySettingsUpdate,
   createAgentAvailabilityUpdateQueue,
   getAgentsPaneSearchEntries,
   AgentAvailabilityControl
 }
-export {
-  AgentPermissionsSetting,
-  AgentGeneratedTabTitlesSetting,
-  AgentStatusHooksSetting
-} from './AgentRunPreferences'
-
+export { AgentPermissionsSetting } from './AgentRunPreferences'
+export { AgentGeneratedTabTitlesSetting } from './AgentRunPreferences'
+export { AgentStatusHooksSetting } from './AgentRunPreferences'
 type AgentSettingProps = {
   settings: GlobalSettings
   updateSettings: (updates: Partial<GlobalSettings>) => void | Promise<void>
 }
-
 type AgentsPaneProps = AgentSettingProps & {
-  /** Host whose agent launch settings and detected agents the pane shows. */
   hostScope: SettingsHostScope
   wslSupportedPlatform?: boolean
   wslAvailable?: boolean
   wslDistros?: string[]
   wslCapabilitiesLoading?: boolean
 }
-const EMPTY_OVERRIDES = {}
 const EMPTY_AGENTS: TuiAgent[] = []
-
 export function AgentsPane(props: AgentsPaneProps): React.JSX.Element {
   return (
     <AgentLaunchSettingsSection
@@ -95,17 +86,22 @@ export function AgentsPane(props: AgentsPaneProps): React.JSX.Element {
       renderPermissions={(mode, onChange) => (
         <AgentPermissionsSetting mode={mode} onChange={onChange} />
       )}
-      renderSettings={(launchSettings, mutate) => (
-        <AgentsPaneContent {...props} launchSettings={launchSettings} mutate={mutate} />
+      renderSettings={(launchSettings, mutate, saveEnvironment) => (
+        <AgentsPaneContent
+          {...props}
+          launchSettings={launchSettings}
+          mutate={mutate}
+          saveEnvironment={saveEnvironment}
+        />
       )}
     />
   )
 }
-
 function AgentsPaneContent(
   props: AgentsPaneProps & {
     launchSettings: AgentLaunchSettings
     mutate: (mutation: AgentLaunchSettingsMutation) => Promise<void>
+    saveEnvironment?: AgentEnvironmentWriter
   }
 ): React.JSX.Element {
   const {
@@ -114,6 +110,7 @@ function AgentsPaneContent(
     hostScope,
     launchSettings,
     mutate,
+    saveEnvironment,
     wslSupportedPlatform,
     wslAvailable,
     wslDistros,
@@ -150,10 +147,6 @@ function AgentsPaneContent(
   const catalog = getAgentCatalog()
   const defaultAgent = launchSettings.defaultTuiAgent
   const cmdOverrides = launchSettings.agentCmdOverrides
-  const agentDefaultArgs = launchSettings.agentDefaultArgs
-  const agentDefaultEnv = activeServerEnvironmentId
-    ? EMPTY_OVERRIDES
-    : (settings.agentDefaultEnv ?? EMPTY_OVERRIDES)
   const disabledAgents = normalizeDisabledTuiAgents(launchSettings.disabledTuiAgents)
   const detectedAgents =
     detectedIds === null ? [] : catalog.filter((agent) => detectedIds.has(agent.id))
@@ -230,8 +223,10 @@ function AgentsPaneContent(
     isEnabled: isTuiAgentEnabled(agent.id, disabledAgents),
     isDefault: isDetected && defaultAgent === agent.id,
     cmdOverride: cmdOverrides[agent.id],
-    argsOverride: resolveTuiAgentLaunchArgs(agent.id, agentDefaultArgs),
-    envOverride: resolveTuiAgentLaunchEnv(agent.id, agentDefaultEnv),
+    argsOverride: launchSettings.agentDefaultArgs[agent.id] ?? getTuiAgentDefaultArgs(agent.id),
+    envOverride: activeServerEnvironmentId
+      ? {}
+      : (settings.agentDefaultEnv?.[agent.id] ?? getTuiAgentDefaultEnv(agent.id)),
     versionSnapshot: versions.snapshots[agent.id],
     onRetryVersions: () => versions.retry(agent.id),
     installation: installations.getSnapshot(agent.id),
@@ -259,9 +254,10 @@ function AgentsPaneContent(
     onSaveOverride: (value) => mutate({ type: 'command', agent: agent.id, value }),
     onSaveArgs: (value) => mutate({ type: 'arguments', agent: agent.id, value }),
     onSaveEnv: (value) => {
-      if (!activeServerEnvironmentId) {
-        void updateSettings({ agentDefaultEnv: { ...agentDefaultEnv, [agent.id]: value } })
+      if (!saveEnvironment) {
+        throw new Error('Local agent environment writer unavailable')
       }
+      return saveEnvironment(agent.id, value)
     },
     ...(activeServerEnvironmentId
       ? {
@@ -280,7 +276,6 @@ function AgentsPaneContent(
         ? buildCodexSessionSourceHomeControl(settings, updateSettings)
         : undefined
   })
-
   return (
     <div className="agents-settings" ref={focusRoot}>
       <Tabs
@@ -350,18 +345,16 @@ function AgentsPaneContent(
             value={registry}
             onChange={(agentNpmRegistry) => updateSettings({ agentNpmRegistry })}
           />
-          <AgentDetectionCatalog
+          <AgentLaunchSettingsDetectionCatalog
+            versions={versions}
             detectedAgents={detectedAgents}
             undetectedAgents={undetectedAgents}
             detectionPending={detectedIds === null}
             detectionFailed={Boolean(detectionFailed || unresolvedLocalTarget)}
-            environmentUnavailable={Boolean(unresolvedLocalTarget)}
+            activeServerEnvironmentId={activeServerEnvironmentId}
+            activeServerName={activeServerName}
             isRefreshing={isRefreshing}
             onRefresh={() => void refreshTargetAgents()}
-            onCheckUpdates={() => void versions.checkLatest()}
-            isCheckingUpdates={Object.values(versions.snapshots).some(
-              (snapshot) => snapshot.latestLoading
-            )}
             getRowProps={getRowProps}
           />
           <AgentPreferencesHint
@@ -374,7 +367,7 @@ function AgentsPaneContent(
             updateSettings={updateSettings}
             permissions={
               <AgentPermissionsSetting
-                mode={launchSettings.permissionMode}
+                mode={launchSettings.agentPermissionDefault}
                 onChange={(mode) => save({ type: 'permissions', mode })}
               />
             }

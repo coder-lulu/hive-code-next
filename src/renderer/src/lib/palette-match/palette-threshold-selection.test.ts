@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { selectThresholdAssignment } from './palette-assignment-ranking'
-import { indexPaletteField } from './indexed-field'
-import type { TokenCandidate } from './match-document'
+import { selectThresholdAssignment } from '../../../../shared/palette-match/palette-assignment-ranking'
+import { indexPaletteField } from '../../../../shared/palette-match/indexed-field'
+import type { TokenCandidate } from '../../../../shared/palette-match/match-document'
 
 const qualities = [
   'word-exact',

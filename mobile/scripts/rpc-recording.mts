@@ -1,84 +1,65 @@
-import { assertRecordingOutput } from '../../config/scripts/upstream-recording-source.mjs'
-/** Record current Hive behavior from a frozen source commit into reviewable scratch evidence. */
+/**
+ * Re-records the RPC recording goldens from the current tree.
+ *
+ *   pnpm --dir mobile rpc:record [<golden-id>...] [--prune]
+ *
+ * With ids, only those goldens are recorded (each derived test title starts with its golden id).
+ * An unchanged behaviour re-records to identical bytes, so recording everything is always safe and
+ * `git diff` shows only what moved. `--prune` deletes goldens the manifest no longer derives and
+ * prints each one; without it they are only listed, and the census test keeps failing on them.
+ */
 import { createRequire } from 'node:module'
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { readdirSync, rmSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { runProcess } from '@orca/process-host'
 import { derivedGoldens } from '../src/test-support/rpc-recording/derived-goldens.ts'
 import { RECORDING_DRIVERS } from '../src/test-support/rpc-recording/recording-drivers.ts'
 import { readScenarios } from '../src/test-support/rpc-recording/scenario-input.ts'
-import { adapterSha256 } from '../src/test-support/rpc-recording/adapter-digest.ts'
-import { recorderSha256 } from '../src/test-support/rpc-recording/recorder-digest.ts'
-import { scenarioSha256 } from '../src/test-support/rpc-recording/scenario-digest.ts'
-import { writeHiveRecordingOverlay } from '../rpc-foundation/write-hive-recording-overlay.ts'
-import {
-  assertRecordingSources,
-  readRecordingSourceInput
-} from '../rpc-foundation/recording-source-fence.ts'
 
-const [mode, sourceInput, outputArgument, ...options] = process.argv.slice(2)
-if (
-  !['--record-hive', '--publish-hive'].includes(mode ?? '') ||
-  process.env.RPC_FOUNDATION_RECORD !== '1' ||
-  !sourceInput ||
-  !outputArgument
-) {
+// Corpus takes 150–290s; allow ten minutes or old 120s budget kills it with misleading truncated failures.
+const RECORDING_TIMEOUT_MS = 600_000
+const root = resolve(import.meta.dirname, '../..')
+const goldens = resolve(root, 'mobile/rpc-foundation/goldens')
+
+const argv = process.argv.slice(2)
+const prune = argv.includes('--prune')
+const ids = argv.filter((arg) => arg !== '--prune')
+const unknownFlag = ids.find((arg) => arg.startsWith('-'))
+if (unknownFlag) {
   throw new Error(
-    'Use --record-hive|--publish-hive <source-input.json> <logs-output-directory> with RPC_FOUNDATION_RECORD=1'
+    `Unknown option ${unknownFlag}. Usage: rpc-recording.mts [<golden-id>...] [--prune]`
   )
 }
-const evidenceOnly = options.includes('--evidence-only')
-const ids = options.filter((arg) => arg !== '--evidence-only')
-if (ids.some((arg) => arg.startsWith('-')) || (mode === '--publish-hive' && options.length)) {
-  throw new Error('Recording accepts golden ids and --evidence-only; publication accepts neither')
-}
-const root = resolve(import.meta.dirname, '../..')
-const { source, projection, controlProjection } = readRecordingSourceInput(resolve(sourceInput))
-assertRecordingSources(root, source, projection, controlProjection)
-const input = readScenarios(resolve(root, 'mobile/rpc-foundation/pilot-scenarios.json'))
-const derived = new Set(derivedGoldens(input.scenarios).map((golden) => golden.id))
+const derived = new Set(
+  derivedGoldens(
+    readScenarios(resolve(root, 'mobile/rpc-foundation/pilot-scenarios.json')).scenarios
+  ).map((golden) => golden.id)
+)
 const unknownIds = ids.filter((id) => !derived.has(id))
 if (unknownIds.length) {
-  throw new Error(`The product manifest derives no golden named ${unknownIds.join(', ')}`)
+  throw new Error(`The manifest derives no golden named ${unknownIds.join(', ')}`)
 }
-const output = resolve(outputArgument)
-assertRecordingOutput(root, output, ['provenance.json', 'goldens', 'hive'])
-const goldens = resolve(output, 'goldens')
-if (existsSync(goldens)) {
-  assertRecordingOutput(root, goldens, readdirSync(goldens))
-}
-const adapterSha256ByOperation = Object.fromEntries(
-  input.scenarios.map((scenario) => [scenario.operation, adapterSha256(root, [scenario])])
-)
-const provenance = {
-  source,
-  recorderSha256: recorderSha256(root),
-  scenariosSha256: scenarioSha256(input.scenarios),
-  adapterSha256ByOperation
-}
-function publishCompleteRecording() {
-  const recordedIds = readdirSync(goldens)
-    .filter((name) => name.endsWith('.json'))
-    .map((name) => name.slice(0, -5))
+
+// Orphans come from the manifest, not the run, so a failed or killed run still lists or prunes them.
+function handleOrphans(): void {
+  const orphans = readdirSync(goldens)
+    .filter((file) => file.endsWith('.json') && !derived.has(file.replace(/\.json$/, '')))
     .sort()
-  if (JSON.stringify(recordedIds) !== JSON.stringify([...derived].sort())) {
-    throw new Error('Publication requires the complete current product-supported recording domain')
+  for (const file of orphans) {
+    if (prune) {
+      rmSync(resolve(goldens, file))
+      process.stdout.write(`pruned ${file}: the manifest no longer derives it\n`)
+    } else {
+      process.stdout.write(
+        `orphaned ${file}: the manifest no longer derives it (--prune deletes it)\n`
+      )
+    }
   }
-  writeHiveRecordingOverlay(root, resolve(sourceInput), goldens, resolve(output, 'hive'))
 }
-if (mode === '--publish-hive') {
-  const recorded = JSON.parse(readFileSync(resolve(output, 'provenance.json'), 'utf8'))
-  if (JSON.stringify(recorded) !== JSON.stringify(provenance)) {
-    throw new Error('Recording provenance differs from the frozen source or upstream commit')
-  }
-  publishCompleteRecording()
-} else {
-  mkdirSync(output, { recursive: true })
-  writeFileSync(resolve(output, 'provenance.json'), JSON.stringify(provenance, null, 2) + '\n')
-  const require = createRequire(resolve(root, 'mobile/package.json'))
-  const escape = (id: string) => id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  // Keep Windows cold-cache headroom and stream output so multi-minute failures retain their tail.
-  const timeoutMs = 1_200_000
+
+const escape = (id: string) => id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const require = createRequire(resolve(root, 'mobile/package.json'))
+try {
   const result = await runProcess({
     program: process.execPath,
     args: [
@@ -88,26 +69,20 @@ if (mode === '--publish-hive') {
       ...(ids.length ? ['-t', `(?:^| )(?:${ids.map(escape).join('|')}): `] : [])
     ],
     cwd: resolve(root, 'mobile'),
-    timeoutMs,
-    env: {
-      ...process.env,
-      ORCA_BACKGROUND_LAUNCH: '1',
-      RPC_FOUNDATION_MODE: '--record',
-      RPC_FOUNDATION_SCENARIOS: resolve(root, 'mobile/rpc-foundation/pilot-scenarios.json'),
-      RPC_FOUNDATION_GOLDENS: goldens
-    },
+    timeoutMs: RECORDING_TIMEOUT_MS,
+    env: { ...process.env, ORCA_BACKGROUND_LAUNCH: '1', RPC_FOUNDATION_MODE: '--record' },
+    // Stream output: multi-minute capture stays silent and truncates beyond 8 MiB.
     stdio: 'inherit'
   })
   if (result.timedOut) {
-    throw new Error(`Recording did not finish within ${timeoutMs / 1000}s and was killed.`)
+    // Distinguish killed partial reporter line from an actual test failure.
+    throw new Error(
+      `Recording did not finish within ${RECORDING_TIMEOUT_MS / 1000}s and was killed.`
+    )
   }
   if (result.code !== 0) {
     process.exitCode = 1
-  } else {
-    assertRecordingSources(root, source, projection, controlProjection)
-    // A partial run remains evidence only; publishing it would shrink the supported domain.
-    if (!evidenceOnly && ids.length === 0) {
-      publishCompleteRecording()
-    }
   }
+} finally {
+  handleOrphans()
 }

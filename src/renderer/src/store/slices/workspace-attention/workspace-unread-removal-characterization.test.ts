@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { resetAgentPaneAuthorityAliasesForTests } from '../agent-pane-authority'
 import type * as WorktreeMetaPersistModule from '../worktrees/metadata/worktree-meta-persist'
 import type * as AgentStatusModule from '@/lib/agent-status'
 import { structuredAgentSessionPaneKey } from '../../../../../shared/structured-agent-session-projection'
@@ -19,6 +18,7 @@ import {
   type PaneTarget
 } from './workspace-unread-characterization-fixture'
 import { completeAgentTurn, ringBell } from './workspace-unread-characterization-driver'
+import { drawTabsFromMain, type TabsDrawnFromMain } from '../tabs-drawn-from-main.test-fixture'
 
 // Pins what removing a tab or pane does to unread: its markers go, and a workspace whose removed
 // marker was its last live one is read.
@@ -42,8 +42,20 @@ vi.mock('../worktrees/metadata/worktree-meta-persist', async (importOriginal) =>
   return { ...actual, persistWorktreeMeta: vi.fn(async () => undefined) }
 })
 
+vi.mock('@/runtime/runtime-rpc-client', async (importOriginal) =>
+  (
+    await import('@/runtime/layout-apply-test-transport.test-fixture')
+  ).runtimeRpcClientWithLayoutApply(await importOriginal())
+)
+vi.mock('@/runtime/runtime-layout-client', async (importOriginal) =>
+  (
+    await import('@/runtime/layout-apply-test-transport.test-fixture')
+  ).runtimeLayoutClientWithTestFrames(await importOriginal())
+)
+
+let main: TabsDrawnFromMain | undefined
+
 beforeEach(() => {
-  resetAgentPaneAuthorityAliasesForTests()
   vi.clearAllMocks()
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(1000)
@@ -54,7 +66,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  resetAgentPaneAuthorityAliasesForTests()
+  main?.close()
+  main = undefined
   vi.useRealTimers()
 })
 
@@ -85,7 +98,6 @@ describe('closing tabs', () => {
     observe(store, persists)
 
     store.getState().closeTab(pane.tabId)
-    expect(store.getState().unreadAgentCompletionCountByPane).toEqual({})
     expect(observe(store, persists)).toMatchInlineSnapshot(`
       [
         "rows a@local:read:1000 b@local:read:0 sortEpoch=1",
@@ -123,12 +135,12 @@ describe('closing tabs', () => {
         "tabs tab-a2=terminal-bell",
         "panes tab-a1:L1=terminal-bell tab-a2:L2=terminal-bell",
         "completions tab-a1:L1=agent-completion tab-a2:L2=agent-completion",
-        "dock=2 floatingDot=false",
+        "dock=1 floatingDot=false",
       ]
     `)
   })
 
-  it('closing a structured chat tab removes its markers', () => {
+  it('closing a structured chat tab removes its markers', async () => {
     const { store, persists } = createAttentionStore({ experimental: true })
     const chat = store.getState().createUnifiedTab(WS_A, 'agent-session', {
       id: 'chat-1',
@@ -140,9 +152,11 @@ describe('closing tabs', () => {
       unreadTerminalPanes: { [paneKey]: 'agent-completion' },
       unreadAgentCompletionPanes: { [paneKey]: 'agent-completion' }
     })
+    main = await drawTabsFromMain(store)
     observe(store, persists)
 
     store.getState().closeUnifiedTab(chat.id)
+    await main.settle()
     expect(observe(store, persists)).toMatchInlineSnapshot(`
       [
         "rows a@local:read:0 b@local:read:0 sortEpoch=0",
@@ -204,17 +218,14 @@ describe('sleep, hibernate, retire, rekey, reconcile, purge', () => {
   it('sleeping the workspace removes every marker of its tabs and its flag', async () => {
     const { store, persists } = seedLitWorkspace()
 
-    const counts = store.getState().unreadAgentCompletionCountByPane
-    expect(Object.values(counts)).toEqual([1, 1])
     await store.getState().shutdownWorktreeTerminals(WS_A, { keepIdentifiers: true })
-    expect(store.getState().unreadAgentCompletionCountByPane).toEqual(counts)
     expect(observe(store, persists)).toMatchInlineSnapshot(`
       [
         "rows a@local:read:1000 b@local:read:0 sortEpoch=1",
         "tabs -",
         "panes -",
         "completions -",
-        "dock=2 floatingDot=false",
+        "dock=0 floatingDot=false",
         "persist worktree a {"isUnread":false}",
       ]
     `)
@@ -240,14 +251,13 @@ describe('sleep, hibernate, retire, rekey, reconcile, purge', () => {
       leafId: first.paneKey.split(':')[1]!,
       ptyId: `pty-${first.tabId}`
     })
-    expect(store.getState().unreadAgentCompletionCountByPane[first.paneKey]).toBe(1)
     expect(observe(store, persists)).toMatchInlineSnapshot(`
       [
         "rows a@local:UNREAD:1000 b@local:read:0 sortEpoch=3",
         "tabs tab-a1=terminal-bell tab-a2=terminal-bell",
         "panes tab-a2:L2=terminal-bell",
         "completions tab-a2:L2=agent-completion",
-        "dock=2 floatingDot=false",
+        "dock=1 floatingDot=false",
       ]
     `)
   })
@@ -256,7 +266,6 @@ describe('sleep, hibernate, retire, rekey, reconcile, purge', () => {
     const { store, persists, first } = seedLitWorkspace()
 
     store.getState().retireAgentPaneAuthority(first.paneKey)
-    expect(store.getState().unreadAgentCompletionCountByPane[first.paneKey]).toBeUndefined()
     expect(observe(store, persists)).toMatchInlineSnapshot(`
       [
         "rows a@local:UNREAD:1000 b@local:read:0 sortEpoch=1",
@@ -286,7 +295,7 @@ describe('sleep, hibernate, retire, rekey, reconcile, purge', () => {
         "tabs tab-a1=terminal-bell tab-a2=terminal-bell",
         "panes tab-a1:L1=terminal-bell tab-a2:L2=terminal-bell",
         "completions tab-a2:L2=agent-completion",
-        "dock=2 floatingDot=false",
+        "dock=1 floatingDot=false",
       ]
     `)
   })
@@ -304,23 +313,9 @@ describe('sleep, hibernate, retire, rekey, reconcile, purge', () => {
         "tabs tab-a1=terminal-bell tab-a2=terminal-bell",
         "panes tab-a2:L2=terminal-bell tab-a1:33333333-3333-4333-8333-333333333333=terminal-bell",
         "completions tab-a2:L2=agent-completion tab-a1:33333333-3333-4333-8333-333333333333=agent-completion",
-        "dock=2 floatingDot=false",
+        "dock=1 floatingDot=false",
       ]
     `)
-  })
-
-  it('combines completion counts when pane authority moves onto an existing counter', () => {
-    const { store, first, second } = seedLitWorkspace()
-    const destination = `${first.tabId}:33333333-3333-4333-8333-333333333333`
-    store.getState().incrementAgentCompletionUnread(destination)
-    store.getState().incrementAgentCompletionUnread(destination)
-    store
-      .getState()
-      .transferAgentPaneAuthority({ fromPaneKey: first.paneKey, toPaneKey: destination })
-    expect(store.getState().unreadAgentCompletionCountByPane).toEqual({
-      [destination]: 3,
-      [second.paneKey]: 1
-    })
   })
 
   it('reconciling a dropped terminal on activation leaves no live marker, so the flag reads', () => {
@@ -341,7 +336,7 @@ describe('sleep, hibernate, retire, rekey, reconcile, purge', () => {
         "tabs -",
         "panes tab-a1:L1=terminal-bell",
         "completions tab-a1:L1=agent-completion",
-        "dock=1 floatingDot=false",
+        "dock=0 floatingDot=false",
         "persist worktree a {"isUnread":false}",
       ]
     `)
@@ -351,7 +346,6 @@ describe('sleep, hibernate, retire, rekey, reconcile, purge', () => {
     const { store, persists } = seedLitWorkspace()
 
     store.getState().purgeWorktreeTerminalState([WS_A])
-    expect(store.getState().unreadAgentCompletionCountByPane).toEqual({})
     expect(observe(store, persists)).toMatchInlineSnapshot(`
       [
         "rows a@local:read:1000 b@local:read:0 sortEpoch=1",
@@ -379,7 +373,7 @@ describe('engagement, read state and tab focus on other surfaces', () => {
         "tabs tab-a1=terminal-bell",
         "panes tab-a1:L1=terminal-bell",
         "completions tab-a1:L1=agent-completion",
-        "dock=2 floatingDot=false",
+        "dock=1 floatingDot=false",
       ]
     `)
   })
@@ -394,7 +388,7 @@ describe('engagement, read state and tab focus on other surfaces', () => {
         "tabs tab-a1=terminal-bell tab-a2=terminal-bell",
         "panes tab-a1:L1=terminal-bell tab-a2:L2=terminal-bell",
         "completions tab-a2:L2=agent-completion",
-        "dock=2 floatingDot=false",
+        "dock=1 floatingDot=false",
       ]
     `)
   })

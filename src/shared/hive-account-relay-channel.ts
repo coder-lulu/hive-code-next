@@ -2,10 +2,10 @@ import { relayBase64Url, type HiveAccountRelayMaterial } from './hive-account-re
 import type { RuntimeE2EEClientSession } from './runtime-e2ee-client-session'
 import { HiveAccountRelayHandshake } from './hive-account-relay-channel-handshake'
 import { HiveAccountRelayRequests } from './hive-account-relay-requests'
-import { RemoteRuntimeClientError } from './remote-runtime-client-error'
+import { RemoteRuntimeClientError } from './remote-runtime/remote-runtime-client-error'
 import { HiveAccountRelayClosedError } from './hive-account-relay-errors'
-import { parseRemoteRuntimeRpcFrame } from './remote-runtime-request-frames'
-import { serializeRemoteRuntimePayload } from './remote-runtime-memory-limits'
+import { parseRemoteRuntimeRpcFrame } from './remote-runtime/requests/remote-runtime-request-frames'
+import { serializeRemoteRuntimePayload } from './remote-runtime/remote-runtime-memory-limits'
 import type { RuntimeRpcResponse } from './runtime-rpc-envelope'
 import type { RuntimeCapability } from './protocol-version'
 import {

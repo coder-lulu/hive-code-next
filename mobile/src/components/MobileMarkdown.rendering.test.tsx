@@ -5,6 +5,7 @@ vi.mock('../theme/mobile-theme-provider', async () => {
 import { createElement } from 'react'
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { colors } from '../theme/mobile-theme'
 import { MobileMarkdown } from './MobileMarkdown'
 
 const openURL = vi.fn((_url: string) => Promise.resolve())
@@ -19,6 +20,7 @@ vi.mock('react-native', () => ({
   View: 'View'
 }))
 vi.mock('./pr-sidebar/MermaidDiagram', () => ({ MermaidDiagram: 'MermaidDiagram' }))
+vi.mock('./MobileSourceCopyButton', () => ({ MobileSourceCopyButton: 'MobileSourceCopyButton' }))
 
 let renderer: ReactTestRenderer | null = null
 
@@ -64,7 +66,7 @@ describe('MobileMarkdown rendering', () => {
     [
       'C1: nested lists keep their own markers and numbers',
       '1. **Frontend**\n   - React\n   - Vite\n2. Backend',
-      ['1.', 'Frontend', '-', 'React', '-', 'Vite', '2.', 'Backend']
+      ['1.', 'Frontend', '•', 'React', '•', 'Vite', '2.', 'Backend']
     ],
     [
       'C1: blank lines keep one list, and a list cut short keeps its numbers',
@@ -74,7 +76,7 @@ describe('MobileMarkdown rendering', () => {
     [
       'C1: a wrapped item stays one item',
       '- a long item\nwrapped at sixty\n- next',
-      ['-', 'a long item\nwrapped at sixty', '-', 'next']
+      ['•', 'a long item\nwrapped at sixty', '•', 'next']
     ],
     [
       'C1: a number starting a wrapped line is not a list',
@@ -89,17 +91,17 @@ describe('MobileMarkdown rendering', () => {
     [
       'C4: a fence with an unusual language tag',
       '```c++\nint x;\n```\nAfter.\n\n```ts title="a.ts"\nconst a = 1\n```',
-      ['c++', 'int x;', 'After.', 'ts', 'const a = 1']
+      ['c++', '1', 'int x;', 'After.', 'ts', '1', 'const a = 1']
     ],
     [
       'C5: tilde and four-backtick fences, with HTML inside left alone',
       '~~~html\n<div className="a"><span>Hi</span></div>\n~~~\n\n````md\n```js\nx\n```\n````',
-      ['html', '<div className="a"><span>Hi</span></div>', 'md', '```js\nx\n```']
+      ['html', '1', '<div className="a"><span>Hi</span></div>', 'md', '1\n2\n3', '```js\nx\n```']
     ],
     [
       'C6: a fence under a list step',
       '1. Install:\n   ```bash\n   pnpm i\n   ```\n2. Run',
-      ['1.', 'Install:', 'bash', 'pnpm i', '2.', 'Run']
+      ['1.', 'Install:', 'bash', '1', 'pnpm i', '2.', 'Run']
     ],
     [
       'C7: a table right under a sentence',
@@ -118,7 +120,7 @@ describe('MobileMarkdown rendering', () => {
     [
       'C18: blocks inside a quote',
       '> - a\n>\n> ```sh\n> ls\n> ```\n> > inner',
-      ['-', 'a', 'sh', 'ls', 'inner']
+      ['•', 'a', 'sh', '1', 'ls', 'inner']
     ],
     ['C19: underlined headings and closing hashes', 'Title\n=====\n\n## Sub ##', ['Title', 'Sub']],
     [
@@ -128,6 +130,12 @@ describe('MobileMarkdown rendering', () => {
     ]
   ])('%s', (_name, content, expected) => {
     expect(texts(render(content))).toEqual(expected)
+  })
+
+  it('gives each code block its own copy button holding only that code', () => {
+    const tree = render('Run this:\n\n```sh\npnpm test\n```\n\nthen:\n\n```\nexit\n```')
+    const buttons = tree.root.findAll((node) => String(node.type) === 'MobileSourceCopyButton')
+    expect(buttons.map((button) => button.props.text)).toEqual(['pnpm test', 'exit'])
   })
 
   it('C12: opens a link with brackets in it, and one with a title, at their own address', () => {
@@ -165,4 +173,76 @@ describe('MobileMarkdown rendering', () => {
     expect(texts(tree)).toEqual(['See config loader'])
     expect(tree.root.findAll((node) => typeof node.props.onPress === 'function')).toEqual([])
   })
+})
+
+describe('MobileMarkdown tone', () => {
+  /** The style a span with exactly `text` draws with, nested arrays flattened in order. */
+  function styleOf(root: ReactTestInstance, text: string): Record<string, unknown> {
+    const flattenStyle = (style: unknown): Record<string, unknown> =>
+      Array.isArray(style)
+        ? Object.assign({}, ...style.map(flattenStyle))
+        : typeof style === 'object' && style !== null
+          ? { ...style }
+          : {}
+    const span = root.find(
+      (node) => isText(node) && node.children.length === 1 && node.children[0] === text
+    )
+    return flattenStyle(span.props.style)
+  }
+
+  it("draws your own message in desktop's strong chat text, and leaves the agent's prose as it was", () => {
+    const content = 'Plain **bold** [docs](https://example.com) `code`'
+    act(() => {
+      renderer = create(createElement(MobileMarkdown, { content, tone: 'userMessage' }))
+    })
+    const own = renderer!.root
+    expect(styleOf(own, 'bold').color).toBe(colors.chatForegroundStrong)
+    expect(styleOf(own, 'docs').color).toBe(colors.accentBlue)
+
+    act(() => renderer!.update(createElement(MobileMarkdown, { content })))
+    expect(styleOf(renderer!.root, 'bold').color).toBe(colors.textPrimary)
+    expect(styleOf(renderer!.root, 'docs').color).toBe(colors.accentBlue)
+  })
+
+  it('keeps the default palette inside a table, which keeps its dark surface', () => {
+    const content = '| **Head** | [docs](https://example.com) |\n| --- | --- |\n| a | b |'
+    act(() => {
+      renderer = create(createElement(MobileMarkdown, { content, tone: 'userMessage' }))
+    })
+    expect(styleOf(renderer!.root, 'Head').color).toBe(colors.textPrimary)
+    expect(styleOf(renderer!.root, 'docs').color).toBe(colors.accentBlue)
+  })
+
+  it('zooms every block with the text, not only paragraphs', () => {
+    const content = [
+      '## Title',
+      '> quoted',
+      '```\nconst a = 1\n```',
+      'Use `code` here.',
+      '| Cell |\n| --- |\n| x |'
+    ].join('\n\n')
+    act(() => {
+      renderer = create(createElement(MobileMarkdown, { content, textScale: 2 }))
+    })
+    expect(styleOf(renderer!.root, 'Title').fontSize).toBe(30)
+    expect(styleOf(renderer!.root, 'quoted').fontSize).toBe(26)
+    expect(styleOf(renderer!.root, 'const a = 1').fontSize).toBe(24)
+    expect(styleOf(renderer!.root, 'code').fontSize).toBe(24)
+    expect(styleOf(renderer!.root, 'Cell').fontSize).toBe(24)
+  })
+})
+
+it('renders document images through the image renderer, including reference syntax', () => {
+  const renderImage = vi.fn((href: string, alt: string) => createElement('View', { href, alt }))
+  act(() => {
+    renderer = create(
+      createElement(MobileMarkdown, {
+        content:
+          '![Architecture](assets/diagram.png)\n\n![Reference][diagram]\n\n[diagram]: assets/other.png',
+        renderImage
+      })
+    )
+  })
+  expect(renderImage).toHaveBeenCalledWith('assets/diagram.png', 'Architecture')
+  expect(renderImage).toHaveBeenCalledWith('assets/other.png', 'Reference')
 })

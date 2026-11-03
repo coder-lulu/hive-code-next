@@ -5,10 +5,12 @@ import { mergeWebUIState } from './web-preference-normalization'
 import { readLocalWebUIState } from './web-preferences-store'
 import { UI_STORAGE_KEY, writeJson } from './web-storage'
 import { APP_DISPLAY_NAME } from '@/product-brand'
+import { getBrowserLanguageDetection } from '../../../../shared/ui-locale'
 
 export function createWebAppApi(): Partial<PreloadApi> {
   return {
     app: {
+      getSystemLanguageDetection: () => Promise.resolve(getBrowserLanguageDetection('browser')),
       // Browser preferences do not use the desktop profile writer.
       isProfileStateSaveDelayed: () => Promise.resolve(false),
       onProfileStateSaveDelayChanged: () => () => undefined,

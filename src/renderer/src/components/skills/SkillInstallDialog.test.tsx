@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SkillCloudVersion } from '../../../../shared/skill-cloud-contract'
 import type { SkillInstallProgress } from '../../../../shared/skill-sharing-contract'
 import { useAppStore } from '@/store'
-import { APP_DISPLAY_NAME } from '@/product-brand'
 import { SkillInstallDialog } from './SkillInstallDialog'
 
 const DIGEST = 'a'.repeat(64)
@@ -120,7 +119,7 @@ function installApi(previewInstall: ReturnType<typeof vi.fn>) {
 }
 
 async function inspectSkill(expectedDescription = 'A private skill'): Promise<void> {
-  fireEvent.change(screen.getByLabelText(`${APP_DISPLAY_NAME} skill link`), {
+  fireEvent.change(screen.getByLabelText('Orca skill link'), {
     target: { value: 'https://app.orca.dev/skills/share/share_1' }
   })
   fireEvent.click(screen.getByRole('button', { name: 'Inspect skill' }))
@@ -163,7 +162,7 @@ describe('SkillInstallDialog', () => {
 
     await inspectSkill(sharedVersion.description)
     expect(screen.getByRole('button', { name: new RegExp(longName) })).toBeTruthy()
-    expect(screen.queryByText(new RegExp(`Published by ${APP_DISPLAY_NAME} user`))).toBeNull()
+    expect(screen.queryByText(/Published by Orca user/)).toBeNull()
     expect(
       screen.getByText(
         (_, element) =>
@@ -172,8 +171,7 @@ describe('SkillInstallDialog', () => {
     ).toBeTruthy()
   })
 
-  // Why: the picker is the only place a recipient can say "not Claude"; the
-  // request has to carry that choice or the host installs everywhere it can.
+  // Carry unchecked-agent choices to the host so it cannot install for every detected provider.
   it('installs only for the agents left checked', async () => {
     const skills = installApi(
       vi.fn().mockResolvedValue({
@@ -233,8 +231,7 @@ describe('SkillInstallDialog', () => {
     )
   })
 
-  // Why: checking agents the machine does not have would write placements no
-  // agent reads, and make the user opt out of tools they never installed.
+  // Default to detected agents so installation cannot create unused placements for absent tools.
   it('starts from the agents the target machine has', async () => {
     const skills = installApi(
       vi.fn().mockResolvedValue({
@@ -254,8 +251,7 @@ describe('SkillInstallDialog', () => {
     })
     render(<SkillInstallDialog open onOpenChange={() => undefined} />)
     await inspectSkill()
-    // Canonical-root agents (for example Muse) are shown alongside the
-    // detected provider, so keep this assertion focused on the detected one.
+    // Canonical-root agents may appear alongside the detected provider; assert the detected provider’s participation.
     await screen.findByRole('button', { name: /Installing for: Codex/ })
 
     fireEvent.click(screen.getByRole('button', { name: 'Install skill' }))
@@ -264,8 +260,6 @@ describe('SkillInstallDialog', () => {
     expect(request.providers).toEqual(['codex'])
   })
 
-  // Why: a skill description doubles as its trigger documentation and can run
-  // for paragraphs; the row shows one line until the reader opens it.
   it('unclamps a long description when the row is opened', async () => {
     const sharedVersion = version()
     sharedVersion.description = `Use the public CLI. ${'trigger words.'.repeat(20)}`
@@ -288,8 +282,6 @@ describe('SkillInstallDialog', () => {
     expect(description.className).not.toContain('group-data-[state=open]/row:max-h-40')
   })
 
-  // Why: "view the full skill contents" is the point of the row — the file list
-  // is the only place a recipient sees what lands on their machine.
   it('lists the files a skill would write when its row is expanded', async () => {
     const skills = installApi(vi.fn())
     Object.defineProperty(window, 'api', {
@@ -304,8 +296,7 @@ describe('SkillInstallDialog', () => {
     expect(screen.getByText('SKILL.md')).toBeTruthy()
   })
 
-  // Why: a recipient cannot compare a digest against anything, and the badge
-  // language ("Immutable version") explained nothing. Both left the review.
+  // Review omits digests users cannot compare and the uninformative immutable-version badge.
   it.each([
     ['skill', () => version(), 'a'],
     ['bundle', () => bundleVersion(), 'c']
@@ -356,7 +347,7 @@ describe('SkillInstallDialog', () => {
     await inspectSkill()
     expect(screen.getByText(/^2 files$/)).toBeTruthy()
     expect(screen.queryByText(/supporting$/, { selector: 'span' })).toBeNull()
-    expect(screen.getByText('Includes supporting files')).toBeTruthy()
+    expect(screen.getByText('Review the supporting files')).toBeTruthy()
     expect(screen.getByText(/include 1 file beyond SKILL.md/)).toBeTruthy()
     expect(screen.queryByRole('checkbox', { name: /I trust the sender/ })).toBeNull()
     expect(
@@ -422,11 +413,8 @@ describe('SkillInstallDialog', () => {
     })
     render(<SkillInstallDialog open onOpenChange={onOpenChange} />)
 
-    expect(document.activeElement).toBe(
-      screen.getByRole('textbox', { name: `${APP_DISPLAY_NAME} skill link` })
-    )
-    // Why: the submit sits in the footer beside Close, so Enter in the field is
-    // the keyboard path rather than tabbing past the back-out action.
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Orca skill link' }))
+    // Enter submits from the field because the footer action sits beside Close.
     const footerButtons = screen
       .getAllByRole('button')
       .filter((button) => button.getAttribute('data-slot') !== 'dialog-close')
@@ -435,7 +423,7 @@ describe('SkillInstallDialog', () => {
       'Inspect skill'
     ])
     await user.type(
-      screen.getByRole('textbox', { name: `${APP_DISPLAY_NAME} skill link` }),
+      screen.getByRole('textbox', { name: 'Orca skill link' }),
       'https://app.orca.dev/skills/share/share_1'
     )
     await user.keyboard('{Enter}')
@@ -452,7 +440,7 @@ describe('SkillInstallDialog', () => {
     Object.defineProperty(window, 'api', { configurable: true, value: { skills } })
     render(<SkillInstallDialog open onOpenChange={() => undefined} />)
 
-    fireEvent.change(screen.getByLabelText(`${APP_DISPLAY_NAME} skill link`), {
+    fireEvent.change(screen.getByLabelText('Orca skill link'), {
       target: { value: 'https://app.orca.dev/skills/share/share_1' }
     })
     fireEvent.click(screen.getByRole('button', { name: 'Inspect skill' }))
@@ -595,7 +583,7 @@ describe('SkillInstallDialog', () => {
   it('surfaces capability loss after preview selection without attempting installation', async () => {
     const previewInstall = vi.fn().mockResolvedValue({
       status: 'unsupported',
-      message: `Update the selected ${APP_DISPLAY_NAME} host to install shared skills.`
+      message: 'Update the selected Orca host to install shared skills.'
     })
     const skills = installApi(previewInstall)
     Object.defineProperty(window, 'api', { configurable: true, value: { skills } })
@@ -605,7 +593,7 @@ describe('SkillInstallDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Install skill' }))
 
     expect((await screen.findByRole('alert')).textContent).toContain(
-      `Update the selected ${APP_DISPLAY_NAME} host`
+      'Update the selected Orca host'
     )
     expect(skills.installShare).not.toHaveBeenCalled()
   })

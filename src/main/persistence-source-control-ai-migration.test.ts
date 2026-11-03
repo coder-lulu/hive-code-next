@@ -5,9 +5,8 @@ import {
   dataFile,
   writeDataFile,
   readDataFile,
-  readPersistedStateJson,
   makeRepo
-} from './persistence-test-harness'
+} from './persistence/persistence-test-harness'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { writeFileSync, readFileSync, rmSync, mkdtempSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
@@ -15,6 +14,7 @@ import { tmpdir } from 'node:os'
 import type { PersistedState } from '../shared/persisted-state-types'
 import { DEFAULT_SIDEBAR_WIDTH } from '../shared/constants'
 import { setSourceControlActionDefault } from '../shared/source-control-ai-actions'
+import { resolveSourceControlActionRecipe } from '../shared/source-control-ai'
 
 // Stub the ~/.ssh/config parser so the SSH-import test drives the real Store with deterministic hosts, not the operator's actual ~/.ssh/config.
 const { loadUserSshConfigMock, sshConfigHostsToTargetsMock } = vi.hoisted(() => ({
@@ -109,21 +109,24 @@ describe('Store', () => {
     expect(store.getSettings().showAutomationsButton).toBe(true)
     expect(store.getSettings().combinedDiffFileTreeVisibleByDefault).toBe(false)
     expect(store.getSettings().visibleTaskProviders).toEqual(['github', 'gitlab', 'linear', 'jira'])
-    expect(store.getSettings().experimentalActivity).toBe(false)
-    expect(store.getSettings().experimentalActivityDefaultedOffForAllUsers).toBe(true)
+    expect(Object.hasOwn(store.getSettings(), 'experimentalActivity')).toBe(false)
+    expect(Object.hasOwn(store.getSettings(), 'experimentalActivityDefaultedOffForAllUsers')).toBe(
+      false
+    )
     expect(store.getSettings().experimentalTerminalAttention).toBe(false)
+    expect(store.getSettings().sourceControlAi?.enabled).toBe(true)
     expect(store.getSettings().notifications.customSoundPath).toBeNull()
     // repos should be loaded
     expect(store.getRepos()).toHaveLength(1)
   })
 
-  it('migrates legacy commit-message AI settings to source-control AI on load', async () => {
+  it('loads current source-control settings with host-isolated models and instructions', async () => {
     writeDataFile({
       schemaVersion: 1,
       repos: [],
       worktreeMeta: {},
       settings: {
-        commitMessageAi: {
+        sourceControlAi: {
           enabled: true,
           agentId: 'cursor',
           selectedModelByAgent: { cursor: 'gpt-5.2' },
@@ -137,7 +140,10 @@ describe('Store', () => {
             }
           },
           selectedThinkingByModel: { 'gpt-5.2': 'high' },
-          customPrompt: 'Use Conventional Commits.',
+          instructionsByOperation: {
+            commitMessage: 'Use Conventional Commits.',
+            branchName: 'Use Conventional Commits.'
+          },
           customAgentCommand: 'cursor-agent'
         }
       },
@@ -166,10 +172,13 @@ describe('Store', () => {
     expect(sourceControlAi?.discoveredModelsByAgentByHost?.['ssh:conn-1']?.cursor?.[0]?.id).toBe(
       'remote-model'
     )
-    expect(store.getSettings().commitMessageAi?.customPrompt).toBe('Use Conventional Commits.')
+    expect(Object.hasOwn(store.getSettings(), 'commitMessageAi')).toBe(false)
+    store.flush()
+    const reopened = await createStore()
+    expect(reopened.getSettings().sourceControlAi).toEqual(sourceControlAi)
   })
 
-  it('migrates first-work branch auto-rename on for existing profiles once', async () => {
+  it('preserves an explicit branch auto-rename opt-out without an age marker', async () => {
     writeDataFile({
       schemaVersion: 1,
       repos: [],
@@ -182,11 +191,11 @@ describe('Store', () => {
 
     const store = await createStore()
 
-    expect(store.getSettings().autoRenameBranchFromWork).toBe(true)
-    expect(store.getSettings().autoRenameBranchFromWorkDefaultedOn).toBe(true)
+    expect(store.getSettings().autoRenameBranchFromWork).toBe(false)
+    expect(Object.hasOwn(store.getSettings(), 'autoRenameBranchFromWorkDefaultedOn')).toBe(false)
   })
 
-  it('preserves first-work branch auto-rename opt-outs after the default-on migration', async () => {
+  it('drops a retired auto-rename age marker while preserving the user opt-out', async () => {
     writeDataFile({
       schemaVersion: 1,
       repos: [],
@@ -203,18 +212,10 @@ describe('Store', () => {
     const store = await createStore()
 
     expect(store.getSettings().autoRenameBranchFromWork).toBe(false)
-    expect(store.getSettings().autoRenameBranchFromWorkDefaultedOn).toBe(true)
+    expect(Object.hasOwn(store.getSettings(), 'autoRenameBranchFromWorkDefaultedOn')).toBe(false)
   })
 
-  it('does not let settings updates clear the first-work branch auto-rename migration guard', async () => {
-    const store = await createStore()
-
-    const updated = store.updateSettings({ autoRenameBranchFromWorkDefaultedOn: false })
-
-    expect(updated.autoRenameBranchFromWorkDefaultedOn).toBe(true)
-  })
-
-  it('migrates inherited TUI scroll sensitivity defaults to one report on first load', async () => {
+  it('loads and persists explicit current TUI scroll sensitivity', async () => {
     writeDataFile({
       schemaVersion: 1,
       repos: [],
@@ -227,13 +228,15 @@ describe('Store', () => {
 
     const store = await createStore()
 
-    expect(store.getSettings().terminalTuiScrollSensitivity).toBe(1)
-    expect(store.getSettings().terminalTuiScrollSensitivityDefaultedToOne).toBe(true)
+    expect(store.getSettings().terminalTuiScrollSensitivity).toBe(3)
+    expect(Object.hasOwn(store.getSettings(), 'terminalTuiScrollSensitivityDefaultedToOne')).toBe(
+      false
+    )
     store.flush()
-    expect((readDataFile() as PersistedState).settings.terminalTuiScrollSensitivity).toBe(1)
+    expect((readDataFile() as PersistedState).settings.terminalTuiScrollSensitivity).toBe(3)
   })
 
-  it('preserves TUI scroll sensitivity choices after the one-report migration', async () => {
+  it('drops retired scroll sensitivity markers while preserving the current value', async () => {
     writeDataFile({
       schemaVersion: 1,
       repos: [],
@@ -250,117 +253,70 @@ describe('Store', () => {
     const store = await createStore()
 
     expect(store.getSettings().terminalTuiScrollSensitivity).toBe(3)
-    expect(store.getSettings().terminalTuiScrollSensitivityDefaultedToOne).toBe(true)
+    expect(Object.hasOwn(store.getSettings(), 'terminalTuiScrollSensitivityDefaultedToOne')).toBe(
+      false
+    )
   })
 
-  it('stamps the TUI scroll sensitivity migration guard on future updates', async () => {
+  it('persists current scroll sensitivity updates without migration markers', async () => {
     const store = await createStore()
 
     const updated = store.updateSettings({
-      terminalTuiScrollSensitivity: 3,
-      terminalTuiScrollSensitivityDefaultedToOne: false
+      terminalTuiScrollSensitivity: 3
     })
 
     expect(updated.terminalTuiScrollSensitivity).toBe(3)
-    expect(updated.terminalTuiScrollSensitivityDefaultedToOne).toBe(true)
+    expect(Object.hasOwn(updated, 'terminalTuiScrollSensitivityDefaultedToOne')).toBe(false)
   })
 
-  it('merges rollback commit-message AI writes into existing source-control AI on load', async () => {
-    writeDataFile({
-      schemaVersion: 1,
-      repos: [],
-      worktreeMeta: {},
-      settings: {
-        sourceControlAi: {
-          enabled: true,
-          agentId: 'codex',
-          selectedModelByAgent: { codex: 'source-model' },
-          selectedModelByAgentByHost: {},
-          discoveredModelsByAgent: {},
-          discoveredModelsByAgentByHost: {},
-          selectedThinkingByModel: { 'source-model': 'medium' },
-          customAgentCommand: 'codex',
-          instructionsByOperation: {
-            commitMessage: 'Source commit prompt',
-            pullRequest: 'Preserve PR prompt'
-          },
-          modelOverridesByOperation: {
-            pullRequest: {
-              selectedModelByAgent: { claude: 'pr-model' },
-              selectedThinkingByModel: { 'pr-model': 'high' }
-            }
-          },
-          prCreationDefaults: {
-            draft: true,
-            openAfterCreate: true
-          }
-        },
-        commitMessageAi: {
-          enabled: false,
-          agentId: 'claude',
-          selectedModelByAgent: { claude: 'legacy-model' },
-          selectedModelByAgentByHost: { 'ssh:conn-1': { claude: 'remote-legacy-model' } },
-          discoveredModelsByAgent: {},
-          discoveredModelsByAgentByHost: {},
-          selectedThinkingByModel: { 'legacy-model': 'high' },
-          customPrompt: 'Rollback commit prompt',
-          customAgentCommand: 'claude'
+  it('ignores retired rollback fields while preserving current disabled settings and custom recipes through reload', async () => {
+    const sourceControlAi = {
+      enabled: false,
+      agentId: 'custom',
+      selectedModelByAgent: { codex: 'current-model' },
+      selectedThinkingByModel: { 'current-model': 'high' },
+      customAgentCommand: 'current-writer {prompt}',
+      instructionsByOperation: {
+        commitMessage: 'Current instructions',
+        pullRequest: 'Preserve PR instructions'
+      },
+      actions: {
+        commitMessage: {
+          agentId: 'custom',
+          commandInputTemplate: 'custom {basePrompt}',
+          agentArgs: '--literal-flag'
         }
       },
-      ui: {},
-      githubCache: { pr: {}, issue: {} },
-      workspaceSession: {}
-    })
-
-    const store = await createStore()
-    const sourceControlAi = store.getSettings().sourceControlAi
-
-    expect(sourceControlAi).toMatchObject({
-      enabled: false,
-      agentId: 'claude',
-      selectedModelByAgent: { codex: 'source-model' },
-      selectedThinkingByModel: { 'source-model': 'medium' },
-      customAgentCommand: 'claude',
-      instructionsByOperation: {
-        commitMessage: 'Rollback commit prompt',
-        pullRequest: 'Preserve PR prompt',
-        branchName: 'Rollback commit prompt'
-      },
-      prCreationDefaults: {
-        draft: true,
-        openAfterCreate: true
+      prCreationDefaults: { draft: true, openAfterCreate: true },
+      launchActionDefaults: { fixChecks: { agentId: 'claude' } }
+    }
+    writeDataFile({
+      settings: {
+        sourceControlAi,
+        commitMessageAi: { enabled: true, agentId: 'claude', customPrompt: 'Retired prompt' }
       }
     })
-    expect(sourceControlAi?.selectedModelByAgentByHost?.['ssh:conn-1']).toBeUndefined()
-    expect(sourceControlAi?.modelOverridesByOperation?.commitMessage).toEqual({
-      selectedModelByAgent: { claude: 'legacy-model' },
-      selectedModelByAgentByHost: { 'ssh:conn-1': { claude: 'remote-legacy-model' } },
-      selectedThinkingByModel: { 'legacy-model': 'high' }
-    })
-    expect(sourceControlAi?.modelOverridesByOperation?.pullRequest).toEqual({
-      selectedModelByAgent: { claude: 'pr-model' },
-      selectedThinkingByModel: { 'pr-model': 'high' }
-    })
-    expect(store.getSettings().commitMessageAi).toMatchObject({
+    const store = await createStore()
+    const current = store.getSettings().sourceControlAi!
+    expect(current).toMatchObject({
       enabled: false,
-      agentId: 'claude',
-      selectedModelByAgent: { claude: 'legacy-model' },
-      customPrompt: 'Rollback commit prompt',
-      customAgentCommand: 'claude'
+      agentId: 'custom',
+      selectedModelByAgent: sourceControlAi.selectedModelByAgent,
+      selectedThinkingByModel: sourceControlAi.selectedThinkingByModel,
+      customAgentCommand: sourceControlAi.customAgentCommand,
+      instructionsByOperation: sourceControlAi.instructionsByOperation,
+      actions: sourceControlAi.actions,
+      prCreationDefaults: sourceControlAi.prCreationDefaults
     })
+    expect(Object.hasOwn(current, 'launchActionDefaults')).toBe(false)
+    expect(Object.hasOwn(store.getSettings(), 'commitMessageAi')).toBe(false)
     store.flush()
-    const persisted = JSON.parse(readPersistedStateJson(dataFile()))
-    expect(persisted.settings.sourceControlAi.actions.commitMessage).toEqual({
-      agentId: 'claude',
-      commandInputTemplate: '{basePrompt}\n\nRollback commit prompt'
-    })
-    expect(persisted.settings.sourceControlAi.actions.branchName).toEqual({
-      agentId: 'claude',
-      commandInputTemplate: 'Rollback commit prompt\n\n{basePrompt}'
-    })
+    const reopened = await createStore()
+    expect(reopened.getSettings().sourceControlAi).toEqual(current)
+    expect(Object.hasOwn(reopened.getSettings(), 'commitMessageAi')).toBe(false)
   })
 
-  it('does not let rollback projection clobber existing source-control action templates on load', async () => {
+  it('ignores retired projection input without clobbering current action templates', async () => {
     writeDataFile({
       schemaVersion: 1,
       repos: [],
@@ -427,7 +383,7 @@ describe('Store', () => {
       repos: [],
       worktreeMeta: {},
       settings: {
-        commitMessageAi: {
+        sourceControlAi: {
           enabled: true,
           agentId: 'codex',
           selectedModelByAgent: {},
@@ -435,7 +391,7 @@ describe('Store', () => {
           discoveredModelsByAgent: {},
           discoveredModelsByAgentByHost: {},
           selectedThinkingByModel: {},
-          customPrompt: '모든 커밋 메시지는 한국어로 작성한다',
+          instructionsByOperation: { commitMessage: '모든 커밋 메시지는 한국어로 작성한다' },
           customAgentCommand: ''
         }
       },
@@ -460,8 +416,62 @@ describe('Store', () => {
     expect(reopened.getSettings().sourceControlAi?.actions?.commitMessage).toMatchObject({
       commandInputTemplate: '{basePrompt}'
     })
-    expect(reopened.getSettings().commitMessageAi?.customPrompt).toBe('')
+    expect(reopened.getSettings().sourceControlAi?.instructionsByOperation.commitMessage).toBe('')
+    expect(Object.hasOwn(reopened.getSettings(), 'commitMessageAi')).toBe(false)
   }, 10_000)
+
+  it('keeps a repository recipe reset inherited across global edits and reload without resetting other recipes', async () => {
+    writeDataFile({ settings: {}, repos: [makeRepo()] })
+    const store = await createStore()
+    const unrelated = {
+      agentId: 'claude' as const,
+      commandInputTemplate: 'fix {basePrompt}',
+      agentArgs: '--verbose'
+    }
+    store.updateRepo(
+      { id: 'r1', executionHostId: 'local' },
+      {
+        sourceControlAi: {
+          actionOverrides: {
+            commitMessage: { agentId: 'codex', commandInputTemplate: 'repo {basePrompt}' },
+            fixChecks: unrelated
+          }
+        }
+      }
+    )
+    store.updateRepo(
+      { id: 'r1', executionHostId: 'local' },
+      { sourceControlAi: { actionOverrides: { fixChecks: unrelated } } }
+    )
+    const current = store.getSettings().sourceControlAi!
+    store.updateSettings({
+      sourceControlAi: {
+        ...current,
+        actions: setSourceControlActionDefault(current.actions, 'commitMessage', {
+          agentId: 'custom',
+          commandInputTemplate: 'global {basePrompt}',
+          agentArgs: '--literal'
+        }),
+        customAgentCommand: 'writer {prompt}'
+      }
+    })
+    store.flush()
+    const reopened = await createStore()
+    const repo = reopened.getRepos()[0]!
+    expect(Object.hasOwn(repo.sourceControlAi?.actionOverrides ?? {}, 'commitMessage')).toBe(false)
+    expect(repo.sourceControlAi?.actionOverrides?.fixChecks).toEqual(unrelated)
+    expect(
+      resolveSourceControlActionRecipe({
+        actionId: 'commitMessage',
+        settings: reopened.getSettings(),
+        repo
+      })
+    ).toMatchObject({
+      agentId: 'custom',
+      commandInputTemplate: 'global {basePrompt}',
+      agentArgs: '--literal'
+    })
+  })
 
   it('normalizes malformed visible task providers on load', async () => {
     writeDataFile({
@@ -475,17 +485,16 @@ describe('Store', () => {
     })
 
     const store = await createStore()
-    expect(store.getSettings().visibleTaskProviders).toEqual(['gitlab', 'jira'])
+    expect(store.getSettings().visibleTaskProviders).toEqual(['gitlab'])
   })
 
-  it('preserves a deliberate Jira provider opt-out after migration', async () => {
+  it('preserves a deliberate Jira provider opt-out without an age marker', async () => {
     writeDataFile({
       schemaVersion: 1,
       repos: [],
       worktreeMeta: {},
       settings: {
-        visibleTaskProviders: ['gitlab'],
-        visibleTaskProvidersDefaultedForJira: true
+        visibleTaskProviders: ['gitlab']
       },
       ui: {},
       githubCache: { pr: {}, issue: {} },
@@ -539,7 +548,7 @@ describe('Store', () => {
 
     const store = await createStore()
     expect(store.getSettings().defaultTaskSource).toBe('github')
-    expect(store.getSettings().visibleTaskProviders).toEqual(['github', 'linear', 'jira'])
+    expect(store.getSettings().visibleTaskProviders).toEqual(['github', 'linear'])
   })
 
   it('normalizes invalid task provider defaults on load', async () => {
@@ -555,7 +564,7 @@ describe('Store', () => {
 
     const store = await createStore()
     expect(store.getSettings().defaultTaskSource).toBe('gitlab')
-    expect(store.getSettings().visibleTaskProviders).toEqual(['gitlab', 'jira'])
+    expect(store.getSettings().visibleTaskProviders).toEqual(['gitlab'])
   })
 
   it('normalizes persisted open-in applications on load', async () => {

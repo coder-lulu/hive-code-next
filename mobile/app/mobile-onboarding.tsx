@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../src/i18n/use-mobile-translation'
 import { productNameText } from '@/product-brand'
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { Animated, BackHandler, Text, View, type LayoutChangeEvent } from 'react-native'
@@ -45,6 +46,8 @@ function MobileOnboardingFlow({
   hostId: string | undefined
   rawSteps: string | undefined
 }) {
+  const t = useMobileTranslation()
+
   const router = useRouter()
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createMobileOnboardingStyles)
@@ -161,7 +164,10 @@ function MobileOnboardingFlow({
             accessible
             accessibilityLiveRegion="polite"
             accessibilityRole="progressbar"
-            accessibilityLabel="引导进度"
+            accessibilityLabel={t(
+              'auto.mobile.app.mobile.onboarding.3c9d03bffa',
+              'Onboarding progress'
+            )}
             accessibilityValue={{ text: `第 ${activeIndex + 1} 步，共 ${steps.length} 步` }}
             style={styles.progress}
           >

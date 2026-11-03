@@ -1,6 +1,12 @@
 import { OrcaRuntimeWithResolveWorktreeRemovalTarget } from '../../workspaces/workspace-removal-target'
 import type { TerminalWorkspaceLaunchScope } from '../../runtime-legacy-worker-terminal-recovery-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
+import { AGENT_CHAT_PERMISSION_MODE_OPTION_ID } from '../../../../shared/agent-chat-permission-mode'
+import {
+  isAgentPermissionChoice,
+  readLaunchPermissionChoice,
+  resolveAgentPermission
+} from '../../../../shared/tui-agent-permission-choice'
 import { parseWslUncPath } from '../../../../shared/wsl-paths'
 import type {
   AgentLaunchPreferences,
@@ -11,16 +17,13 @@ import type {
 import {
   canonicalizeAgentSessionIdentity,
   type ProviderExecutionNamespace
-} from '../../agent-session-claim-identity'
+} from '../../agent-session/ownership/agent-session-claim-identity'
 import { isTuiAgentEnabled } from '../../../../shared/tui-agent-selection'
 import { buildAgentResumeStartupPlan } from '../../../../shared/tui-agent-startup'
 import { agentLaunchQuotingShell } from '../../../../shared/agent-launch-runtime'
 import { OrchestrationError } from '../../orchestration/orchestration-error'
 import { withAgentSessionAccountEnv } from '../../agent-session-account-env'
-import {
-  resolveTuiAgentLaunchArgs,
-  resolveTuiAgentLaunchEnv
-} from '../../../../shared/tui-agent-launch-defaults'
+import { resolveAgentStartupPlanInputs } from '../../../../shared/agent-startup-plan-inputs'
 
 export abstract class OrcaRuntimeWithGetAgentSessionExecutionNamespace extends OrcaRuntimeWithResolveWorktreeRemovalTarget {
   protected getAgentSessionExecutionNamespace(
@@ -83,7 +86,11 @@ export abstract class OrcaRuntimeWithGetAgentSessionExecutionNamespace extends O
     const options = {
       ...(preferences.model ? { model: preferences.model } : {}),
       ...(preferences.effort ? { effort: preferences.effort } : {}),
-      ...(preferences.mode ? { mode: preferences.mode } : {})
+      ...(preferences.mode
+        ? isAgentPermissionChoice(preferences.mode)
+          ? { [AGENT_CHAT_PERMISSION_MODE_OPTION_ID]: preferences.mode }
+          : { mode: preferences.mode }
+        : {})
     }
     return Object.keys(options).length > 0 ? options : undefined
   }
@@ -134,22 +141,27 @@ export abstract class OrcaRuntimeWithGetAgentSessionExecutionNamespace extends O
     // Why: `workspace.repo` is display metadata and may be a row from another host; the launch
     // shape must match the PTY route this scope already resolved.
     const isRemote = Boolean(workspace.connectionId)
+    const sessionOptions = this.toAgentSessionOptions(request.launchPreferences)
+    const permissionChoice = readLaunchPermissionChoice(sessionOptions)
     const startup = buildAgentResumeStartupPlan({
+      ...resolveAgentStartupPlanInputs({
+        agent: request.agent,
+        settings,
+        platform,
+        shell,
+        isRemote,
+        ...(request.agentArgs !== undefined ? { agentArgs: request.agentArgs } : {}),
+        sessionOptions
+      }),
       agent: request.agent,
+      agentArgsSource:
+        request.agentArgs !== undefined ||
+        (permissionChoice ?? resolveAgentPermission(request.agent, settings).choice) === 'own'
+          ? 'current'
+          : 'recorded',
       agentPermissionMode: request.agentPermissionMode,
       providerSession: identity.providerSession,
-      cmdOverrides: settings.agentCmdOverrides ?? {},
-      agentArgs:
-        request.agentArgs !== undefined
-          ? request.agentArgs
-          : resolveTuiAgentLaunchArgs(request.agent, settings.agentDefaultArgs),
-      agentEnv: resolveTuiAgentLaunchEnv(request.agent, settings.agentDefaultEnv),
-      ompResumeFilePath: request.ompResumeFilePath,
-      sessionOptions: this.toAgentSessionOptions(request.launchPreferences),
-      sessionOptionsOverrideAgentArgs: Boolean(request.launchPreferences),
-      platform,
-      shell,
-      isRemote
+      ompResumeFilePath: request.ompResumeFilePath
     })
     if (!startup) {
       throw new Error('agent_session_identity_required')
@@ -159,7 +171,11 @@ export abstract class OrcaRuntimeWithGetAgentSessionExecutionNamespace extends O
     }
     const terminal = await this.createTerminal(`id:${workspace.id}`, {
       command: startup.launchCommand,
-      env: withAgentSessionAccountEnv(startup.env, request.accountEnv),
+      env: withAgentSessionAccountEnv(
+        startup.env,
+        request.accountEnv,
+        permissionChoice ? { agent: request.agent, choice: permissionChoice, shell } : undefined
+      ),
       launchConfig: startup.launchConfig,
       startupCommandDelivery: startup.startupCommandDelivery,
       launchAgent: request.agent,
@@ -169,6 +185,7 @@ export abstract class OrcaRuntimeWithGetAgentSessionExecutionNamespace extends O
       tabId: request.placement?.tabId,
       leafId: request.placement?.leafId,
       agentSessionClaim: claim,
+      ...(request.resumeOrigin ? { resumeOrigin: request.resumeOrigin } : {}),
       ...(request.spawnIntent ? { spawnIntent: request.spawnIntent } : {}),
       signal: _caller.signal
     })

@@ -13,7 +13,7 @@ describe('createUISlice Activity navigation', () => {
     const store = createUIStore()
     store.setState({
       activeView: 'tasks',
-      settings: { ...getDefaultSettings('/tmp'), experimentalActivity: false }
+      settings: { ...getDefaultSettings('/tmp') }
     })
 
     store.getState().openActivityPage()
@@ -27,7 +27,7 @@ describe('createUISlice Activity navigation', () => {
     const store = createUIStore()
     store.setState({
       activeView: 'tasks',
-      settings: { ...getDefaultSettings('/tmp'), experimentalActivity: true }
+      settings: { ...getDefaultSettings('/tmp') }
     })
 
     store.getState().openActivityPage()
@@ -41,7 +41,7 @@ describe('createUISlice Activity navigation', () => {
     const store = createUIStore()
     store.setState({
       activeView: 'settings',
-      settings: { ...getDefaultSettings('/tmp'), experimentalActivity: false }
+      settings: { ...getDefaultSettings('/tmp') }
     })
 
     store.getState().openActivityPage({ scope: 'temporary-sessions' })
@@ -55,7 +55,7 @@ describe('createUISlice Activity navigation', () => {
     const store = createUIStore()
     store.setState({
       activeView: 'tasks',
-      settings: { ...getDefaultSettings('/tmp'), experimentalActivity: true }
+      settings: { ...getDefaultSettings('/tmp') }
     })
 
     store.getState().openActivityPage()
@@ -69,7 +69,7 @@ describe('createUISlice Activity navigation', () => {
     const store = createUIStore()
     store.setState({
       activeView: 'settings',
-      settings: { ...getDefaultSettings('/tmp'), experimentalActivity: false }
+      settings: { ...getDefaultSettings('/tmp') }
     })
     store.getState().openActivityPage({ scope: 'temporary-sessions' })
 

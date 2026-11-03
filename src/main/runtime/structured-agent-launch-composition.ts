@@ -4,7 +4,7 @@
 // sealed environment; it only adds what is that agent's.
 
 import type { AgentSessionJournalIdentity } from '../../shared/agent-session-journal-types'
-import type { AgentChatPermissionMode } from '../../shared/agent-chat-permission-mode'
+import type { AgentChatPermissionChoice } from '../../shared/agent-chat-permission-mode'
 import type { AgentSessionRecord } from '../../shared/agent-session-record'
 import { isNativeLocalLocation } from '../../shared/execution-host'
 import type { StructuredAgentDefinition } from '../native-chat/agent-session-wire/structured-agent-definition'
@@ -22,7 +22,10 @@ import { sealStructuredSessionChild } from './structured-session-child-env'
 
 /** Where a launch's shared inputs come from. */
 export type StructuredAgentLaunchSources = {
-  store: Pick<AgentSessionRecordStore, 'getRecord' | 'pinLaunchDirectory'>
+  store: Pick<
+    AgentSessionRecordStore,
+    'selectWritableRecord' | 'requireWritableRecord' | 'pinLaunchDirectory'
+  >
   resolveWorkspacePath: (workspaceId: string) => Promise<string>
   resolveBaseEnvironment: () => Promise<Record<string, string>>
   /** The base environment with the user's overlay for `agent` laid over it. */
@@ -55,14 +58,14 @@ export type StructuredAgentLaunchBasis = {
    *  reads return the refreshed one. Absent when the runtime never retries. */
   refreshAfterMissingProgram?: (askedAt: number) => Promise<void>
   /** The permission mode the host decided this start runs with; absent asks. */
-  permissionMode?: AgentChatPermissionMode
+  permissionMode?: AgentChatPermissionChoice
 }
 
 export type StructuredLaunchRequest = {
   identity: AgentSessionJournalIdentity
   /** The reservation's token, which the seal hands the child. */
   spawnToken: string
-  permissionMode?: AgentChatPermissionMode
+  permissionMode?: AgentChatPermissionChoice
 }
 
 export type StructuredAgentLaunchPart<L> = {
@@ -107,10 +110,10 @@ function admittedRecord(
   store: StructuredAgentLaunchSources['store'],
   sessionId: string
 ): AgentSessionRecord {
-  const record = store.getRecord(sessionId)
-  if (!record) {
+  if (store.selectWritableRecord(sessionId).kind === 'missing') {
     throw new Error(`no durable agent-session record for ${sessionId}`)
   }
+  const record = store.requireWritableRecord(sessionId)
   if (Object.hasOwn(record, 'taskSource')) {
     throw new Error('structured_agent_session_unsupported')
   }
@@ -140,7 +143,7 @@ async function composedPart<L>(
   sources: StructuredAgentLaunchSources,
   part: StructuredAgentLaunchPartResolver<L>,
   identity: AgentSessionJournalIdentity,
-  permissionMode?: AgentChatPermissionMode
+  permissionMode?: AgentChatPermissionChoice
 ): Promise<StructuredAgentLaunchPart<L> & { cwd: string }> {
   const record = admittedRecord(definition, sources.store, identity.sessionId)
   const launchEnv = once(() => sources.resolveAgentLaunchEnv?.(definition.agent) ?? {})
@@ -189,6 +192,7 @@ export function composeStructuredLaunch<L>(
       identity,
       permissionMode
     )
+    admittedRecord(definition, sources.store, identity.sessionId)
     const child = sealStructuredSessionChild({
       sessionId: identity.sessionId,
       spawnToken,
@@ -196,7 +200,13 @@ export function composeStructuredLaunch<L>(
       inheritedEnvToDelete,
       ...(cliRuntimeCommand ? { cliRuntimeCommand } : {})
     })
-    return { ...launch, cwd, env: child.env, envToDelete: child.envToDelete }
+    return {
+      ...launch,
+      cwd,
+      env: child.env,
+      envToDelete: child.envToDelete,
+      commandEnv: child.commandEnv
+    }
   }
 }
 
@@ -212,6 +222,7 @@ export function composeStructuredLaunchRead<L>(
       part,
       identity
     )
+    admittedRecord(definition, sources.store, identity.sessionId)
     return { ...launch, cwd, env, envToDelete: [...inheritedEnvToDelete] }
   }
 }

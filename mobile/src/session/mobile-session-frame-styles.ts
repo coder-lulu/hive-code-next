@@ -1,166 +1,227 @@
 import { StyleSheet } from 'react-native'
 
-import type { MobileTheme } from '../theme/mobile-theme'
+import { colors, spacing, radii, typography } from '../theme/mobile-theme'
+import { themedStyleSheet } from '../theme/themed-styles'
 
-export function createMobileSessionFrameStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.color.bg.canvas
-    },
-    kavInner: {
-      flex: 1
-    },
-    sessionContentRow: {
-      flex: 1,
-      flexDirection: 'row'
-    },
-    sessionContentMain: {
-      flex: 1,
-      minWidth: 0,
-      backgroundColor: theme.color.bg.canvas
-    },
-    sessionChrome: {
-      backgroundColor: theme.color.bg.surface,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.color.border.subtle
-    },
-    sessionTopBar: {
-      minHeight: theme.size.navigationBarHeight,
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: theme.spacing.space8
-    },
-    backButton: {
-      width: theme.size.minimumTouchTarget,
-      height: theme.size.minimumTouchTarget,
-      borderRadius: theme.radii.circle,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: theme.spacing.space4
-    },
-    backButtonPressed: {
-      backgroundColor: theme.color.bg.subtle
-    },
-    filesButton: {
-      width: theme.size.minimumTouchTarget,
-      height: theme.size.minimumTouchTarget,
-      borderRadius: theme.radii.control,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginLeft: theme.spacing.space4
-    },
-    filesButtonPressed: {
-      backgroundColor: theme.color.bg.subtle
-    },
-    filesButtonActive: {
-      backgroundColor: theme.color.bg.selected
-    },
-    sessionTitleBlock: {
-      flex: 1,
-      minWidth: 0
-    },
-    sessionTitle: {
-      ...theme.typography.label,
-      color: theme.color.text.primary,
-      fontWeight: '600'
-    },
-    sessionMetaRow: {
-      gap: theme.spacing.space8,
-      minHeight: theme.spacing.space20,
-      flexDirection: 'row',
-      alignItems: 'center'
-    },
-    sessionMetaText: {
-      ...theme.typography.caption,
-      flexShrink: 1,
-      color: theme.color.text.secondary
-    },
-    tabBar: {
-      minHeight: theme.size.minimumTouchTarget,
-      flexDirection: 'row',
-      alignItems: 'center',
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.color.border.subtle,
-      backgroundColor: theme.color.bg.surface
-    },
-    tabScroll: {
-      flex: 1,
-      maxHeight: theme.size.minimumTouchTarget
-    },
-    tabContent: {
-      paddingHorizontal: theme.spacing.space8
-    },
-    tab: {
-      width: 128,
-      maxWidth: 128,
-      minHeight: theme.size.minimumTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: theme.spacing.space8,
-      borderBottomWidth: 2,
-      borderBottomColor: 'transparent'
-    },
-    tabActive: {
-      borderBottomColor: theme.color.text.primary
-    },
-    tabLabelRow: {
-      maxWidth: '100%',
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.space4
-    },
-    tabText: {
-      ...theme.typography.meta,
-      flexShrink: 1,
-      color: theme.color.text.secondary
-    },
-    tabTextActive: {
-      color: theme.color.text.primary,
-      fontWeight: '500'
-    },
-    newTerminalButton: {
-      width: theme.size.minimumTouchTarget,
-      height: theme.size.minimumTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center'
-    },
-    newTerminalButtonPressed: {
-      backgroundColor: theme.color.bg.subtle
-    },
-    newTerminalButtonDisabled: {
-      opacity: 0.45
-    },
-    tabActionDivider: {
-      width: StyleSheet.hairlineWidth,
-      height: theme.spacing.space20,
-      backgroundColor: theme.color.border.subtle
-    },
-    contentFrame: { flex: 1, minHeight: 0 },
-    terminalFrame: {
-      flex: 1,
-      minHeight: 0,
-      position: 'relative',
-      overflow: 'hidden'
-    },
-    terminalPane: {
-      ...StyleSheet.absoluteFillObject
-    },
-    terminalPaneHidden: {
-      opacity: 0
-    },
-    terminalWebView: {
-      flex: 1
-    },
-    markdownFrame: {
-      flex: 1,
-      minHeight: 0,
-      backgroundColor: theme.color.bg.canvas
-    },
-    browserFrame: {
-      flex: 1,
-      minHeight: 0,
-      backgroundColor: theme.color.bg.canvas
-    }
-  })
-}
+export const mobileSessionFrameStyles = themedStyleSheet(() => ({
+  container: {
+    flex: 1,
+    backgroundColor: colors.bgBase
+  },
+  kavInner: {
+    flex: 1
+  },
+  sessionContentRow: {
+    flex: 1,
+    flexDirection: 'row'
+  },
+  sessionContentMain: {
+    flex: 1,
+    minWidth: 0
+  },
+  sessionChrome: {
+    backgroundColor: colors.bgPanel,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSubtle
+  },
+  sessionTopBar: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs
+  },
+  // Each 36pt visual reserves 4pt per side for its 44pt touch area.
+  headerButton: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.button,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: spacing.xs
+  },
+  headerButtonPressed: {
+    backgroundColor: colors.bgRaised
+  },
+  headerButtonActive: {
+    backgroundColor: colors.bgRaised
+  },
+  headerButtonDisabled: {
+    opacity: 0.45
+  },
+  sessionTitleBlock: {
+    flex: 1,
+    minWidth: 0
+  },
+  // Landscape phone: the tab strip takes the row's spare width instead of the title.
+  sessionTitleBlockBesideTabs: {
+    // Use natural-width flex -1: web’s zero basis for flex 0 collapses the title.
+    flex: -1,
+    maxWidth: 160
+  },
+  sessionTitle: {
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '600'
+  },
+  sessionMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: 2
+  },
+  sessionMetaText: {
+    flexShrink: 1,
+    color: colors.textSecondary,
+    fontSize: typography.metaSize
+  },
+  tabBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSubtle
+  },
+  // Cancels the top bar's vertical padding so tab borders run the bar's full height.
+  tabBarInTopBar: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    marginVertical: -spacing.xs,
+    marginLeft: spacing.md,
+    borderLeftWidth: 1,
+    borderLeftColor: colors.borderSubtle
+  },
+  tabScrollFrame: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'stretch'
+  },
+  tabEdgeHint: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xs,
+    backgroundColor: colors.bgPanel
+  },
+  tabEdgeHintLeft: {
+    left: 0,
+    borderRightWidth: 1,
+    borderRightColor: colors.borderSubtle
+  },
+  tabEdgeHintRight: {
+    right: 0,
+    borderLeftWidth: 1,
+    borderLeftColor: colors.borderSubtle
+  },
+  tabScroll: {
+    flex: 1,
+    maxHeight: 44
+  },
+  tabScrollInTopBar: {
+    alignSelf: 'stretch',
+    maxHeight: 44
+  },
+  tabContent: {
+    paddingLeft: spacing.sm,
+    paddingRight: spacing.sm
+  },
+  tabContentInTopBar: {
+    paddingLeft: 0
+  },
+  tab: {
+    minWidth: 44,
+    maxWidth: 128,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+    borderRightWidth: 1,
+    borderRightColor: colors.borderSubtle
+  },
+  tabFirst: {
+    borderLeftWidth: 1,
+    borderLeftColor: colors.borderSubtle
+  },
+  tabActive: {
+    borderBottomColor: colors.textSecondary,
+    backgroundColor: colors.bgRaised
+  },
+  tabLabelRow: {
+    maxWidth: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs
+  },
+  // Prevent web SVG shrink before the title ellipsizes.
+  tabIcon: {
+    flexShrink: 0
+  },
+  tabText: {
+    flexShrink: 1,
+    color: colors.textSecondary,
+    fontSize: 13
+  },
+  tabTextActive: {
+    color: colors.textPrimary
+  },
+  newTerminalButtonPressed: {
+    backgroundColor: colors.bgRaised
+  },
+  tabActionDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 18,
+    backgroundColor: colors.borderSubtle
+  },
+  contentFrame: {
+    flex: 1,
+    minHeight: 0
+  },
+  terminalFrame: {
+    flex: 1,
+    minHeight: 0,
+    position: 'relative',
+    overflow: 'hidden'
+  },
+  terminalPane: {
+    ...StyleSheet.absoluteFillObject
+  },
+  terminalPaneHidden: {
+    opacity: 0
+  },
+  terminalWebView: {
+    flex: 1
+  },
+  markdownFrame: {
+    flex: 1,
+    minHeight: 0,
+    backgroundColor: colors.bgBase
+  },
+  browserFrame: {
+    flex: 1,
+    minHeight: 0,
+    backgroundColor: colors.bgBase
+  },
+  markdownEditor: {
+    flex: 1,
+    position: 'relative'
+  },
+  markdownState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+    gap: spacing.md
+  },
+  markdownError: {
+    color: colors.statusRed,
+    fontSize: typography.bodySize
+  }
+}))

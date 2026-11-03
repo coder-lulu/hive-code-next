@@ -11,7 +11,7 @@ import {
 } from '../../../../shared/worktree/host-qualified-identity'
 import { parseAgentStatusPaneIdentity } from '@/lib/agent-status-worktree-attribution'
 import { isExplicitAgentStatusFresh } from '@/lib/pane-agent-evidence'
-import { collectLeafIds } from '../terminal-pane/terminal-pane-layout-tree'
+import { collectLeafIds } from '../../../../shared/terminal-pane-layout-tree'
 import type { SessionListItem } from './session-list-types'
 
 type HookEntries = Readonly<Record<string, AgentStatusEntry | undefined>>

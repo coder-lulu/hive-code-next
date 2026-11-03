@@ -1,4 +1,4 @@
-import { ElectronSecretStore } from '../host/electron-secret-store'
+import { getSecretStore } from '../../shared/secret-store'
 import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -11,6 +11,8 @@ import type { SecretAtRestProtection } from '../../shared/secret-at-rest-protect
 import { ApiKeyFileUnreadableError } from './api-key-file-unreadable-error'
 
 type EncryptedApiKeyFileStore = {
+  /** Envelope location and prefix used by orcad's plaintext migration. */
+  envelopeFile: () => { path: string; envelopePrefix: string }
   protection: () => SecretAtRestProtection | null
   has: () => boolean
   save: (key: string) => void
@@ -70,30 +72,13 @@ export function createEncryptedApiKeyFileStore({
   }
 
   function readEnvelope(envelope: ApiKeyEnvelope): string {
-    const secrets = new ElectronSecretStore()
-    if (
-      envelope.kind !== 'encrypted' ||
-      !secrets.isEncryptionAvailable() ||
-      secrets.describeProtectionGap() !== null
-    ) {
+    if (envelope.kind === 'plaintext') {
+      return envelope.payload.toString('utf8')
+    }
+    if (!getSecretStore().isEncryptionAvailable()) {
       throw new Error(`${providerLabel} API key could not be decrypted`)
     }
-    return secrets.decryptString(envelope.payload)
-  }
-
-  function readStoredEnvelope(keyPath: string): ApiKeyEnvelope | null {
-    const raw = readFileSync(keyPath)
-    try {
-      const envelope = decodeApiKeyEnvelope(raw)
-      if (envelope.kind === 'plaintext') {
-        envelope.payload.fill(0)
-        rmSync(keyPath, { force: true })
-        return null
-      }
-      return envelope
-    } finally {
-      raw.fill(0)
-    }
+    return getSecretStore().decryptString(envelope.payload)
   }
 
   function has(): boolean {
@@ -112,13 +97,7 @@ export function createEncryptedApiKeyFileStore({
         )
       }
     }
-    try {
-      const envelope = readStoredEnvelope(keyPath)
-      envelope?.payload.fill(0)
-      return envelope !== null
-    } catch {
-      return false
-    }
+    return true
   }
 
   function protection(): SecretAtRestProtection | null {
@@ -138,21 +117,21 @@ export function createEncryptedApiKeyFileStore({
     if (!trimmed) {
       throw new Error(`${providerLabel} API key is required`)
     }
-    const secrets = new ElectronSecretStore()
-    let protectedAtRest = false
-    try {
-      protectedAtRest = secrets.isEncryptionAvailable() && secrets.describeProtectionGap() === null
-    } catch {
-      // An unavailable protection probe never authorizes a credential write.
-    }
-    if (!protectedAtRest) {
-      throw new Error(
-        `Could not save ${providerLabel} API key securely. Install and unlock an OS keyring or keychain, then retry.`
+    if (getSecretStore().isEncryptionAvailable()) {
+      writeSecureFile(
+        getApiKeyPath(),
+        encodeApiKeyEnvelope('encrypted', getSecretStore().encryptString(trimmed)),
+        { durable: true }
       )
+      cachedApiKey = trimmed
+      return
     }
+    console.warn(
+      `[${logScope}] safeStorage encryption unavailable — storing ${providerLabel} API key in plaintext`
+    )
     writeSecureFile(
       getApiKeyPath(),
-      encodeApiKeyEnvelope('encrypted', secrets.encryptString(trimmed)),
+      encodeApiKeyEnvelope('plaintext', Buffer.from(trimmed, 'utf8')),
       { durable: true }
     )
     cachedApiKey = trimmed
@@ -166,7 +145,7 @@ export function createEncryptedApiKeyFileStore({
     if (!existsSync(keyPath)) {
       return null
     }
-    // Why: permission failures must not be reported as decryption failures.
+    // Keep permission failures distinct from decryption failures.
     try {
       hardenExistingSecureFile(keyPath)
     } catch (error) {
@@ -179,16 +158,8 @@ export function createEncryptedApiKeyFileStore({
     try {
       raw = readFileSync(keyPath)
       const envelope = decodeApiKeyEnvelope(raw)
-      try {
-        if (envelope.kind === 'plaintext') {
-          rmSync(keyPath, { force: true })
-          return null
-        }
-        cachedApiKey = readEnvelope(envelope)
-        return cachedApiKey
-      } finally {
-        envelope.payload.fill(0)
-      }
+      cachedApiKey = readEnvelope(envelope)
+      return cachedApiKey
     } catch (error) {
       if (raw === null && isUnreadableError(error)) {
         console.warn(`[${logScope}] failed to read API key file`, error)
@@ -196,8 +167,6 @@ export function createEncryptedApiKeyFileStore({
       }
       console.error(`[${logScope}] failed to decode/decrypt API key`, error)
       throw new Error(`${providerLabel} API key could not be decrypted`)
-    } finally {
-      raw?.fill(0)
     }
   }
 
@@ -206,5 +175,12 @@ export function createEncryptedApiKeyFileStore({
     rmSync(getApiKeyPath(), { force: true })
   }
 
-  return { has, save, read, clear, protection }
+  return {
+    has,
+    save,
+    read,
+    clear,
+    protection,
+    envelopeFile: () => ({ path: getApiKeyPath(), envelopePrefix })
+  }
 }

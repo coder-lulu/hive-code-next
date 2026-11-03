@@ -4,16 +4,15 @@ import type { EmulatorSessionInfo } from './emulator-types'
 import type { SimulatorDevice } from './simctl-simulator-devices'
 import type { EmulatorBridgeOptions } from './emulator-bridge-types'
 import type { EmulatorGesturePoint } from './emulator-gesture-sender'
-import { PRIMARY_CLI_COMMAND } from '../../shared/brand'
 import { EmulatorSessionRegistry } from './emulator-session-registry'
 import {
   EmulatorStartLeaseRegistry,
   type EmulatorStartLease
 } from './emulator-start-lease-registry'
 import { listAvailableEmulatorDevices } from './emulator-device-inventory'
+import { deriveAxUrlFromStreamUrl } from './serve-sim-detached-session'
 import { IosEmulatorBackend } from './backends/ios-emulator-backend'
 import { AndroidEmulatorBackend } from './backends/android-emulator-backend'
-import { readEmulatorAccessibilityTree } from './emulator-accessibility-tree'
 import type {
   EmulatorBackend,
   EmulatorBackendCapabilities,
@@ -22,10 +21,6 @@ import type {
   EmulatorTargetOpts
 } from './backends/emulator-backend'
 
-// Routes emulator commands to the backend that owns the target device while
-// owning the per-worktree active-session registry and lifecycle orchestration.
-// Backends supply only device/helper/input mechanics; the bridge decides which
-// backend a command targets (by the session's recorded backend, else by device).
 export class EmulatorBridge {
   private readonly sessionRegistry = new EmulatorSessionRegistry()
   private readonly startLeases = new EmulatorStartLeaseRegistry()
@@ -36,8 +31,7 @@ export class EmulatorBridge {
   constructor(options: EmulatorBridgeOptions = {}) {
     this.iosBackend = new IosEmulatorBackend(options)
     this.androidBackend = new AndroidEmulatorBackend()
-    // Why: backends are always registered (not host-gated) so explicitly targeted
-    // commands still reach them; availability reporting handles host support.
+    // Register all backends so explicit targets reach their own host-support errors.
     this.backends = [this.iosBackend, this.androidBackend]
   }
 
@@ -45,13 +39,10 @@ export class EmulatorBridge {
     return this.backends
   }
 
-  // Aggregated device list across host-supported backends (iOS simulators +
-  // Android devices/AVDs), for the unified `orca emulator list`.
   async listAllDevices(): Promise<EmulatorDevice[]> {
     return listAvailableEmulatorDevices(this.backends)
   }
 
-  // iOS-specific passthroughs kept for back-compat with the runtime + availability code.
   async listSimulators(): Promise<SimulatorDevice[]> {
     return this.iosBackend.listSimulators()
   }
@@ -80,8 +71,7 @@ export class EmulatorBridge {
     return this.sessionRegistry.getActiveForWorktree(worktreeId)
   }
 
-  // On a device switch, keep slow-to-boot Android emulators running for instant
-  // switch-back; shut down other backends' devices so they are not leaked.
+  // Keep slow-booting Android devices alive across switches for fast reattachment.
   async stopActiveForSwitch(worktreeId: string): Promise<string | null> {
     const keepAlive = this.backendForActiveWorktree(worktreeId)?.kind === 'android'
     return this.stopActiveForWorktreeInternal(worktreeId, { shutdownDevice: !keepAlive })
@@ -100,8 +90,7 @@ export class EmulatorBridge {
       return null
     }
     if (device) {
-      // resolveDeviceId throws for a not-yet-booted AVD; treat that as "not the
-      // active device" so the caller falls through to a fresh (booting) attach.
+      // An unbooted AVD cannot resolve yet; let the caller fall through to a fresh attach.
       const resolved = await backend.resolveDeviceId(device).catch(() => null)
       if (resolved !== active.deviceUdid) {
         return null
@@ -200,13 +189,28 @@ export class EmulatorBridge {
   }
 
   async accessibilityTree(opts?: EmulatorTargetOpts): Promise<unknown> {
-    return this.runCapability('accessibilityTree', opts, (backend, device) =>
-      readEmulatorAccessibilityTree(this.sessionRegistry, backend, device, opts)
-    )
+    return this.runCapability('accessibilityTree', opts, async (backend, device) => {
+      if (backend.kind !== 'ios') {
+        return backend.accessibilityTree!(device)
+      }
+      const udid = await backend.resolveDeviceId(device)
+      const worktreeId = opts?.worktreeId
+      // Explicit device reads must work without an active workspace attachment.
+      const session =
+        (worktreeId ? this.getActiveForWorktree(worktreeId) : null) ??
+        this.sessionRegistry.getSession(udid)
+      if (worktreeId && session && session.deviceUdid !== udid) {
+        throw new EmulatorError(
+          'emulator_no_active',
+          `iOS simulator ${udid} is not active for this worktree (active: ${session.deviceUdid}); attach the requested simulator first.`
+        )
+      }
+      // Older registered sessions may lack the AX URL derived for fresh sessions.
+      const axUrl = session?.axUrl ?? deriveAxUrlFromStreamUrl(session?.streamUrl)
+      return backend.accessibilityTree!(udid, axUrl)
+    })
   }
 
-  // Runs a capability-gated verb against the resolved target, rejecting backends
-  // that do not advertise the capability (e.g. install/logcat on iOS).
   async runCapability<T>(
     capability: keyof EmulatorBackendCapabilities,
     opts: EmulatorTargetOpts | undefined,
@@ -248,6 +252,10 @@ export class EmulatorBridge {
     await backend.shutdownDevice(udid)
     this.sessionRegistry.clearSessionAndWorktrees(udid)
     return udid
+  }
+
+  hasLiveManagedSessions(): Promise<boolean> {
+    return this.sessionRegistry.pruneGoneManagedSessions((kind) => this.backendForKind(kind))
   }
 
   async destroyAllSessions(): Promise<void> {
@@ -292,7 +300,7 @@ export class EmulatorBridge {
     }
     throw new EmulatorError(
       'emulator_no_active',
-      `No active emulator for this worktree — use ${PRIMARY_CLI_COMMAND} emulator attach or open the pane`
+      'No active emulator for this worktree — use orca emulator attach or open the pane'
     )
   }
 
@@ -322,14 +330,13 @@ export class EmulatorBridge {
   }
 
   private async backendForDevice(device: string): Promise<EmulatorBackend> {
+    const registered = this.sessionRegistry.getSession(device)
     for (const backend of this.backends) {
-      if (await backend.ownsDevice(device)) {
+      if (registered ? backend.kind === registered.backend : await backend.ownsDevice(device)) {
         return backend
       }
     }
-    // Why: fall back to a host-supported backend, else the platform-primary one,
-    // so an unrecognized device (e.g. no SDK yet) surfaces the right setup error
-    // — Android on Windows/Linux, iOS/CoreSimulator on macOS — not iOS-on-Windows.
+    // Choose the host's backend so unknown devices produce the relevant setup error.
     return (
       this.backends.find((backend) => backend.isSupportedOnHost()) ??
       (platform() === 'darwin' ? this.iosBackend : this.androidBackend)

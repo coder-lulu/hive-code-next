@@ -5,9 +5,9 @@ vi.mock('../theme/mobile-theme-provider', async () => {
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { AskPrompt } from '../../../src/shared/native-chat-ask'
-import { NATIVE_CHAT_QUESTION_AUTO_ADVANCE_MS } from '../../../src/shared/native-chat-question-auto-advance'
-import { MobileNativeChatAsk } from './MobileNativeChatAsk'
+import type { AskPrompt } from '../../../src/shared/native-chat/input/native-chat-ask'
+import { NATIVE_CHAT_QUESTION_AUTO_ADVANCE_MS } from '../../../src/shared/native-chat/input/native-chat-question-auto-advance'
+import { MobileNativeChatAsk } from './native-chat/input/MobileNativeChatAsk'
 
 vi.mock('react-native', () => ({
   Keyboard: { dismiss: () => {} },

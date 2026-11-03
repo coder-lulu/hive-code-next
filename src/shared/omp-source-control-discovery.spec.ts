@@ -40,10 +40,7 @@ for (const hostKey of ['local', 'ssh:omp-host']) {
         ])
         const settings = getDefaultSettings('/disposable-omp-home')
         settings.defaultTuiAgent = 'omp'
-        const config = normalizeSourceControlAiSettings(
-          settings.sourceControlAi,
-          settings.commitMessageAi
-        )
+        const config = normalizeSourceControlAiSettings(settings.sourceControlAi)
         config.selectedModelByAgentByHost = selectedModel
           ? { [hostKey]: { omp: selectedModel } }
           : {}

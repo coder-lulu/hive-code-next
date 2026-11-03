@@ -48,11 +48,6 @@ function standaloneMobile() {
     mkdirSync(dirname(destination), { recursive: true })
     cpSync(join(repository, 'mobile', file), destination, { recursive: true })
   }
-  for (const file of ['upstream-recording-inputs.mjs', 'upstream-recording-adapters.mjs']) {
-    const destination = join(root, 'config', 'scripts', file)
-    mkdirSync(dirname(destination), { recursive: true })
-    cpSync(join(repository, 'config', 'scripts', file), destination)
-  }
   writeFileSync(join(mobile, 'package.json'), JSON.stringify(manifest))
   mkdirSync(join(mobile, 'rpc-foundation', 'goldens'), { recursive: true })
   mkdirSync(join(mobile, 'node_modules', '@orca'), { recursive: true })
@@ -110,10 +105,29 @@ it('runs the RPC diff with a mobile-only dependency link and no compiled host pa
   expect(result.stdout).toContain('No recorded behaviour moved')
 })
 
-it('refuses the retired recording invocation without frozen source provenance', () => {
-  const result = rpcCommand(join(repository, 'mobile'), 'rpc:record', ['unreviewed-scenario'])
-  expect(result.code).not.toBe(0)
-  expect(result.stderr).toContain(
-    'Use --record-hive|--publish-hive <source-input.json> <logs-output-directory> with RPC_FOUNDATION_RECORD=1'
+it('launches the recording runner with a mobile-only dependency link and no compiled host package', () => {
+  const { mobile } = standaloneMobile()
+  const vitest = join(mobile, 'node_modules', 'vitest')
+  mkdirSync(vitest)
+  writeFileSync(join(vitest, 'package.json'), '{"name":"vitest","version":"0.0.0"}')
+  writeFileSync(
+    join(vitest, 'vitest.mjs'),
+    'process.stdout.write(JSON.stringify(process.argv.slice(2)))'
   )
+  const { scenarios } = JSON.parse(
+    readFileSync(join(mobile, 'rpc-foundation', 'pilot-scenarios.json'), 'utf8')
+  )
+  const result = rpcCommand(mobile, 'rpc:record', [scenarios[0].id])
+  expect(result.code, result.stderr).toBe(0)
+  const args = JSON.parse(result.stdout)
+  expect(args).toEqual([
+    'run',
+    'src/test-support/rpc-recording/pilot-recordings.test.ts',
+    'src/test-support/rpc-recording/family-recordings.test.ts',
+    '-t',
+    expect.any(String)
+  ])
+  const selected = new RegExp(args[4])
+  expect(selected.test(`${scenarios[0].id}: replays its recording deterministically`)).toBe(true)
+  expect(selected.test(`${scenarios[1].id}: replays its recording deterministically`)).toBe(false)
 })

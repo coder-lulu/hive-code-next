@@ -1,6 +1,6 @@
 import type { HiveAccountRelayChannel } from './hive-account-relay-channel'
-import { RemoteRuntimeClientError } from './remote-runtime-client-error'
-import { serializeRemoteRuntimePayload } from './remote-runtime-memory-limits'
+import { RemoteRuntimeClientError } from './remote-runtime/remote-runtime-client-error'
+import { serializeRemoteRuntimePayload } from './remote-runtime/remote-runtime-memory-limits'
 import { toHiveAccountRelayClientError } from './hive-account-relay-errors'
 import {
   createHiveAccountRelayDeadline,

@@ -1,3 +1,4 @@
+import { TUI_AGENT_AUTO_PICK_ORDER } from '../../../shared/tui-agent-selection'
 import { vi } from 'vitest'
 import { settleAgentLaunchPaneStart } from './agent-launch-pane-start'
 
@@ -14,7 +15,7 @@ export type LaunchFunnelSettings = {
   agentDefaultEnv: Record<string, Record<string, string>>
   activeRuntimeEnvironmentId: string | null
   terminalWindowsShell?: string
-  experimentalNativeChat?: boolean
+  nativeChatProviders?: Record<string, boolean>
   experimentalStructuredNativeChat?: boolean
   openAgentTabsInChatByDefault?: boolean
   nativeChatSessionOptions?: Record<
@@ -31,6 +32,7 @@ export function launchFunnelSettings(
     agentDefaultArgs: {},
     agentDefaultEnv: {},
     activeRuntimeEnvironmentId: null,
+    nativeChatProviders: Object.fromEntries(TUI_AGENT_AUTO_PICK_ORDER.map(agent => [agent, false])),
     ...overrides
   }
 }

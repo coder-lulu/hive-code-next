@@ -1,8 +1,5 @@
-import {
-  interpretAtRpcBarrier,
-  startRpcOperation,
-  type RpcOperationClient
-} from '../transport/rpc-operation'
+import type { RpcClient } from '../transport/rpc-client'
+import { interpretAtRpcBarrier, startRpcOperation } from '../transport/rpc-operation'
 import { RESUME_RPC_TIMEOUT_MS } from '../session/ai-vault-resume-preparation'
 import {
   resumeRepos,
@@ -12,7 +9,7 @@ import {
   resumeWorktrees
 } from './mobile-ai-vault-resume-operations'
 
-export async function loadMobileResumeMetadata(client: RpcOperationClient) {
+export async function loadMobileResumeMetadata(client: RpcClient) {
   const options = { timeoutMs: RESUME_RPC_TIMEOUT_MS }
   const repos = startRpcOperation(client, resumeRepos, undefined, options)
   const folders = startRpcOperation(client, resumeFolders, undefined, options)

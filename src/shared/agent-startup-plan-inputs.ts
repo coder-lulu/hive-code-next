@@ -1,16 +1,30 @@
 import type { GlobalSettings } from './global-settings-types'
-import type { SessionOptionValue } from './native-chat-session-options'
+import type { SessionOptionValue } from './native-chat/input/native-chat-session-options'
 import type { TuiAgent } from './tui-agent'
-import { resolveTuiAgentLaunchArgs, resolveTuiAgentLaunchEnv } from './tui-agent-launch-defaults'
+import {
+  agentLaunchPermissionSettings,
+  resolveTuiAgentLaunchArgs,
+  resolveTuiAgentLaunchEnv
+} from './tui-agent-launch-defaults'
+import {
+  agentPermissionHasTerminalChoice,
+  readLaunchPermissionChoice
+} from './tui-agent-permission-choice'
 import { resolveStartupShell, type AgentStartupShell } from './tui-agent-startup-shell'
 import { hasExtraAgentArgs, mergeExtraAgentArgs } from './automation-extra-agent-args'
 import { resolveLocalWindowsAgentStartupShell } from './windows-terminal-shell'
+import { resolveTuiAgentLaunchPermission } from './tui-agent-permissions'
 
 /** The settings slice a launch reads; hosts pass their whole `GlobalSettings` row. */
 export type AgentStartupSettings = Partial<
   Pick<
     GlobalSettings,
-    'agentCmdOverrides' | 'agentDefaultArgs' | 'agentDefaultEnv' | 'terminalWindowsShell'
+    | 'agentCmdOverrides'
+    | 'agentDefaultArgs'
+    | 'agentDefaultEnv'
+    | 'agentPermissionDefault'
+    | 'agentPermissionOverrides'
+    | 'terminalWindowsShell'
   >
 >
 
@@ -25,6 +39,7 @@ export type AgentStartupPlanInputs = {
   isRemote: boolean
   sessionOptions?: Record<string, SessionOptionValue>
   sessionOptionsOverrideAgentArgs: boolean
+  suppressStartupUpdatePrompt?: true
 }
 
 /**
@@ -46,18 +61,28 @@ export function resolveAgentStartupPlanInputs(args: {
   agentArgs?: string | null
   /** An automation's saved extras, merged over the resolved args; invalid extras throw. */
   extraAgentArgs?: string
+  suppressStartupUpdatePrompt?: boolean
   /** The shell family this PTY will be; `undefined` reads it from the Settings shell, which is
    *  right only where the Settings shell is the one the PTY gets. */
   shell: AgentStartupShell | undefined
   sessionOptions?: Record<string, SessionOptionValue> | undefined
 }): AgentStartupPlanInputs {
-  const { agent, settings, platform, isRemote, sessionOptions } = args
+  const { agent, platform, isRemote, sessionOptions } = args
+  const permission = readLaunchPermissionChoice(sessionOptions)
+  if (permission === 'auto' && !agentPermissionHasTerminalChoice(agent, 'auto')) {
+    throw new Error('Automatic approval is unavailable for this agent')
+  }
+  const settings = agentLaunchPermissionSettings(agent, args.settings, sessionOptions)
   // A per-launch override wins over the Settings default; `null` is "no arguments", so this
   // tests for absence rather than falsiness.
   let agentArgs =
     args.agentArgs !== undefined
       ? args.agentArgs
-      : resolveTuiAgentLaunchArgs(agent, settings.agentDefaultArgs)
+      : resolveTuiAgentLaunchArgs(
+          agent,
+          settings,
+          readLaunchPermissionChoice(sessionOptions) ? 'own' : undefined
+        )
   const shell =
     args.shell ??
     resolveLocalWindowsAgentStartupShell({
@@ -77,17 +102,28 @@ export function resolveAgentStartupPlanInputs(args: {
     }
     agentArgs = merged.agentArgs
   }
+  const configuredEnv = resolveTuiAgentLaunchEnv(agent, settings, platform)
+  const agentEnv =
+    permission && permission !== 'own'
+      ? resolveTuiAgentLaunchPermission({
+          agent,
+          mode: permission === 'full-access' ? 'yolo' : permission === 'auto' ? 'auto' : 'manual',
+          agentEnv: configuredEnv,
+          shell: resolveStartupShell(platform, shell)
+        }).agentEnv
+      : configuredEnv
   return {
     agent,
     cmdOverrides: settings.agentCmdOverrides ?? {},
     agentArgs,
-    agentEnv: resolveTuiAgentLaunchEnv(agent, settings.agentDefaultEnv),
+    agentEnv,
     platform,
     shell,
     isRemote,
     ...(sessionOptions ? { sessionOptions } : {}),
     // Why: session options are an explicit per-launch pick, so they outrank configured args —
     // without this the two spellings of the same flag both reach argv and the last one wins.
-    sessionOptionsOverrideAgentArgs: Boolean(sessionOptions)
+    sessionOptionsOverrideAgentArgs: Boolean(sessionOptions),
+    ...(args.suppressStartupUpdatePrompt ? { suppressStartupUpdatePrompt: true } : {})
   }
 }

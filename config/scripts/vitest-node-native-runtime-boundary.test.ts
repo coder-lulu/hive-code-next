@@ -90,7 +90,7 @@ it('runs real interrupted Git removal and durable-record cleanup on the Node hos
 })
 
 it('runs real quick-open ripgrep, junction and inventory-cap contracts in Node', () => {
-  const owner = 'src/main/ipc/filesystem-quick-open-options.integration.test.ts'
+  const owner = 'src/main/ipc/filesystem/filesystem-quick-open-options.integration.test.ts'
   const source = ts.createSourceFile(owner, readFileSync(owner, 'utf8'), ts.ScriptTarget.Latest)
   expect(callsImportedRuntime(source, '/filesystem-list-files', 'listQuickOpenFiles')).toBe(true)
   expect(
@@ -102,8 +102,8 @@ it('runs real quick-open ripgrep, junction and inventory-cap contracts in Node',
   expect(source.text).toContain('20_020')
   expect(source.text).not.toContain('vi.mock(')
   expect(NODE_RUNTIME_INCLUDE).toContain(owner)
-  const mockOwner = 'src/main/ipc/filesystem-search-file-paths.test.ts'
-  expect(readFileSync(mockOwner, 'utf8')).toContain("vi.mock('../git/runner'")
+  const mockOwner = 'src/main/ipc/filesystem/filesystem-search-file-paths.test.ts'
+  expect(readFileSync(mockOwner, 'utf8')).toContain("vi.mock('../../git/runner'")
   expect(NODE_RUNTIME_INCLUDE).not.toContain(mockOwner)
 })
 
@@ -276,13 +276,13 @@ it('keeps real durable runtime stores and lifecycle listeners on their Node host
       'addEnvironmentFromPairingCode'
     ],
     [
-      'src/main/ephemeral-vm-runtime-ssh-cleanup.test.ts',
+      'src/main/ephemeral-vm/runtime-ssh-cleanup.test.ts',
       '/ephemeral-vm-runtime-store',
       'upsertEphemeralVmRuntime'
     ],
     [
-      'src/main/ephemeral-vm-runtime-service.test.ts',
-      '/ephemeral-vm-runtime-service',
+      'src/main/ephemeral-vm/runtime-service.test.ts',
+      '/runtime-service',
       'provisionEphemeralVmRuntime'
     ],
     [
@@ -321,14 +321,15 @@ it('keeps real durable runtime stores and lifecycle listeners on their Node host
       '/runtime-environment-store-file',
       'writeEnvironmentStore'
     ],
+    ['src/shared/runtime-environment-store-file.ts', '/secure-file', 'writeSecureFile'],
     [
       'src/shared/runtime-environment-store-file.ts',
-      '/bounded-secure-json-file',
-      'writeSecureJsonFileWithinLimit'
+      '/node-bounded-json-stringify',
+      'stringifyJsonWithinByteLimit'
     ],
     ['src/shared/secure-file.ts', '/secure-path-windows-acl', 'restrictWindowsPathSync'],
     [
-      'src/main/ephemeral-vm-runtime-service.ts',
+      'src/main/ephemeral-vm/runtime-service.ts',
       '/ephemeral-vm-recipe-runner',
       'runEphemeralVmRecipeStart'
     ],

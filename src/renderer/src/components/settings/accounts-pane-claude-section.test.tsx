@@ -11,7 +11,7 @@ import type {
 } from '../../../../shared/managed-account-types'
 import { i18n } from '../../i18n/i18n'
 import { useAppStore } from '../../store'
-import { ClaudeAccountsSheetList } from './accounts-pane-claude-section'
+import { ClaudeAccountsSheetList } from './accounts-pane-claude-sheet-list'
 import type { AccountsPaneSectionModel } from './accounts-pane-types'
 
 function account(
@@ -51,8 +51,6 @@ function makeModel(
     accountScopeKey: 'local:host:',
     claudeAccountsLoadState: 'loaded',
     codexAccountsLoadState: 'loaded',
-    miniMaxCredentialLoadState: 'loaded',
-    refreshMiniMaxCredentialStatus: vi.fn(async () => {}),
     searchQuery: '',
     recordFeatureInteraction: vi.fn(),
     wslSupportedPlatform: false,
@@ -78,19 +76,7 @@ function makeModel(
     runCodexAccountAction: vi.fn(async () => {}),
     recordOpenCodeSettingEdit: vi.fn(),
     miniMaxRateLimits: null,
-    miniMaxApiKeyDraft: '',
-    setMiniMaxApiKeyDraft: vi.fn(),
-    miniMaxApiKeyConfigured: false,
-    miniMaxApiKeyProtection: null,
-    saveMiniMaxApiKey: vi.fn(async () => {}),
-    clearMiniMaxApiKey: vi.fn(async () => {}),
-    miniMaxCookieDraft: '',
-    setMiniMaxCookieDraft: vi.fn(),
-    miniMaxConfigured: false,
-    miniMaxCookieProtection: null,
-    miniMaxCredentialBusy: false,
-    saveMiniMaxCookie: vi.fn(async () => {}),
-    clearMiniMaxCookie: vi.fn(async () => {}),
+    usageHostSettings: { settings: {}, update: vi.fn(async () => {}) },
     accountRuntime,
     accountRuntimeSentenceLabel: 'this device',
     accountRuntimeUnavailable: false,

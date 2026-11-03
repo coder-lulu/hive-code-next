@@ -1,4 +1,4 @@
-import type { SecretAtRestProtection } from '../../../../shared/secret-at-rest-protection'
+import type { UsageHostSettingsModel } from './use-usage-host-settings'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type {
@@ -123,19 +123,5 @@ export type AccountsPaneSectionModel = {
   runCodexAccountAction: CodexAccountActionRunner
   recordOpenCodeSettingEdit: (field: 'cookie' | 'workspaceId' | 'apiKey') => void
   miniMaxRateLimits: ProviderRateLimits | null
-  miniMaxApiKeyDraft: string
-  setMiniMaxApiKeyDraft: Dispatch<SetStateAction<string>>
-  miniMaxApiKeyConfigured: boolean
-  miniMaxApiKeyProtection: SecretAtRestProtection | null
-  saveMiniMaxApiKey: () => Promise<void>
-  clearMiniMaxApiKey: () => Promise<void>
-  miniMaxCookieDraft: string
-  setMiniMaxCookieDraft: Dispatch<SetStateAction<string>>
-  miniMaxConfigured: boolean
-  miniMaxCookieProtection: SecretAtRestProtection | null
-  miniMaxCredentialBusy: boolean
-  miniMaxCredentialLoadState: ProviderRosterLoadState
-  refreshMiniMaxCredentialStatus: () => Promise<void>
-  saveMiniMaxCookie: () => Promise<void>
-  clearMiniMaxCookie: () => Promise<void>
+  usageHostSettings: UsageHostSettingsModel
 }

@@ -2,9 +2,11 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Check } from 'lucide-react-native'
 
-import type { MobileTheme } from '../theme/mobile-theme'
-import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { colors, spacing, typography } from '../theme/mobile-theme'
+import { themedStyleSheet } from '../theme/themed-styles'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 import { BottomDrawer } from './BottomDrawer'
+import { BOTTOM_DRAWER_HIDE_DURATION_MS } from './bottom-drawer-constants'
 
 type PickerListItem = { id: string; label: string; detail?: string }
 
@@ -27,52 +29,47 @@ export function PickerListDrawer<T extends PickerListItem>({
   onClose,
   renderIcon
 }: Props<T>) {
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createStyles)
+  const colorScheme = useMobileColorScheme()
   const [closing, setClosing] = useState(false)
-  const pendingItemRef = useRef<T | null>(null)
-  const selectionClosingRef = useRef(false)
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const drawerVisible = visible && !closing
 
   useEffect(() => {
-    pendingItemRef.current = null
     if (visible) {
-      selectionClosingRef.current = false
       setClosing(false)
+    }
+    return () => {
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current)
+        closeTimerRef.current = null
+      }
     }
   }, [visible])
 
   const finishClose = useCallback(() => {
-    // Native dismissal can arrive after selection; only the completed hide owns that handoff.
-    if (selectionClosingRef.current) {
-      return
-    }
+    setClosing(false)
     onClose()
   }, [onClose])
 
-  const completeSelection = useCallback(() => {
-    const item = pendingItemRef.current
-    pendingItemRef.current = null
-    if (item) {
-      onClose()
-      onSelect(item)
-    }
-  }, [onClose, onSelect])
-
-  const closeThenSelect = useCallback((item: T) => {
-    if (selectionClosingRef.current) {
-      return
-    }
-    pendingItemRef.current = item
-    selectionClosingRef.current = true
-    setClosing(true)
-  }, [])
+  const closeThenSelect = useCallback(
+    (item: T) => {
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current)
+      }
+      setClosing(true)
+      closeTimerRef.current = setTimeout(() => {
+        closeTimerRef.current = null
+        onClose()
+        onSelect(item)
+      }, BOTTOM_DRAWER_HIDE_DURATION_MS)
+    },
+    [onClose, onSelect]
+  )
 
   return (
     <BottomDrawer
       visible={drawerVisible}
       onClose={finishClose}
-      onAfterClose={completeSelection}
       dragContentToDismiss={false}
       contentScrollable={false}
     >
@@ -81,6 +78,7 @@ export function PickerListDrawer<T extends PickerListItem>({
       </View>
       <FlatList
         data={items}
+        extraData={colorScheme}
         keyExtractor={(item) => item.id}
         style={styles.group}
         contentContainerStyle={items.length === 0 ? styles.emptyContent : undefined}
@@ -91,9 +89,6 @@ export function PickerListDrawer<T extends PickerListItem>({
           const selected = item.id === selectedId
           return (
             <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={item.label}
-              accessibilityState={{ selected }}
               style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
               onPress={() => closeThenSelect(item)}
             >
@@ -111,7 +106,7 @@ export function PickerListDrawer<T extends PickerListItem>({
                   </Text>
                 ) : null}
               </View>
-              {selected && <Check size={16} color={theme.color.brand.primary} />}
+              {selected && <Check size={14} color={colors.textPrimary} />}
             </Pressable>
           )
         }}
@@ -121,63 +116,59 @@ export function PickerListDrawer<T extends PickerListItem>({
 }
 
 function PickerSeparator() {
-  const styles = useMobileThemeStyles(createStyles)
+  useMobileColorScheme()
   return <View style={styles.separator} />
 }
 
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    header: {
-      paddingHorizontal: theme.spacing.space4,
-      paddingBottom: theme.spacing.space12
-    },
-    title: {
-      ...theme.typography.sectionTitle,
-      color: theme.color.text.primary
-    },
-    group: {
-      backgroundColor: theme.color.bg.surface,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.color.border.subtle,
-      borderRadius: theme.radii.card,
-      overflow: 'hidden',
-      maxHeight: 420,
-      flexGrow: 0
-    },
-    emptyContent: {
-      minHeight: theme.spacing.space24
-    },
-    separator: {
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: theme.color.border.subtle,
-      marginHorizontal: theme.spacing.space16
-    },
-    item: {
-      minHeight: theme.size.groupedListRowMinHeight,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.space12,
-      paddingVertical: theme.spacing.space12,
-      paddingHorizontal: theme.spacing.space16
-    },
-    itemPressed: {
-      backgroundColor: theme.color.bg.subtle
-    },
-    itemText: {
-      ...theme.typography.body,
-      color: theme.color.text.primary
-    },
-    itemCopy: {
-      flex: 1,
-      minWidth: 0
-    },
-    itemDetail: {
-      ...theme.typography.caption,
-      color: theme.color.text.tertiary,
-      marginTop: theme.spacing.space4
-    },
-    itemTextSelected: {
-      fontWeight: '600'
-    }
-  })
-}
+const styles = themedStyleSheet(() => ({
+  header: {
+    paddingHorizontal: spacing.xs,
+    paddingBottom: spacing.sm
+  },
+  title: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.textMuted
+  },
+  group: {
+    backgroundColor: colors.bgPanel,
+    borderRadius: 12,
+    overflow: 'hidden',
+    maxHeight: 420,
+    flexGrow: 0
+  },
+  emptyContent: {
+    minHeight: spacing.xl
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.borderSubtle,
+    marginHorizontal: spacing.md
+  },
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md + 2
+  },
+  itemPressed: {
+    backgroundColor: colors.bgRaised
+  },
+  itemText: {
+    fontSize: typography.bodySize,
+    color: colors.textPrimary
+  },
+  itemCopy: {
+    flex: 1,
+    minWidth: 0
+  },
+  itemDetail: {
+    fontSize: typography.metaSize,
+    color: colors.textMuted,
+    marginTop: 1
+  },
+  itemTextSelected: {
+    fontWeight: '600'
+  }
+}))

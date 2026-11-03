@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { sendRuntimePtyInputVerified } from './runtime-terminal-inspection'
+import { sendRuntimePtyInputVerified } from './runtime-terminal-verified-input'
 import {
   createCompatibleRuntimeStatusResponseIfNeeded,
   type RuntimeEnvironmentCallRequest

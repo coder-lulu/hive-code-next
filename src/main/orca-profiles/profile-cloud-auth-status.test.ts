@@ -1,3 +1,6 @@
+vi.mock('../product/product-cloud-config', () => ({
+  getProductCloudAuthConfig: () => configuration
+}))
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ActiveOrcaProfileState } from './profile-index-store'
 import type { OrcaCloudSessionReadResult } from './profile-cloud-session-store'
@@ -10,7 +13,6 @@ const { readSession, configuration } = vi.hoisted(() => ({
 
 vi.mock('./profile-cloud-session-owner', () => ({ readCloudSession: readSession }))
 vi.mock('./profile-cloud-auth-config', () => ({
-  getOrcaCloudAuthConfig: () => configuration,
   isOrcaCloudDevAuthEnabled: () => false
 }))
 

@@ -1,9 +1,9 @@
 import { Keyboard, Pressable, StyleSheet } from 'react-native'
 import { ChevronDown, X } from 'lucide-react-native'
-import type { MobileTheme } from '../theme/mobile-theme'
-import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { colors } from '../theme/mobile-theme'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 
-/** A prompt card's header action: Cancel where the lane can cancel, else a Collapse that writes nothing. */
 export function MobileNativeChatCardHeaderAction<Prompt>({
   prompt,
   onCancel,
@@ -15,16 +15,19 @@ export function MobileNativeChatCardHeaderAction<Prompt>({
   onCollapse?: () => void
   disabled?: boolean
 }): React.JSX.Element | null {
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createStyles)
+  useMobileColorScheme()
+  const t = useMobileTranslation()
   if (!onCancel && !onCollapse) {
     return null
   }
   const Icon = onCancel ? X : ChevronDown
   return (
     <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={onCancel ? '取消请求' : '收起请求'}
+      accessibilityLabel={
+        onCancel
+          ? t('common.cancel', 'Cancel')
+          : t('session.nativeChatCardHeaderAction.collapse', 'Collapse')
+      }
       accessibilityState={onCancel ? undefined : { expanded: true }}
       hitSlop={8}
       style={styles.action}
@@ -39,18 +42,11 @@ export function MobileNativeChatCardHeaderAction<Prompt>({
       }}
       disabled={disabled}
     >
-      <Icon size={16} color={theme.color.text.tertiary} />
+      <Icon size={16} color={colors.textMuted} />
     </Pressable>
   )
 }
 
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    action: {
-      width: theme.size.minimumTouchTarget,
-      height: theme.size.minimumTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center'
-    }
-  })
-}
+const styles = StyleSheet.create({
+  action: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }
+})

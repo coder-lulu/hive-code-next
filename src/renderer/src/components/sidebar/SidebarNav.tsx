@@ -28,10 +28,8 @@ export { shouldShowMobileButton } from '@/hooks/use-hive-account-state'
 
 export { getSetupGuideSidebarEntryReady, shouldShowSetupGuideEntry } from './SetupGuideSidebarEntry'
 
-export function shouldShowAgentsButton(
-  settings: Partial<Pick<GlobalSettings, 'experimentalActivity'>> | null | undefined
-): boolean {
-  return settings?.experimentalActivity === true
+export function shouldShowAgentsButton(settings: GlobalSettings | null | undefined): boolean {
+  return settings !== null && settings !== undefined
 }
 
 export function shouldShowAutomationsButton(
@@ -87,7 +85,7 @@ const SidebarNav = React.memo(function SidebarNav({ onNavigate }: { onNavigate?:
   const activityActive = activeView === 'activity'
   const artifactsActive = activeView === 'artifacts'
   const skillsActive = activeView === 'skills'
-  const activityUnreadCount = useActivityUnreadCount(showAgentsButton, 'sidebar-badge')
+  const activityUnreadCount = useActivityUnreadCount()
   const mobileActive = activeView === 'device-connections'
   const mobileOnboardingBadge = useMobileSidebarOnboardingBadge(showMobileButton)
   const hideAutomationsButton = React.useCallback(() => {

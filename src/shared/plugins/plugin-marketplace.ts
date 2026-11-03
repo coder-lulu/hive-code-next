@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { isAllowedPluginGitUrl } from './plugin-install-lockfile'
-import { isQualifiedPluginKey } from './plugin-manifest'
+import { isAllowedPluginGitUrl } from './installation/plugin-install-lockfile'
+import { isQualifiedPluginKey } from './manifest/plugin-manifest'
 
 export const PLUGIN_MARKETPLACE_FILENAME = 'orca-marketplace.json'
 export const PLUGIN_MARKETPLACE_ENTRY_LIMIT = 2_048

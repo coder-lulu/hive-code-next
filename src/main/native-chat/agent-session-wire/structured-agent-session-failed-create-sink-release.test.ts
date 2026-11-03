@@ -57,6 +57,7 @@ beforeEach(async () => {
     logger: createStructuredAgentSessionLogger(),
     store,
     adapter: {
+      open: vi.fn(async () => ({ reportedOptions: {} })),
       acquire,
       releaseAcquisition: vi.fn(async () => true),
       dispatch: vi.fn(async () => ({ state: 'admitted' as const })),

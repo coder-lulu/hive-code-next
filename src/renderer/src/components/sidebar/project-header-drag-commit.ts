@@ -1,83 +1,55 @@
 import { getLogicalRepoOrderRankById } from '../../../../shared/project-section-order'
 import {
   applyAllRepoInsertAt,
+  getProjectHeaderDragBucketKey,
   getProjectGroupOrderForSidebarDrop,
-  getProjectGroupIdFromHeaderDragBucketKey,
-  isProjectHeaderDropBucketHostCompatible,
   mapSidebarProjectHeaderDropIndexToSiblingInsertIndex,
-  mapSidebarRepoDropIndexToAllRepoInsertAt,
-  type ProjectHeaderDragBucketKey
+  mapSidebarRepoDropIndexToAllRepoInsertAt
 } from './project-header-drop'
 import type { ProjectHeaderDragSession } from './project-header-drag-contract'
-import type { ExecutionHostId } from '../../../../shared/execution-host'
 import type { Repo } from '../../../../shared/repo-types'
+import { isSameRepoRow } from '@/store/slices/repo-host-identity'
 
 export function commitProjectHeaderDragDrop(args: {
   session: ProjectHeaderDragSession
   sidebarDropIndex: number
-  targetBucketKey: ProjectHeaderDragBucketKey
-  targetSidebarRepoHeaderIds: readonly string[]
   orderedRepoIds: readonly string[]
   repoById: ReadonlyMap<string, Repo>
+  liveRepos: readonly Repo[]
   usesProjectGroupOrdering: boolean
-  projectGroupHostIdByGroupId: ReadonlyMap<string, ExecutionHostId | null>
   onCommitRepoOrder: (orderedIds: string[]) => void
-  onCommitProjectGroupOrder: (
-    repoId: string,
-    projectGroupId: string | null,
-    order: number,
-    sourceExecutionHostId: ExecutionHostId
-  ) => void
+  onCommitProjectGroupOrder: (project: Repo, projectGroupId: string | null, order: number) => void
 }): void {
-  const draggedRepo = args.repoById.get(args.session.repoId)
-  if (!draggedRepo) {
+  const draggedRepo = args.liveRepos.find((repo) => isSameRepoRow(repo, args.session.repo))
+  // Why: a group change mid-drag (another window or client) moved the row out of this bucket.
+  if (!draggedRepo || getProjectHeaderDragBucketKey(draggedRepo) !== args.session.bucketKey) {
     return
   }
 
-  const sourceSidebarRepoHeaderIds = args.session.sidebarRepoHeaderIds
-  const sourceIndex = sourceSidebarRepoHeaderIds.indexOf(args.session.repoId)
-  const sameBucket = args.targetBucketKey === args.session.bucketKey
-  // Why: both slots bordering the dragged header are visual no-ops. In
-  // particular, do not compact paired-host occurrences on an unchanged drop.
+  const sidebarRepoHeaderIds = args.session.sidebarRepoHeaderIds
+  const sourceIndex = sidebarRepoHeaderIds.indexOf(draggedRepo.id)
+  // Both slots beside the dragged header are no-ops; do not compact paired-host occurrences.
   if (
     sourceIndex === -1 ||
-    (sameBucket &&
-      (args.sidebarDropIndex === sourceIndex || args.sidebarDropIndex === sourceIndex + 1))
+    args.sidebarDropIndex === sourceIndex ||
+    args.sidebarDropIndex === sourceIndex + 1
   ) {
     return
   }
 
   if (args.usesProjectGroupOrdering) {
-    if (
-      !isProjectHeaderDropBucketHostCompatible({
-        sourceBucketKey: args.session.bucketKey,
-        targetBucketKey: args.targetBucketKey,
-        sourceExecutionHostId: args.session.sourceExecutionHostId,
-        projectGroupHostIdByGroupId: args.projectGroupHostIdByGroupId
-      })
-    ) {
-      return
-    }
-    const targetProjectGroupId = getProjectGroupIdFromHeaderDragBucketKey(args.targetBucketKey)
-    if (args.targetBucketKey !== 'ungrouped' && !targetProjectGroupId) {
-      return
-    }
-    const siblings = args.targetSidebarRepoHeaderIds
-      .filter((repoId) => repoId !== args.session.repoId)
+    const siblings = sidebarRepoHeaderIds
+      .filter((repoId) => repoId !== draggedRepo.id)
       .map((repoId) => args.repoById.get(repoId))
       .filter((repo): repo is Repo => repo !== undefined)
     const siblingDropIndex = mapSidebarProjectHeaderDropIndexToSiblingInsertIndex({
       sidebarDropIndex: args.sidebarDropIndex,
-      sourceIndex: sameBucket ? sourceIndex : -1,
+      sourceIndex,
       siblingCount: siblings.length
     })
-    // Why: sourceIndex is the position in the original array (including the
-    // dragged item), but siblingDropIndex is the position in the filtered
-    // array. The equivalent position in the filtered array is the sourceIndex
-    // capped at siblings.length (since removing an item can only shift indices
-    // down by 1 when the removed item was before the insertion point).
+    // The original source slot is capped by the shorter sibling list after removing the dragged item.
     const sourceIndexInSiblings = Math.min(sourceIndex, siblings.length)
-    if (sameBucket && siblingDropIndex === sourceIndexInSiblings) {
+    if (siblingDropIndex === sourceIndexInSiblings) {
       return
     }
     const repoOrderRankById = getLogicalRepoOrderRankById(args.orderedRepoIds)
@@ -86,25 +58,16 @@ export function commitProjectHeaderDragDrop(args: {
       dropIndex: siblingDropIndex,
       repoOrderRankById
     })
-    args.onCommitProjectGroupOrder(
-      args.session.repoId,
-      targetProjectGroupId,
-      order,
-      args.session.sourceExecutionHostId
-    )
-    return
-  }
-
-  if (!sameBucket) {
+    args.onCommitProjectGroupOrder(draggedRepo, draggedRepo.projectGroupId ?? null, order)
     return
   }
 
   const insertAt = mapSidebarRepoDropIndexToAllRepoInsertAt(
     args.sidebarDropIndex,
-    sourceSidebarRepoHeaderIds,
+    sidebarRepoHeaderIds,
     args.orderedRepoIds
   )
-  const next = applyAllRepoInsertAt(args.orderedRepoIds, args.session.repoId, insertAt)
+  const next = applyAllRepoInsertAt(args.orderedRepoIds, draggedRepo.id, insertAt)
   if (!next) {
     return
   }

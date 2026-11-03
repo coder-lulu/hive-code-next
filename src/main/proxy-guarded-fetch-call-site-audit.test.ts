@@ -23,7 +23,7 @@ const AUDITED_NON_NET_FETCH_CALLS = new Map<string, number>([
   // Injected HttpClient, not a session: resolves to net.fetch on defaultSession
   // (main/host/electron-http-client.ts) or to the global-fetch-audited Node fallback.
   ['main/jira/authenticated-request.ts', 1],
-  ['main/claude-accounts/oauth-refresh.ts', 1],
+  // ClaudeProfileRouter refreshes profile provisioning in its worker; no host OAuth fetch remains.
   ['main/rate-limits/codex-fetcher.ts', 1],
   // MainHttpClient paths retain the host proxy fence; each response owner consumes or cancels.
   ['main/rate-limits/claude-oauth-usage-request.ts', 1],

@@ -1,4 +1,4 @@
-import { normalizeNativeChatAppearanceSettings } from '../../../shared/native-chat-appearance-settings'
+import { normalizeNativeChatAppearanceSettings } from '../../../shared/native-chat/native-chat-appearance-settings'
 import { getDefaultVoiceSettings } from '../../../shared/constants'
 import { normalizePRBotAuthorOverrides } from '../../../shared/pr-bot-author-overrides'
 import { normalizeTerminalQuickCommands } from '../../../shared/terminal-quick-commands'
@@ -7,129 +7,71 @@ import { normalizeTerminalShortcutPolicy } from '../../../shared/keybindings'
 import { normalizeAppIconId } from '../../../shared/app-icon'
 import { normalizeTerminalCustomThemes } from '../../../shared/terminal-custom-themes'
 import { normalizeTerminalDefaultShell } from '../../../shared/terminal-default-shell'
-import { projectSourceControlAiToLegacyCommitMessageAi } from '../../../shared/source-control-ai'
 import { normalizeUiLanguage } from '../../../shared/ui-language'
-import { normalizeNativeChatShellEnvironmentVariables } from '../../../shared/native-chat-shell-environment'
-import { loadedChatPermissionSetting } from '../../../shared/agent-chat-permission-mode'
-import {
-  savedChatUiWithTerminalDefaultView,
-  stripRetiredGlobalSettings
-} from '../applying-settings/terminal-settings-migrations'
-import { readLegacySidekickFlag } from '../applying-settings/onboarding-normalization'
+import { normalizeNativeChatShellEnvironmentVariables } from '../../../shared/native-chat/native-chat-shell-environment'
 import { normalizeMachineName } from '../../../shared/machine-name'
 import { isTuiAgent } from '../../../shared/tui-agent-config'
 import type { PersistedState } from '../../../shared/persisted-state-types'
 import type { PreparedLoadedTerminalSettings } from './prepare-loaded-terminal-settings'
 import type { PreparedLoadedProfileSettings } from './prepare-loaded-profile-settings'
 
+import { pickCurrentGlobalSettings } from '../../../shared/current-global-settings'
+import { expandWorkspaceDirHome } from '../applying-settings/terminal-settings-migrations'
+import { normalizeNativeChatProviders } from '../../../shared/structured-native-chat-launch-route'
+import { normalizePluginOwnedSettings } from '../../../shared/plugins/capabilities/plugin-owned-settings'
+import { normalizeNodeDistMirrorUrl } from '../../../shared/node-dist-mirror'
+import { resolveOrchestrationHeartbeatInterval } from '../../../shared/orchestration-heartbeat'
+import { normalizeCurrentTelemetry } from './current-telemetry-settings'
 export function normalizeLoadedGlobalSettings(
   parsed: PersistedState,
   terminal: PreparedLoadedTerminalSettings,
   profile: PreparedLoadedProfileSettings
 ): PersistedState['settings'] {
-  const {
-    defaults,
-    migratedExternalVisibility,
-    migratedTerminalScrollback,
-    migratedTerminalTuiScrollSensitivity,
-    migratedSourceControlAi,
-    migratedOptionAsAlt,
-    migratedFloatingTerminalEnabled,
-    migratedOsc52Clipboard,
-    migratedFloatingTerminalCwd,
-    migratedFloatingTerminalTrustedCwds
-  } = terminal
-  const {
-    migratedExperimentalActivity,
-    migratedAutoRenameBranchFromWork,
-    migratedTerminalCursorStyle,
-    migratedTerminalLineHeight,
-    terminalRightClickToPasteDefaultedForPlatform,
-    taskProviderSettings,
-    primarySelectionDefaultedForLinux,
-    primarySelectionDefaultedForTerminalDefaults,
-    migratePrimarySelectionPlatformDefault,
-    stampPrimarySelectionTerminalDefaults,
-    migratedDisabledTuiAgents,
-    migratedAgentYoloDefaults,
-    migratedWindowsRuntimeDefault,
-    migratedLocalAccountRuntime,
-    loadedCompactWorktreeCards,
-    mobilePairingCustomAddress,
-    mobilePairingCustomAddresses,
-    normalizedNotifications,
-    normalizedSourceControlGroupOrder
-  } = profile
-
-  return {
+  const defaults = terminal.defaults
+  const pluginSystemEnabled: unknown = parsed.settings?.pluginSystemEnabled
+  const settings = {
     ...defaults.settings,
-    // Why (#7977): v1.4.130 onboarding persisted this as a plain boolean, making the
-    // old default indistinguishable from a real opt-in. Preserve stored `true`; only
-    // the default changed.
-    ...stripRetiredGlobalSettings(parsed.settings),
+    ...expandWorkspaceDirHome(pickCurrentGlobalSettings(parsed.settings)),
+    ...terminal.settings,
+    ...profile.settings,
     defaultTuiAgent:
       parsed.settings?.defaultTuiAgent === 'blank' || isTuiAgent(parsed.settings?.defaultTuiAgent)
         ? parsed.settings.defaultTuiAgent
         : null,
-    // Why: Chat UI on now opens new tabs in chat; keep users whose new tabs opened in the terminal there.
-    ...(savedChatUiWithTerminalDefaultView(parsed.settings)
-      ? { experimentalNativeChat: false }
-      : {}),
     nativeChatAppearance: normalizeNativeChatAppearanceSettings(
       parsed.settings?.nativeChatAppearance
     ),
-    worktreeVisibilityDefaults: migratedExternalVisibility.defaults,
+    nativeChatProviders: normalizeNativeChatProviders(parsed.settings?.nativeChatProviders),
     prBotAuthorOverrides: normalizePRBotAuthorOverrides(parsed.settings?.prBotAuthorOverrides),
-    // Why: v1.3.42 renamed the sidekick setting to pet; carry the old flag forward once so enabled users don't lose it.
-    experimentalPet: parsed.settings?.experimentalPet ?? readLegacySidekickFlag(parsed) ?? false,
-    // Why: early builds saved the disabled default; flip Linux/macOS profiles once to match platform, guards keep opt-outs.
-    primarySelectionMiddleClickPaste: migratePrimarySelectionPlatformDefault
-      ? true
-      : (parsed.settings?.primarySelectionMiddleClickPaste ??
-        defaults.settings.primarySelectionMiddleClickPaste),
-    primarySelectionMiddleClickPasteDefaultedForLinux:
-      primarySelectionDefaultedForLinux ||
-      (process.platform === 'linux' && migratePrimarySelectionPlatformDefault),
-    primarySelectionMiddleClickPasteDefaultedForTerminalDefaults:
-      primarySelectionDefaultedForTerminalDefaults || stampPrimarySelectionTerminalDefaults,
-    ...migratedAutoRenameBranchFromWork,
-    ...migratedTerminalCursorStyle,
-    terminalLineHeight: migratedTerminalLineHeight,
-    // Why: the old true default was inherited, but false was always an explicit opt-out and must survive this one-shot reset.
-    terminalRightClickToPaste: terminalRightClickToPasteDefaultedForPlatform
-      ? (parsed.settings?.terminalRightClickToPaste ?? defaults.settings.terminalRightClickToPaste)
-      : parsed.settings?.terminalRightClickToPaste === false
-        ? false
-        : defaults.settings.terminalRightClickToPaste,
-    terminalRightClickToPasteDefaultedForPlatform: true,
-    ...migratedTerminalTuiScrollSensitivity.settings,
-    experimentalActivity: migratedExperimentalActivity,
-    experimentalActivityDefaultedOffForAllUsers: true,
-    // Preserve the legacy opt-in so the one-time introduction copy can target existing users.
-    agentsSidebarMigratedFromExperimental:
-      parsed.settings?.agentsSidebarMigratedFromExperimental === true ||
-      migratedExperimentalActivity,
-    // Why: compact worktree cards graduated from Experimental; preserve the old opt-in for rollout-era profiles.
-    compactWorktreeCards: loadedCompactWorktreeCards,
-    experimentalCompactWorktreeCards: undefined,
-    terminalMacOptionAsAlt: migratedOptionAsAlt,
-    terminalMacOptionAsAltMigrated: true,
-    localWindowsRuntimeDefault: migratedWindowsRuntimeDefault,
-    localAccountRuntime: migratedLocalAccountRuntime,
-    localAccountRuntimeDefaultedToAutoForAllUsers: true,
-    ...migratedOsc52Clipboard,
-    floatingTerminalEnabled: migratedFloatingTerminalEnabled,
-    floatingTerminalDefaultedForAllUsers: true,
-    floatingTerminalCwd: migratedFloatingTerminalCwd,
-    floatingTerminalTrustedCwds: migratedFloatingTerminalTrustedCwds,
-    floatingTerminalCwdMigratedToAppWorkspace: true,
-    terminalScrollbackRows: migratedTerminalScrollback.rows,
+    terminalCursorStyle: ['bar', 'block', 'underline'].includes(
+      parsed.settings?.terminalCursorStyle
+    )
+      ? parsed.settings.terminalCursorStyle
+      : defaults.settings.terminalCursorStyle,
+    terminalTuiScrollSensitivity:
+      typeof parsed.settings?.terminalTuiScrollSensitivity === 'number' &&
+      Number.isFinite(parsed.settings.terminalTuiScrollSensitivity)
+        ? parsed.settings.terminalTuiScrollSensitivity
+        : defaults.settings.terminalTuiScrollSensitivity,
+    compactWorktreeCards: profile.loadedCompactWorktreeCards,
+    terminalShortcutPolicy: normalizeTerminalShortcutPolicy(
+      parsed.settings?.terminalShortcutPolicy
+    ),
+    openInApplications: normalizeOpenInApplications(parsed.settings?.openInApplications, {
+      seedDefaults: true
+    }),
     terminalDefaultShell: normalizeTerminalDefaultShell(parsed.settings?.terminalDefaultShell),
     terminalQuickCommands: normalizeTerminalQuickCommands(parsed.settings?.terminalQuickCommands),
     terminalCustomThemes: normalizeTerminalCustomThemes(parsed.settings?.terminalCustomThemes),
+    ...normalizePluginOwnedSettings(parsed.settings ?? {}),
+    pluginSystemEnabled: pluginSystemEnabled !== false,
+    nodeDistMirrorUrl: normalizeNodeDistMirrorUrl(parsed.settings?.nodeDistMirrorUrl).value,
+    orchestrationHeartbeatIntervalMinutes: resolveOrchestrationHeartbeatInterval(
+      parsed.settings ?? {}
+    ),
+    experimentalBrowserExtensions: parsed.settings?.experimentalBrowserExtensions !== false,
+    experimentalConnectors: parsed.settings?.experimentalConnectors !== false,
     appIcon: normalizeAppIconId(parsed.settings?.appIcon),
-    mobilePairingCustomAddress,
-    mobilePairingCustomAddresses,
     machineName: normalizeMachineName(parsed.settings?.machineName),
     // Why: persisted settings may be hand-edited or from older builds; keep tray-minimize false unless stored value is true.
     minimizeToTrayOnClose: parsed.settings?.minimizeToTrayOnClose === true,
@@ -141,38 +83,9 @@ export function normalizeLoadedGlobalSettings(
     nativeChatShellEnvironmentVariables: normalizeNativeChatShellEnvironmentVariables(
       parsed.settings?.nativeChatShellEnvironmentVariables
     ),
-    // Why: the next settings save stores the seed; until then a reload derives the same one.
-    nativeChatPermissionMode: loadedChatPermissionSetting(
-      parsed.settings?.nativeChatPermissionMode,
-      {
-        ...migratedAgentYoloDefaults,
-        terminalWindowsShell: parsed.settings?.terminalWindowsShell
-      },
-      process.platform
-    ),
-    defaultTaskSource: taskProviderSettings.defaultTaskSource,
-    visibleTaskProviders: taskProviderSettings.visibleTaskProviders,
-    visibleTaskProvidersDefaultedForJira: true,
-    terminalShortcutPolicy: normalizeTerminalShortcutPolicy(
-      parsed.settings?.terminalShortcutPolicy
-    ),
-    disabledTuiAgents: migratedDisabledTuiAgents,
-    ...migratedAgentYoloDefaults,
-    claudeAgentTeamsDefaultDisabledMigrated: true,
-    openInApplications: normalizeOpenInApplications(parsed.settings?.openInApplications, {
-      seedDefaults: true
-    }),
-    notifications: normalizedNotifications,
-    sourceControlAi: migratedSourceControlAi,
-    sourceControlGroupOrder: normalizedSourceControlGroupOrder,
-    // Why: rollback builds still read commitMessageAi, so refresh the legacy projection from sourceControlAi for compat.
-    commitMessageAi: projectSourceControlAiToLegacyCommitMessageAi(
-      migratedSourceControlAi,
-      parsed.settings?.commitMessageAi ?? defaults.settings.commitMessageAi
-    ),
-    voice: {
-      ...getDefaultVoiceSettings(),
-      ...parsed.settings?.voice
-    }
+
+    voice: { ...getDefaultVoiceSettings(), ...parsed.settings?.voice },
+    telemetry: normalizeCurrentTelemetry(parsed.settings?.telemetry)
   }
+  return settings
 }

@@ -1,3 +1,4 @@
+import { normalizeSourceControlAiSettings } from '../../../../shared/source-control-ai'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FeatureWallWorkflowId } from '../../../../shared/feature-wall-workflows'
 import type { AgentsStepId } from '../../../../shared/agents-orchestration-steps'
@@ -50,19 +51,21 @@ export function useFeatureWallCompletion(
   const fetchRateLimits = useAppStore((s) => s.fetchRateLimits)
   const githubConfigured =
     preflightStatus?.gh.installed === true && preflightStatus.gh.authenticated === true
-  const commitMessageAi = settings?.commitMessageAi
+  const sourceControlAi = settings
+    ? normalizeSourceControlAiSettings(settings.sourceControlAi)
+    : undefined
   const resolvedCommitMessageAgent =
-    settings && commitMessageAi?.enabled === true
+    settings && sourceControlAi?.enabled === true
       ? resolveCommitMessageAgentChoice(
-          commitMessageAi.agentId,
+          sourceControlAi.agentId,
           settings.defaultTuiAgent,
           settings.disabledTuiAgents
         )
       : null
   const aiCommitPrConfigured =
-    commitMessageAi?.enabled === true &&
+    sourceControlAi?.enabled === true &&
     (isCustomAgentId(resolvedCommitMessageAgent)
-      ? (commitMessageAi.customAgentCommand ?? '').trim().length > 0
+      ? (sourceControlAi.customAgentCommand ?? '').trim().length > 0
       : resolvedCommitMessageAgent
         ? getCommitMessageAgentCapability(resolvedCommitMessageAgent) !== undefined
         : false)

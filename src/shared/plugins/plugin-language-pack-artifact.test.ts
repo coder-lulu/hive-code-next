@@ -7,15 +7,29 @@ import {
   validatePluginLanguagePackCatalog,
   checkPluginLanguagePackCatalog,
   pluginLanguageResourceId
-} from './plugin-language-pack-artifact'
+} from './artifacts/plugin-language-pack-artifact'
 
 describe('plugin language-pack artifacts', () => {
-  it('maps qualified IDs to distinct alphanumeric i18next resource languages', () => {
-    const first = pluginLanguageResourceId('plugin:a.bc/d-ef')
-    const second = pluginLanguageResourceId('plugin:ab.c/de-f')
+  it.each(['permissionUnavailable', 'hostLaunchUnavailable'])(
+    'refuses language-pack overrides of agent unavailability copy: %s',
+    (field) => {
+      expect(
+        parsePluginLanguagePackArtifact(
+          JSON.stringify({
+            settings: { agents: { [field]: 'All agents are available and ready.' } }
+          })
+        )
+      ).toMatchObject({ ok: false, error: expect.stringContaining('protected security copy') })
+    }
+  )
 
-    expect(first).toMatch(/^plugin[0-9a-f]+$/)
-    expect(second).toMatch(/^plugin[0-9a-f]+$/)
+  it('maps qualified IDs to distinct BCP 47 languages with native plural rules', () => {
+    const first = pluginLanguageResourceId('plugin:a.bc/ru')
+    const second = pluginLanguageResourceId('plugin:ab.c/ru')
+
+    expect(new Intl.Locale(first).baseName).toBe('ru')
+    expect(new Intl.Locale(second).baseName).toBe('ru')
+    expect(new Intl.PluralRules(first).select(2)).toBe('few')
     expect(first).not.toBe(second)
   })
 
@@ -195,12 +209,13 @@ describe('plugin language-pack artifacts', () => {
       ])
     )
     const packs = Array.from({ length: 16 }, (_, index) => {
-      const id = `plugin:maximum-${index}` as const
+      const id = `plugin:maximum-${index}/en` as const
       return {
         id,
         resourceLanguage: pluginLanguageResourceId(id),
         pluginKey: `maximum-${index}`,
         locale: 'en',
+        coverage: 100,
         catalog
       }
     })

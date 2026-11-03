@@ -5,7 +5,7 @@ import {
   PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
   WORKSPACE_RUN_CONTEXT_RUNTIME_CAPABILITY
 } from '../../../../shared/protocol-version'
-import { buildSetupHostOptions } from './repository-host-setup-options'
+import { buildSetupHostOptions } from './repository/execution/repository-host-setup-options'
 
 vi.mock('@/i18n/i18n', () => ({
   translate: (_key: string, fallback: string) => fallback

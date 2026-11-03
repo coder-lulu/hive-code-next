@@ -42,14 +42,6 @@ export const KEYBINDING_DEFINITIONS: readonly KeybindingDefinition[] = [
   ...buildAgentTabKeybindingDefinitions()
 ]
 
-/** Pre-swap tab-switch bindings; a one-time migration pins these for pre-release installs so upgrading users keep the shortcuts they learned. */
-export const LEGACY_TAB_SWITCH_BINDINGS: Readonly<Partial<Record<KeybindingActionId, string[]>>> = {
-  'tab.nextSameType': ['Mod+Shift+BracketRight'],
-  'tab.previousSameType': ['Mod+Shift+BracketLeft'],
-  'tab.nextAllTypes': ['Mod+Alt+BracketRight'],
-  'tab.previousAllTypes': ['Mod+Alt+BracketLeft']
-}
-
 export const DEFINITIONS_BY_ID = new Map<KeybindingActionId, KeybindingDefinition>(
   KEYBINDING_DEFINITIONS.map((definition) => [definition.id, definition])
 )

@@ -1,3 +1,4 @@
+import { closeTestJournalHostDatabases } from '../agent-session-journal/journal-host-database-test-support'
 import { spawn } from 'node:child_process'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -7,10 +8,9 @@ import type { AgentSessionOwnerProbe } from '../../../shared/agent-session-lease
 import {
   readPersistedLease,
   writeOlderBuildLease
-} from '../../runtime/agent-session-older-build-lease.test-fixture'
+} from '../../runtime/agent-session/ownership/agent-session-older-build-lease.test-fixture'
 import type { AgentSessionRecordStore } from '../../runtime/agent-session-record-store'
 import { openTestAgentSessionRecordStore } from '../../runtime/agent-session-record-store-test-harness'
-import { closeTestJournalHostDatabase } from '../agent-session-journal/journal-host-database-test-support'
 import { supervisedPosixLaunch } from '../../provider-process/provider-process-supervisor'
 import {
   resolveStructuredSessionRecovery,
@@ -25,9 +25,7 @@ const roots: string[] = []
 let operations = 0
 
 afterEach(async () => {
-  for (const root of roots) {
-    closeTestJournalHostDatabase(root)
-  }
+  closeTestJournalHostDatabases()
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
@@ -52,10 +50,7 @@ async function reserve(store: AgentSessionRecordStore) {
       workspaceKind: 'folder'
     },
     provider: 'codex',
-    accountHome: {
-      variable: 'CODEX_HOME',
-      path: '/tmp/agent-home'
-    },
+    accountHome: { variable: 'CODEX_HOME', path: '/tmp/codex' },
     expectedFence: null,
     spawnToken: 'spawn-recovery',
     claimKeyId: 'key-1',
@@ -119,25 +114,31 @@ function deps(
     },
     now: () => NOW + 10_000,
     delay: async () => {},
+    platform: 'linux',
     probes: () => calls,
     ...overrides
   }
 }
 
 describe('structured session recovery resolution', () => {
-  it('keeps an ownerless reservation when no scan proves it unused', async () => {
+  it('retains an ownerless reservation until a token scan proves absence', async () => {
     const store = await openStore()
     await reserve(store)
     await latch(store)
 
-    const before = store.getRecord(SESSION)
     const result = await resolveStructuredSessionRecovery(
       deps(store, () => ({ outcome: 'indeterminate', reason: 'no scan' })),
       SESSION
     )
 
     expect(result).toBe('unresolved')
-    expect(store.getRecord(SESSION)).toEqual(before)
+    expect(store.getRecord(SESSION)?.lease).toMatchObject({
+      claimStatus: 'reserved',
+      handoffStage: 'recovering',
+      runtimeFence: 1,
+      reservedSpawnToken: expect.any(String),
+      deathEvidence: null
+    })
   })
 
   it('evicts a latched owner the probe now proves dead, without a stop request', async () => {
@@ -177,7 +178,7 @@ describe('structured session recovery resolution', () => {
           alive
             ? { outcome: 'identity-matched', matchedOn: ['process-start-time'] }
             : { outcome: 'pid-absent' },
-        { stopOwnerProcess, platform: 'linux' }
+        { stopOwnerProcess }
       ),
       SESSION
     )
@@ -192,17 +193,16 @@ describe('structured session recovery resolution', () => {
     })
   })
 
-  it('keeps the owner when it survives the stop ladder', async () => {
+  it('retains an owner that survives the stop ladder, with no death evidence', async () => {
     const store = await openStore()
     await liveOwner(store)
     await latch(store)
+    const before = store.getRecord(SESSION)?.lease
     const stopOwnerProcess = vi.fn()
 
-    const before = store.getRecord(SESSION)
     const result = await resolveStructuredSessionRecovery(
       deps(store, () => ({ outcome: 'identity-matched', matchedOn: ['process-start-time'] }), {
-        stopOwnerProcess,
-        platform: 'linux'
+        stopOwnerProcess
       }),
       SESSION
     )
@@ -212,16 +212,17 @@ describe('structured session recovery resolution', () => {
       [4242, 'SIGTERM'],
       [4242, 'SIGKILL']
     ])
-    expect(store.getRecord(SESSION)).toEqual(before)
+    // Lost transport supplies no death proof and cannot authorize another writer.
+    expect(store.getRecord(SESSION)?.lease).toEqual(before)
   })
 
-  it('keeps an unverifiable owner and signals nothing', async () => {
+  it('retains an owner whose identity cannot be verified, and signals nothing', async () => {
     const store = await openStore()
     await liveOwner(store)
     await latch(store)
+    const before = store.getRecord(SESSION)?.lease
     const stopOwnerProcess = vi.fn()
 
-    const before = store.getRecord(SESSION)
     const result = await resolveStructuredSessionRecovery(
       deps(store, () => ({ outcome: 'indeterminate', reason: 'probe timed out' }), {
         stopOwnerProcess
@@ -230,15 +231,16 @@ describe('structured session recovery resolution', () => {
     )
 
     expect(result).toBe('unresolved')
-    // The pid may have been reused by an unrelated process.
+    // Saved PIDs may belong to unrelated processes.
     expect(stopOwnerProcess).not.toHaveBeenCalled()
-    expect(store.getRecord(SESSION)).toEqual(before)
+    expect(store.getRecord(SESSION)?.lease).toEqual(before)
   })
 
-  it('keeps a Windows owner the probe matches without signalling its saved pid', async () => {
+  it('retains a Windows owner the probe matches without signalling its saved pid', async () => {
     const store = await openStore()
     await liveOwner(store)
     await latch(store)
+    const before = store.getRecord(SESSION)?.lease
     const stopOwnerProcess = vi.fn()
 
     const result = await resolveStructuredSessionRecovery(
@@ -250,23 +252,16 @@ describe('structured session recovery resolution', () => {
     )
 
     expect(result).toBe('unresolved')
-    // Windows stops a tree only through a child it still holds; a saved pid is never signalled.
+    // Windows requires a held child to stop a tree; never signal a saved PID.
     expect(stopOwnerProcess).not.toHaveBeenCalled()
-    expect(store.getRecord(SESSION)?.lease).toMatchObject({
-      claimStatus: 'live',
-      handoffStage: 'recovering',
-      deathEvidence: null
-    })
+    expect(store.getRecord(SESSION)?.lease).toEqual(before)
   })
 
   it('waits out a terminal owner an older build recorded, and never stops it', async () => {
     const directory = await newStoreDirectory()
     await liveOwner(await openStore(directory))
     await writeOlderBuildLease(directory, SESSION, { runtimeKind: 'tui' })
-    closeTestJournalHostDatabase(directory)
     await (await openStore(directory)).reconcileOnRestart({ probe: async () => MATCHED, now: NOW })
-    // A fresh load of what that restart persisted, as any later or older build reads it.
-    closeTestJournalHostDatabase(directory)
     const store = await openStore(directory)
     await store.reconcileOnRestart({ probe: async () => MATCHED, now: NOW })
     const stopOwnerProcess = vi.fn()
@@ -278,7 +273,7 @@ describe('structured session recovery resolution', () => {
       )
     ).toBe('unresolved')
     expect(stopOwnerProcess).not.toHaveBeenCalled()
-    // Older builds stop only a native owner that is not conflicted, the same rule as this one.
+    // Conflicted claims must remain safe for older builds’ native-owner stop rules.
     expect(await readPersistedLease(directory, SESSION)).toMatchObject({
       runtimeKind: 'native',
       claimStatus: 'conflicted',
@@ -297,17 +292,15 @@ describe('structured session recovery resolution', () => {
     })
   })
 
-  it('keeps a terminal reservation without proof that no provider started', async () => {
+  it('retains an older terminal reservation at restart until absence is proven', async () => {
     const directory = await newStoreDirectory()
     await reserve(await openStore(directory))
     await writeOlderBuildLease(directory, SESSION, { runtimeKind: 'tui' })
-    closeTestJournalHostDatabase(directory)
     const store = await openStore(directory)
     await store.reconcileOnRestart({
       probe: async () => ({ outcome: 'indeterminate', reason: 'no scan' }),
       now: NOW
     })
-    // Missing process identity is not proof that the reservation never launched a provider.
     expect(store.getRecord(SESSION)?.lease).toMatchObject({
       runtimeKind: 'native',
       claimStatus: 'reserved',
@@ -376,7 +369,7 @@ describe.runIf(process.platform !== 'win32')(
       const result = await resolveStructuredSessionRecovery(
         {
           store,
-          // The recorded pid is the supervisor's; its absence is the proof recovery evicts on.
+          // Supervisor absence proves provider-group cleanup.
           probeRecord: async () =>
             alive(supervisor.pid!) ? MATCHED : { outcome: 'pid-absent' as const },
           now: () => NOW + 10_000
@@ -385,7 +378,7 @@ describe.runIf(process.platform !== 'win32')(
       )
 
       expect(result).toBe('resolved')
-      // Evicted on proof of death, which must hold for the provider too, not only the supervisor.
+      // Death proof must cover the provider, not merely its supervisor.
       expect(store.getRecord(SESSION)?.lease.deathEvidence).not.toBeNull()
       expect(alive(provider)).toBe(false)
     })

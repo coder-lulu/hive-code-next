@@ -1,3 +1,4 @@
+import type { AgentExplicitLaunchPermissionMode } from '../../../shared/tui-agent-permissions'
 import type { TuiAgent } from '../../../shared/tui-agent'
 import type { EventProps } from '../../../shared/telemetry-events'
 import type { StartupCommandDelivery } from '../../../shared/codex-startup-delivery'
@@ -5,8 +6,7 @@ import type {
   AgentProviderSessionMetadata,
   SleepingAgentLaunchConfig
 } from '../../../shared/agent-session-resume'
-import type { SessionOptionValue } from '../../../shared/native-chat-session-options'
-import type { AgentExplicitLaunchPermissionMode } from '../../../shared/tui-agent-permissions'
+import type { SessionOptionValue } from '../../../shared/native-chat/input/native-chat-session-options'
 
 /** Telemetry threaded from the launch site to `pty:spawn`; main fires `agent_started`
  *  only after the spawn succeeds. See telemetry-plan.md§Agent launch semantics. */

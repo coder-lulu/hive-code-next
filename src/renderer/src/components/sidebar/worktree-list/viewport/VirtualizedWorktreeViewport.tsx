@@ -1,10 +1,12 @@
+import { useOfflineRuntimeEnvironmentIds } from '../listing/use-offline-runtime-environment-ids'
 import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
+import { useProjectHeaderHostContexts } from './use-project-header-host-contexts'
 import { translate } from '@/i18n/i18n'
+import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
 import { WorktreeListScrollToTopButton } from '../../WorktreeListScrollToTopButton'
 import { renderWorktreeSidebarDropIndicators } from './drop-indicators'
 import { useWorktreeListScrollToTop } from './use-scroll-to-top'
-import { useRepoSshGateResolver } from '@/hooks/use-repo-ssh-gate-resolver'
 import { getActiveDescendantOptionId } from '../navigation/active-descendant-option'
 import { buildRenderableRows } from '../listing/renderable-rows'
 import { useFolderWorkspacePathStatusRows } from '../listing/use-folder-path-statuses'
@@ -19,7 +21,7 @@ import { useWorktreeDragRuntime } from '../drag/use-runtime'
 import { useWorktreeDragSession } from '../drag/use-session'
 import { useWorktreeDocumentDrop } from '../drag/use-document-drop'
 import { useWorktreeLineageDropCommit } from '../drag/use-lineage-drop-commit'
-import { useWorktreeListKeyboardNavigation } from '../navigation/use-keyboard'
+import { useWorktreeListKeyboardNavigation, withKeyboardPreview } from '../navigation/use-keyboard'
 import { useWorktreeListVirtualizer } from './use-virtualizer'
 import { useWorktreeNativeDrag } from '../drag/use-native-drag'
 import { useWorktreePointerDrag } from '../drag/use-pointer-drag'
@@ -28,8 +30,11 @@ import { useWorktreeSidebarScrollSuppression } from './use-scroll-suppression'
 import { EMPTY_PROJECT_GROUPS, type VirtualizedWorktreeViewportProps } from './viewport-props'
 import { useWorktreeDropCommitContext } from '../drag/use-drop-commit-context'
 import { buildWorktreeVirtualRowContext } from './virtual-row-context'
-import { useProjectTree } from '../../project-tree-context'
+import type { RepoHeaderProjectActions } from '../rows/repo-header-project-actions'
+import { getRepoOwnerWorktreeVisibilityDefaults } from '../../../../store/worktree-visibility-defaults-by-host'
 import { renderWorktreeVirtualRow } from '../rows/virtual-row-dispatch'
+
+const EMPTY_HOST_OPTIONS: NonNullable<VirtualizedWorktreeViewportProps['hostOptions']> = []
 
 const WORKTREE_SIDEBAR_SCROLL_STYLE: React.CSSProperties = {
   // Why: TanStack Virtual owns scroll correction; native overflow anchoring fights it and causes jumps.
@@ -39,6 +44,7 @@ const WORKTREE_SIDEBAR_SCROLL_STYLE: React.CSSProperties = {
 export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewport(
   props: VirtualizedWorktreeViewportProps
 ) {
+  useUiLanguageRevision()
   const {
     rows,
     groupBy,
@@ -59,9 +65,48 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
   const settings = useAppStore((s) => s.settings)
   const worktreeVisibilityDefaultsByHost = useAppStore((s) => s.worktreeVisibilityDefaultsByHost)
-  const sshConnectionStates = useAppStore((s) => s.sshConnectionStates)
-  const getRepoSshGate = useRepoSshGateResolver()
+  const projectHeaderHostContexts = useProjectHeaderHostContexts({
+    rows,
+    visibleProjectRepoIdsBySection: props.visibleProjectRepoIdsBySection,
+    hosts: props.hostOptions ?? EMPTY_HOST_OPTIONS,
+    repoMap,
+    projectGrouping: props.projectGrouping
+  })
   const newCardStyle = settings?.experimentalNewWorktreeCardStyle === true
+  const {
+    handleOpenRepoSettings,
+    handleOpenWorktreeVisibility,
+    handleCreateGroupFromRepo,
+    handleMoveProjectToGroup,
+    handleRemoveProjectFromGroup,
+    handleRemoveProject,
+    handleCreateForRepo
+  } = props
+  // Why stable: a new object re-renders every project header's menu tree on each workspace switch.
+  const projectActions = useMemo<RepoHeaderProjectActions>(
+    () => ({
+      getWorktreeVisibilityDefaults: (repo) =>
+        getRepoOwnerWorktreeVisibilityDefaults(repo, settings, worktreeVisibilityDefaultsByHost),
+      onOpenRepoSettings: handleOpenRepoSettings,
+      onOpenWorktreeVisibility: handleOpenWorktreeVisibility,
+      onCreateGroupFromRepo: handleCreateGroupFromRepo,
+      onMoveProjectToGroup: handleMoveProjectToGroup,
+      onRemoveProjectFromGroup: handleRemoveProjectFromGroup,
+      onRemoveProject: handleRemoveProject,
+      onCreateForRepo: handleCreateForRepo
+    }),
+    [
+      settings,
+      worktreeVisibilityDefaultsByHost,
+      handleOpenRepoSettings,
+      handleOpenWorktreeVisibility,
+      handleCreateGroupFromRepo,
+      handleMoveProjectToGroup,
+      handleRemoveProjectFromGroup,
+      handleRemoveProject,
+      handleCreateForRepo
+    ]
+  )
 
   const reveal = useSidebarRevealHighlight()
   const scrollSuppression = useWorktreeSidebarScrollSuppression(scrollRef)
@@ -123,8 +168,7 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     allRepoIds: props.allRepoIds,
     repoMap,
     projectGroups,
-    folderWorkspaces: props.folderWorkspaces,
-    sshConnectionStates
+    folderWorkspaces: props.folderWorkspaces
   })
 
   const { showScrollToTop, scrollToTop } = useWorktreeListScrollToTop({
@@ -140,7 +184,10 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     suppressMeasurementAdjustmentUntilRef: scrollSuppression.suppressMeasurementAdjustmentUntilRef
   })
 
+  const offlineRuntimeEnvironmentIds = useOfflineRuntimeEnvironmentIds()
   usePendingSidebarReveal({
+    offlineRuntimeEnvironmentIds,
+    occurrencePlan: props.occurrencePlan,
     pendingRevealWorktree: props.pendingRevealWorktree,
     pendingRevealSidebarRow: props.pendingRevealSidebarRow,
     clearPendingRevealWorktreeId: props.clearPendingRevealWorktreeId,
@@ -162,9 +209,8 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     prCache: props.prCache,
     workspaceStatuses,
     settings,
-    projectGroups,
+    projectGroups: props.visibleProjectGroups ?? projectGroups,
     projectGrouping: props.projectGrouping,
-    offlineRuntimeEnvironmentIds: props.offlineRuntimeEnvironmentIds,
     flashRevealedRow: reveal.flashRevealedRow,
     markRevealScroll: scrollSuppression.markRevealScroll,
     schedulePendingRevealFrame: reveal.schedulePendingRevealFrame,
@@ -186,7 +232,7 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     toggleGroup
   })
 
-  const { handleContainerKeyDown } = useWorktreeListKeyboardNavigation({
+  const { handleContainerKeyDown, keyboardPreview } = useWorktreeListKeyboardNavigation({
     rows,
     renderRows,
     activeWorktreeId,
@@ -256,8 +302,7 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     scrollRef
   })
 
-  // Why: a callback ref that changes identity is re-invoked with null on every render, which
-  // would run the teardown below mid-drag; depend only on the stable teardown callbacks.
+  // Keep the ref callback stable so React cannot invoke null teardown mid-drag on ordinary renders.
   const { cancelPendingRevealFrames, clearRevealHighlightFrame, clearRevealHighlightTimeout } =
     reveal
   const { clearWorktreeDrag } = runtime
@@ -297,18 +342,18 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     markScrollMovement()
   }, [markScrollMovement])
 
-  const projectTree = useProjectTree()
+  const rowProps = useMemo(
+    () => withKeyboardPreview(props, keyboardPreview),
+    [keyboardPreview, props]
+  )
   const rowContext = buildWorktreeVirtualRowContext({
-    projectTree,
-    props,
+    props: rowProps,
     renderRows,
     firstHeaderIndex,
     virtualization,
     measureVirtualRowElement,
     settings,
-    defaultHostId: props.defaultHostId,
-    worktreeVisibilityDefaultsByHost,
-    getRepoSshGate,
+    projectActions,
     newCardStyle,
     folderBackedProjectGroupIds,
     projectGroups,
@@ -319,6 +364,7 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
     statusDrag,
     nativeDrag,
     headerDrag,
+    projectHeaderHostContexts,
     getCachedFolderWorkspacePathStatus,
     getLineageToggleHandler,
     toggleGroupWithScrollAnchor,
@@ -341,8 +387,8 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
         aria-orientation="vertical"
         aria-multiselectable="true"
         aria-activedescendant={getActiveDescendantOptionId({
-          activeWorktreeId,
-          activeWorkspaceExecutionHostId: props.activeWorkspaceExecutionHostId,
+          activeWorktreeId: rowProps.activeWorktreeId,
+          activeWorkspaceExecutionHostId: rowProps.activeWorkspaceExecutionHostId,
           primaryActiveRowKey: primaryActive.primaryActiveWorktreeRow?.rowKey,
           pinnedDisplayPolicy,
           renderRows,
@@ -354,18 +400,8 @@ export const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktr
         onPointerDown={handleScrollPointerDown}
         onTouchMove={markDirectScrollInput}
         onWheel={markDirectScrollInput}
-        onDragOver={(event) => {
-          if (props.onTemporarySessionDragOver(event)) {
-            return
-          }
-          nativeDrag.handleWorktreeDragOver(event)
-        }}
-        onDrop={(event) => {
-          if (props.onTemporarySessionDrop(event)) {
-            return
-          }
-          nativeDrag.handleWorktreeDrop(event)
-        }}
+        onDragOver={nativeDrag.handleWorktreeDragOver}
+        onDrop={nativeDrag.handleWorktreeDrop}
         className="worktree-sidebar-scrollbar h-full overflow-y-auto overflow-x-hidden pl-1 scrollbar-sleek outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-inset pt-px"
         style={WORKTREE_SIDEBAR_SCROLL_STYLE}
       >

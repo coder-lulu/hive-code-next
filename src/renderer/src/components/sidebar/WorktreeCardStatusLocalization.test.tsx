@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { i18n } from '@/i18n/i18n'
-import { checksLabel, getConflictOperationLabel } from './WorktreeCardHelpers'
+import { checksLabel, conflictOperationLabel } from './WorktreeCardHelpers'
 import { ReviewChecksBadge } from './WorktreeCardMetadataStatusBadges'
 import { WorktreeCardStatusSlot } from './WorktreeCardStatusSlot'
 import { useWorktreeCardWorkspaceActions } from './use-worktree-card-workspace-actions'
@@ -46,25 +46,25 @@ const expectedLocales = [
   },
   {
     locale: 'es',
-    checks: ['Correcto', 'Con errores', 'Pendiente'],
+    checks: ['Correctas', 'Con errores', 'Pendientes'],
     prefix: 'Comprobaciones: ',
-    operations: ['Fusionando', 'Rebasando', 'Aplicando commits seleccionados'],
+    operations: ['Fusionando', 'Aplicando rebase', 'Aplicando cherry-pick'],
     read: 'Marcar como leído',
     unread: 'Marcar como no leído',
-    unreadState: 'No leído',
-    failed: 'Comprobaciones de PR: Fallidas',
+    unreadState: 'Sin leer',
+    failed: 'Checks de PR: Fallidos',
     merged: 'MR: Fusionada'
   },
   {
     locale: 'fr',
     checks: ['Réussies', 'En échec', 'En attente'],
     prefix: 'Vérifications : ',
-    operations: ['Fusion en cours', 'Rebasage en cours', 'Sélection de commits en cours'],
+    operations: ['Merge en cours', 'Rebase en cours', 'Cherry-pick en cours'],
     read: 'Marquer comme lu',
     unread: 'Marquer comme non lu',
     unreadState: 'Non lu',
-    failed: 'Vérifications de PR : Échec',
-    merged: 'MR : Fusionnée'
+    failed: 'PR : vérifications en échec',
+    merged: 'MR : fusionnée'
   },
   {
     locale: 'ja',
@@ -85,14 +85,14 @@ const expectedLocales = [
     read: '읽음으로 표시',
     unread: '읽지 않음으로 표시',
     unreadState: '읽지 않음',
-    failed: 'PR 검사: 실패',
+    failed: 'PR 체크: 실패',
     merged: 'MR: 병합됨'
   },
   {
     locale: 'zh',
-    checks: ['通过', '失败', '等待中'],
+    checks: ['通过', '失败', '待处理'],
     prefix: '检查：',
-    operations: ['正在合并', '正在变基', '正在拣选'],
+    operations: ['合并中', '变基中', '挑拣中'],
     read: '标为已读',
     unread: '标为未读',
     unreadState: '未读',
@@ -141,8 +141,6 @@ const actionInput: Parameters<typeof useWorktreeCardWorkspaceActions>[0] = {
   lineageCollapsed: false,
   isMultiSelected: false,
   folderWorkspaceId: null,
-  deleteFolderWorkspace: vi.fn(async () => false),
-  setActiveWorktree: vi.fn(),
   setShowRenameErrorDialog: vi.fn(),
   isDeleting: false,
   showDeleteQuickAction: false
@@ -185,9 +183,9 @@ describe('native worktree card status localization', () => {
     expect(checksLabel('neutral')).toBe('')
     const operations = ['merge', 'rebase', 'cherry-pick'] as const
     operations.forEach((operation, index) => {
-      expect(getConflictOperationLabel(operation)).toBe(expected.operations[index])
+      expect(conflictOperationLabel(operation)).toBe(expected.operations[index])
     })
-    expect(getConflictOperationLabel('unknown')).toBe('')
+    expect(conflictOperationLabel('unknown')).toBe('')
   })
 
   it.each(expectedLocales)(

@@ -1,11 +1,7 @@
 import type { GlobalSettings } from '../../shared/global-settings-types'
 import { gitExecFileAsync } from '../git/runner'
 import type { getPullRequestDraftContext } from '../text-generation/pull-request-context'
-import {
-  mergeLegacyCommitMessageAiIntoSourceControlAi,
-  type ResolvedSourceControlAiGenerationParams
-} from '../../shared/source-control-ai'
-import type { SourceControlAiOperation } from '../../shared/source-control-ai-types'
+import type { ResolvedSourceControlAiGenerationParams } from '../../shared/source-control-ai'
 import type { CommitMessageAgentRuntimeTarget } from '../text-generation/commit-message-agent-environment'
 import type { CommitMessageGenerationTarget } from '../text-generation/commit-message-text-generation'
 import type { PullRequestLinkedIssueMeta } from '../source-control/pull-request-linked-issue'
@@ -32,32 +28,28 @@ export function pullRequestDraftGitExec(target: RuntimeGitTarget): PullRequestDr
 }
 
 export type RuntimeCommitMessageSettingsOverride = Partial<
-  Pick<
-    GlobalSettings,
-    'commitMessageAi' | 'sourceControlAi' | 'agentCmdOverrides' | 'defaultTuiAgent'
-  >
+  Pick<GlobalSettings, 'sourceControlAi' | 'agentCmdOverrides' | 'defaultTuiAgent'>
 > & {
   commitMessageDiscoveryHostKey?: string
   sourceControlAiResolvedParams?: ResolvedSourceControlAiGenerationParams
 }
 
 export function getRuntimeGitGenerationSettings(
-  settings: GlobalSettings,
-  settingsOverride: RuntimeCommitMessageSettingsOverride | undefined,
-  operation: SourceControlAiOperation
-): GlobalSettings {
-  const mergedSettings = { ...settings, ...settingsOverride }
-  if (
-    settingsOverride?.commitMessageAi !== undefined &&
-    settingsOverride.sourceControlAi === undefined
-  ) {
-    mergedSettings.sourceControlAi = mergeLegacyCommitMessageAiIntoSourceControlAi(
-      settings.sourceControlAi,
-      settingsOverride.commitMessageAi,
-      { pullRequestInstructionsFromLegacy: operation === 'pullRequest' }
-    )
+  settings: ReturnType<RuntimeGitCommandHost['getRuntimeSettings']>,
+  settingsOverride: RuntimeCommitMessageSettingsOverride | undefined
+): ReturnType<RuntimeGitCommandHost['getRuntimeSettings']> {
+  return {
+    ...settings,
+    ...(settingsOverride?.sourceControlAi !== undefined
+      ? { sourceControlAi: settingsOverride.sourceControlAi }
+      : {}),
+    ...(settingsOverride?.agentCmdOverrides !== undefined
+      ? { agentCmdOverrides: settingsOverride.agentCmdOverrides }
+      : {}),
+    ...(settingsOverride?.defaultTuiAgent !== undefined
+      ? { defaultTuiAgent: settingsOverride.defaultTuiAgent }
+      : {})
   }
-  return mergedSettings
 }
 
 export function localAgentRuntimeTargetForTarget(

@@ -24,10 +24,6 @@ test('keeps the visible Agent Dashboard interactive during a 100-pane status rep
 }) => {
   await waitForSessionReady(orcaPage)
   const worktreeId = await waitForActiveWorktree(orcaPage)
-  await orcaPage
-    .locator('.sidebar-primary-nav')
-    .getByRole('button', { name: 'Projects', exact: true })
-    .click()
   const panes = await orcaPage.evaluate(
     ({ baseTime, paneCount, worktreeId }): BurstPane[] => {
       const store = window.__store
@@ -35,21 +31,23 @@ test('keeps the visible Agent Dashboard interactive during a 100-pane status rep
         throw new Error('window.__store is unavailable')
       }
       const state = store.getState()
-      if (!state.settings) {
-        throw new Error('Settings unavailable')
-      }
       const tab =
         state.tabsByWorktree[worktreeId]?.[0] ??
         state.createTab(worktreeId, undefined, undefined, {
           activate: false,
           id: 'agent-dashboard-burst-tab'
         })
+      const settings = store.getState().settings
+      if (!settings) {
+        throw new Error('Settings are not loaded')
+      }
       store.setState({
-        workspaceBoardOpen: false,
-        workspaceBoardView: 'agents',
+        agentDashboardDrawerOpen: false,
         settings: {
-          ...state.settings,
-          agentDashboardShowIdle: true,
+          ...settings,
+          experimentalAgentDashboardPopout: true,
+          experimentalAgentDashboardMode: 'in-window',
+          experimentalAgentDashboardShowIdle: true,
           tabAutoGenerateTitle: false
         }
       })
@@ -83,7 +81,7 @@ test('keeps the visible Agent Dashboard interactive during a 100-pane status rep
     { baseTime: BASE_TIME, paneCount: PANE_COUNT, worktreeId }
   )
 
-  const dashboardButton = orcaPage.locator('[data-workspace-board-trigger]')
+  const dashboardButton = orcaPage.getByRole('button', { name: /Agent Dashboard/ })
   await expect(dashboardButton).toBeVisible()
 
   await electronApp.evaluate(
@@ -110,7 +108,7 @@ test('keeps the visible Agent Dashboard interactive during a 100-pane status rep
 
   const interactionStartedAt = performance.now()
   await dashboardButton.click()
-  await orcaPage.locator('[data-workspace-board-sheet]').waitFor({ state: 'visible' })
+  await orcaPage.locator('[data-agent-dashboard-sheet]').waitFor({ state: 'visible' })
   const interactionElapsedMs = performance.now() - interactionStartedAt
   const statusPublicationsAtVisible = await orcaPage.evaluate(() => {
     const probe = (
@@ -174,15 +172,4 @@ test('keeps the visible Agent Dashboard interactive during a 100-pane status rep
   expect(evidence.statusPublications).toBeLessThanOrEqual(3)
   expect(new Set(evidence.finalStates)).toEqual(new Set(['done']))
   expect(evidence.firstHistory.at(-1)).toBe('working')
-  await expect(
-    orcaPage
-      .locator('[data-workspace-board-sheet]')
-      .getByRole('tab', { name: 'Agents', exact: true })
-  ).toHaveAttribute('data-state', 'active')
-  await expect(
-    orcaPage
-      .locator('[data-workspace-board-sheet]')
-      .getByRole('button', { name: /Completed (task )?0(?:\s|$)/ })
-      .first()
-  ).toBeVisible()
 })

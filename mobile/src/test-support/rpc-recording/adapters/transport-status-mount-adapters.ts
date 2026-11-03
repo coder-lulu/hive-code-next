@@ -5,10 +5,7 @@ import { hookMount } from '../hook-mount'
 
 const HOST = 'host-1'
 
-/**
- * The three `status.get` readers the transport owns: the protocol gate hook, the retrying
- * capability probe. The retired upstream relay pairing race is intentionally absent.
- */
+// Drive the real status readers: acceptance is shared, while refusal consequences differ by owner.
 export function transportStatusMountAdapters(
   modules: ReturnType<typeof operationModuleLoader>
 ): Record<string, MountAdapter> {

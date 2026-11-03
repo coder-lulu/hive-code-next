@@ -122,7 +122,12 @@ test('retries an identical remote pane layout after reconnect', async ({
 
   try {
     await host.client.call('repo.add', { path: testRepoPath, kind: 'git' })
-    client = await launchPairedElectronClient(host.offer, testInfo, 'Pane layout retry client')
+    const pairedClient = await launchPairedElectronClient(
+      host.offer,
+      testInfo,
+      'Pane layout retry client'
+    )
+    client = pairedClient
     await expect
       .poll(
         () =>
@@ -161,7 +166,6 @@ test('retries an identical remote pane layout after reconnect', async ({
       await window.api.runtimeEnvironments.disconnect({ selector })
     }, client.environmentId)
 
-    const connectedClient = client
     const failedPush = client.page.waitForEvent('console', {
       predicate: (message) =>
         message.type() === 'warning' &&
@@ -179,10 +183,10 @@ test('retries an identical remote pane layout after reconnect', async ({
     await expect
       .poll(
         () =>
-          connectedClient.page.evaluate(async (selector) => {
+          pairedClient.page.evaluate(async (selector) => {
             const response = await window.api.runtimeEnvironments.connect({ selector })
             return response.ok
-          }, connectedClient.environmentId),
+          }, pairedClient.environmentId),
         { timeout: 60_000, message: 'paired client never reconnected to the host runtime' }
       )
       .toBe(true)

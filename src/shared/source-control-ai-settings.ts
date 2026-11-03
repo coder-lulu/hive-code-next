@@ -1,5 +1,4 @@
 import { isCustomAgentId } from './commit-message-agent-spec'
-import type { CommitMessageAiSettings } from './commit-message-ai-types'
 import {
   DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES,
   AI_ACTION_IDS,
@@ -7,11 +6,7 @@ import {
   normalizeSourceControlAiActionDefaults,
   readSourceControlActionDefault
 } from './source-control-ai-actions'
-import {
-  actionRecipeFromLegacyCommitMessageAi,
-  commandTemplateFromOperationInstruction,
-  isLegacyBranchInstructionTemplate
-} from './source-control-ai-command-template'
+import { commandTemplateFromOperationInstruction } from './source-control-ai-command-template'
 import type {
   SourceControlAiPrCreationDefaults,
   SourceControlAiSettings
@@ -47,81 +42,28 @@ export function getDefaultSourceControlAiSettings(): SourceControlAiSettings {
     selectedThinkingByModel: {},
     customAgentCommand: '',
     instructionsByOperation: { commitMessage: '', pullRequest: '', branchName: '' },
-    prCreationDefaults: { ...DEFAULT_SOURCE_CONTROL_AI_PR_CREATION_DEFAULTS },
-    launchActionDefaults: {}
-  }
-}
-
-export function sourceControlAiSettingsFromLegacy(
-  legacy: CommitMessageAiSettings | null | undefined
-): SourceControlAiSettings {
-  const defaults = getDefaultSourceControlAiSettings()
-  if (!legacy) {
-    return defaults
-  }
-  const legacyActionRecipe = actionRecipeFromLegacyCommitMessageAi(legacy)
-  return {
-    ...defaults,
-    enabled: legacy.enabled,
-    agentId: legacy.agentId,
-    selectedModelByAgent: { ...legacy.selectedModelByAgent },
-    selectedModelByAgentByHost: copyRecord(legacy.selectedModelByAgentByHost) ?? {},
-    discoveredModelsByAgent: copyRecord(legacy.discoveredModelsByAgent) ?? {},
-    discoveredModelsByAgentByHost: copyRecord(legacy.discoveredModelsByAgentByHost) ?? {},
-    selectedThinkingByModel: { ...legacy.selectedThinkingByModel },
-    customAgentCommand: legacy.customAgentCommand,
-    instructionsByOperation: {
-      commitMessage: legacy.customPrompt ?? '',
-      pullRequest: '',
-      branchName: legacy.customPrompt ?? ''
-    },
-    actions: {
-      ...defaults.actions,
-      commitMessage: legacyActionRecipe,
-      branchName: {
-        ...legacyActionRecipe,
-        commandInputTemplate: commandTemplateFromOperationInstruction(
-          'branchName',
-          legacy.customPrompt
-        )
-      }
-    }
+    prCreationDefaults: { ...DEFAULT_SOURCE_CONTROL_AI_PR_CREATION_DEFAULTS }
   }
 }
 
 export function normalizeSourceControlAiSettings(
-  value: SourceControlAiSettings | null | undefined,
-  legacy?: CommitMessageAiSettings | null
+  value: SourceControlAiSettings | null | undefined
 ): SourceControlAiSettings {
-  const base = value ?? sourceControlAiSettingsFromLegacy(legacy)
+  const base = value ?? getDefaultSourceControlAiSettings()
   const defaults = getDefaultSourceControlAiSettings()
-  const normalizedLaunchActionDefaults = normalizeSourceControlAiActionDefaults(
-    base.launchActionDefaults
-  )
-  const normalizedActions = {
-    ...normalizedLaunchActionDefaults,
-    ...normalizeSourceControlAiActionDefaults(base.actions)
-  }
-  const migratedTextActions = Object.fromEntries(
+  const normalizedActions = normalizeSourceControlAiActionDefaults(base.actions) ?? {}
+  const textActions = Object.fromEntries(
     SOURCE_CONTROL_TEXT_ACTION_IDS.map((actionId) => {
       const existing = readSourceControlActionDefault(normalizedActions, actionId)
       const instruction = base.instructionsByOperation?.[actionId]
-      const legacyInstruction = actionId === 'commitMessage' ? legacy?.customPrompt : undefined
-      const resolvedInstruction = instruction ?? legacyInstruction
-      const instructionTemplate =
-        instruction || legacyInstruction
-          ? commandTemplateFromOperationInstruction(actionId, resolvedInstruction)
-          : undefined
+      const instructionTemplate = instruction
+        ? commandTemplateFromOperationInstruction(actionId, instruction)
+        : undefined
       const shouldApplyInstructionTemplate =
         instructionTemplate !== undefined &&
         (existing.commandInputTemplate === undefined ||
           existing.commandInputTemplate ===
-            DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES[actionId] ||
-          isLegacyBranchInstructionTemplate(
-            actionId,
-            resolvedInstruction,
-            existing.commandInputTemplate
-          ))
+            DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES[actionId])
       return [
         actionId,
         {
@@ -135,7 +77,12 @@ export function normalizeSourceControlAiSettings(
   ) as SourceControlAiSettings['actions']
   return {
     ...defaults,
-    ...base,
+    enabled: typeof base.enabled === 'boolean' ? base.enabled : defaults.enabled,
+    agentId: base.agentId ?? defaults.agentId,
+    customAgentCommand:
+      typeof base.customAgentCommand === 'string'
+        ? base.customAgentCommand
+        : defaults.customAgentCommand,
     selectedModelByAgent: { ...defaults.selectedModelByAgent, ...base.selectedModelByAgent },
     selectedModelByAgentByHost:
       copyRecord(base.selectedModelByAgentByHost) ?? defaults.selectedModelByAgentByHost,
@@ -153,7 +100,6 @@ export function normalizeSourceControlAiSettings(
     },
     modelOverridesByOperation: copyRecord(base.modelOverridesByOperation),
     prCreationDefaults: { ...defaults.prCreationDefaults, ...base.prCreationDefaults },
-    actions: { ...defaults.actions, ...normalizedActions, ...migratedTextActions },
-    launchActionDefaults: normalizedLaunchActionDefaults ?? defaults.launchActionDefaults
+    actions: { ...defaults.actions, ...normalizedActions, ...textActions }
   }
 }

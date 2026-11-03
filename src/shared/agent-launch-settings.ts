@@ -1,3 +1,5 @@
+import { permissionUpdates } from './agent-launch-permission-updates'
+import { agentEnvironmentMutationUpdates } from './agent-launch-environment-updates'
 import type { GlobalSettings } from './global-settings-types'
 import type { TuiAgent } from './tui-agent'
 import { buildDefaultAgentSettingsUpdate } from './default-agent-settings'
@@ -5,12 +7,12 @@ import {
   buildAgentAvailabilitySettingsUpdate,
   normalizeDisabledTuiAgents
 } from './tui-agent-selection'
-import { normalizeTuiAgentArgsRecord, resolveTuiAgentLaunchEnv } from './tui-agent-launch-defaults'
+import { normalizeTuiAgentArgsRecord } from './tui-agent-launch-defaults'
 import {
-  applyAgentPermissionMode,
-  resolveAgentPermissionModeSummary,
-  type AgentPermissionMode
-} from './tui-agent-permissions'
+  isAgentPermissionChoice,
+  normalizeAgentPermissionOverrides,
+  type AgentPermissionChoice
+} from './tui-agent-permission-choice'
 
 export type AgentLaunchSettingsSource = Partial<
   Pick<
@@ -21,6 +23,8 @@ export type AgentLaunchSettingsSource = Partial<
     | 'agentCmdOverrides'
     | 'agentDefaultArgs'
     | 'agentDefaultEnv'
+    | 'agentPermissionDefault'
+    | 'agentPermissionOverrides'
   >
 >
 
@@ -31,13 +35,14 @@ export type AgentLaunchSettings = {
   agentCmdOverrides: NonNullable<GlobalSettings['agentCmdOverrides']>
   agentDefaultArgs: NonNullable<GlobalSettings['agentDefaultArgs']>
   environmentNames: Partial<Record<TuiAgent, string[]>>
-  permissionMode: AgentPermissionMode
+  agentPermissionDefault: AgentPermissionChoice
+  agentPermissionOverrides: NonNullable<GlobalSettings['agentPermissionOverrides']>
 }
 
 export type AgentLaunchSettingsMutation =
   | { type: 'default'; agent: GlobalSettings['defaultTuiAgent']; setupOnly?: boolean }
   | { type: 'availability'; agent: TuiAgent; enabled: boolean }
-  | { type: 'permissions'; mode: Exclude<AgentPermissionMode, 'mixed'> }
+  | { type: 'permissions'; agent?: TuiAgent; mode: AgentPermissionChoice | 'default' }
   | { type: 'command'; agent: TuiAgent; value: string }
   | { type: 'arguments'; agent: TuiAgent; value: string }
   | { type: 'environment-set'; agent: TuiAgent; name: string; value: string }
@@ -46,6 +51,7 @@ export type AgentLaunchSettingsMutation =
 export function projectAgentLaunchSettings(
   settings: AgentLaunchSettingsSource
 ): AgentLaunchSettings {
+  assertKnownSettings(settings)
   return {
     defaultTuiAgent: settings.defaultTuiAgent ?? null,
     newWorkspaceSetupOnly: false,
@@ -58,7 +64,10 @@ export function projectAgentLaunchSettings(
         Object.keys(env ?? {}).sort()
       ])
     ),
-    permissionMode: resolveAgentPermissionModeSummary(settings)
+    agentPermissionDefault: isAgentPermissionChoice(settings.agentPermissionDefault)
+      ? settings.agentPermissionDefault
+      : 'own',
+    agentPermissionOverrides: normalizeAgentPermissionOverrides(settings.agentPermissionOverrides)
   }
 }
 
@@ -67,6 +76,7 @@ export function agentLaunchSettingsMutationUpdates(
   mutation: AgentLaunchSettingsMutation,
   platform: NodeJS.Platform
 ): AgentLaunchSettingsSource {
+  assertKnownSettings(settings)
   switch (mutation.type) {
     case 'default':
       return buildDefaultAgentSettingsUpdate(mutation.agent)
@@ -80,7 +90,7 @@ export function agentLaunchSettingsMutationUpdates(
         mutation.enabled
       )
     case 'permissions':
-      return applyAgentPermissionMode({ ...settings, mode: mutation.mode })
+      return permissionUpdates(settings, mutation)
     case 'command': {
       const commands = { ...settings.agentCmdOverrides }
       if (mutation.value.trim()) {
@@ -98,20 +108,13 @@ export function agentLaunchSettingsMutationUpdates(
         })
       }
     case 'environment-set':
-    case 'environment-remove': {
-      const env = { ...resolveTuiAgentLaunchEnv(mutation.agent, settings.agentDefaultEnv) }
-      // Windows environment names are case insensitive on the execution host.
-      for (const name of Object.keys(env)) {
-        if (
-          name === mutation.name ||
-          (platform === 'win32' && name.toLowerCase() === mutation.name.toLowerCase())
-        ) {
-          delete env[name]
-        }
-      }
-      const nextEnv =
-        mutation.type === 'environment-set' ? { ...env, [mutation.name]: mutation.value } : env
-      return { agentDefaultEnv: { ...settings.agentDefaultEnv, [mutation.agent]: nextEnv } }
-    }
+    case 'environment-remove':
+      return agentEnvironmentMutationUpdates(settings, mutation, platform)
+  }
+}
+
+function assertKnownSettings(settings: AgentLaunchSettingsSource): void {
+  if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+    throw new Error('settings_unavailable')
   }
 }

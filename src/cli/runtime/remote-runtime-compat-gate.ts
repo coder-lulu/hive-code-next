@@ -1,4 +1,4 @@
-import type { PairingOffer } from '../../shared/pairing'
+import type { PairedRuntimeConnection } from '../../shared/paired-runtime-connection'
 import { describeRuntimeCompatBlock, evaluateRuntimeCompat } from '../../shared/protocol-compat'
 import {
   MIN_COMPATIBLE_RUNTIME_SERVER_VERSION,
@@ -28,7 +28,7 @@ export class RemoteRuntimeCompatGate {
 
   send<TResult>(args: {
     transport: WebSocketTransport
-    connection: PairingOffer
+    connection: PairedRuntimeConnection
     method: string
     params: unknown
     timeoutMs: number

@@ -1,36 +1,30 @@
-import { darkTheme } from '../../theme/mobile-theme'
+import { colors, paletteForScheme } from '../../theme/mobile-theme'
 
-/**
- * The rules that style the document itself, which only the WebView's document may carry.
- *
- * Inside the WebView this is the terminal's own page and these say so. On the page the document
- * is a guest in a React Native Web application, and the same three selectors would set that
- * application's background, its overflow and every element's box model — and keep doing it after
- * the terminal is gone. So the page never injects them; `document-style-scoping.ts` is what
- * separates them from the rules below, and it recognises them by their selectors rather than by
- * this split, so a fourth one added here is still caught there.
- */
+// Only native WebViews own document roots; injecting these rules on the page would restyle the app beyond terminal unmount.
 export const TERMINAL_DOCUMENT_ROOT_STYLE = `  * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
-    background: ${darkTheme.terminal.background};
+    background: ${colors.terminalBg};
     overflow: hidden;
     width: 100%;
     height: 100%;
   }`
 
-/**
- * The terminal's own elements, beside xterm's sheet.
- *
- * Split out of the document shell because the page needs exactly this and must not reach the
- * engine string the shell also splices in. The rules are addressed at the ids and classes
- * `document-markup.ts` declares, which is the other half of the same pair; the page holds every
- * one of them under its host element rather than letting them loose in the application.
- */
+// The thumb sits on terminal content, themed by the desktop rather than the app scheme.
+const SCROLL_THUMB_COLOR = paletteForScheme('dark').textSecondary
+
+// Keep element rules separate from native script strings so pages can inject only host-scoped styles.
 export const TERMINAL_DOCUMENT_ELEMENT_STYLE = `  #terminal-container {
     overflow: hidden;
     position: relative;
     width: 100%;
     height: 100%;
+  }
+  #terminal-container::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: var(--terminal-bottom-row-backdrop, none);
   }
   #terminal-surface {
     transform-origin: top left;
@@ -74,7 +68,7 @@ export const TERMINAL_DOCUMENT_ELEMENT_STYLE = `  #terminal-container {
     width: 3px;
     min-height: 24px;
     border-radius: 999px;
-    background: var(--terminal-scroll-thumb, ${darkTheme.terminal.brightBlack});
+    background: ${SCROLL_THUMB_COLOR};
     will-change: transform, height;
   }
   /* Why: selection overlay sits in unscaled viewport coords, above the
@@ -101,9 +95,9 @@ export const TERMINAL_DOCUMENT_ELEMENT_STYLE = `  #terminal-container {
     left: 50%; top: 22px;
     transform: translateX(-50%);
     width: 14px; height: 14px;
-    background: var(--terminal-accent, ${darkTheme.terminal.blue});
+    background: #7aa2f7;
     border-radius: 50%;
-    border: 2px solid var(--terminal-foreground, ${darkTheme.terminal.foreground});
+    border: 2px solid #c0caf5;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   }
   .sel-handle.start::before { top: 8px; }
@@ -113,7 +107,7 @@ export const TERMINAL_DOCUMENT_ELEMENT_STYLE = `  #terminal-container {
     left: 50%; top: 22px;
     transform: translateX(-50%);
     width: 2px; height: 16px;
-    background: var(--terminal-accent, ${darkTheme.terminal.blue});
+    background: #7aa2f7;
   }
   .sel-handle.end::before { top: 22px; }
   .sel-handle.end::after {
@@ -122,12 +116,12 @@ export const TERMINAL_DOCUMENT_ELEMENT_STYLE = `  #terminal-container {
     left: 50%; top: 6px;
     transform: translateX(-50%);
     width: 2px; height: 16px;
-    background: var(--terminal-accent, ${darkTheme.terminal.blue});
+    background: #7aa2f7;
   }
   #sel-menu {
     position: absolute;
     pointer-events: auto;
-    background: var(--terminal-menu-background, ${darkTheme.terminal.selectionBackground});
+    background: #2a2f4a;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
     display: flex;
@@ -140,19 +134,13 @@ export const TERMINAL_DOCUMENT_ELEMENT_STYLE = `  #terminal-container {
   #sel-menu button {
     background: transparent;
     border: none;
-    color: var(--terminal-foreground, ${darkTheme.terminal.foreground});
+    color: #c0caf5;
     font: 600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     padding: 10px 16px;
     cursor: pointer;
   }
-  #sel-menu button:active { background: var(--terminal-menu-active, ${darkTheme.terminal.brightBlack}); }
-  #sel-menu button + button { border-left: 1px solid var(--terminal-menu-active, ${darkTheme.terminal.brightBlack}); }`
+  #sel-menu button:active { background: #414868; }
+  #sel-menu button + button { border-left: 1px solid #414868; }`
 
-/**
- * Both halves, in the order the WebView's `<head>` carries them.
- *
- * The root rules come first: the element rules the page scopes to its host are the second half, and
- * a page's copy is that half alone.
- */
 export const TERMINAL_DOCUMENT_STYLE = `${TERMINAL_DOCUMENT_ROOT_STYLE}
 ${TERMINAL_DOCUMENT_ELEMENT_STYLE}`

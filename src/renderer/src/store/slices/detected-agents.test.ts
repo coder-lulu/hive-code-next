@@ -13,7 +13,7 @@ import {
   RUNTIME_PROTOCOL_VERSION
 } from '../../../../shared/protocol-version'
 import { clearRuntimeCompatibilityCacheForTests } from '@/runtime/runtime-rpc-client'
-import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
+import { getDefaultSettings, FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
 
 const detectAgents = vi.fn()
 const refreshAgents = vi.fn()
@@ -126,6 +126,7 @@ describe('createDetectedAgentsSlice WSL context', () => {
     await expect(store.getState().ensureDetectedAgents()).resolves.toEqual(['claude'])
 
     expect(detectAgents).toHaveBeenCalledWith({
+      enabledOnly: true,
       wslDistro: 'Ubuntu',
       projectRuntime: {
         status: 'resolved',
@@ -204,6 +205,7 @@ describe('createDetectedAgentsSlice WSL context', () => {
     await expect(store.getState().refreshDetectedAgents()).resolves.toEqual(['codex'])
 
     expect(refreshAgents).toHaveBeenCalledWith({
+      enabledOnly: true,
       wslDistro: 'Debian',
       projectRuntime: {
         status: 'resolved',
@@ -242,10 +244,11 @@ describe('createDetectedAgentsSlice WSL context', () => {
     } as Partial<AppState>)
 
     await expect(store.getState().ensureDetectedAgents()).resolves.toEqual([])
-    expect(store.getState().detectedAgentIds).toBeNull()
-    expect(store.getState().didAgentDetectionFail).toBe(true)
+    expect(store.getState().detectedAgentIds).toEqual([])
+    expect(store.getState().readLocalAgentInventory()).toEqual({ ids: [], state: 'failed' })
 
     expect(detectAgents).toHaveBeenCalledWith({
+      enabledOnly: true,
       projectRuntime: {
         status: 'repair-required',
         repair: {
@@ -273,6 +276,7 @@ describe('createDetectedAgentsSlice WSL context', () => {
     await expect(store.getState().ensureDetectedAgents()).resolves.toEqual(['claude'])
 
     expect(detectAgents).toHaveBeenCalledWith({
+      enabledOnly: true,
       wslDistro: 'Debian',
       projectRuntime: {
         status: 'resolved',
@@ -303,6 +307,7 @@ describe('createDetectedAgentsSlice WSL context', () => {
     await expect(store.getState().ensureDetectedAgents()).resolves.toEqual(['claude'])
 
     expect(detectAgents).toHaveBeenCalledWith({
+      enabledOnly: true,
       projectRuntime: {
         status: 'resolved',
         runtime: {
@@ -331,6 +336,7 @@ describe('createDetectedAgentsSlice WSL context', () => {
     await expect(store.getState().ensureDetectedAgents()).resolves.toEqual(['claude'])
 
     expect(detectAgents).toHaveBeenCalledWith({
+      enabledOnly: true,
       wslDistro: 'Fedora',
       projectRuntime: {
         status: 'resolved',
@@ -358,6 +364,7 @@ describe('createDetectedAgentsSlice WSL context', () => {
     await expect(store.getState().ensureDetectedAgents()).resolves.toEqual(['claude'])
 
     expect(detectAgents).toHaveBeenCalledWith({
+      enabledOnly: true,
       wslDistro: 'Ubuntu',
       projectRuntime: {
         status: 'resolved',
@@ -376,10 +383,11 @@ describe('createDetectedAgentsSlice WSL context', () => {
   it('detects agents in the project override runtime instead of legacy agent location', async () => {
     const store = createTestStore({
       settings: {
+        ...getDefaultSettings('/tmp'),
         localWindowsRuntimeDefault: { kind: 'wsl', distro: 'Ubuntu' },
         localAgentRuntime: 'wsl',
         localAgentWslDistro: 'Ubuntu'
-      } as AppState['settings'],
+      },
       projects: [
         {
           id: 'repo-1',
@@ -394,11 +402,12 @@ describe('createDetectedAgentsSlice WSL context', () => {
       repos: [makeRepo({ id: 'repo-1', path: 'C:\\repo' })],
       activeRepoId: 'repo-1',
       activeWorktreeId: null
-    } as Partial<AppState>)
+    })
 
     await expect(store.getState().ensureDetectedAgents()).resolves.toEqual(['claude'])
 
     expect(detectAgents).toHaveBeenCalledWith({
+      enabledOnly: true,
       projectRuntime: {
         status: 'resolved',
         runtime: {
@@ -435,8 +444,8 @@ describe('createDetectedAgentsSlice WSL context', () => {
 
     expect(store.getState().detectedAgentIds).toBeNull()
     await expect(detected).resolves.toEqual([])
-    expect(store.getState().detectedAgentIds).toBeNull()
-    expect(store.getState().didAgentDetectionFail).toBe(true)
+    expect(store.getState().detectedAgentIds).toEqual([])
+    expect(store.getState().readLocalAgentInventory()).toEqual({ ids: [], state: 'failed' })
   })
 
   it('clears local detection cache explicitly after a project runtime switch', async () => {
@@ -582,8 +591,7 @@ describe('createDetectedAgentsSlice remote detection', () => {
 
   it('re-runs remote detection after an empty result instead of pinning it', async () => {
     const store = createTestStore()
-    // An empty [] is truthy, so a prior "no agents found" must not be cached:
-    // a later install / PATH fix has to be picked up without a reconnect.
+    // Retry empty detections so later installs/PATH fixes appear without reconnect; [] truthiness must not cache misses.
     detectRemoteAgents.mockResolvedValueOnce([])
 
     await expect(store.getState().ensureRemoteDetectedAgents('ssh-1')).resolves.toEqual([])
@@ -627,9 +635,7 @@ describe('createDetectedAgentsSlice remote detection', () => {
 
   it('re-runs runtime detection after an empty result instead of pinning it', async () => {
     const store = createTestStore()
-    // An empty [] is truthy, so a prior "no agents found" must not be cached:
-    // a later install / PATH fix has to be picked up without a reconnect. This is
-    // the Orca-serve path (kind: 'runtime'), distinct from the SSH remote path.
+    // Runtime Orca-serve path must retry empty detection after install/PATH fixes too, independently of SSH.
     let detectCalls = 0
     runtimeEnvironmentCall.mockImplementation(({ method }: { method: string }) => {
       let result: unknown
@@ -834,7 +840,7 @@ describe('createDetectedAgentsSlice remote detection', () => {
     ])
     expect(store.getState().runtimeDetectedAgentIds['env-1']).toEqual(['claude'])
     expect(store.getState().isRefreshingRuntimeAgents['env-1']).toBe(false)
-    expect(store.getState().didRuntimeAgentDetectionFail['env-1']).toBe(true)
+    expect(store.getState().runtimeAgentInventoryOutcome('env-1')).toBe('failed')
     expect(
       runtimeEnvironmentCall.mock.calls.filter(([{ method }]) => method.startsWith('preflight.'))
     ).toEqual([[expect.objectContaining({ selector: 'env-1', method: 'preflight.refreshAgents' })]])

@@ -7,14 +7,14 @@ import {
 import type { RenderRow } from './worktree-list/listing/render-row'
 
 const repoHeader = (id: string): RenderRow =>
-  ({ type: 'header', key: `repo:${id}`, label: id, count: 1, tone: '', repo: { id } }) as RenderRow
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the boundary reader only reads type, key, repo.id and projectGroup.id.
+  ({ type: 'header', key: `repo:${id}`, label: id, count: 1, repo: { id } }) as RenderRow
 const groupHeader = (id: string): RenderRow =>
   ({
     type: 'header',
     key: `group:${id}`,
     label: id,
     count: 1,
-    tone: '',
     projectGroup: { id },
     projectGroupDepth: 0
   }) as RenderRow
@@ -26,11 +26,10 @@ const startOfB = 28 + 116
 const startOfC = startOfB + 32 + 116
 
 describe('getRepoHeaderSectionEndByRepoId', () => {
-  it('uses project-tree header heights for drag section boundaries', () => {
+  it('uses the active row estimator for grouped drag section boundaries', () => {
     const ends = getRepoHeaderSectionEndByRepoId({
       rows: [groupHeader('group'), repoHeader('a'), item, repoHeader('b')],
       firstHeaderIndex: 0,
-      projectTree: true,
       sidebarRepoHeaderIdsByBucket: new Map([['group', ['a', 'b']]]),
       repoHeaderBucketByRepoId: new Map([
         ['a', 'group'],
@@ -38,7 +37,7 @@ describe('getRepoHeaderSectionEndByRepoId', () => {
       ])
     })
 
-    expect(ends.get('a')).toBe(32 + 40 + 116)
+    expect(ends.get('a')).toBe(28 + 32 + 116)
   })
 
   it('ends a section at the successor from the header’s own bucket', () => {

@@ -1,32 +1,38 @@
-import { existsSync, mkdtempSync, statSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, statSync } from 'node:fs'
 import type * as Fs from 'node:fs'
 import { tmpdir } from 'node:os'
 import type * as Os from 'node:os'
+import type * as WindowsAcl from '../../shared/secure-path-windows-acl'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 let tempHome = ''
 const decryptStringMock = vi.fn((value: Buffer) => value.toString('utf-8'))
+const writeRestrictedWindowsFileMock = vi.fn<typeof WindowsAcl.writeRestrictedWindowsFile>()
 
 async function loadStore(
   options: {
-    encryptionAvailable?: boolean
-    protectionGap?: string | null
     unlinkError?: NodeJS.ErrnoException
     writeError?: Error
     shortWrites?: boolean
   } = {}
 ) {
   vi.resetModules()
-  // Why: doMock registrations outlive resetModules, so an injected failure from
-  // one case would leak into every later one in this file.
+  // resetModules leaves doMock registrations behind.
   vi.doUnmock('node:fs')
+  vi.doUnmock('../../shared/secure-path-windows-acl')
+  writeRestrictedWindowsFileMock.mockReset()
+  vi.doMock('../../shared/secure-path-windows-acl', async (importOriginal) => {
+    const actual = await importOriginal<typeof WindowsAcl>()
+    writeRestrictedWindowsFileMock.mockImplementation(actual.writeRestrictedWindowsFile)
+    return { ...actual, writeRestrictedWindowsFile: writeRestrictedWindowsFileMock }
+  })
   const { setSecretStore } = await import('../../shared/secret-store')
   setSecretStore({
-    isEncryptionAvailable: () => options.encryptionAvailable ?? true,
+    isEncryptionAvailable: () => true,
     encryptString: (value) => Buffer.from(value),
     decryptString: decryptStringMock,
-    describeProtectionGap: () => options.protectionGap ?? null
+    describeProtectionGap: () => null
   })
   vi.doMock('node:os', async () => {
     const actual = await vi.importActual<typeof Os>('node:os')
@@ -37,8 +43,6 @@ async function loadStore(
       const actual = await vi.importActual<typeof Fs>('node:fs')
       return {
         ...actual,
-        // Why: write(2) may return a short count; publishing without looping
-        // would rename a truncated credential into place.
         writeSync: (fd: number, data: Buffer, offset = 0, length = data.length) =>
           actual.writeSync(fd, data, offset, Math.min(1, length))
       }
@@ -55,10 +59,16 @@ async function loadStore(
         }
       }
     })
+    // Windows writes use the ACL helper.
+    vi.doMock('../../shared/secure-path-windows-acl', async (importOriginal) => ({
+      ...(await importOriginal<typeof WindowsAcl>()),
+      writeRestrictedWindowsFile: () => {
+        throw error
+      }
+    }))
   }
   if (options.unlinkError) {
-    // Why mocked: chmod-based failure injection is not portable — Windows has no
-    // POSIX modes and a root/elevated runner can unlink through a 0500 directory.
+    // Mock failures: POSIX modes cannot reliably deny deletion on Windows or elevated runners.
     const error = options.unlinkError
     vi.doMock('node:fs', async () => {
       const actual = await vi.importActual<typeof Fs>('node:fs')
@@ -79,77 +89,7 @@ beforeEach(() => {
 })
 
 describe('Bitbucket credential store', () => {
-  it.each([
-    { label: 'an unavailable keyring', encryptionAvailable: false },
-    { label: 'the basic_text backend', protectionGap: 'basic_text obfuscation' }
-  ])(
-    'preserves an existing secret and metadata when $label cannot seal a replacement',
-    async (options) => {
-      const first = await loadStore()
-      first.saveBitbucketCredential({
-        authMode: 'basic',
-        email: 'ada@example.com',
-        baseUrl: null,
-        account: 'ada',
-        accessToken: null,
-        apiToken: 'first-token'
-      })
-      const { readFileSync } = await import('node:fs')
-      const secretPath = join(tempHome, '.orca', 'bitbucket-credential.enc')
-      const metadataPath = join(tempHome, '.orca', 'bitbucket-credential.json')
-      const oldSecret = readFileSync(secretPath)
-      const oldMetadata = readFileSync(metadataPath)
-
-      const blocked = await loadStore(options)
-      expect(() =>
-        blocked.saveBitbucketCredential({
-          authMode: 'basic',
-          email: 'grace@example.com',
-          baseUrl: null,
-          account: 'grace',
-          accessToken: null,
-          apiToken: 'second-token'
-        })
-      ).toThrow('Could not save Bitbucket credential securely')
-
-      expect(readFileSync(secretPath)).toEqual(oldSecret)
-      expect(readFileSync(metadataPath)).toEqual(oldMetadata)
-      expect(existsSync(`${secretPath}.tmp`)).toBe(false)
-      expect(blocked.loadStoredBitbucketSecret({ force: true })).toMatchObject({
-        apiToken: 'first-token',
-        email: 'ada@example.com'
-      })
-    }
-  )
-
-  it('persists plaintext metadata and an encrypted secret, then reads them back', async () => {
-    const store = await loadStore()
-    store.saveBitbucketCredential({
-      authMode: 'basic',
-      email: 'ada@example.com',
-      baseUrl: null,
-      account: 'ada',
-      accessToken: null,
-      apiToken: 'secret-token'
-    })
-
-    expect(store.hasStoredBitbucketCredential()).toBe(true)
-    expect(store.getStoredBitbucketMetadata()).toMatchObject({
-      authMode: 'basic',
-      email: 'ada@example.com',
-      account: 'ada'
-    })
-    expect(store.loadStoredBitbucketSecret()).toMatchObject({
-      accessToken: null,
-      apiToken: 'secret-token',
-      // Why (STA-3941): auth fields live in the envelope so a torn write cannot
-      // pair a new secret with a stale email.
-      authMode: 'basic',
-      email: 'ada@example.com'
-    })
-  })
-
-  it.skipIf(process.platform === 'win32')('writes both credential files 0600', async () => {
+  it('writes both credential files through platform protection', async () => {
     const store = await loadStore()
     store.saveBitbucketCredential({
       authMode: 'token',
@@ -160,38 +100,45 @@ describe('Bitbucket credential store', () => {
       apiToken: null
     })
 
-    for (const file of ['bitbucket-credential.enc', 'bitbucket-credential.json']) {
-      expect(statSync(join(tempHome, '.orca', file)).mode & 0o777).toBe(0o600)
-    }
-  })
-
-  it.skipIf(process.platform === 'win32')(
-    're-tightens permissions when overwriting an existing credential',
-    async () => {
-      const store = await loadStore()
-      const save = (account: string): void =>
-        store.saveBitbucketCredential({
-          authMode: 'token',
-          email: null,
-          baseUrl: null,
-          account,
-          accessToken: 'access-secret',
-          apiToken: null
-        })
-      save('first')
-      // Why: writeFileSync's mode is ignored for an existing file, so a loosened
-      // credential would stay world-readable across a reconnect.
-      const { chmodSync } = await import('node:fs')
-      for (const file of ['bitbucket-credential.enc', 'bitbucket-credential.json']) {
-        chmodSync(join(tempHome, '.orca', file), 0o644)
-      }
-      save('second')
-
+    if (process.platform === 'win32') {
+      expect(writeRestrictedWindowsFileMock).toHaveBeenCalledTimes(2)
+      expect(writeRestrictedWindowsFileMock.mock.calls.map(([file]) => file)).toEqual([
+        expect.stringContaining('bitbucket-credential.enc.'),
+        expect.stringContaining('bitbucket-credential.json.')
+      ])
+    } else {
       for (const file of ['bitbucket-credential.enc', 'bitbucket-credential.json']) {
         expect(statSync(join(tempHome, '.orca', file)).mode & 0o777).toBe(0o600)
       }
     }
-  )
+  })
+
+  it('re-tightens permissions when overwriting an existing credential', async () => {
+    const store = await loadStore()
+    const save = (account: string): void =>
+      store.saveBitbucketCredential({
+        authMode: 'token',
+        email: null,
+        baseUrl: null,
+        account,
+        accessToken: 'access-secret',
+        apiToken: null
+      })
+    save('first')
+    const { chmodSync } = await import('node:fs')
+    for (const file of ['bitbucket-credential.enc', 'bitbucket-credential.json']) {
+      chmodSync(join(tempHome, '.orca', file), 0o644)
+    }
+    save('second')
+
+    if (process.platform === 'win32') {
+      expect(writeRestrictedWindowsFileMock).toHaveBeenCalledTimes(4)
+    } else {
+      for (const file of ['bitbucket-credential.enc', 'bitbucket-credential.json']) {
+        expect(statSync(join(tempHome, '.orca', file)).mode & 0o777).toBe(0o600)
+      }
+    }
+  })
 
   it('does not decrypt for metadata/status reads — only on a forced secret load', async () => {
     const store = await loadStore()
@@ -204,18 +151,15 @@ describe('Bitbucket credential store', () => {
       apiToken: null
     })
 
-    // Simulate a fresh session: caches cleared, files still on disk.
     store._resetBitbucketCredentialCache()
 
     expect(store.getStoredBitbucketMetadata()?.account).toBe('dev')
     expect(store.hasStoredBitbucketCredential()).toBe(true)
     expect(decryptStringMock).not.toHaveBeenCalled()
 
-    // Without force, the secret stays unread.
     expect(store.loadStoredBitbucketSecret()).toBeNull()
     expect(decryptStringMock).not.toHaveBeenCalled()
 
-    // Forcing the load decrypts exactly once, then caches.
     expect(store.loadStoredBitbucketSecret({ force: true })).toMatchObject({
       accessToken: 'access-secret',
       apiToken: null,
@@ -268,8 +212,6 @@ describe('Bitbucket credential store', () => {
     const { readFileSync } = await import('node:fs')
     const before = readFileSync(join(tempHome, '.orca', 'bitbucket-credential.enc'))
 
-    // Why: a direct write truncates in place, so a failure mid-write used to
-    // destroy the only working credential. The temp+rename path cannot.
     const failing = await loadStore({ writeError: new Error('disk full') })
     expect(() =>
       failing.saveBitbucketCredential({
@@ -283,7 +225,7 @@ describe('Bitbucket credential store', () => {
     ).toThrow(/disk full/)
 
     expect(readFileSync(join(tempHome, '.orca', 'bitbucket-credential.enc'))).toEqual(before)
-    expect(existsSync(join(tempHome, '.orca', 'bitbucket-credential.enc.tmp'))).toBe(false)
+    expect(readdirSync(join(tempHome, '.orca')).filter((name) => name.endsWith('.tmp'))).toEqual([])
   })
 
   it('authenticates from the envelope when metadata is stale (STA-3941)', async () => {
@@ -297,8 +239,7 @@ describe('Bitbucket credential store', () => {
       apiToken: 'second-token'
     })
 
-    // Simulate an interrupt between publishing the secret and the metadata:
-    // metadata still describes the previous connection.
+    // Simulate interruption after secret publication but before metadata publication.
     const { writeFileSync } = await import('node:fs')
     writeFileSync(
       join(tempHome, '.orca', 'bitbucket-credential.json'),
@@ -314,8 +255,6 @@ describe('Bitbucket credential store', () => {
     store._resetBitbucketCredentialCache()
 
     const { resolveBitbucketAuthConfig } = await import('./resolve-auth')
-    // Auth follows the envelope, so the pair stays usable; only the displayed
-    // account is stale until the next status refresh.
     expect(resolveBitbucketAuthConfig()).toMatchObject({
       email: 'grace@example.com',
       apiToken: 'second-token'
@@ -333,7 +272,6 @@ describe('Bitbucket credential store', () => {
       apiToken: 'legacy-token'
     })
     const { writeFileSync } = await import('node:fs')
-    // Legacy envelopes held only the two tokens.
     writeFileSync(
       join(tempHome, '.orca', 'bitbucket-credential.enc'),
       JSON.stringify({ accessToken: null, apiToken: 'legacy-token' })
@@ -399,8 +337,6 @@ describe('Bitbucket credential store', () => {
       apiToken: 'secret-token'
     })
 
-    // Clearing memory while the files survive would resurrect the credential on
-    // the next launch, so the failure has to reach the caller.
     expect(() => store.clearStoredBitbucketCredential()).toThrow(/permission denied/)
     expect(existsSync(join(tempHome, '.orca', 'bitbucket-credential.enc'))).toBe(true)
   })

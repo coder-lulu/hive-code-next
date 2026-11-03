@@ -157,63 +157,69 @@ function callsRealFixture(file: ts.SourceFile): boolean {
 
 // Exact reviewed owners; this list must never be replaced by the mobile-web-app prefix.
 const DIRECT_OWNERS = [
-  'config/scripts/mobile-web-app-agent-history-render.test.mjs',
-  'config/scripts/mobile-web-app-browser-pane-render.test.mjs',
-  'config/scripts/mobile-web-app-clipboard-image-resize-render.test.mjs',
-  'config/scripts/mobile-web-app-drawer-render.test.mjs',
-  'config/scripts/mobile-web-app-files-render.test.mjs',
-  'config/scripts/mobile-web-app-frame-budget-sweep.test.ts',
-  'config/scripts/mobile-web-app-handoff-grants-render.test.mjs',
-  'config/scripts/mobile-web-app-held-press-render.test.mjs',
-  'config/scripts/mobile-web-app-html-preview-render.test.mjs',
-  'config/scripts/mobile-web-app-media-preview-render.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-agent-icon-render.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-composer-sizing-render.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-mermaid-render.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-agent-history-render.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-browser-pane-render.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-clipboard-image-resize-render.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-drawer-render.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-files-render.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-frame-budget-sweep.test.ts',
+  'config/scripts/mobile-web-app/mobile-web-app-handoff-grants-render.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-held-press-render.test.mjs',
+  'config/scripts/mobile-web-app/preview/mobile-web-app-html-preview-render.test.mjs',
+  'config/scripts/mobile-web-app/preview/mobile-web-app-media-preview-render.test.mjs',
   'config/scripts/mobile-web-app-mermaid-render.test.mjs',
-  'config/scripts/mobile-web-app-native-chat-visual-links.test.mjs',
-  'config/scripts/mobile-web-app-native-parity-render.test.mjs',
-  'config/scripts/mobile-web-app-render.test.mjs',
-  'config/scripts/mobile-web-app-rich-markdown-render.test.mjs',
-  'config/scripts/mobile-web-app-safe-area-render.test.mjs',
-  'config/scripts/mobile-web-app-session-render.test.mjs',
-  'config/scripts/mobile-web-app-session-terminal-init.test.mjs',
-  'config/scripts/mobile-web-app-source-control-render.test.mjs',
-  'config/scripts/mobile-web-app-stack-transition-render.test.mjs',
-  'config/scripts/mobile-web-app-tasks-render.test.mjs',
-  'config/scripts/mobile-web-app-terminal-live-input-render.test.mjs',
-  'config/scripts/mobile-web-app-working-spinner-render.test.mjs'
+  'config/scripts/mobile-web-app/mobile-web-app-native-chat-visual-links.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-native-parity-render.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-render.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-rich-markdown-render.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-safe-area-render.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-session-render.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-session-terminal-init.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-source-control-render.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-stack-transition-render.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-tasks-render.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-terminal-live-input-render.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-working-spinner-render.test.mjs'
 ]
 
 const HELPER_OWNERS = [
-  'config/scripts/mobile-web-app-terminal-render.test.mjs',
-  'config/scripts/mobile-web-app-terminal-render-fixture.test.mjs'
+  'config/scripts/mobile-web-app/mobile-web-app-terminal-font-render.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-terminal-render.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-terminal-render-fixture.test.mjs'
 ]
 
 const PURE_OWNERS = [
+  'config/scripts/mobile-web-app/mobile-web-app-push-subsystem-closure.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-session-dictation-capture.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-session-terminal-closure.test.mjs',
   'config/scripts/mobile-web-app-csp.test.mjs',
-  'config/scripts/mobile-web-app-editable-host-font-size.test.mjs',
-  'config/scripts/mobile-web-app-external-link-seam.test.mjs',
-  'config/scripts/mobile-web-app-external-navigation-grant.test.mjs',
-  'config/scripts/mobile-web-app-files-external-links.test.mjs',
-  'config/scripts/mobile-web-app-haptics-seam.test.mjs',
-  'config/scripts/mobile-web-app-module-closure-entrypoints.test.mjs',
-  'config/scripts/mobile-web-app-module-entry-resolution.test.mjs',
+  'config/scripts/mobile-web-app/platform-seams/mobile-web-app-editable-host-font-size.test.mjs',
+  'config/scripts/mobile-web-app/platform-seams/mobile-web-app-external-link-seam.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-external-navigation-grant.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-files-external-links.test.mjs',
+  'config/scripts/mobile-web-app/platform-seams/mobile-web-app-haptics-seam.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-module-closure-entrypoints.test.mjs',
   'config/scripts/mobile-web-app-override-inventory.test.mjs',
-  'config/scripts/mobile-web-app-page-closure-families.test.mjs',
-  'config/scripts/mobile-web-app-page-grant-call-sites.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-page-closure-families.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-page-grant-call-sites.test.mjs',
   'config/scripts/mobile-web-app-push-subsystem-closure.test.mjs',
-  'config/scripts/mobile-web-app-route-manifest.test.mjs',
-  'config/scripts/mobile-web-app-route-snapshot.test.mjs',
-  'config/scripts/mobile-web-app-screencast-lane-grant.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-route-manifest.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-route-snapshot.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-screencast-lane-grant.test.mjs',
   'config/scripts/mobile-web-app-session-dictation-capture.test.mjs',
-  'config/scripts/mobile-web-app-session-external-links.test.mjs',
-  'config/scripts/mobile-web-app-session-media-picker.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-session-external-links.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-session-media-picker.test.mjs',
   'config/scripts/mobile-web-app-session-terminal-closure.test.mjs',
   'config/scripts/mobile-web-app-session-text-inputs.test.mjs',
-  'config/scripts/mobile-web-app-session-webview-consumers.test.mjs',
-  'config/scripts/mobile-web-app-source-control-external-links.test.mjs',
-  'config/scripts/mobile-web-app-source-control-keyboard.test.mjs',
-  'config/scripts/mobile-web-app-source-control-text-inputs.test.mjs',
-  'config/scripts/mobile-web-app-tasks-external-links.test.mjs',
-  'config/scripts/mobile-web-app-text-input-discovery.test.mjs'
+  'config/scripts/mobile-web-app/mobile-web-app-session-webview-consumers.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-source-control-external-links.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-source-control-keyboard.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-source-control-text-inputs.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-tasks-external-links.test.mjs',
+  'config/scripts/mobile-web-app/mobile-web-app-text-input-discovery.test.mjs'
 ]
 
 it.each([
@@ -303,7 +309,7 @@ it.each(DIRECT_OWNERS)('proves the real imported Playwright launch in %s', (owne
 
 it.each(HELPER_OWNERS)('proves the real helper call and producer launch for %s', (owner) => {
   expect(callsRealFixture(source(owner))).toBe(true)
-  expect(launchesPlaywright(source(`config/scripts/${FIXTURE.slice(2)}`))).toBe(true)
+  expect(launchesPlaywright(source(`config/scripts/mobile-web-app/${FIXTURE.slice(2)}`))).toBe(true)
 })
 
 it.each([...DIRECT_OWNERS, ...HELPER_OWNERS])(
@@ -314,14 +320,15 @@ it.each([...DIRECT_OWNERS, ...HELPER_OWNERS])(
 )
 
 it('keeps the reviewed browser inventory exact without prefix or wider glob ownership', () => {
-  expect(DIRECT_OWNERS).toHaveLength(23)
-  expect(HELPER_OWNERS).toHaveLength(2)
-  expect(PURE_OWNERS).toHaveLength(26)
+  expect(DIRECT_OWNERS).toHaveLength(26)
+  expect(HELPER_OWNERS).toHaveLength(3)
+  expect(PURE_OWNERS).toHaveLength(28)
   const owners = [...DIRECT_OWNERS, ...HELPER_OWNERS]
-  expect(new Set(owners).size).toBe(25)
-  const prefixFiles = globSync('config/scripts/mobile-web-app-*.test.{mjs,ts}').map((file) =>
-    file.replaceAll('\\', '/')
-  )
+  expect(new Set(owners).size).toBe(29)
+  const prefixFiles = globSync([
+    'config/scripts/mobile-web-app-*.test.{mjs,ts}',
+    'config/scripts/mobile-web-app/**/mobile-web-app-*.test.{mjs,ts}'
+  ]).map((file) => file.replaceAll('\\', '/'))
   expect(prefixFiles.sort()).toEqual([...owners, ...PURE_OWNERS].sort())
   for (const pattern of NODE_RUNTIME_INCLUDE) {
     for (const owner of prefixFiles.filter((file) => matchesGlob(file, pattern))) {

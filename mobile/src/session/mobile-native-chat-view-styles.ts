@@ -1,112 +1,109 @@
 import { StyleSheet } from 'react-native'
-import type { MobileTheme } from '../theme/mobile-theme'
+import { colors, spacing, typography } from '../theme/mobile-theme'
+import { themedStyleSheet } from '../theme/themed-styles'
 
-export function createMobileNativeChatViewStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    root: {
-      flex: 1,
-      backgroundColor: theme.color.bg.canvas
-    },
-    chromeRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      minHeight: theme.size.minimumTouchTarget,
-      paddingHorizontal: theme.spacing.space12
-    },
-    chromeLeft: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.space8
-    },
-    stopButton: {
-      minHeight: theme.size.minimumTouchTarget,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.space4,
-      paddingHorizontal: theme.spacing.space8
-    },
-    stopLabel: {
-      ...theme.typography.meta,
-      color: theme.color.status.dangerText,
-      fontWeight: '600'
-    },
-    sendError: {
-      alignItems: 'center',
-      paddingHorizontal: theme.spacing.space12,
-      paddingBottom: theme.spacing.space4
-    },
-    sendErrorText: {
-      ...theme.typography.meta,
-      color: theme.color.status.dangerText,
-      fontWeight: '600'
-    },
-    chromeToggle: {
-      minHeight: theme.size.minimumTouchTarget,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.space4,
-      paddingHorizontal: theme.spacing.space8
-    },
-    chromeToggleLabel: {
-      ...theme.typography.meta,
-      color: theme.color.text.tertiary,
-      fontWeight: '600'
-    },
-    pressed: {
-      opacity: 0.64
-    },
-    listWrap: {
-      flex: 1,
-      position: 'relative'
-    },
-    listContent: {
-      paddingVertical: theme.spacing.space8,
-      flexGrow: 1
-    },
-    center: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: theme.spacing.space24
-    },
-    emptyTitle: {
-      ...theme.typography.sectionTitle,
-      color: theme.color.text.secondary,
-      textAlign: 'center',
-      marginBottom: theme.spacing.space4
-    },
-    emptySubtitle: {
-      ...theme.typography.meta,
-      color: theme.color.text.tertiary,
-      textAlign: 'center'
-    },
-    fab: {
-      position: 'absolute',
-      right: theme.spacing.space12,
-      width: theme.size.minimumTouchTarget,
-      height: theme.size.minimumTouchTarget,
-      borderRadius: theme.radii.circle,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.color.bg.elevated,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.color.border.default
-    },
-    fabBottom: {
-      bottom: theme.spacing.space12
-    },
-    loadEarlier: {
-      minHeight: theme.size.minimumTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: theme.spacing.space12
-    },
-    loadEarlierText: {
-      ...theme.typography.meta,
-      color: theme.color.text.tertiary,
-      fontWeight: '600'
-    }
-  })
-}
+const FLOATING_CONTROLS_BOTTOM = spacing.md
+const LOAD_EARLIER_HEIGHT = 44
+const LOAD_EARLIER_RETRY_HEIGHT = 28
+
+export const styles = themedStyleSheet(() => ({
+  hidden: { display: 'none' },
+  root: {
+    flex: 1,
+    backgroundColor: colors.bgBase
+  },
+  inputLockStatus: {
+    color: colors.textSecondary,
+    fontSize: typography.metaSize,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xs
+  },
+  sendError: {
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xs
+  },
+  sendErrorText: {
+    color: colors.statusRed,
+    fontSize: typography.metaSize,
+    fontWeight: '600'
+  },
+  floatingControls: {
+    position: 'absolute',
+    right: spacing.md,
+    bottom: FLOATING_CONTROLS_BOTTOM,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm
+  },
+  listWrap: {
+    flex: 1,
+    position: 'relative'
+  },
+  listContent: {
+    paddingVertical: spacing.sm,
+    flexGrow: 1
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl
+  },
+  emptyTitle: {
+    color: colors.textSecondary,
+    fontSize: typography.bodySize,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: spacing.xs
+  },
+  emptySubtitle: {
+    color: colors.textMuted,
+    fontSize: typography.metaSize,
+    textAlign: 'center'
+  },
+  fab: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bgRaised,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle
+  },
+  loadEarlier: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: LOAD_EARLIER_HEIGHT
+  },
+  loadEarlierFailed: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md
+  },
+  loadEarlierRetry: {
+    justifyContent: 'center',
+    height: LOAD_EARLIER_RETRY_HEIGHT,
+    paddingHorizontal: spacing.md,
+    borderRadius: LOAD_EARLIER_RETRY_HEIGHT / 2,
+    backgroundColor: colors.bgRaised,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle
+  },
+  loadEarlierRetryPressed: {
+    opacity: 0.6
+  },
+  loadEarlierRetryLabel: {
+    color: colors.textSecondary,
+    fontSize: typography.metaSize,
+    fontWeight: '600'
+  },
+  loadEarlierFailedText: {
+    flexShrink: 1,
+    color: colors.textMuted,
+    fontSize: typography.metaSize,
+    textAlign: 'center'
+  }
+}))

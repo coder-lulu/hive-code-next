@@ -1,123 +1,279 @@
 <h1 align="center">
-  <img src="resources/build/icon.png" alt="HiveCode" width="64" valign="middle" /> HiveCode
+  <a href="https://onOrca.dev"><img src="resources/build/icon.png" alt="Orca" width="64" valign="middle" /></a> Orca
 </h1>
 
-<p align="center">面向并行 AI 编程的工作台，把智能体、Git 工作树、终端和代码审阅放在一起。</p>
+<p align="center">
+  <a href="https://github.com/stablyai/orca"><img src="https://img.shields.io/github/stars/stablyai/orca?style=flat&amp;label=%E2%98%85&amp;color=08C" alt="GitHub stars" /></a>
+  <a href="https://github.com/stablyai/orca/releases"><img src="docs/assets/readme-downloads.svg" alt="Total downloads across all releases" /></a>
+  <img src="https://img.shields.io/badge/license-MIT-08C?style=flat" alt="License: MIT" />
+  <a href="https://discord.gg/fzjDKHxv8Q"><img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white" alt="Join the Orca Discord" /></a>
+  <a href="https://x.com/orca_build"><img src="https://img.shields.io/badge/X-000000?logo=x&logoColor=white" alt="Follow Orca on X" /></a>
+  <img src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-4493F8?style=flat-square" alt="Supported platforms: macOS, Windows, and Linux" />
+</p>
 
-HiveCode 提供 macOS、Windows 和 Linux 桌面客户端，以及 Android、iOS 和浏览器访问入口。桌面、手机和浏览器可以连接同一运行主机，查看项目、工作树与会话，并继续处理正在进行的开发任务。
+<p align="center">
+  <sub><a href="docs/readme/README.zh-CN.md">中文</a> · <a href="docs/readme/README.ja.md">日本語</a> · <a href="docs/readme/README.ko.md">한국어</a> · <a href="docs/readme/README.es.md">Español</a> · <a href="docs/readme/README.fr.md">Français</a> · <a href="docs/readme/README.pt.md">Português</a> · <a href="docs/readme/README.tr.md">Türkçe</a> · <a href="docs/readme/README.ru.md">Русский</a></sub>
+</p>
 
-## 核心能力
+<p align="center">
+  <strong>The AI Orchestrator for 100x builders.</strong><br/>
+  Run Codex, ClaudeCode, OpenCode or Pi side-by-side — each in its own worktree, tracked in one place.
+</p>
 
-| 能力              | 当前实现                                                                                             |
-| ----------------- | ---------------------------------------------------------------------------------------------------- |
-| 项目与 Git 工作树 | 导入本地目录或克隆仓库，创建、切换和管理独立工作树，为并行任务隔离工作目录。                         |
-| 智能体会话        | 接入 Codex、Claude Code、OpenCode、Gemini、Pi 等工具，在工作树中运行多个会话，查看输出、状态和历史。 |
-| 终端与文件        | 使用集成终端、文件浏览与编辑、Markdown 预览和文件搜索。                                              |
-| 代码审阅          | 查看 Git 改动和差异，执行提交操作，处理已连接代码托管平台上的 PR。                                   |
-| 浏览器工具        | 使用浏览器视图，以及页面操作、截图、控制台和网络检查工具。                                           |
-| 远程工作          | 连接 SSH 主机或已配对的运行主机，访问其项目、终端与会话。                                            |
-| 移动协作          | 配对后查看工作区、会话、终端、文件、源码管理、任务与智能体历史，并使用已配置的通知能力。             |
+<h3 align="center"><a href="https://onorca.dev/download"><ins>Download Orca</ins></a></h3>
 
-第三方智能体需要安装对应工具，并完成各自的账户登录或 API 授权。不同工具提供的模型、额度和会话能力由其自身服务决定。
+<p align="center">
+  <img src="docs/assets/readme-hero.jpg" alt="Orca desktop app running agents in parallel worktrees, with the Orca mobile companion app in the corner" width="960" />
+</p>
 
-## 桌面、手机与浏览器
+## Features
 
-桌面客户端提供完整工作台。移动客户端通过扫码或配对信息连接运行主机；浏览器客户端也通过配对访问同一主机的数据和会话。
+<table>
+<tr>
+<td width="50%" valign="middle">
 
-桌面与无界面模式共享同一套运行服务（runtime）。运行主机可以在没有桌面窗口的模式下工作，适用于服务器与远程开发。客户端需要能够访问主机端点；SSH 转发、局域网或其他已配置网络可以提供连接通道。浏览器与终端相关功能仍需要目标系统的原生运行依赖。
+### Mobile Companion
 
-Hive 账户登录和账户中继需要可用的 Hive 后端及有效授权。HiveCode 不提供内置智能体、模型 API 或 API 额度。登录渠道以服务实际返回的能力为准；通知还需要系统权限与对应平台的推送配置。
+Monitor and steer your agents from your phone — get notified when an agent finishes and send follow-ups from anywhere.
 
-## 从源码开发
+[iOS App Store](https://apps.apple.com/us/app/orca-ide/id6766130217) · [Android APK](https://www.onorca.dev/download/android) · [Docs →](https://www.onorca.dev/docs/mobile)
 
-需要 Git、Node.js **24.18.0**、pnpm **12.8.1**，以及当前平台的原生编译工具。精确版本与平台约束见 [工具链配置](config/toolchain.json)。
+</td>
+<td width="50%">
+  <a href="https://www.onorca.dev/docs/mobile"><picture><source srcset="docs/assets/feature-wall/mobile-companion-app-showcase.gif" type="image/gif"><img src="docs/assets/feature-wall/mobile-companion-app-showcase.jpg" alt="Orca desktop with the mobile companion app" width="100%" /></picture></a>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="middle">
 
-获取源码后，在仓库根目录执行：
+### Parallel Worktrees
+
+Fan one prompt across five agents, each in its own isolated git worktree — compare the results and merge the winner.
+
+[Docs →](https://www.onorca.dev/docs/model/worktrees)
+
+</td>
+<td width="50%">
+  <a href="https://www.onorca.dev/docs/model/worktrees"><picture><source srcset="docs/site/public/docs/tab-split.gif" type="image/gif"><img src="docs/site/public/docs/posters/tab-split.jpg" alt="Parallel worktree orchestration" width="100%" /></picture></a>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="middle">
+
+### Terminal Splits
+
+Ghostty-class terminals with WebGL rendering, infinite splits, and scrollback that survives restarts.
+
+[Docs →](https://www.onorca.dev/docs/terminal)
+
+</td>
+<td width="50%">
+  <a href="https://www.onorca.dev/docs/terminal"><picture><source srcset="resources/onboarding/feature-wall/tile-02.webp" type="image/webp"><img src="resources/onboarding/feature-wall/tile-02.poster.jpg" alt="Terminal splits" width="100%" /></picture></a>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="middle">
+
+### Design Mode
+
+Click any UI element in a real Chromium window to send its HTML, CSS, and a cropped screenshot straight into your agent's prompt.
+
+[Docs →](https://www.onorca.dev/docs/browser/design-mode)
+
+</td>
+<td width="50%">
+  <a href="https://www.onorca.dev/docs/browser/design-mode"><picture><source srcset="docs/site/public/docs/orca-design-mode.gif" type="image/gif"><img src="resources/onboarding/feature-wall/tile-05.poster.jpg" alt="Embedded browser and Design Mode" width="100%" /></picture></a>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="middle">
+
+### GitHub &amp; Linear, Native
+
+Browse PRs, issues, and project boards in-app — open a worktree from any task and review without a context switch.
+
+[Docs →](https://www.onorca.dev/docs/review/linear)
+
+</td>
+<td width="50%">
+  <a href="https://www.onorca.dev/docs/review/linear"><picture><source srcset="resources/onboarding/feature-wall/tile-03.webp" type="image/webp"><img src="resources/onboarding/feature-wall/tile-03.poster.jpg" alt="GitHub and Linear task workflows in Orca" width="100%" /></picture></a>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="middle">
+
+### SSH Worktrees
+
+Run agents on a beefy remote box with full file editing, git, and terminals — auto-reconnect and port forwarding included.
+
+[Docs →](https://www.onorca.dev/docs/ssh)
+
+</td>
+<td width="50%">
+  <a href="https://www.onorca.dev/docs/ssh"><picture><source srcset="resources/onboarding/feature-wall/tile-06.webp" type="image/webp"><img src="resources/onboarding/feature-wall/tile-06.poster.jpg" alt="Remote worktrees over SSH" width="100%" /></picture></a>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="middle">
+
+### Annotate AI Diffs
+
+Drop comments on any diff line and ship them back to the agent — review, edit, and commit without leaving Orca.
+
+[Docs →](https://www.onorca.dev/docs/review/annotate-ai-diff)
+
+</td>
+<td width="50%">
+  <a href="https://www.onorca.dev/docs/review/annotate-ai-diff"><picture><source srcset="docs/site/public/docs/annotate-ai-diff.gif" type="image/gif"><img src="resources/onboarding/feature-wall/tile-08.poster.jpg" alt="Annotate AI-generated diffs" width="100%" /></picture></a>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="middle">
+
+### Drag Files to Agents
+
+VS Code's editor with autosave everywhere — drag files or images straight into an agent prompt.
+
+[Docs →](https://www.onorca.dev/docs/editing/file-explorer)
+
+</td>
+<td width="50%">
+  <a href="https://www.onorca.dev/docs/editing/file-explorer"><picture><source srcset="resources/onboarding/feature-wall/tile-07.gif" type="image/gif"><img src="resources/onboarding/feature-wall/tile-07.poster.jpg" alt="Drag files and images into an agent prompt" width="100%" /></picture></a>
+</td>
+</tr>
+<tr>
+<td width="50%" valign="middle">
+
+### Orca CLI
+
+Agents drive Orca too — script every workflow with `orca worktree create`, `snapshot`, `click`, and `fill`.
+
+[Docs →](https://www.onorca.dev/docs/cli/overview)
+
+</td>
+<td width="50%">
+  <a href="https://www.onorca.dev/docs/cli/overview"><picture><source srcset="resources/onboarding/feature-wall/tile-09.webp" type="image/webp"><img src="resources/onboarding/feature-wall/tile-09.poster.jpg" alt="Script Orca from the CLI" width="100%" /></picture></a>
+</td>
+</tr>
+</table>
+
+**Also in the box:**
+
+- **[Quick open](https://www.onorca.dev/docs/model/quick-open)** — Search across worktrees, files, agents, commands, and repo context without leaving your flow.
+- **[Account switcher &amp; usage tracking](https://www.onorca.dev/docs/agents/usage-tracking)** — See Claude and Codex usage and rate-limit resets, and hot-swap accounts without re-logging in.
+- **[Rich repo previews](https://www.onorca.dev/docs/editing/markdown)** — Preview Markdown, images, PDFs, and repo docs in the workspace.
+- **[Computer Use](https://www.onorca.dev/docs/cli/computer-use)** — Let agents operate desktop apps and visible UI when a workflow needs real interaction.
+- **[Notifications and unread state](https://www.onorca.dev/docs/notifications)** — Know when an agent finishes or needs attention, then mark threads unread to come back later.
+- **And many, many more** — we ship daily, so this list is perpetually behind. The [changelog](https://github.com/stablyai/orca/releases) is the real feature list.
+
+---
+
+## Supported Agents
+
+Works with **any CLI agent** — if it runs in a terminal, it runs in Orca.
+
+<p>
+  <a href="https://docs.anthropic.com/claude/docs/claude-code"><kbd><img src="docs/assets/claude-logo.svg" alt="Claude Code logo" width="16" valign="middle" /> Claude Code</kbd></a> &nbsp;
+  <a href="https://github.com/openai/codex"><kbd><img src="https://www.google.com/s2/favicons?domain=openai.com&sz=64" alt="Codex logo" width="16" valign="middle" /> Codex</kbd></a> &nbsp;
+  <a href="https://x.ai/cli"><kbd><img src="https://www.google.com/s2/favicons?domain=x.ai&sz=64" alt="Grok logo" width="16" valign="middle" /> Grok</kbd></a> &nbsp;
+  <a href="https://cursor.com/cli"><kbd><img src="https://www.google.com/s2/favicons?domain=cursor.com&sz=64" alt="Cursor logo" width="16" valign="middle" /> Cursor</kbd></a> &nbsp;
+  <a href="https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli"><kbd><img src="https://www.google.com/s2/favicons?domain=github.com&sz=64" alt="GitHub Copilot logo" width="16" valign="middle" /> GitHub Copilot</kbd></a> &nbsp;
+  <a href="https://dev.meta.ai/docs/muse-code"><kbd><img src="src/shared/agent-icons/muse.png" alt="Muse logo" width="16" valign="middle" /> Muse</kbd></a> &nbsp;
+  <a href="https://deepseek-harness.github.io/deepseek-harness/"><kbd><img src="src/shared/agent-icons/dsh.png" alt="DeepSeek Harness logo" width="16" valign="middle" /> DeepSeek Harness</kbd></a> &nbsp;
+  <a href="https://zcode.z.ai/en/docs"><kbd><img src="src/shared/agent-icons/zcode.png" alt="ZCode logo" width="16" valign="middle" /> ZCode</kbd></a> &nbsp;
+  <a href="https://opencode.ai/docs/cli/"><kbd><img src="https://www.google.com/s2/favicons?domain=opencode.ai&sz=64" alt="OpenCode logo" width="16" valign="middle" /> OpenCode</kbd></a> &nbsp;
+  <a href="https://mimo.xiaomi.com/coder"><kbd><img src="https://www.google.com/s2/favicons?domain=mimo.xiaomi.com&sz=64" alt="MiMo Code logo" width="16" valign="middle" /> MiMo Code</kbd></a> &nbsp;
+  <a href="https://ampcode.com/manual#install"><kbd><img src="https://www.google.com/s2/favicons?domain=ampcode.com&sz=64" alt="Amp logo" width="16" valign="middle" /> Amp</kbd></a> &nbsp;
+  <a href="https://openclaude.gitlawb.com/"><kbd><img src="resources/openclaude-logo.png" alt="OpenClaude logo" width="16" valign="middle" /> OpenClaude</kbd></a> &nbsp;
+  <a href="https://antigravity.google/docs/cli-overview"><kbd><img src="https://www.google.com/s2/favicons?domain=antigravity.google&sz=64" alt="Antigravity logo" width="16" valign="middle" /> Antigravity</kbd></a> &nbsp;
+  <a href="https://pi.dev"><kbd><img src="https://pi.dev/favicon.svg" alt="Pi logo" width="16" valign="middle" /> Pi</kbd></a> &nbsp;
+  <a href="https://omp.sh"><kbd><img src="https://omp.sh/favicon.svg" alt="oh-my-pi logo" width="16" valign="middle" /> oh-my-pi</kbd></a> &nbsp;
+  <a href="https://hermes-agent.nousresearch.com/docs/"><kbd><img src="https://www.google.com/s2/favicons?domain=nousresearch.com&sz=64" alt="Hermes Agent logo" width="16" valign="middle" /> Hermes Agent</kbd></a> &nbsp;
+  <a href="https://devin.ai/cli"><kbd><img src="https://www.google.com/s2/favicons?domain=devin.ai&sz=64" alt="Devin logo" width="16" valign="middle" /> Devin</kbd></a> &nbsp;
+  <a href="https://goose-docs.ai/docs/quickstart/"><kbd><img src="https://www.google.com/s2/favicons?domain=goose-docs.ai&sz=64" alt="Goose logo" width="16" valign="middle" /> Goose</kbd></a> &nbsp;
+  <a href="https://docs.augmentcode.com/cli/overview"><kbd><img src="https://www.google.com/s2/favicons?domain=augmentcode.com&sz=64" alt="Auggie logo" width="16" valign="middle" /> Auggie</kbd></a> &nbsp;
+  <a href="https://github.com/autohandai/code-cli"><kbd><img src="https://www.google.com/s2/favicons?domain=autohand.ai&sz=64" alt="Autohand Code logo" width="16" valign="middle" /> Autohand Code</kbd></a> &nbsp;
+  <a href="https://github.com/charmbracelet/crush"><kbd><img src="https://www.google.com/s2/favicons?domain=charm.sh&sz=64" alt="Charm logo" width="16" valign="middle" /> Charm</kbd></a> &nbsp;
+  <a href="https://docs.cline.bot/cline-cli/overview"><kbd><img src="https://www.google.com/s2/favicons?domain=cline.bot&sz=64" alt="Cline logo" width="16" valign="middle" /> Cline</kbd></a> &nbsp;
+  <a href="https://www.codebuddy.ai/cli"><kbd><img src="https://www.google.com/s2/favicons?domain=codebuddy.ai&sz=64" alt="CodeBuddy logo" width="16" valign="middle" /> CodeBuddy</kbd></a> &nbsp;
+  <a href="https://www.codebuff.com/docs/help/quick-start"><kbd><img src="https://www.google.com/s2/favicons?domain=codebuff.com&sz=64" alt="Codebuff logo" width="16" valign="middle" /> Codebuff</kbd></a> &nbsp;
+  <a href="https://freebuff.com"><kbd><img src="src/shared/agent-icons/freebuff.png" alt="Freebuff logo" width="16" valign="middle" /> Freebuff</kbd></a> &nbsp;
+  <a href="https://commandcode.ai/docs/quickstart"><kbd><img src="https://www.google.com/s2/favicons?domain=commandcode.ai&sz=64" alt="Command Code logo" width="16" valign="middle" /> Command Code</kbd></a> &nbsp;
+  <a href="https://docs.continue.dev/cli/quickstart"><kbd><img src="https://www.google.com/s2/favicons?domain=continue.dev&sz=64" alt="Continue logo" width="16" valign="middle" /> Continue</kbd></a> &nbsp;
+  <a href="https://docs.factory.ai/cli/getting-started/quickstart"><kbd><img src="docs/assets/droid-logo.svg" alt="Droid logo" width="16" valign="middle" /> Droid</kbd></a> &nbsp;
+  <a href="https://kilo.ai/docs/cli"><kbd><img src="https://raw.githubusercontent.com/Kilo-Org/kilocode/main/packages/kilo-vscode/assets/icons/kilo-light.svg" alt="Kilocode logo" width="16" valign="middle" /> Kilocode</kbd></a> &nbsp;
+  <a href="https://www.kimi.com/code/docs/en/kimi-code-cli/getting-started.html"><kbd><img src="https://www.google.com/s2/favicons?domain=moonshot.cn&sz=64" alt="Kimi logo" width="16" valign="middle" /> Kimi</kbd></a> &nbsp;
+  <a href="https://kiro.dev/docs/cli/"><kbd><img src="https://www.google.com/s2/favicons?domain=kiro.dev&sz=64" alt="Kiro logo" width="16" valign="middle" /> Kiro</kbd></a> &nbsp;
+  <a href="https://github.com/mistralai/mistral-vibe"><kbd><img src="https://www.google.com/s2/favicons?domain=mistral.ai&sz=64" alt="Mistral Vibe logo" width="16" valign="middle" /> Mistral Vibe</kbd></a> &nbsp;
+  <a href="https://github.com/QwenLM/qwen-code"><kbd><img src="https://www.google.com/s2/favicons?domain=qwenlm.github.io&sz=64" alt="Qwen Code logo" width="16" valign="middle" /> Qwen Code</kbd></a> &nbsp;
+  <a href="https://support.atlassian.com/rovo/docs/install-and-run-rovo-dev-cli-on-your-device/"><kbd><img src="https://www.google.com/s2/favicons?domain=atlassian.com&sz=64" alt="Rovo Dev logo" width="16" valign="middle" /> Rovo Dev</kbd></a> &nbsp;
+  <kbd>+ any CLI agent</kbd>
+</p>
+
+---
+
+## Install
+
+### Desktop — macOS, Windows, Linux
+
+- **[Download from onOrca.dev](https://onorca.dev/download)**
+- Or grab a build directly: [macOS Apple Silicon](https://github.com/stablyai/orca/releases/latest/download/orca-macos-arm64.dmg) · [macOS Intel](https://github.com/stablyai/orca/releases/latest/download/orca-macos-x64.dmg) · [Windows (.exe)](https://github.com/stablyai/orca/releases/latest/download/orca-windows-setup.exe) · [Linux AppImage](https://github.com/stablyai/orca/releases/latest/download/orca-linux.AppImage) · [All builds](https://github.com/stablyai/orca/releases/latest)
+
+_Or via a package manager:_
 
 ```bash
-pnpm install --frozen-lockfile --ignore-scripts
-pnpm --dir mobile install --frozen-lockfile --ignore-scripts
-pnpm dev
+# macOS (Homebrew)
+# Always use the full name; bare `orca` is an unrelated Plotly cask.
+brew install --cask stablyai/orca/orca
+# Upgrade an existing install
+brew upgrade --cask stablyai/orca/orca
+
+# Arch Linux (AUR) — or stably-orca-git to build from source
+yay -S stably-orca-bin
 ```
 
-`pnpm dev` 会准备 Electron 原生运行环境，再启动桌面开发模式。移动端使用独立的依赖目录和锁文件。
+### Mobile Companion — iOS, Android
 
-首次运行完整 `pnpm test` 前，执行 `node config/scripts/prepare-cross-version-baselines.mjs` 获取跨版本测试所需的固定上游快照，并在同一终端设置 `ORCA_CROSS_VERSION_BASELINE_REF=v1.4.186`。Bash 使用 `export ORCA_CROSS_VERSION_BASELINE_REF=v1.4.186`，PowerShell 使用 `$env:ORCA_CROSS_VERSION_BASELINE_REF='v1.4.186'`。这些快照用于历史回归验证，不会写入公开分支或创建发布标签；涉及真实 shell 的测试还需要本机安装相应工具。
+Pair with your desktop app to monitor and steer your agents from your phone.
 
-常用检查：
+- **iOS:** [Download on the App Store](https://apps.apple.com/us/app/orca-ide/id6766130217)
+- **Android:** [Download APK](https://www.onorca.dev/download/android) · [Install guide](https://www.onorca.dev/docs/android-apk)
 
-```bash
-pnpm run typecheck
-pnpm lint
-pnpm test
+---
 
-pnpm --dir mobile typecheck
-pnpm --dir mobile lint
-pnpm --dir mobile test
-```
+## Community &amp; Support
 
-完整单测使用产品固定的 Node 版本。需要私有 HiveRelay Cell 源码与 BEAM 工具链的真实 mTLS 集成验证由 [Cell 私有 Actions](https://github.com/coder-lulu/hive-relay-cell/actions/workflows/client-mtls-integration.yml) 执行，并记录被验证的公开源码提交。获授权的开发者也可设置 `HIVE_RELAY_CELL_SOURCE` 为 Cell 源码的绝对路径，准备 Elixir `1.20.2-otp-29`、Erlang `29.0.3` 与 Mix 依赖，再执行 `pnpm run test:integration:relay-cell`。该检查验证客户端证书准入，不会以缺少依赖为成功。
+- **Discord:** Join the community on **[Discord](https://discord.gg/fzjDKHxv8Q)**.
+- **Twitter / X:** Follow **[@orca_build](https://x.com/orca_build)** for updates and announcements.
+- **WeChat:** Scan to join the Orca community WeChat group.
 
-只构建桌面应用代码时，可运行 `pnpm run build:desktop`。生成安装包使用下面的客户端构建入口。
+  <img src="docs/assets/wechat-qr.jpg" alt="WeChat QR code for the Orca community" width="160" />
 
-## CLI 与运行主机
+- **Feedback &amp; Ideas:** We ship fast. Missing something? [Request a new feature](https://github.com/stablyai/orca/issues).
+- **Privacy:** See the [privacy &amp; telemetry docs](https://www.onorca.dev/docs/telemetry) for what anonymous usage data Orca collects and how to opt out.
+- **Show Support:** [Star](https://github.com/stablyai/orca) this repo to follow along with our daily ships.
 
-CLI 主命令是 `hive`，桌面安装包包含 CLI。开发时也可以构建 CLI 并查看命令帮助：
+---
 
-```bash
-pnpm run build:cli
-node out/cli/index.js --help
-```
+## Developing
 
-安装好 CLI 后：
+Want to contribute or run locally? See our [CONTRIBUTING.md](.github/CONTRIBUTING.md) guide.
 
-```bash
-hive --help
-hive project list
-hive worktree list
-hive serve
-```
+The relay that pairs the mobile app with a desktop host is also in this repository under
+[`cloud/`](cloud/README.md), with a separate pnpm workspace and setup guide.
 
-`hive serve` 在前台启动无桌面窗口的运行服务，输出端点与配对状态，使用 `Ctrl+C` 停止。包含 Web 客户端的构建还会输出浏览器访问地址。
+<a href="https://github.com/stablyai/orca/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=stablyai/orca" alt="Orca contributors" />
+</a>
 
-可以使用 `hive serve --mobile-pairing` 获取移动端配对信息；`--port` 指定端口，`--pairing-address` 指定客户端可访问的地址。连接与操作仍受配对、身份和主机权限约束。
+<p align="center">
+  <img src="docs/assets/star-history.png" alt="GitHub star history chart for stablyai/orca" width="880" />
+</p>
 
-## 构建客户端
+## Signed Builds
 
-统一入口会检查工具链、准备依赖与构建资源，并验证产物。先针对本机桌面平台执行：
+Windows code signing sponsored/provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
 
-```bash
-pnpm run clients:doctor -- --target desktop
-pnpm run clients:prepare -- --target desktop
-pnpm run clients:build -- --target desktop
-```
+## License
 
-输出保存在 `dist/<版本>/` 下。目标及产物类型如下：
-
-| 目标          | 构建主机                | 产物                                                          |
-| ------------- | ----------------------- | ------------------------------------------------------------- |
-| `windows-x64` | Windows x64             | NSIS 安装程序 `.exe`                                          |
-| `macos-x64`   | macOS Intel             | `.dmg`、`.zip`                                                |
-| `macos-arm64` | macOS Apple Silicon     | `.dmg`、`.zip`                                                |
-| `linux-x64`   | Linux x64               | `.AppImage`、`.deb`、`.rpm`、运行主机 `.deb`，以及 Web 静态包 |
-| `linux-arm64` | Linux arm64             | `.AppImage`、`.deb`、`.rpm`、运行主机 `.deb`                  |
-| `android`     | Windows、macOS 或 Linux | 已签名的 Release `.apk`、`.aab`                               |
-| `ios`         | macOS                   | 未分发签名的设备归档与模拟器应用包                            |
-
-构建其他目标时，将三个命令中的 `desktop` 替换为表中的目标名称。Android 需要 JDK、Android SDK 及配置好的 Release 签名密钥；iOS 需要 macOS 和匹配的 Xcode。平台版本配置见 [客户端构建配置](config/client-build.json)，本机路径配置可参考 [配置模板](config/client-build.local.example.json)。凭据与签名密钥保存在私有配置中。
-
-**当前 iOS 流程不生成可直接安装到设备的 IPA。** Windows 和 macOS 的通用构建产物也不能视为已完成正式分发签名；正式分发需要对应证书、签名与平台验证。
-
-本机 `--target all` 选择当前系统的桌面目标、Android，以及 macOS 上的 iOS。跨平台构建由 [客户端构建工作流](.github/workflows/hivecode-client-build.yml) 在各平台原生 runner 上分别执行。
-
-## 贡献与文档
-
-修改前请阅读 [贡献指南](.github/CONTRIBUTING.md)。提交变更时应验证涉及的平台、远程连接和授权边界，并附上有意义的测试结果。
-
-内部设计、运维和审计资料通过 `docs` 私有子模块维护，需要单独授权。公开源码的普通开发、测试和客户端构建使用公开仓库中的代码与配置。
-
-维护者通过 [Upstream Sync](.github/workflows/upstream-sync.yml) 跟随 Orca 更新。同步以 `config/upstream-sync-state.json` 中已审核的上游提交为基准，并保留 `config/upstream-change-ledger.json` 中的吸收与延期记录；源码采用三方内容合并，经过产品边界复核和测试后推送主分支，审核游标才会生效。冲突、私有文档变更或未完成的必要修复会阻止发布。操作约束见 [上游同步说明](.github/CONTRIBUTING.md#upstream-synchronization)。
-
-## 开源许可与致谢
-
-HiveCode 基于 Stably AI 的开源项目 [Orca](https://github.com/stablyai/orca) 开发，遵循 [MIT License](LICENSE)。原始版权声明与许可条件保留在许可证文件中。感谢 Orca、Stably AI 及相关开源项目的贡献者。
+Orca is free and open source under the [MIT License](LICENSE).

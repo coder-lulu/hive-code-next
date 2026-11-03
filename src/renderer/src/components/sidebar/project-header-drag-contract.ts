@@ -1,11 +1,6 @@
 import type { PointerEvent } from 'react'
 
-import type {
-  ProjectHeaderDragBucketKey,
-  ProjectHeaderDragRect,
-  ProjectHeaderDropZone
-} from './project-header-drop'
-import type { ExecutionHostId } from '../../../../shared/execution-host'
+import type { ProjectHeaderDragBucketKey, ProjectHeaderDragRect } from './project-header-drop'
 import type { Repo } from '../../../../shared/repo-types'
 
 export type RepoDragState = {
@@ -24,16 +19,10 @@ export type UseRepoHeaderDragArgs = {
   orderedRepoIds: string[]
   sidebarRepoHeaderIdsByBucket: ReadonlyMap<ProjectHeaderDragBucketKey, readonly string[]>
   repoById: ReadonlyMap<string, Repo>
+  getLiveRepos: () => readonly Repo[]
   usesProjectGroupOrdering: boolean
-  canMoveAcrossProjectGroups: boolean
-  projectGroupHostIdByGroupId: ReadonlyMap<string, ExecutionHostId | null>
   onCommitRepoOrder: (orderedIds: string[]) => void
-  onCommitProjectGroupOrder: (
-    repoId: string,
-    projectGroupId: string | null,
-    order: number,
-    sourceExecutionHostId: ExecutionHostId
-  ) => void
+  onCommitProjectGroupOrder: (project: Repo, projectGroupId: string | null, order: number) => void
   getScrollContainer: () => HTMLElement | null
 }
 
@@ -43,13 +32,12 @@ export type RepoHeaderDragController = {
 }
 
 export type ProjectHeaderDragSession = {
-  repoId: string
+  // Why the row, not its id: a twin on another host shares the id.
+  repo: Repo
   bucketKey: ProjectHeaderDragBucketKey
   sidebarRepoHeaderIds: readonly string[]
-  sourceExecutionHostId: ExecutionHostId
   pointerId: number
   headerRects: ProjectHeaderDragRect[]
-  dropZones: ProjectHeaderDropZone[]
   handleEl: HTMLElement
   startX: number
   startY: number
@@ -69,9 +57,7 @@ export function isProjectHeaderDragHandleTarget(
   target: EventTarget | null,
   currentTarget: HTMLElement
 ): boolean {
-  // Why: the project icon renders as an <svg>, so pressing it makes the event
-  // target an SVGElement (not an HTMLElement). Match Element so dragging by the
-  // icon still arms the drag; closest/contains work on any Element.
+  // SVG icons are Elements too; allow dragging by the project icon.
   if (!(target instanceof Element)) {
     return false
   }
@@ -83,8 +69,7 @@ export function isRepoHeaderActionTarget(
   target: EventTarget | null,
   currentTarget: HTMLElement
 ): boolean {
-  // Why: an <svg> icon inside an action button is an SVGElement, so match
-  // Element to still treat it as an action target and not arm a drag.
+  // SVG action icons must not arm a header drag.
   if (!(target instanceof Element) || target === currentTarget) {
     return false
   }

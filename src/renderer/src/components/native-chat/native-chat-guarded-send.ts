@@ -1,6 +1,6 @@
-import { sendRuntimePtyInputVerified } from '@/runtime/runtime-terminal-inspection'
+import { sendRuntimePtyInputVerified } from '@/runtime/runtime-terminal-verified-input'
 import { AGENT_TUI_CLEAR_INPUT_MAX } from '../../../../shared/agent-tui-input-clear'
-import { NATIVE_CHAT_SUBMIT_DELAY_MS } from '../../../../shared/native-chat-answer-stepping'
+import { NATIVE_CHAT_SUBMIT_DELAY_MS } from '../../../../shared/native-chat/input/native-chat-answer-stepping'
 import { enqueueNativeChatPtySend } from './native-chat-pty-send-queue'
 import { wrapTerminalBracketedPasteText } from '../terminal-pane/terminal-bracketed-paste'
 import type { NativeChatSendHandle, NativeChatSendOptions } from './native-chat-runtime-send'

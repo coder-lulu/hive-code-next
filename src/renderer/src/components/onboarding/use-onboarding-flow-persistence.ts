@@ -9,8 +9,7 @@ import type { EventProps } from '../../../../shared/telemetry-events'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { OnboardingState } from '../../../../shared/onboarding-state-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
-import { isTuiAgent } from '../../../../shared/tui-agent-config'
-import { applyAgentPermissionMode } from '../../../../shared/tui-agent-permissions'
+import { applyAllAgentsPermission } from '../../../../shared/tui-agent-permission-choice'
 import type { StepId, StepNumber } from './use-onboarding-flow-types'
 
 export async function persistStep(
@@ -25,7 +24,7 @@ export async function persistStep(
 }
 
 function selectedAgentOrBlank(agent: TuiAgent | null): TuiAgent | 'blank' {
-  return isTuiAgent(agent) ? agent : 'blank'
+  return agent ?? 'blank'
 }
 
 export function buildCompletedOnboardingNotificationSettings(
@@ -73,12 +72,7 @@ export function trackOnboardingDismissed(
 }
 
 export function useCloseWith({ onOnboardingChange, startTimeRef, setError }: CloseWithDeps) {
-  // Why: onboarding closes exactly once. On the final notifications step both
-  // the "Add your first project" handoff (completed) and a click-off/Escape
-  // dismissal (dismissed) can reach closeWith, and next()'s persist window
-  // leaves the modal interactive with no busy flag. This latch makes closeWith
-  // idempotent so the first close wins — no double onboarding.update write and
-  // no double completed/dismissed telemetry.
+  // First close wins across completion/dismissal during persistence, preventing duplicate writes and telemetry.
   const closedRef = useRef(false)
   return useCallback(
     async (
@@ -101,8 +95,7 @@ export function useCloseWith({ onOnboardingChange, startTimeRef, setError }: Clo
           checklist: { dismissed: outcome === 'dismissed' }
         })
       } catch (err) {
-        // Why: the persist failed, so onboarding did not actually close — clear
-        // the latch so the user can retry the close action.
+        // A failed write did not close onboarding; release the latch for retry.
         closedRef.current = false
         setError(err instanceof Error ? err.message : String(err))
         return false
@@ -110,17 +103,14 @@ export function useCloseWith({ onOnboardingChange, startTimeRef, setError }: Clo
       onOnboardingChange(nextState)
       if (outcome === 'completed' && completedPath) {
         const total = Math.max(0, Date.now() - startTimeRef.current)
-        // Why: no `is_git_repo` — project selection now happens in the Add
-        // Project modal after this fires, so the signal moved to
-        // `repo_added.is_git_repo`.
+        // Project selection happens later; repo_added owns is_git_repo telemetry.
         track('onboarding_completed', {
           path: completedPath,
           total_duration_ms: total
         })
       }
       if (outcome === 'completed') {
-        // Why: closeWith updates parent state synchronously from this hook's
-        // perspective, but the modal unmounts on the next React commit.
+        // Wait until the next commit can unmount onboarding before notifying star nag.
         window.setTimeout(() => {
           void window.api.starNag.onboardingCompleted()
         }, 0)
@@ -137,6 +127,8 @@ type PersistCurrentStepDeps = {
   currentStepId: StepId
   selectedAgent: TuiAgent | null
   yoloPermissions: boolean
+  /** Whether the person flipped Yolo mode in this flow; a replay left untouched keeps chats as set. */
+  yoloPermissionsChosen: { readonly current: boolean }
   theme: GlobalSettings['theme']
   settings: GlobalSettings | null
   updateSettings: (updates: Partial<GlobalSettings>) => Promise<void> | void
@@ -153,6 +145,7 @@ export function usePersistCurrentStep({
   currentStepId,
   selectedAgent,
   yoloPermissions,
+  yoloPermissionsChosen,
   theme,
   settings,
   updateSettings,
@@ -169,11 +162,10 @@ export function usePersistCurrentStep({
         const defaultTuiAgent = selectedAgentOrBlank(selectedAgent)
         await updateSettings({
           defaultTuiAgent,
-          ...applyAgentPermissionMode({
-            mode: yoloPermissions ? 'yolo' : 'manual',
-            agentDefaultArgs: settings.agentDefaultArgs,
-            agentDefaultEnv: settings.agentDefaultEnv
-          })
+          // Off adds no flag, as it always has: each agent's own settings apply.
+          ...(yoloPermissionsChosen.current
+            ? applyAllAgentsPermission(settings, yoloPermissions ? 'full-access' : 'own')
+            : {})
         })
         const choseAgent = defaultTuiAgent !== 'blank'
         const wasAlreadyChosen = onboardingChecklist.choseAgent
@@ -204,16 +196,12 @@ export function usePersistCurrentStep({
         return { ok: true }
       }
       if (currentStepId === 'windows_terminal') {
-        // Why: the Windows terminal controls persist on selection. Continuing
-        // only marks the preference page complete for resume/telemetry state.
+        // Selections already persist; Continue only records page completion for resume/telemetry.
         onOnboardingChange(await persistStep(4))
         return { ok: true }
       }
       if (currentStepId === 'integrations') {
-        // Why: GitHub and Linear connections persist through their own
-        // store slices when the user actually wires them up. The step itself
-        // is a no-op for settings/onboarding state beyond marking it
-        // completed.
+        // Connections persist in their integration slices; this step only records completion.
         onOnboardingChange(await persistStep(3))
         return { ok: true }
       }
@@ -231,6 +219,7 @@ export function usePersistCurrentStep({
     theme,
     updateSettings,
     yoloPermissions,
+    yoloPermissionsChosen,
     setError
   ])
 }

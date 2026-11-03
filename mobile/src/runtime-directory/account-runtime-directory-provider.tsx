@@ -14,7 +14,7 @@ import { AppState } from 'react-native'
 import { useMobileAuthSession } from '../auth/mobile-auth-session'
 import { MobileApiError } from '../auth/mobile-sms-client'
 import type { MobileSession } from '../auth/mobile-sms-auth'
-import { useForgetHostClient, useRefreshHostClient } from '../transport/client-context'
+import { useForgetHostClient, useRefreshHostClient } from '../transport/host-client-hooks'
 import type { HostCatalogEntry } from '../transport/types'
 import {
   loadAllAccountRuntimes,

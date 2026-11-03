@@ -130,20 +130,20 @@ test.describe('Issue #12656 terminal link tooltip', () => {
     )
     await waitForTerminalOutput(orcaPage, url)
 
-    const capture: { probe: LinkProbe | null } = { probe: null }
+    const located: { probe: LinkProbe | null } = { probe: null }
     await expect
       .poll(
         async () => {
-          capture.probe = await locateUrl(orcaPage, url)
-          return capture.probe
+          located.probe = await locateUrl(orcaPage, url)
+          return located.probe
         },
         { timeout: 5_000, message: 'URL did not become visible in the terminal viewport' }
       )
       .not.toBeNull()
-    const probe = capture.probe
-    if (!probe) {
+    if (!located.probe) {
       throw new Error('URL probe disappeared before hover')
     }
+    let probe: LinkProbe = located.probe
     const idle = await readTooltipState(orcaPage, probe.tabId)
     expect(Math.abs(idle.paneBottom - idle.terminalBottom)).toBeLessThanOrEqual(1)
     await expect
@@ -152,7 +152,7 @@ test.describe('Issue #12656 terminal link tooltip', () => {
         if (!currentProbe) {
           return { display: 'none', text: '' }
         }
-        capture.probe = currentProbe
+        probe = currentProbe
         await moveToLink(orcaPage, currentProbe)
         return readTooltipState(orcaPage, currentProbe.tabId)
       })

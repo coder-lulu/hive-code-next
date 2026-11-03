@@ -531,7 +531,7 @@ describe('git RPC methods', () => {
   })
 
   it('forwards commit-message settings to the runtime', async () => {
-    const commitMessageAi = {
+    const sourceControlAi = {
       enabled: true,
       agentId: 'codex',
       selectedModelByAgent: { codex: 'gpt-5.3-codex-spark' },
@@ -545,7 +545,7 @@ describe('git RPC methods', () => {
         }
       },
       selectedThinkingByModel: { 'gpt-5.3-codex-spark': 'medium' },
-      customPrompt: '',
+      instructionsByOperation: {},
       customAgentCommand: ''
     }
     const agentCmdOverrides = { codex: 'codex --profile work' }
@@ -558,14 +558,14 @@ describe('git RPC methods', () => {
     await dispatcher.dispatch(
       makeRequest('git.generateCommitMessage', {
         worktree: 'id:wt-1',
-        commitMessageAi,
+        sourceControlAi,
         agentCmdOverrides,
         commitMessageDiscoveryHostKey: 'runtime:env-1'
       })
     )
 
     expect(runtime.generateRuntimeCommitMessage).toHaveBeenCalledWith('id:wt-1', {
-      commitMessageAi,
+      sourceControlAi,
       agentCmdOverrides,
       commitMessageDiscoveryHostKey: 'runtime:env-1'
     })
@@ -648,7 +648,7 @@ describe('git RPC methods', () => {
     const response = await dispatcher.dispatch(
       makeRequest('git.generateCommitMessage', {
         worktree: 'id:wt-1',
-        commitMessageAi: {
+        sourceControlAi: {
           enabled: true,
           agentId: 'codex'
         }

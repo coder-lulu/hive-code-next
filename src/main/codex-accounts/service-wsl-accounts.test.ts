@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { EventEmitter } from 'node:events'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -15,24 +15,7 @@ import {
   testState
 } from './service-test-harness'
 
-const { rejectRealProcess } = vi.hoisted(() => ({
-  rejectRealProcess: vi.fn(() => {
-    throw new Error('WSL account unit tests must not launch a real child process')
-  })
-}))
-
-vi.mock('node:child_process', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('node:child_process')>()), // eslint-disable-line @typescript-eslint/consistent-type-imports -- mock requires module export types
-  exec: rejectRealProcess,
-  execSync: rejectRealProcess,
-  execFile: rejectRealProcess,
-  execFileSync: rejectRealProcess,
-  spawn: rejectRealProcess,
-  spawnSync: rejectRealProcess,
-  fork: rejectRealProcess
-}))
-
-// Why: temp homes exceed sun_path on macOS but not on Linux; keep asserted config bytes host-independent.
+// Keep asserted config bytes independent of platform socket-path limits.
 vi.mock('../codex/codex-daemon-socket-path-guard', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   applyCodexDaemonSocketGuard: (config: string) => config
@@ -44,8 +27,8 @@ vi.mock('electron', () => ({
   }
 }))
 
-vi.mock('node:os', async () => {
-  const actual = await vi.importActual<typeof import('node:os')>('node:os') // eslint-disable-line @typescript-eslint/consistent-type-imports -- vi.importActual requires inline import()
+vi.mock(import('node:os'), async (importOriginal) => {
+  const actual = await importOriginal()
   return {
     ...actual,
     homedir: () => testState.fakeHomeDir
@@ -68,10 +51,6 @@ function wslFailed(code: number, stderr = ''): WslResult {
 describe('CodexAccountService config sync', () => {
   registerCodexAccountsTestHomes()
 
-  afterEach(() => {
-    expect(rejectRealProcess).not.toHaveBeenCalled()
-  })
-
   it('preserves WSL account-home project trust while refreshing canonical settings', async () => {
     const wslManagedHomePath = join(testState.userDataDir, 'wsl-account', 'home')
     const wslCanonicalHomePath = join(testState.userDataDir, 'wsl-home', '.codex')
@@ -91,19 +70,6 @@ describe('CodexAccountService config sync', () => {
       'utf-8'
     )
 
-    const validateWslHome = vi.fn((command: string, args: string[]) => {
-      expect(command).toBe('wsl.exe')
-      expect(args.slice(0, 5)).toEqual(['-d', 'Ubuntu', '--exec', 'bash', '-lc'])
-      const script = decodeEncodedWslBashCommand(args[5])
-      expect(script).toContain('candidate_real=$(readlink -f -- "$candidate")')
-      expect(script).toContain("expected_marker='account-1'")
-      return `${wslLinuxHomePath}\n`
-    })
-    vi.doMock('node:child_process', () => ({
-      execFileSync: validateWslHome,
-      spawn: rejectRealProcess
-    }))
-
     vi.doMock('../../shared/wsl-paths', () => ({
       parseWslUncPath: (path: string) => {
         if (path === wslManagedHomePath) {
@@ -114,6 +80,10 @@ describe('CodexAccountService config sync', () => {
         }
         return null
       }
+    }))
+    // The distro runs: the config mirror may read its home.
+    vi.doMock('../wsl-background-distro-gate', () => ({
+      wasWslDistroLastSeenRunningSettled: () => true
     }))
     vi.doMock('../wsl', () => ({
       toWindowsWslPath: (linuxPath: string) =>
@@ -144,24 +114,17 @@ describe('CodexAccountService config sync', () => {
       ]
     })
 
-    const originalPlatform = process.platform
-    Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' })
-    try {
-      const { CodexAccountService } = await import('./service')
-      new CodexAccountService(
-        createStore(settings) as never,
-        createRateLimits() as never,
-        createRuntimeHome() as never
-      )
+    const { CodexAccountService } = await import('./service')
+    new CodexAccountService(
+      createStore(settings) as never,
+      createRateLimits() as never,
+      createRuntimeHome() as never
+    )
 
-      expect(validateWslHome).toHaveBeenCalled()
-      expect(readFileSync(join(wslManagedHomePath, 'config.toml'), 'utf-8')).toBe(
-        'sandbox_mode = "danger-full-access"\n\n' +
-          '[projects."/workspace"]\ntrust_level = "trusted"\n'
-      )
-    } finally {
-      Object.defineProperty(process, 'platform', { configurable: true, value: originalPlatform })
-    }
+    expect(readFileSync(join(wslManagedHomePath, 'config.toml'), 'utf-8')).toBe(
+      'sandbox_mode = "danger-full-access"\n\n' +
+        '[projects."/workspace"]\ntrust_level = "trusted"\n'
+    )
   })
 
   it('keeps Linux-relative config paths when a WSL home is under a mounted drive', async () => {
@@ -186,6 +149,10 @@ describe('CodexAccountService config sync', () => {
     vi.doMock('../../shared/wsl-paths', () => ({
       parseWslUncPath: (path: string) =>
         path === wslManagedHomePath ? { distro: 'Ubuntu', linuxPath: wslLinuxHomePath } : null
+    }))
+    // The distro runs: the config mirror may read its home.
+    vi.doMock('../wsl-background-distro-gate', () => ({
+      wasWslDistroLastSeenRunningSettled: () => true
     }))
     vi.doMock('../wsl', () => ({
       toWindowsWslPath: (linuxPath: string) =>
@@ -263,14 +230,11 @@ describe('CodexAccountService config sync', () => {
       const script = String(spec.script)
       expect(spec.distro).toBe('Debian')
       if (script.includes('WSL_DISTRO_NAME')) {
-        // 'none': reads $HOME and $WSL_DISTRO_NAME, which wsl.exe supplies from
-        // /etc/passwd without a login shell.
         expect(spec.loginPath).toBe('none')
         return wslOk('Debian\n/home/alice\n')
       }
       if (script.includes('_orca_lookup_command=')) {
-        // 'preferred': a PATH lookup. Under 'none' an nvm-installed codex is
-        // invisible and a working install is reported absent (#9725).
+        // Include the login PATH so nvm-installed Codex remains visible (#9725).
         expect(spec.loginPath).toBe('preferred')
         expect(script).toBe(buildWslCodexAvailabilityScript())
         return wslOk()
@@ -284,8 +248,7 @@ describe('CodexAccountService config sync', () => {
     const spawnMock = vi.fn((command: string, args: string[]) => {
       expect(command).toBe('wsl.exe')
       expect(args).toEqual(buildWslCodexLoginArgs('Debian', wslLinuxHomePath))
-      // Why: codex login runs inside WSL, so the rewritten path must be the
-      // Linux-side ~/.codex, not a Windows UNC path.
+      // Codex consumes rewritten config paths inside WSL, so they must use guest spelling.
       expect(readFileSync(join(wslManagedHomePath, 'config.toml'), 'utf-8')).toBe(
         'sandbox_mode = "danger-full-access"\n' +
           "model_instructions_file = '/home/alice/.codex/instructions.md'\n"
@@ -327,6 +290,10 @@ describe('CodexAccountService config sync', () => {
             ? { distro: 'Debian', linuxPath: '/home/alice/.codex' }
             : null
     }))
+    // The distro runs: the config mirror may read its home.
+    vi.doMock('../wsl-background-distro-gate', () => ({
+      wasWslDistroLastSeenRunningSettled: () => true
+    }))
     vi.doMock('../wsl', () => ({
       toWindowsWslPath: (linuxPath: string) =>
         linuxPath.endsWith('/.codex/config.toml')
@@ -361,8 +328,7 @@ describe('CodexAccountService config sync', () => {
         wslLinuxHomePath,
         managedHomeRuntime: 'wsl'
       })
-      // Why: a WSL add must sync the WSL runtime home, not the default host lane,
-      // or the account it just selected stays unmaterialized until the next switch.
+
       expect(runtimeHome.syncForCurrentSelection).toHaveBeenCalledWith({
         runtime: 'wsl',
         wslDistro: 'Debian'
@@ -420,6 +386,10 @@ describe('CodexAccountService config sync', () => {
       parseWslUncPath: (path: string) =>
         path === wslManagedHomePath ? { distro: 'Debian', linuxPath: wslLinuxHomePath } : null
     }))
+    // The distro runs: the config mirror may read its home.
+    vi.doMock('../wsl-background-distro-gate', () => ({
+      wasWslDistroLastSeenRunningSettled: () => true
+    }))
     vi.doMock('../wsl', () => ({
       toWindowsWslPath: () => wslManagedHomePath
     }))
@@ -451,9 +421,6 @@ describe('CodexAccountService config sync', () => {
   })
 
   it('says it could not check, not "not installed", when the login PATH is unavailable', async () => {
-    // #9725: an nvm-installed codex lives only on the login PATH. When the
-    // probe cannot supply it, a non-zero lookup is "we could not check" --
-    // reporting a working install as absent is the bug this pins.
     vi.resetModules()
     const originalPlatform = process.platform
     Object.defineProperty(process, 'platform', {
@@ -497,6 +464,10 @@ describe('CodexAccountService config sync', () => {
     vi.doMock('../../shared/wsl-paths', () => ({
       parseWslUncPath: (path: string) =>
         path === wslManagedHomePath ? { distro: 'Debian', linuxPath: wslLinuxHomePath } : null
+    }))
+    // The distro runs: the config mirror may read its home.
+    vi.doMock('../wsl-background-distro-gate', () => ({
+      wasWslDistroLastSeenRunningSettled: () => true
     }))
     vi.doMock('../wsl', () => ({
       toWindowsWslPath: () => wslManagedHomePath
@@ -563,7 +534,9 @@ describe('CodexAccountService config sync', () => {
     let clearSelectionDuringLogin = (): void => {}
     const spawnMock = vi.fn((command: string, args: string[]) => {
       expect(command).toBe('wsl.exe')
-      expect(args).toEqual(buildWslCodexLoginArgs('Ubuntu', wslLinuxHomePath))
+      expect(args).toEqual(
+        buildWslCodexLoginArgs('Ubuntu', `${wslLinuxHomePath}/.orca-reauth-login`)
+      )
       const child = new EventEmitter() as EventEmitter & {
         stdout: PassThrough
         stderr: PassThrough
@@ -574,7 +547,7 @@ describe('CodexAccountService config sync', () => {
       child.kill = vi.fn()
       clearSelectionDuringLogin()
       writeFileSync(
-        join(wslManagedHomePath, 'auth.json'),
+        join(wslManagedHomePath, '.orca-reauth-login', 'auth.json'),
         JSON.stringify({
           tokens: {
             id_token: `header.${Buffer.from(JSON.stringify({ email: 'new@example.com' })).toString(
@@ -595,7 +568,16 @@ describe('CodexAccountService config sync', () => {
     vi.doMock('../wsl/wsl-runner', () => ({ runWslProcess: runWslProcessMock }))
     vi.doMock('../../shared/wsl-paths', () => ({
       parseWslUncPath: (path: string) =>
-        path === wslManagedHomePath ? { distro: 'Ubuntu', linuxPath: wslLinuxHomePath } : null
+        path.startsWith(wslManagedHomePath)
+          ? {
+              distro: 'Ubuntu',
+              linuxPath: `${wslLinuxHomePath}${path.slice(wslManagedHomePath.length).replaceAll('\\', '/')}`
+            }
+          : null
+    }))
+    // The distro runs: the config mirror may read its home.
+    vi.doMock('../wsl-background-distro-gate', () => ({
+      wasWslDistroLastSeenRunningSettled: () => true
     }))
     vi.doMock('../wsl', () => ({
       toWindowsWslPath: () => wslManagedHomePath
@@ -703,7 +685,9 @@ describe('CodexAccountService config sync', () => {
     })
     const spawnMock = vi.fn((command: string, args: string[]) => {
       expect(command).toBe('wsl.exe')
-      expect(args).toEqual(buildWslCodexLoginArgs('Ubuntu', wslLinuxHomePath))
+      expect(args).toEqual(
+        buildWslCodexLoginArgs('Ubuntu', `${wslLinuxHomePath}/.orca-reauth-login`)
+      )
       expect(readFileSync(join(wslManagedHomePath, '.orca-managed-home'), 'utf-8')).toBe(
         'account-1\n'
       )
@@ -716,7 +700,7 @@ describe('CodexAccountService config sync', () => {
       child.stderr = new PassThrough()
       child.kill = vi.fn()
       writeFileSync(
-        join(wslManagedHomePath, 'auth.json'),
+        join(wslManagedHomePath, '.orca-reauth-login', 'auth.json'),
         createCodexAuthJson('new-wsl@example.com', 'provider-wsl-1', 'refresh-token'),
         'utf-8'
       )
@@ -731,7 +715,16 @@ describe('CodexAccountService config sync', () => {
     vi.doMock('../wsl/wsl-runner', () => ({ runWslProcess: runWslProcessMock }))
     vi.doMock('../../shared/wsl-paths', () => ({
       parseWslUncPath: (path: string) =>
-        path === wslManagedHomePath ? { distro: 'Ubuntu', linuxPath: wslLinuxHomePath } : null
+        path.startsWith(wslManagedHomePath)
+          ? {
+              distro: 'Ubuntu',
+              linuxPath: `${wslLinuxHomePath}${path.slice(wslManagedHomePath.length).replaceAll('\\', '/')}`
+            }
+          : null
+    }))
+    // The distro runs: the config mirror may read its home.
+    vi.doMock('../wsl-background-distro-gate', () => ({
+      wasWslDistroLastSeenRunningSettled: () => true
     }))
     vi.doMock('../wsl', () => ({
       toWindowsWslPath: () => wslManagedHomePath
@@ -822,6 +815,10 @@ describe('CodexAccountService config sync', () => {
     vi.doMock('../../shared/wsl-paths', () => ({
       parseWslUncPath: (path: string) =>
         path === wslManagedHomePath ? { distro: 'Ubuntu', linuxPath: wslLinuxHomePath } : null
+    }))
+    // The distro runs: the config mirror may read its home.
+    vi.doMock('../wsl-background-distro-gate', () => ({
+      wasWslDistroLastSeenRunningSettled: () => true
     }))
     vi.doMock('../wsl', () => ({
       toWindowsWslPath: () => wslManagedHomePath

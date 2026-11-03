@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { getDefaultSettings } from '../../../shared/constants'
 import type * as AgentStatusModule from '@/lib/agent-status'
 import { createTabsSliceMockApi } from '../store/slices/tabs-slice-test-harness'
 import { createTestStore } from '../store/slices/store-test-helpers'
@@ -25,7 +26,7 @@ vi.mock('@/store', () => ({
 }))
 createTabsSliceMockApi()
 
-const { launchAgentThroughHost } = await import('./agent-launch-through-host')
+const { launchAgentThroughHost, windowMakesHostLaunchTab } = await import('./agent-launch-through-host')
 const { settleAgentLaunchPaneStart } = await import('./agent-launch-pane-start')
 const { applyAgentLaunchPaneVerdict } = await import('./agent-launch-pane-verdict-application')
 const { agentLaunchPanePrompt } = await import('./agent-launch-pane-prompt')
@@ -60,6 +61,15 @@ beforeEach(() => {
 })
 
 describe('a desktop AI-button launch', () => {
+  it('chooses the pane from the actual agent preference only after settings load', () => {
+    store.setState({ settings: null })
+    expect(windowMakesHostLaunchTab('codex')).toBe(false)
+    store.setState({ settings: { ...getDefaultSettings('/tmp'), nativeChatProviders: {} } })
+    expect(windowMakesHostLaunchTab('codex')).toBe(false)
+    store.setState({ settings: { ...getDefaultSettings('/tmp'), nativeChatProviders: { codex: false } } })
+    expect(windowMakesHostLaunchTab('codex')).toBe(true)
+    expect(windowMakesHostLaunchTab('claude')).toBe(false)
+  })
   it('shows its tab at the click, in its split, with the launch queued for its pane to start', () => {
     const { tabId } = launch()
 

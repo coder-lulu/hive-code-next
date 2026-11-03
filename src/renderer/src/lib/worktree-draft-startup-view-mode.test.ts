@@ -30,7 +30,6 @@ beforeEach(() => {
   useAppStore.setState({
     settings: {
       ...initialSettings,
-      experimentalNativeChat: true
     }
   })
 })

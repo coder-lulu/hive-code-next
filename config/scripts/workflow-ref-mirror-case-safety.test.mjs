@@ -10,7 +10,45 @@ const projectDir = resolve(import.meta.dirname, '../..')
 
 const readWorkflow = (relativePath) => parse(readFileSync(join(projectDir, relativePath), 'utf8'))
 
-describe('product release checkout identities', () => {
+describe('ref-mirroring vet steps', () => {
+  it.each(['daily', 'hourly', 'adhoc'])('%s builds only need the current commit', (channel) => {
+    const { jobs } = readWorkflow(`.github/workflows/${channel}-mac-build.yml`)
+    const job = jobs[channel === 'adhoc' ? 'build-adhoc-mac-arch' : `build-${channel}-mac`]
+    const identity = channel === 'adhoc' ? jobs['orcad-template-support'] : job
+    const checkout = job.steps.find((step) => step.uses === 'actions/checkout@v6')
+    expect(checkout.with['fetch-depth']).toBe(1)
+    expect(
+      (channel === 'adhoc' ? jobs['build-adhoc-mac'] : job).steps.some((step) =>
+        step.run?.includes('gh release list')
+      )
+    ).toBe(true)
+    expect(
+      identity.steps.some((step) => step.run?.includes('ORCA_PUBLISHED_VERSIONS="$published"'))
+    ).toBe(true)
+  })
+
+  // Use matching refs, not releases: unpublished stable release still owns tag number and must not roll channel backward.
+  it.each(['daily', 'hourly', 'adhoc'])(
+    '%s versions from git tags, not main GitHub releases',
+    (channel) => {
+      const { jobs } = readWorkflow(`.github/workflows/${channel}-mac-build.yml`)
+      const identity =
+        channel === 'adhoc'
+          ? jobs['orcad-template-support']
+          : jobs[channel === 'adhoc' ? 'build-adhoc-mac-arch' : `build-${channel}-mac`]
+      const step = identity.steps.find(
+        (candidate) => candidate.name === `Compute ${channel} version`
+      )
+      expect(step.run).toContain('git/matching-refs/tags/v')
+      expect(step.run).not.toMatch(
+        /gh release list[\s\S]*--repo "\$GITHUB_REPOSITORY"[\s\S]*--json tagName/
+      )
+      if (channel !== 'adhoc') {
+        expect(step.run).toContain('channel_tags=')
+      }
+    }
+  )
+
   it('retains release-cut history for version reservation and retry ancestry', () => {
     const checkout = readWorkflow('.github/workflows/release-cut.yml').jobs.cut.steps.find(
       (step) => step.uses === 'actions/checkout@v6'

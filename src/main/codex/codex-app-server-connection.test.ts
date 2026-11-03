@@ -9,14 +9,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ProcessSpec, PipedProcessSpawner } from '@orca/process-host/process-spec'
 
 import type * as WindowsProcessTreeKill from '../windows-process-tree-kill'
-import {
-  isCodexAppServerRequestError,
-  openCodexAppServerConnection,
-  type CodexAppServerConnection
-} from './codex-app-server-connection'
+import { openCodexAppServerConnection } from './codex-app-server-connection'
+import { isCodexAppServerRequestError } from './app-server/codex-app-server-request-error'
+import type { CodexAppServerConnection } from './app-server/codex-app-server-connection-types'
+
 import { PROVIDER_SUPERVISOR_MAX_STOP_MS } from '../provider-process/provider-process-supervisor'
 import { isCodexAppServerUnsupportedError } from './codex-app-server-session'
-import { isCodexAppServerHandshakeExitUnprovenError } from './codex-app-server-handshake-exit-proof'
+import { isCodexAppServerHandshakeExitUnprovenError } from './app-server/codex-app-server-handshake-exit-proof'
 
 const { stubPid } = vi.hoisted(() => ({ stubPid: 9_999_999 }))
 

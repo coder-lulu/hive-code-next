@@ -113,9 +113,9 @@ async function loadClientModule(options: SafeStorageMockOptions = {}) {
     return { ...actual, homedir: () => tempHome }
   })
   class AuthenticationLinearError extends Error {}
-  // Why: client.ts loads @linear/sdk lazily via ./linear-sdk (createRequire) to
-  // keep it off the startup parse path; mock the loader, not the raw module.
+  // Mock the lazy loader; createRequire bypasses mocks on the raw SDK module.
   vi.doMock('./linear-sdk', () => ({
+    createLinearClient: (options: { apiKey: string }) => new linearClientMock(options),
     loadLinearSdk: () => ({
       AuthenticationLinearError,
       LinearClient: linearClientMock
@@ -409,7 +409,8 @@ describe('Linear client workspace storage', () => {
 
     await expect(linear.testConnection('legacy')).resolves.toEqual({
       ok: false,
-      error: 'No API key stored.'
+      error: 'No API key stored.',
+      errorCode: 'linear.noApiKey'
     })
 
     expect(linearClientMock).not.toHaveBeenCalled()
@@ -433,8 +434,7 @@ describe('Linear client workspace storage', () => {
     })
     const linear = await loadClientModule({
       encryptionAvailable: true,
-      // Why: the plaintext "token-good" falls back through the legacy path;
-      // the binary "bad" token throws CredentialDecryptionError.
+      // Plaintext tokens use the legacy path; binary tokens exercise decryption failures.
       decryptString: () => {
         throw new Error('userCanceledErr')
       }
@@ -544,6 +544,8 @@ describe('Linear workspace file cross-process visibility', () => {
       [{ id: 'ws-alpha', token: 'token-alpha', credentialRevision: 3 }],
       'ws-alpha'
     )
+    // Equal timestamps isolate credential revisions from filesystem clock resolution.
+    utimesSync(join(tempHome, '.orca', 'linear-workspaces.json'), 1, 1)
     const linear = await loadClientModule()
     const signal = new AbortController().signal
     const captured = linear.getClients('ws-alpha', signal)[0]
@@ -570,8 +572,7 @@ describe('Linear workspace file cross-process visibility', () => {
     expect(linear.getStatus()).toMatchObject({ connected: false, workspaces: [] })
   })
   it('picks up a workspace connected by another Orca process', async () => {
-    // ~/.orca is shared by every Orca process on the machine, so a load-once
-    // cache would report "not connected" until this process restarted.
+    // Shared ~/.orca metadata must refresh without restarting other Orca processes.
     const linear = await loadClientModule()
     expect(linear.getStatus()).toMatchObject({ connected: false })
 

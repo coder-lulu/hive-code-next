@@ -48,7 +48,7 @@ export function sourceControlTextGenerationDefaultsMatchTarget(input: {
   actionId: SourceControlTextActionId
   target: SourceControlAiWriteTarget
   params: ResolvedSourceControlAiGenerationParams
-  settings: Pick<GlobalSettings, 'sourceControlAi' | 'commitMessageAi'> | null | undefined
+  settings: Pick<GlobalSettings, 'sourceControlAi'> | null | undefined
   repo?: Pick<Repo, 'sourceControlAi'> | null
 }): boolean {
   return sourceControlActionRecipeMatchesTarget({
@@ -63,7 +63,7 @@ export function sourceControlTextGenerationDefaultsMatchTarget(input: {
 
 export function hasConfiguredSourceControlTextGenerationDefaults(input: {
   actionId: SourceControlTextActionId
-  settings: Pick<GlobalSettings, 'sourceControlAi' | 'commitMessageAi'> | null | undefined
+  settings: Pick<GlobalSettings, 'sourceControlAi'> | null | undefined
   repo?: Pick<Repo, 'sourceControlAi'> | null
 }): boolean {
   const repoRecipe = normalizeRepoSourceControlAiOverrides(input.repo?.sourceControlAi)
@@ -79,14 +79,11 @@ export function hasConfiguredSourceControlTextGenerationDefaults(input: {
   ) {
     return true
   }
-  return (
-    input.settings?.sourceControlAi?.agentId != null ||
-    (input.actionId === 'commitMessage' && input.settings?.commitMessageAi?.agentId != null)
-  )
+  return input.settings?.sourceControlAi?.agentId != null
 }
 
 export function hasConfiguredCommitMessageGenerationDefaults(input: {
-  settings: Pick<GlobalSettings, 'sourceControlAi' | 'commitMessageAi'> | null | undefined
+  settings: Pick<GlobalSettings, 'sourceControlAi'> | null | undefined
   repo?: Pick<Repo, 'sourceControlAi'> | null
 }): boolean {
   return hasConfiguredSourceControlTextGenerationDefaults({

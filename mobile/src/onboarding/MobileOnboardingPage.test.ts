@@ -1,17 +1,36 @@
-import { createElement } from 'react'
+import { createElement, type ReactNode } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { darkTheme, lightTheme, type MobileTheme } from '../theme/mobile-theme'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MobileOnboardingPage } from './MobileOnboardingPage'
-
-const mocks = vi.hoisted(() => ({ theme: undefined as MobileTheme | undefined }))
+import { findAllByHostType, findByHostType } from '../test-support/react-test-renderer-host-nodes'
 
 vi.mock('react-native', async () => {
   const React = await import('react')
+  class AnimatedValue {
+    interpolate() {
+      return 0
+    }
+    setValue() {}
+  }
   return {
+    AccessibilityInfo: {
+      addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+      isReduceMotionEnabled: vi.fn(() => Promise.resolve(true))
+    },
     ActivityIndicator: 'ActivityIndicator',
+    Animated: {
+      Value: AnimatedValue,
+      View: 'AnimatedView',
+      delay: vi.fn(() => ({ start: vi.fn(), stop: vi.fn() })),
+      loop: vi.fn(() => ({ start: vi.fn(), stop: vi.fn() })),
+      parallel: vi.fn(() => ({ start: vi.fn(), stop: vi.fn() })),
+      sequence: vi.fn(() => ({ start: vi.fn(), stop: vi.fn() })),
+      timing: vi.fn(() => ({ start: vi.fn(), stop: vi.fn() }))
+    },
+    Easing: { cubic: (t: number) => t, in: (e: unknown) => e, out: (e: unknown) => e },
+    Image: 'Image',
     Pressable: 'Pressable',
-    ScrollView: ({ children, ...props }: { children?: unknown }) =>
+    ScrollView: ({ children, ...props }: { children?: ReactNode }) =>
       React.createElement('ScrollView', props, children),
     StyleSheet: { create: (styles: unknown) => styles },
     Text: 'Text',
@@ -20,25 +39,13 @@ vi.mock('react-native', async () => {
 })
 
 vi.mock('lucide-react-native', () => ({
-  BellRing: 'BellRing',
   MessageSquare: 'MessageSquare'
 }))
 
-vi.mock('../theme/mobile-theme-provider', async () => {
-  const { lightTheme: defaultTheme } = await import('../theme/mobile-theme')
-  return {
-    useMobileTheme: () => mocks.theme ?? defaultTheme,
-    useMobileThemeStyles: (factory: (theme: MobileTheme) => unknown) =>
-      factory(mocks.theme ?? defaultTheme)
-  }
-})
+vi.mock('../components/OrcaLogo', () => ({ OrcaLogo: 'OrcaLogo' }))
 
 describe('MobileOnboardingPage', () => {
   let renderer: ReactTestRenderer | null = null
-
-  beforeEach(() => {
-    mocks.theme = lightTheme
-  })
 
   afterEach(() => {
     act(() => renderer?.unmount())
@@ -76,69 +83,57 @@ describe('MobileOnboardingPage', () => {
 
   function button(label: string) {
     return renderer!.root.find(
-      (node) => node.type === 'Pressable' && node.props.accessibilityLabel === label
+      (node) => String(node.type) === 'Pressable' && node.props.accessibilityLabel === label
     )
+  }
+
+  function collectText(): string {
+    return findAllByHostType(renderer!.root, 'Text')
+      .flatMap((node) => node.props.children)
+      .join(' ')
   }
 
   it('renders the session choices and sends exactly one selected view', async () => {
     const callbacks = await renderPage('session-view')
 
-    act(() => button('默认使用聊天界面打开会话').props.onPress())
-    expect(callbacks.onSessionChoice).toHaveBeenCalledWith('chat')
+    act(() => button('Open sessions in Chat UI').props.onPress())
+    expect(callbacks.onSessionChoice).toHaveBeenCalledExactlyOnceWith('chat')
     expect(callbacks.onNotificationChoice).not.toHaveBeenCalled()
   })
 
   it('renders the notification choices and sends the selected option', async () => {
     const callbacks = await renderPage('notifications')
-    act(() => button('暂不开启 Agent 通知').props.onPress())
+    act(() => button('Skip notifications for now').props.onPress())
 
     expect(callbacks.onNotificationChoice).toHaveBeenCalledWith('skip')
     expect(callbacks.onSessionChoice).not.toHaveBeenCalled()
   })
 
+  it('explains that alerts cover finished work and waiting agents, even if the app is closed', async () => {
+    await renderPage('notifications')
+    const copy = collectText()
+
+    expect(copy).toContain('Don’t miss when an agent needs you')
+    expect(copy).toContain('finishes or is waiting')
+    expect(copy).toContain('using the app')
+    expect(copy).toContain('Enable notifications')
+    expect(copy).toContain('Codex finished')
+    expect(copy).toContain('Claude needs input')
+    expect(renderer!.root.findByProps({ testID: 'notification-onboarding-preview' })).toBeTruthy()
+  })
+
   it('disables both notification choices while permission is pending', async () => {
     await renderPage('notifications', { busyChoice: 'enable' })
-    const enable = button('开启 Agent 通知')
-    const secondary = button('暂不开启 Agent 通知')
+    const enable = button('Enable agent notifications')
+    const secondary = button('Skip notifications for now')
 
     expect(enable.props.disabled).toBe(true)
-    expect(enable.props.accessibilityState).toEqual({ busy: true, disabled: true })
     expect(secondary.props.disabled).toBe(true)
-    expect(secondary.props.accessibilityState).toEqual({ busy: false, disabled: true })
-  })
-
-  it('uses Chinese copy, semantic hierarchy, and bounded font scaling', async () => {
-    await renderPage('session-view')
-    const title = renderer!.root.find(
-      (node) => node.type === 'Text' && node.children.join('') === '选择会话打开方式'
-    )
-    const body = renderer!.root.find(
-      (node) =>
-        node.type === 'Text' &&
-        node.children.join('').includes('选择此设备上的 Agent 会话默认在终端或聊天界面中打开')
-    )
-
-    expect(title.props).toMatchObject({ accessibilityRole: 'header', maxFontSizeMultiplier: 1.3 })
-    expect(body.props.maxFontSizeMultiplier).toBe(1.3)
-  })
-
-  it('updates semantic colors for dark mode', async () => {
-    mocks.theme = darkTheme
-    await renderPage('session-view', { busyChoice: 'chat' })
-    const icon = renderer!.root.findByType('MessageSquare')
-    const spinner = renderer!.root.findByType('ActivityIndicator')
-
-    expect(icon.props).toMatchObject({
-      color: darkTheme.color.text.primary,
-      size: 24,
-      strokeWidth: 2
-    })
-    expect(spinner.props.color).toBe(darkTheme.color.text.inverse)
   })
 
   it('hides an off-screen page from assistive technology', async () => {
     await renderPage('notifications', { active: false })
-    const scrollView = renderer!.root.findByType('ScrollView')
+    const scrollView = findByHostType(renderer!.root, 'ScrollView')
 
     expect(scrollView.props.accessibilityElementsHidden).toBe(true)
     expect(scrollView.props.importantForAccessibility).toBe('no-hide-descendants')

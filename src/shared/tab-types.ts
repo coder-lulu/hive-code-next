@@ -1,9 +1,8 @@
 import type { AiVaultSessionTitle } from './ai-vault-session-title'
+import type { SessionProjectAssignment } from './session-project-assignment'
 import type { AgentType } from './agent-status-types'
 import type { ExecutionHostId } from './execution-host'
-import type { SessionProjectAssignment } from './session-project-assignment'
 
-// ─── Tab Group Layout ───────────────────────────────────────────────
 export type TabGroupSplitDirection = 'horizontal' | 'vertical'
 
 export type TabGroupLayoutNode =
@@ -17,7 +16,6 @@ export type TabGroupLayoutNode =
       ratio?: number
     }
 
-// ─── Unified Tab ────────────────────────────────────────────────────
 export type TabContentType =
   | 'terminal'
   | 'editor'
@@ -36,8 +34,7 @@ export type WorkspaceVisibleTabType =
   | 'simulator'
 export type CtrlTabOrderMode = 'mru' | 'sequential'
 
-// Why: many-to-one — every editor-family kind collapses to 'editor'. Never invert it by equality;
-// resolve the concrete tab and project forward instead.
+// Many content kinds collapse to editor; resolve a concrete tab and project forward instead of trying to invert equality.
 export function toVisibleTabType(contentType: TabContentType): WorkspaceVisibleTabType {
   if (
     contentType === 'agent-session' ||
@@ -62,7 +59,6 @@ export type Tab = {
   generatedLabel?: string | null
   /** Stable AI Vault conversation name, bound to its provider session identity. */
   aiVaultTitle?: AiVaultSessionTitle | null
-  /** Optional project organization without changing the backing tab owner. */
   projectAssignment?: SessionProjectAssignment
   quickCommandLabel?: string | null
   customLabel: string | null
@@ -73,12 +69,9 @@ export type Tab = {
   isPinned?: boolean // pinned tabs survive "close others"
   /** Provider backing a structured agent-session tab. */
   agentSessionAgent?: AgentType
-  /** Structured session adopted from this terminal's Codex TUI. */
+  /** Structured chat identity persisted with the tab when the host supports it. */
   structuredSessionId?: string
-  /** Why: per-tab rendering mode for coding-agent terminals. `'chat'` shows the
-   *  native chat view as an overlay while the live terminal stays mounted
-   *  underneath; `'terminal'` (the default for legacy/missing) shows the raw
-   *  xterm. Optional so sessions persisted before this field hydrate cleanly. */
+  /** Chat overlays retain the mounted terminal; missing/legacy mode uses raw xterm. */
   viewMode?: 'terminal' | 'chat'
   /** Timestamp when the tab was last focused / activated by the user. */
   lastFocusedAt?: number
@@ -89,11 +82,7 @@ export type TabGroup = {
   worktreeId: string
   activeTabId: string | null
   tabOrder: string[] // canonical visual order of tab IDs
-  /** Per-group MRU stack (oldest → most-recent at the tail). Drives which tab
-   *  becomes active when the current active tab closes: we pop back to the
-   *  previously-active tab instead of jumping to a visual neighbor. Scoped to
-   *  the group so split panes keep independent histories. Optional because
-   *  sessions persisted before this field was added still hydrate cleanly —
-   *  hydration seeds from activeTabId. */
+  /** Per-group MRU, newest last, restores the previous tab on close instead of a visual neighbor.
+   * Legacy sessions omit it; hydration seeds from activeTabId so split groups keep independent histories. */
   recentTabIds?: string[]
 }

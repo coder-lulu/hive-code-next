@@ -38,6 +38,7 @@ import type { CdpAuxiliaryCommands, CdpTabState } from './cdp-auxiliary-commands
 import { CdpBridgeCommandSet } from './cdp-bridge-command-set'
 import { CdpBridgeState, type CdpQueuedCommand } from './cdp-bridge-state'
 
+// Preserve existing imports; runtime code uses browser-error without loading Chromium.
 export { BrowserError } from './browser-error'
 
 export class CdpBridge {
@@ -258,6 +259,7 @@ export class CdpBridge {
   }
 
   private getRegisteredTabs(): Map<string, number> {
+    // BrowserManager exposes no public tab enumeration.
     return (this.browserManager as unknown as { webContentsIdByTabId: Map<string, number> })
       .webContentsIdByTabId
   }

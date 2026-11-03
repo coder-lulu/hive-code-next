@@ -1,8 +1,10 @@
-import { Pressable, StyleSheet, View } from 'react-native'
+import { View } from 'react-native'
 import { SquareChevronRight } from 'lucide-react-native'
 
-import type { MobileTheme } from '../theme/mobile-theme'
-import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { MobileSessionHeaderIconButton } from './MobileSessionHeaderIconButton'
+import { styles } from './mobile-session-styles'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 
 type Props = {
   disabled: boolean
@@ -10,46 +12,17 @@ type Props = {
 }
 
 export function QuickCommandsTabButton({ disabled, onPress }: Props) {
-  const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createStyles)
+  const t = useMobileTranslation()
+  useMobileColorScheme()
   return (
     <>
       <View style={styles.tabActionDivider} />
-      <Pressable
-        style={({ pressed }) => [
-          styles.newTerminalButton,
-          pressed && styles.newTerminalButtonPressed,
-          disabled && styles.newTerminalButtonDisabled
-        ]}
+      <MobileSessionHeaderIconButton
         disabled={disabled}
         onPress={onPress}
-        accessibilityLabel="快捷命令"
-      >
-        <SquareChevronRight size={16} color={theme.color.text.secondary} strokeWidth={2} />
-      </Pressable>
+        accessibilityLabel={t('session.quickCommandsTabButton.quickCommands', 'Quick commands')}
+        icon={SquareChevronRight}
+      />
     </>
   )
-}
-
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    tabActionDivider: {
-      width: StyleSheet.hairlineWidth,
-      height: theme.spacing.space20,
-      backgroundColor: theme.color.border.subtle
-    },
-    newTerminalButton: {
-      width: theme.size.minimumTouchTarget,
-      height: theme.size.minimumTouchTarget,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: theme.radii.control
-    },
-    newTerminalButtonPressed: {
-      backgroundColor: theme.color.bg.subtle
-    },
-    newTerminalButtonDisabled: {
-      opacity: 0.45
-    }
-  })
 }

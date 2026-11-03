@@ -21,7 +21,7 @@ const runtimeRecordId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
 function memoryStorage() {
   let raw: string | null = null
   return {
-    getItem: vi.fn(async () => raw),
+    getItem: vi.fn(async (_key: string) => raw),
     setItem: vi.fn(async (_key: string, value: string) => {
       raw = value
     })

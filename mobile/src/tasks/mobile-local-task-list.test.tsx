@@ -1,3 +1,4 @@
+import { findAllByHostType, findByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -95,7 +96,7 @@ describe('MobileLocalTaskList', () => {
       )
     })
 
-    const list = renderer!.root.findByType('SectionList')
+    const list = findByHostType(renderer!.root, 'SectionList')
     expect(list.props.sections.map((section: { title: string }) => section.title)).toEqual([
       '最近完成'
     ])
@@ -103,11 +104,11 @@ describe('MobileLocalTaskList', () => {
     act(() => {
       rowRenderer = create(list.props.renderItem({ item: task() }))
     })
-    const row = rowRenderer!.root.findByType('Pressable')
+    const row = findByHostType(rowRenderer!.root, 'Pressable')
     act(() => row.props.onPress())
     expect(onOpen).toHaveBeenCalledWith('wt-1', 'tab-1')
 
-    const text = rowRenderer!.root.findAllByType('Text')
+    const text = findAllByHostType(rowRenderer!.root, 'Text')
     expect(text.every((node) => node.props.maxFontSizeMultiplier === 1.3)).toBe(true)
     expect(text.map((node) => node.children.join('')).join(' ')).toContain(
       '本地 · hive-code-next · mobile-ui · Codex · 1 分钟前'
@@ -148,8 +149,7 @@ describe('MobileLocalTaskList', () => {
       )
     })
 
-    const labels = renderer!.root
-      .findAllByType('Text')
+    const labels = findAllByHostType(renderer!.root, 'Text')
       .map((node) => node.children.join(''))
       .join(' ')
     expect(labels).toContain('无法加载本地任务')
@@ -170,8 +170,7 @@ describe('MobileLocalTaskList', () => {
       )
     })
 
-    const labels = renderer!.root
-      .findAllByType('Text')
+    const labels = findAllByHostType(renderer!.root, 'Text')
       .map((node) => node.children.join(''))
       .join(' ')
     expect(labels).toContain('没有匹配的本地任务')
@@ -194,8 +193,7 @@ describe('MobileLocalTaskList', () => {
       )
     })
 
-    let labels = renderer!.root
-      .findAllByType('Text')
+    let labels = findAllByHostType(renderer!.root, 'Text')
       .map((node) => node.children.join(''))
       .join(' ')
     expect(labels).toContain('连接恢复前无法验证任务状态')
@@ -212,8 +210,7 @@ describe('MobileLocalTaskList', () => {
         })
       )
     )
-    labels = renderer!.root
-      .findAllByType('Text')
+    labels = findAllByHostType(renderer!.root, 'Text')
       .map((node) => node.children.join(''))
       .join(' ')
     expect(labels).toContain('没有符合筛选的任务')
@@ -237,8 +234,7 @@ describe('MobileLocalTaskList', () => {
       )
     })
 
-    const labels = renderer!.root
-      .findAllByType('Text')
+    const labels = findAllByHostType(renderer!.root, 'Text')
       .map((node) => node.children.join(''))
       .join(' ')
     expect(labels).toContain('还没有任务')

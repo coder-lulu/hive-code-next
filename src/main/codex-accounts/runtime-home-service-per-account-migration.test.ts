@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { installFakeAppEnvironment } from '../../../config/scripts/vitest-host-ports-setup'
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -11,28 +12,31 @@ import { writeCodexStateDbBackfillStatus } from '../codex/codex-state-db-test-fi
 const testState = { userData: '', home: '' }
 const previousEnv: Record<string, string | undefined> = {}
 
-// Why: stands in for asking a real Codex for its hook hashes.
 vi.mock('../codex/codex-hook-trust-derivation', async (importOriginal) =>
   (await import('../codex/codex-hook-trust-derivation.test-fixture')).answeringCodexForTests(
     await importOriginal()
   )
 )
 vi.mock('electron', () => ({ app: { getPath: () => testState.userData } }))
+beforeEach(() => installFakeAppEnvironment({ getPath: () => testState.userData }))
 vi.mock('node:os', async () => {
   const actual = await vi.importActual<typeof NodeOs>('node:os')
   return { ...actual, homedir: () => testState.home }
 })
-// Why: selecting an account starts the history bridge, which would otherwise
-// spawn the real `codex app-server` on these fixture homes.
-vi.mock('../codex/codex-account-session-index-heal', () => ({
-  createCodexAccountStateDb: async () => false,
-  healCodexAccountSessionIndex: async () => ({
+// Prevent the selection-triggered history bridge from spawning a real app-server.
+vi.mock('../codex/codex-account-session-index-heal', () => {
+  const upToDate = async () => ({
     outcome: 'up-to-date',
     healedThreads: 0,
     missingThreads: 0,
     failedThreads: 0
   })
-}))
+  return {
+    createCodexAccountStateDb: async () => false,
+    healCodexAccountSessionIndex: upToDate,
+    healPendingCodexAccountThreads: upToDate
+  }
+})
 
 beforeEach(() => {
   vi.resetModules()
@@ -166,7 +170,7 @@ describe('CodexRuntimeHomeService per-account takeover composition', () => {
     expect(settings.activeCodexManagedAccountId).toBe(account.id)
   })
 
-  it('keeps E in-place auth when selection becomes system default without an explicit sync', async () => {
+  it('keeps E in-place auth when selection becomes real-home without an explicit sync', async () => {
     const fresh = createAuth('one@example.com', 'acct-1', 'e-refresh', 3_000)
     const mismatch = createAuth('other@example.com', 'acct-other', 'stale-shared', 4_000)
     const account = createManagedAccount('account-1', 'acct-1', fresh)
@@ -179,7 +183,6 @@ describe('CodexRuntimeHomeService per-account takeover composition', () => {
     settings.activeCodexManagedAccountId = null
     settings.activeCodexManagedAccountIdsByRuntime = { host: null, wsl: {} }
 
-    // System default uses the real home on every host, without importing shared account auth.
     expect(service.prepareForCodexLaunch()).toBeNull()
     expect(service.prepareForRateLimitFetch()).toEqual({
       kind: 'ready',
@@ -217,7 +220,7 @@ describe('CodexRuntimeHomeService per-account takeover composition', () => {
     expect(readFileSync(systemAuthPath(), 'utf-8')).toBe('system auth sentinel\n')
   })
 
-  it('keeps real-home and sibling-account history outside the selected account home', async () => {
+  it('bridges real-home and sibling-account history into the launched account home', async () => {
     const accountOne = createManagedAccount(
       'account-1',
       'acct-1',
@@ -233,29 +236,27 @@ describe('CodexRuntimeHomeService per-account takeover composition', () => {
     const siblingRollout = join('2026', '07', '21', 'rollout-2026-07-21T10-00-00-bbbb.jsonl')
     writeRollout(systemHome(), systemRollout, '{"session":"real-home"}\n')
     writeRollout(accountOne.managedHomePath, siblingRollout, '{"session":"account-one"}\n')
-    // Why: history is linked only once Codex has indexed the new home (#20669).
+    // History bridging requires the new home to be indexed first (#20669).
     writeCodexStateDbBackfillStatus(accountTwo.managedHomePath, 'complete')
     const { settings, store } = createStore([accountOne, accountTwo], accountOne.id)
     const { CodexRuntimeHomeService } = await import('./runtime-home-service')
     const bridge = await import('../codex/codex-account-session-bridge')
-    const startBridge = vi
-      .spyOn(bridge, 'startCodexAccountSessionBridgeInBackground')
-      .mockResolvedValue()
     const service = new CodexRuntimeHomeService(store as never)
 
     selectManagedAccount(settings, accountTwo.id)
     service.syncForCurrentSelection()
     expect(service.prepareForCodexLaunch()).toBe(accountTwo.managedHomePath)
-    expect(startBridge).not.toHaveBeenCalled()
-    expect(existsSync(join(accountTwo.managedHomePath, 'sessions', systemRollout))).toBe(false)
-    expect(existsSync(join(accountTwo.managedHomePath, 'sessions', siblingRollout))).toBe(false)
-    expect(readFileSync(join(systemHome(), 'sessions', systemRollout), 'utf8')).toContain(
-      'real-home'
+    await bridge.startCodexAccountSessionBridgeInBackground({
+      targetCodexHomePath: accountTwo.managedHomePath,
+      sourceCodexHomePaths: [systemHome(), accountOne.managedHomePath]
+    })
+
+    expect(readFileSync(join(accountTwo.managedHomePath, 'sessions', systemRollout), 'utf-8')).toBe(
+      '{"session":"real-home"}\n'
     )
     expect(
-      readFileSync(join(accountOne.managedHomePath, 'sessions', siblingRollout), 'utf8')
-    ).toContain('account-one')
-    startBridge.mockRestore()
+      readFileSync(join(accountTwo.managedHomePath, 'sessions', siblingRollout), 'utf-8')
+    ).toBe('{"session":"account-one"}\n')
     expect(existsSync(join(systemHome(), 'sessions', siblingRollout))).toBe(false)
   })
 

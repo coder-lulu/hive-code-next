@@ -3,7 +3,10 @@ import WebSocket from 'ws'
 import { parsePairingCode } from '../../shared/pairing'
 import type { RuntimeMobileSessionTabsResult } from '../../shared/runtime-types'
 import type { OrcaRuntimeService } from './orca-runtime'
-import { RuntimeE2EEClientSession } from '../../shared/runtime-e2ee-client-session'
+import type { Repo } from '../../shared/repo-types'
+import type { WorktreeMeta } from '../../shared/worktree/meta-types'
+import type { HostWorktreeTarget } from '../../shared/worktree/host-qualified-identity'
+import { decrypt, deriveSharedKey, encrypt, generateKeyPair } from '../../shared/e2ee-crypto'
 
 export const REPO_ID = 'repo-1'
 export const FOLDER_REPO_ID = 'folder-repo-1'
@@ -16,7 +19,7 @@ export const SESSION_WORKTREE_ID = worktreeId('session')
 
 export type PairedSession = {
   ws: WebSocket
-  sharedKey: RuntimeE2EEClientSession
+  sharedKey: Uint8Array
 }
 
 export type ResponseReader = {
@@ -28,7 +31,7 @@ export type ResponseReader = {
 }
 
 export function makeStore() {
-  const worktreeMeta = Object.fromEntries(
+  const worktreeMeta: Record<string, WorktreeMeta> = Object.fromEntries(
     [
       HOST_WORKTREE_ID,
       CLIENT_A_WORKTREE_ID,
@@ -52,7 +55,7 @@ export function makeStore() {
       }
     ])
   )
-  const repos = [
+  const repos: Repo[] = [
     {
       id: REPO_ID,
       path: '/tmp/repo',
@@ -60,7 +63,7 @@ export function makeStore() {
       badgeColor: 'blue',
       addedAt: 1
     },
-    // Why: a folder project reaches the same create-activation notifier without a real git worktree add.
+    // Folder projects exercise create activation without adding a Git worktree.
     {
       id: FOLDER_REPO_ID,
       path: '/tmp/folder-project',
@@ -74,13 +77,13 @@ export function makeStore() {
     getRepo: (id: string) => repos.find((repo) => repo.id === id),
     getRepos: () => repos,
     addRepo: () => {},
-    updateRepo: () => undefined as never,
+    updateRepo: () => null,
     getAllWorktreeMeta: () => worktreeMeta,
     getWorktreeMeta: (id: string) => worktreeMeta[id],
-    setWorktreeMeta: (id: string, patch: Record<string, unknown>) => {
-      const next = { ...worktreeMeta[id], ...patch }
-      worktreeMeta[id] = next as (typeof worktreeMeta)[string]
-      return next as never
+    setWorktreeMeta: ({ id }: HostWorktreeTarget, patch: Partial<WorktreeMeta>) => {
+      const next = { ...worktreeMeta[id]!, ...patch }
+      worktreeMeta[id] = next
+      return next
     },
     removeWorktreeMeta: () => {},
     getSettings: () => ({
@@ -113,20 +116,27 @@ export async function authenticate(pairingUrl: string): Promise<PairedSession> {
     throw new Error('invalid_pairing_url')
   }
   const ws = await connect(pairing.endpoint)
-  const sharedKey = RuntimeE2EEClientSession.create({
-    desktopPublicKeyB64: pairing.publicKeyB64,
-    transport: 'direct'
+  const keys = generateKeyPair()
+  const serverPublicKey = Uint8Array.from(Buffer.from(pairing.publicKeyB64, 'base64'))
+  const sharedKey = deriveSharedKey(keys.secretKey, serverPublicKey)
+  ws.send(
+    JSON.stringify({
+      type: 'e2ee_hello',
+      publicKeyB64: Buffer.from(keys.publicKey).toString('base64')
+    })
+  )
+  expect(JSON.parse(await nextMessage(ws))).toEqual({ type: 'e2ee_ready' })
+  ws.send(
+    encrypt(JSON.stringify({ type: 'e2ee_auth', deviceToken: pairing.deviceToken }), sharedKey)
+  )
+  expect(JSON.parse(decrypt(await nextMessage(ws), sharedKey)!)).toEqual({
+    type: 'e2ee_authenticated'
   })
-  ws.send(JSON.stringify(sharedKey.hello))
-  expect(sharedKey.acceptReady(JSON.parse(await nextMessage(ws)))).toBe(true)
-  ws.send(sharedKey.sealText(sharedKey.authMessage(pairing.deviceToken)))
-  expect(sharedKey.isAuthenticated(sharedKey.openText(await nextMessage(ws))!)).toBe(true)
-
   return { ws, sharedKey }
 }
 
 export function send(session: PairedSession, request: Record<string, unknown>): void {
-  session.ws.send(session.sharedKey.sealText(JSON.stringify(request)))
+  session.ws.send(encrypt(JSON.stringify(request), session.sharedKey))
 }
 
 export function createReader(session: PairedSession): ResponseReader {
@@ -138,8 +148,9 @@ export function createReader(session: PairedSession): ResponseReader {
   const queued: Record<string, unknown>[] = []
   const waiters: Waiter[] = []
   const onMessage = (data: WebSocket.RawData): void => {
-    const plaintext = session.sharedKey.openText(
-      typeof data === 'string' ? data : data.toString('utf-8')
+    const plaintext = decrypt(
+      typeof data === 'string' ? data : data.toString('utf-8'),
+      session.sharedKey
     )
     if (!plaintext) {
       return

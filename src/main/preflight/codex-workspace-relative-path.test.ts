@@ -8,14 +8,17 @@ import { codexProviderHandle } from '../../shared/agent-session-provider-handle-
 import { runProcess } from '@orca/process-host'
 import {
   createCodexStructuredLaunchResolver,
+  launchRecordStore,
   TEST_SPAWN_TOKEN
 } from '../runtime/structured-agent-launch-composition.test-support'
-import { withSupportedCodexCli } from '../codex/codex-cli-installation-error'
+import {
+  requireSupportedCodexCli,
+  withSupportedCodexCli
+} from '../codex/codex-cli-installation-error'
 import { resolveStructuredAgentCommand } from '../native-chat/structured-agent-command-resolution'
 import { resolveTuiAgentLaunchEnv } from '../../shared/tui-agent-launch-defaults'
 import { createStructuredAgentEnvironmentResolvers } from '../runtime/structured-agent-shell-environment'
 import { identityFor } from '../codex/codex-structured-session-adapter-fixture'
-import { readCodexCliInstallation } from './codex-cli-installation'
 import type * as CommandResolution from '../../shared/node-cli-command-resolution'
 
 vi.mock('../startup/login-shell-environment', () => ({
@@ -59,7 +62,7 @@ describe.skipIf(process.platform === 'win32')('workspace-relative Codex selectio
       const sources = {
         resolveCommand: (options?: { pathEnv?: string | null; homePath?: string }) =>
           resolveStructuredAgentCommand('codex', settings, options),
-        resolveAgentLaunchEnv: () => resolveTuiAgentLaunchEnv('codex', settings.agentDefaultEnv)
+        resolveAgentLaunchEnv: () => resolveTuiAgentLaunchEnv('codex', settings)
       }
       const environment = createStructuredAgentEnvironmentResolvers(sources)
       const record: AgentSessionRecord = {
@@ -71,7 +74,7 @@ describe.skipIf(process.platform === 'win32')('workspace-relative Codex selectio
       }
       const resolve = withSupportedCodexCli(
         createCodexStructuredLaunchResolver({
-          store: { getRecord: () => record, pinLaunchDirectory: vi.fn() },
+          store: launchRecordStore(() => record, vi.fn()),
           resolveCommand: sources.resolveCommand,
           resolveEnvironment: () => environment.resolveAgentEnvironment('codex'),
           resolveLaunchArgs: () => [],
@@ -119,10 +122,12 @@ describe.skipIf(process.platform === 'win32')('workspace-relative Codex selectio
       mode: 0o755
     })
     const input = { program: join('bin', 'codex'), cwd: root, env: { PATH: '' } }
-    expect((await readCodexCliInstallation(input)).status).toBe('ready')
+    await expect(requireSupportedCodexCli(input)).resolves.toBeUndefined()
     await writeFile(file, `#!${process.execPath}\nconsole.log('codex-cli 0.135.0')\n`, {
       mode: 0o755
     })
-    expect((await readCodexCliInstallation(input)).status).toBe('unsupported')
+    await expect(requireSupportedCodexCli(input)).rejects.toMatchObject({
+      installation: { agent: 'codex', installedVersion: '0.135.0', minimumVersion: '0.136.0' }
+    })
   })
 })

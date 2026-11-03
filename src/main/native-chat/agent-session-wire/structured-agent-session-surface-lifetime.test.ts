@@ -67,6 +67,7 @@ let statusSink: StructuredAgentSessionStatusSink
 let clock: number
 function adapter(): StructuredAgentSessionAdapter {
   return {
+    open: async () => ({ reportedOptions: {} }),
     acquire,
     closeSession,
     releaseAcquisition: vi.fn(async () => true),
@@ -142,7 +143,7 @@ function emitTurnLifecycle(state: 'running' | 'completed', ordinal: number): voi
 /** The sweep stops the child first and closes the conversation last. */
 function waitForEviction(): Promise<void> {
   return vi.waitFor(() => {
-    expect(closeSession).toHaveBeenCalledWith(SESSION)
+    expect(closeSession).toHaveBeenCalledWith(SESSION, undefined)
     expect(host.hasSession(SESSION)).toBe(false)
   })
 }
@@ -260,7 +261,7 @@ describe('a chat that closes', () => {
 
     await host.close(SESSION, 'evict')
 
-    expect(closeSession).toHaveBeenCalledWith(SESSION)
+    expect(closeSession).toHaveBeenCalledWith(SESSION, undefined)
     expect(host.hasSession(SESSION)).toBe(false)
     expect(hostErrors).toEqual([])
     // The record and its journal stay; only the process and the claim on it go.
@@ -411,7 +412,9 @@ describe('startup', () => {
 
     store = await openTestAgentSessionRecordStore(root)
     openHost(async () => ({ outcome: 'pid-absent' }))
-    await host.restoreReadableSessions()
+    await store.reconcileOnRestart({ probe: async () => ({ outcome: 'pid-absent' }), now: clock })
+    await host.seedSessionTabs([SESSION])
+    await host.revealSession(SESSION)
 
     const restored = await host.history({ sessionId: SESSION, direction: 'tail' })
     expect(restored.ok && restored.page.items.some((item) => item.body.kind === 'status')).toBe(
@@ -431,9 +434,12 @@ describe('startup', () => {
 
   it('restores a session for reading without spawning a provider child', async () => {
     await attach()
+    await host.setSessionTabVisibility(SESSION, true)
     await reboot()
 
-    await host.restoreReadableSessions()
+    await store.reconcileOnRestart({ probe: async () => ({ outcome: 'pid-absent' }), now: clock })
+    await host.seedSessionTabs([SESSION])
+    await host.revealSession(SESSION)
 
     // The record is readable — the tab comes back, history answers — and nothing is running.
     expect(acquire).not.toHaveBeenCalled()
@@ -447,7 +453,9 @@ describe('startup', () => {
   it('gives the child back for work, never for a read', async () => {
     await attach()
     await reboot()
-    await host.restoreReadableSessions()
+    await store.reconcileOnRestart({ probe: async () => ({ outcome: 'pid-absent' }), now: clock })
+    await host.seedSessionTabs([SESSION])
+    await host.revealSession(SESSION)
 
     const unsubscribe = await host.subscribe({
       id: 'viewer-1',
@@ -715,6 +723,9 @@ describe('an unexpected provider exit', () => {
     await vi.waitFor(async () =>
       expect(await submissionState(unknownParams.envelope.clientOperationId)).toBe('unknown')
     )
+    // The exit outcome belongs to a provider-confirmed running response.
+    emitTurnLifecycle('running', 1)
+    await host.flushStreamedEvents(SESSION)
     const runtimeState = (
       host as unknown as {
         runtimeState: { lifecycleBarrier: () => Promise<{ ok: false; error: Error }> }

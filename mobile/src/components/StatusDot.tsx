@@ -1,33 +1,30 @@
+import type { MobileTheme } from '../theme/mobile-theme'
 import { View, StyleSheet } from 'react-native'
 import { colors } from '../theme/mobile-theme'
+import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 import type { ConnectionState } from '../transport/types'
-import type { ConnectionVerdict } from '../transport/connection-health'
-import type { MobileTheme } from '../theme/mobile-theme'
+import { isConnectionDialing, type ConnectionVerdict } from '../transport/connection-health'
 
-const stateColors: Record<ConnectionState, string> = {
+const stateColors = (): Record<ConnectionState, string> => ({
   connected: colors.statusGreen,
   connecting: colors.statusAmber,
   handshaking: colors.statusAmber,
   reconnecting: colors.statusAmber,
   disconnected: colors.textMuted,
   'auth-failed': colors.statusRed
-}
+})
 
 export function statusDotColor(state: ConnectionState, verdict?: ConnectionVerdict): string {
   if (verdict?.kind === 'unreachable' || verdict?.kind === 'auth-failed') {
     return colors.statusRed
   }
-  if (verdict?.kind === 'warning' || (verdict?.kind === 'normal' && verdict.label.endsWith('…'))) {
+  if (verdict?.kind === 'warning' || (verdict && isConnectionDialing(verdict))) {
     return colors.statusAmber
   }
-  return stateColors[state] ?? colors.textMuted
+  return stateColors()[state] ?? colors.textMuted
 }
 
-// Why: when caller passes a verdict, the dot color reflects the verdict's
-// severity instead of the raw transport state. This avoids the "amber dot
-// next to red 'Can't reach desktop' label" mismatch — the underlying
-// transport is still 'reconnecting' (amber) but the user-visible meaning
-// has escalated to error (red).
+// Prefer verdict severity over transport color: reconnecting can already mean user-visible error, so dot must match label.
 export function StatusDot({
   state,
   verdict,
@@ -37,10 +34,11 @@ export function StatusDot({
   verdict?: ConnectionVerdict
   theme?: MobileTheme
 }) {
+  useMobileColorScheme()
   const color = theme
     ? verdict?.kind === 'unreachable' || verdict?.kind === 'auth-failed'
       ? theme.color.status.danger
-      : verdict?.kind === 'warning' || (verdict?.kind === 'normal' && verdict.label.endsWith('…'))
+      : verdict?.kind === 'warning' || (verdict && isConnectionDialing(verdict))
         ? theme.color.status.warning
         : theme.color.status[
             state === 'connected' ? 'success' : state === 'auth-failed' ? 'danger' : 'warning'

@@ -2,11 +2,11 @@
 
 import { createElement, useEffect, act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultOnboardingState } from '../../../../shared/onboarding-defaults'
-import { renderHook, cleanup } from '@testing-library/react'
-import { getDefaultSettings } from '../../../../shared/constants'
 import type { OnboardingState } from '../../../../shared/onboarding-state-types'
+import { getDefaultSettings } from '../../../../shared/constants'
 
 const trackMock = vi.hoisted(() => vi.fn())
 
@@ -16,11 +16,9 @@ vi.mock('@/lib/telemetry', () => ({
 
 import {
   buildCompletedOnboardingNotificationSettings,
-  buildOnboardingDismissedPayload,
-  useCloseWith,
   usePersistCurrentStep,
-  type DismissedExtras,
-  trackOnboardingDismissed
+  useCloseWith,
+  type DismissedExtras
 } from './use-onboarding-flow-persistence'
 import type { StepNumber } from './use-onboarding-flow-types'
 
@@ -84,7 +82,6 @@ describe('onboarding flow persistence', () => {
   })
 
   afterEach(() => {
-    cleanup()
     if (root) {
       act(() => root?.unmount())
     }
@@ -92,68 +89,6 @@ describe('onboarding flow persistence', () => {
     root = null
     container = null
     vi.useRealTimers()
-  })
-
-  it.each([
-    ['hivecode', 'blank', false],
-    ['managed-pi', 'blank', false],
-    ['unknown-agent', 'blank', false],
-    [null, 'blank', false],
-    ['codex', 'codex', true],
-    ['pi', 'pi', true]
-  ] as const)(
-    'persists selection %s without claiming an invalid choice',
-    async (selectedAgent, expected, choseAgent) => {
-      const updateSettings = vi.fn().mockResolvedValue(undefined)
-      const input: Parameters<typeof usePersistCurrentStep>[0] = {
-        currentStepId: 'agent',
-        selectedAgent: null,
-        yoloPermissions: false,
-        theme: 'dark',
-        settings: getDefaultSettings('/tmp'),
-        updateSettings,
-        onboardingChecklist: getDefaultOnboardingState().checklist,
-        onOnboardingChange: vi.fn(),
-        setError: vi.fn()
-      }
-      Reflect.set(input, 'selectedAgent', selectedAgent)
-      const { result } = renderHook(() => usePersistCurrentStep(input))
-      await expect(result.current()).resolves.toEqual({ ok: true })
-      expect(updateSettings).toHaveBeenCalledWith(
-        expect.objectContaining({ defaultTuiAgent: expected })
-      )
-      expect(window.api.onboarding.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          checklist: expect.objectContaining({ choseAgent })
-        })
-      )
-    }
-  )
-
-  it('builds dismissed telemetry with the triggering advance path', () => {
-    expect(
-      buildOnboardingDismissedPayload(3, {
-        durationMs: 250,
-        advancedVia: 'keyboard'
-      })
-    ).toEqual({
-      last_step: 3,
-      duration_ms: 250,
-      advanced_via: 'keyboard'
-    })
-  })
-
-  it('tracks dismissed onboarding telemetry with the triggering advance path', () => {
-    trackOnboardingDismissed(3, {
-      durationMs: 250,
-      advancedVia: 'keyboard'
-    })
-
-    expect(trackMock).toHaveBeenCalledWith('onboarding_dismissed', {
-      last_step: 3,
-      duration_ms: 250,
-      advanced_via: 'keyboard'
-    })
   })
 
   it('preserves explicit focus notification suppression when completing onboarding', () => {
@@ -181,6 +116,44 @@ describe('onboarding flow persistence', () => {
       notifyHiddenWorkspaces: false
     })
   })
+
+  it.each([
+    { chosen: false, yolo: false, expected: {} },
+    { chosen: false, yolo: true, expected: {} },
+    { chosen: true, yolo: false, expected: { agentPermissionDefault: 'own' } },
+    { chosen: true, yolo: true, expected: { agentPermissionDefault: 'full-access' } }
+  ])(
+    'persists current permissions only after an explicit toggle: %j',
+    async ({ chosen, yolo, expected }) => {
+      const settings = getDefaultSettings('/tmp')
+      settings.agentPermissionDefault = 'auto'
+      settings.agentPermissionOverrides = { claude: 'ask' }
+      const updateSettings = vi.fn()
+      const { result, unmount } = renderHook(() =>
+        usePersistCurrentStep({
+          currentStepId: 'agent',
+          selectedAgent: 'codex',
+          yoloPermissions: yolo,
+          yoloPermissionsChosen: { current: chosen },
+          theme: settings.theme,
+          settings,
+          updateSettings,
+          onboardingChecklist: getDefaultOnboardingState().checklist,
+          onOnboardingChange: vi.fn(),
+          setError: vi.fn()
+        })
+      )
+      await act(async () => {
+        expect(await result.current()).toEqual({ ok: true })
+      })
+      expect(updateSettings).toHaveBeenCalledWith({
+        defaultTuiAgent: 'codex',
+        ...expected,
+        ...(chosen ? { agentPermissionOverrides: { claude: 'ask' } } : {})
+      })
+      unmount()
+    }
+  )
 
   it('schedules the star toast after every completed close path', async () => {
     let closeWith: CloseWithCallback | null = null

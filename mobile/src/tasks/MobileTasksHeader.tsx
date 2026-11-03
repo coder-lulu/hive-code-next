@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { useMemo } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
 import { ChevronDown, Plus, RefreshCw } from 'lucide-react-native'
@@ -24,6 +25,8 @@ export function MobileTasksHeader(props: {
   readonly showCreateTask: boolean
   readonly taskUiReady: boolean
 }) {
+  const t = useMobileTranslation()
+
   const router = useRouter()
   const theme = useMobileTheme()
   const styles = useMemo(() => createStyles(theme), [theme])
@@ -55,7 +58,15 @@ export function MobileTasksHeader(props: {
       <View style={styles.header}>
         <View style={styles.side}>
           <Pressable
-            accessibilityLabel={`选择 Runtime，当前为 ${currentRuntime?.name ?? '未命名设备'}，${runtimeStatus.accessibilityLabel}`}
+            accessibilityLabel={t(
+              'auto.mobile.src.tasks.MobileTasksHeader.a1dd77d752',
+              'Choose Runtime, currently {{value0}}, {{value1}}',
+              {
+                value0:
+                  currentRuntime?.name ?? t('connection.path.unnamedDevice', 'Unnamed device'),
+                value1: runtimeStatus.accessibilityLabel
+              }
+            )}
             accessibilityRole="button"
             onPress={() => props.onRuntimeSelectorVisibleChange(true)}
             style={({ pressed }) => [styles.runtimeButton, pressed && styles.pressed]}
@@ -63,7 +74,8 @@ export function MobileTasksHeader(props: {
             <View style={[styles.statusDot, { backgroundColor: runtimeStatusColor }]} />
             <View style={styles.runtimeCopy}>
               <Text maxFontSizeMultiplier={1.3} numberOfLines={1} style={styles.runtimeName}>
-                {currentRuntime?.name ?? 'Runtime'}
+                {currentRuntime?.name ??
+                  t('auto.mobile.src.home.MobileHomeResumeCard.62207aa32c', 'Runtime')}
               </Text>
               <Text
                 maxFontSizeMultiplier={1.3}
@@ -79,14 +91,17 @@ export function MobileTasksHeader(props: {
 
         <View pointerEvents="none" style={styles.titleWrap}>
           <Text maxFontSizeMultiplier={1.3} numberOfLines={1} style={styles.title}>
-            任务中心
+            {t('auto.mobile.src.tasks.MobileTasksHeader.4b3fff907d', 'Task center')}
           </Text>
         </View>
 
         <View style={[styles.side, styles.actions]}>
           {props.showCreateTask ? (
             <Pressable
-              accessibilityLabel="新建任务"
+              accessibilityLabel={t(
+                'auto.mobile.src.tasks.MobileTasksHeader.6540f2d039',
+                'New task'
+              )}
               accessibilityRole="button"
               accessibilityState={{ disabled: !props.taskUiReady }}
               disabled={!props.taskUiReady}
@@ -99,12 +114,15 @@ export function MobileTasksHeader(props: {
             >
               <Plus color={theme.color.brand.primary} size={18} strokeWidth={2} />
               <Text maxFontSizeMultiplier={1.3} style={styles.createButtonText}>
-                新建
+                {t('auto.mobile.src.tasks.MobileTasksHeader.901a4ee0a3', 'New')}
               </Text>
             </Pressable>
           ) : (
             <Pressable
-              accessibilityLabel="刷新任务"
+              accessibilityLabel={t(
+                'auto.mobile.src.tasks.MobileTasksHeader.cf9756a426',
+                'Refresh tasks'
+              )}
               accessibilityRole="button"
               accessibilityState={{ disabled: !props.taskUiReady || props.busy }}
               disabled={!props.taskUiReady || props.busy}

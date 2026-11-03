@@ -6,7 +6,15 @@ import { resolveLocalWindowsAgentStartupShell } from '../../shared/windows-termi
 /** Use the same grouping rules as terminal launches before the provider filters its owned flags. */
 export function structuredAgentConfiguredArgs(
   agent: string,
-  settings: Partial<Pick<GlobalSettings, 'agentDefaultArgs' | 'terminalWindowsShell'>>,
+  settings: Partial<
+    Pick<
+      GlobalSettings,
+      | 'agentDefaultArgs'
+      | 'terminalWindowsShell'
+      | 'agentPermissionDefault'
+      | 'agentPermissionOverrides'
+    >
+  >,
   platform: NodeJS.Platform = process.platform
 ): string[] {
   const shell =
@@ -15,10 +23,7 @@ export function structuredAgentConfiguredArgs(
       isRemote: false,
       terminalWindowsShell: settings.terminalWindowsShell
     }) ?? 'posix'
-  const parsed = tokenizeStartupCommand(
-    resolveTuiAgentLaunchArgs(agent, settings.agentDefaultArgs),
-    shell
-  )
+  const parsed = tokenizeStartupCommand(resolveTuiAgentLaunchArgs(agent, settings), shell)
   if (!parsed.ok) {
     throw new Error(`${agent} Arguments are invalid: ${parsed.error}`)
   }

@@ -1,3 +1,4 @@
+import type { ManagedServerUpdateDeps } from './managed-server-update-check'
 import { describe, expect, it, vi } from 'vitest'
 import type { SshTarget } from '../../shared/ssh-types'
 import {
@@ -9,6 +10,10 @@ import {
   type HostServerOnConnectDeps
 } from './ssh-host-server-on-connect'
 import { hostServerDepsStub } from './ssh-host-server-on-connect-test-deps'
+
+// Read the final callback because retry eligibility is decided under lifecycle lock.
+const failedBeforeOf = (autoUpdate: ManagedServerUpdateDeps['autoUpdate']) =>
+  vi.mocked(autoUpdate).mock.lastCall?.[1].failedBefore()
 
 const target: SshTarget = { id: 'ssh-1', label: 'Box', host: 'box', port: 22, username: 'me' }
 
@@ -23,6 +28,18 @@ describe('which server an SSH host runs on connect', () => {
     })
     expect(d.ensureTunnel).toHaveBeenCalledWith('env-9')
     expect(d.convert).not.toHaveBeenCalled()
+  })
+
+  it("says when a converted host's server kept moved automations off", async () => {
+    const d = deps({
+      managedEnvironmentId: () => 'env-9',
+      retainCommittedSource: vi.fn(async () => 2)
+    })
+    await expect(resolveHostServerOnConnect(target, d)).resolves.toEqual({
+      route: 'managed',
+      environmentId: 'env-9',
+      automationsLeftDisabled: 2
+    })
   })
 
   it('checks the server behind the tunnel on every connect to a converted host', async () => {
@@ -147,6 +164,24 @@ describe('which server an SSH host runs on connect', () => {
     })
   })
 
+  it('offers "Move anyway" when only saved state refuses', async () => {
+    const d = deps({
+      convert: async () => ({
+        outcome: 'refused',
+        verdict: 'live',
+        code: 'orcad_migration_preflight_blocked',
+        reason: 'This SSH host cannot move yet: saved tabs and panes (2).',
+        canLeaveBehind: true
+      })
+    })
+    await expect(resolveHostServerOnConnect(target, d)).resolves.toEqual({
+      route: 'unserved',
+      reason: 'refused',
+      detail: 'This SSH host cannot move yet: saved tabs and panes (2).',
+      canLeaveBehind: true
+    })
+  })
+
   it('falls back to the relay ladder for good when orcad cannot run, and remembers why', async () => {
     const d = deps({
       isEmptyHost: () => true,
@@ -176,7 +211,7 @@ describe('which server an SSH host runs on connect', () => {
       reason: 'orcad_unavailable'
     })
     expect(preflight.recordUnavailable).toHaveBeenCalledWith(target, 'native_preflight')
-    // The conversion fenced the host first; that fence must go before the relay serves it.
+    // Release failed-conversion fences before direct source can serve again.
     expect(preflight.abandonConversion).toHaveBeenCalledWith(target)
 
     const remembered = deps({ recordedUnavailable: () => 'unsupported_host' })
@@ -271,6 +306,25 @@ describe('which server an SSH host runs on connect', () => {
     expect(detail).toContain('started in /root/my repo are still running')
     expect(detail).toContain('remove that project from this desktop and connect again')
     warn.mockRestore()
+  })
+
+  it('refuses live or unverifiable relay terminals before conversion even with a stale bridge hint', async () => {
+    for (const verdict of ['live', 'unverifiable'] as const) {
+      const convert = vi.fn()
+      const d = deps({
+        relayTerminals: async () => ({ verdict, count: 1, bridged: true }),
+        convert
+      })
+      const result = await resolveHostServerOnConnect(target, d)
+      expect(result).toMatchObject({
+        route: 'unserved',
+        reason: verdict === 'live' ? 'relay_terminals_live' : 'relay_terminals_unverifiable',
+        terminals: 1
+      })
+      expect(result).not.toHaveProperty('bridged')
+      expect(convert).not.toHaveBeenCalled()
+      expect(d.abandonConversion).not.toHaveBeenCalled()
+    }
   })
 
   it('never pins a relay terminal of unknown project on the linked one, and offers the way out', async () => {
@@ -387,10 +441,7 @@ describe('which server an SSH host runs on connect', () => {
         route: 'managed',
         environmentId: 'env-9'
       })
-      expect(d.autoUpdate).toHaveBeenCalledWith(
-        'env-9',
-        expect.objectContaining({ failedBefore: false })
-      )
+      expect(failedBeforeOf(d.autoUpdate)).toBe(false)
       expect(d.progress).not.toHaveBeenCalledWith(target, 'updating')
     })
 
@@ -416,7 +467,7 @@ describe('which server an SSH host runs on connect', () => {
           order.push('start')
           return { state: 'started' as const, boundPort: null }
         }),
-        // The restarted server's fresh daemon answers zero sessions, so the update goes ahead.
+        // Wake first so the restarted daemon can supply authoritative idle census.
         autoUpdate: vi.fn(async (_id, options) => {
           order.push('update')
           options.onUpdating()
@@ -477,10 +528,7 @@ describe('which server an SSH host runs on connect', () => {
       await expect(resolveHostServerOnConnect(target, later)).resolves.toMatchObject({
         update: { state: 'failed', detail: reason }
       })
-      expect(later.autoUpdate).toHaveBeenCalledWith(
-        'env-9',
-        expect.objectContaining({ failedBefore: true })
-      )
+      expect(failedBeforeOf(later.autoUpdate)).toBe(true)
       expect(later.recordUpdateFailure).not.toHaveBeenCalled()
     })
 
@@ -498,7 +546,8 @@ describe('which server an SSH host runs on connect', () => {
       })
       await expect(resolveHostServerOnConnect(target, d)).resolves.toEqual({
         route: 'managed',
-        environmentId: 'env-9'
+        environmentId: 'env-9',
+        update: { state: 'check-failed', detail: 'ssh dropped' }
       })
       expect(d.recordUpdateFailure).not.toHaveBeenCalled()
     })
