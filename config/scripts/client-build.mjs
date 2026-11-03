@@ -99,6 +99,10 @@ async function main() {
   try {
     const commit = await capture(context, 'git', ['rev-parse', 'HEAD'])
     const status = await capture(context, 'git', ['status', '--porcelain'])
+    const meaningfulStatus = status
+      .split(/\r?\n/)
+      .filter((line) => line && !line.endsWith('.client-build.lock'))
+      .join('\n')
     const diff = await capture(context, 'git', ['diff', 'HEAD', '--binary'])
     const untracked = await capture(context, 'git', [
       'ls-files',
@@ -108,7 +112,7 @@ async function main() {
     ])
     context.source = {
       commit,
-      dirty: Boolean(status),
+      dirty: Boolean(meaningfulStatus),
       trackedDiffSha256: sha256(diff),
       untracked: untracked
         .split('\0')
