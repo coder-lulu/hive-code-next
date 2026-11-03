@@ -4,7 +4,7 @@
   "sourceProductSha": "0bdf023229b17cc6968f41fd819103747cbbf24e",
   "baseUpstreamSha": "8e350554480ac5b77d3050a2040541fd334dad7c",
   "upstreamSha": "b89cfbd09d6bb99e637a6f4f5bfcad5a4fcf3a12",
-  {
+  "documentation": {
     "privateRepository": "coder-lulu/hive-code-docs",
     "privateCommitSha": "ea4511d796b44485acd56095d1ff25df90e1ac26",
     "receiptBlobSha": "1a4057d43bf893ce8d0e9968c53ded64f2bc6181",
