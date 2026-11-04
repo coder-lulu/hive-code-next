@@ -20015,6 +20015,7 @@
       "archive": "归档会话",
       "archived": "已归档",
       "backToList": "返回会话列表",
+      "chooseWorkspace": "选择一个工作区",
       "chooseWorktreeRepo": "选择新 worktree 所属的仓库和设备。",
       "clearSearch": "清除搜索",
       "closeView": "关闭会话视图",
@@ -20325,6 +20326,7 @@
   },
   "dashboard": {
     "sidebar": {
+      "activityView": "活动视图",
       "openActivity": "查看活动",
       "closeActivity": "关闭活动视图",
       "projects": "项目",

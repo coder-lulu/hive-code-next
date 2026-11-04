@@ -9,13 +9,14 @@ import SetupScriptPromptCard from './SetupScriptPromptCard'
 import WorktreeList from './WorktreeList'
 import WslMovedProjectsSection from './WslMovedProjectsSection'
 import SidebarToolbar from './SidebarToolbar'
+import SidebarFooter from './SidebarFooter'
 import WorkspaceBoardDrawer from './WorkspaceBoardDrawer'
 import type { VirtualizedScrollAnchor } from '@/hooks/useVirtualizedScrollAnchor'
 import { cn } from '@/lib/utils'
 import { FolderPlus, Loader2 } from 'lucide-react'
 import { ActivityThreadCollapseContext } from '@/components/activity/activity-thread-collapse-context'
 import { useSidebarProjectDrop } from './useSidebarProjectDrop'
-import { useWorkspaceBoardPanel } from './useWorkspaceBoardPanel'
+import type { WorkspaceBoardPanelState } from './useWorkspaceBoardPanel'
 import { useWorkspaceRevealBodyRedirect } from './use-workspace-reveal-body-redirect'
 import { resolveLeftSidebarStyleVariables } from '@/lib/left-sidebar-appearance'
 import { useSystemPrefersDark } from '@/components/terminal-pane/use-system-prefers-dark'
@@ -24,6 +25,8 @@ import { LocalGitToolchainScanBanner } from './LocalGitToolchainScanBanner'
 import { SeveredTerminalDaemonBanner } from './SeveredTerminalDaemonBanner'
 import { StalledTerminalDaemonBanner } from './StalledTerminalDaemonBanner'
 import { StartupWorktreeRefreshStatus } from './StartupWorktreeRefreshStatus'
+import { translate } from '@/i18n/i18n'
+import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
 
 // Keep the Agents activity pipeline out of the workspace view’s initial bundle.
 const SidebarAgentsList = lazyWithRetry(() => import('./SidebarAgentsList'))
@@ -46,12 +49,15 @@ export const WORKTREE_SIDEBAR_RESIZE_HANDLE_LINE_CLASS_NAME =
 type SidebarProps = {
   worktreeScrollOffsetRef: React.MutableRefObject<number>
   worktreeScrollAnchorRef: React.MutableRefObject<VirtualizedScrollAnchor>
+  workspaceBoardPanel: WorkspaceBoardPanelState
 }
 
 function Sidebar({
   worktreeScrollOffsetRef,
-  worktreeScrollAnchorRef
+  worktreeScrollAnchorRef,
+  workspaceBoardPanel
 }: SidebarProps): React.JSX.Element {
+  useUiLanguageRevision()
   const sidebarOpen = useAppStore((s) => s.sidebarOpen)
   const sidebarWidth = useAppStore((s) => s.sidebarWidth)
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth)
@@ -59,6 +65,11 @@ function Sidebar({
   const startupWorktreeRefreshCompleted = useAppStore((s) => s.startupWorktreeRefreshCompleted)
   const settings = useAppStore((s) => s.settings)
   const sidebarBody = useAppStore((s) => s.sidebarBody ?? 'workspaces')
+  const projectNavigation = useAppStore(
+    (s) =>
+      s.sessionsView.navigation === 'projects' &&
+      (s.activeView === 'sessions' || s.activeView === 'terminal')
+  )
   const agentReadFilter = useAppStore((s) => s.agentsReadFilter)
   const setAgentReadFilter = useAppStore((s) => s.setAgentsReadFilter)
   const agentGroupBy = useAppStore((s) => s.agentsGroupBy)
@@ -107,7 +118,7 @@ function Sidebar({
     previewWorkspaceBoardFromDrag,
     solidifyWorkspaceBoardFromDrag,
     cancelWorkspaceBoardDragPreview
-  } = useWorkspaceBoardPanel()
+  } = workspaceBoardPanel
 
   const repoCount = repos.length
   const previousRepoCountRef = React.useRef(repoCount)
@@ -146,6 +157,23 @@ function Sidebar({
     [containerRef, dropOwnerRef, sidebarOpen]
   )
 
+  const agentsList = (
+    <React.Suspense fallback={<div className="min-h-0 flex-1" />}>
+      <ActivityThreadCollapseContext.Provider value={agentsCollapseState}>
+        <SidebarAgentsList
+          readFilter={agentReadFilter}
+          setReadFilter={setAgentReadFilter}
+          groupBy={agentGroupBy}
+          setGroupBy={setAgentGroupBy}
+          query={agentQuery}
+          setQuery={setAgentQuery}
+          optionsTarget={agentOptionsTarget}
+          scrollTopRef={agentsScrollTopRef}
+        />
+      </ActivityThreadCollapseContext.Provider>
+    </React.Suspense>
+  )
+
   return (
     <TooltipProvider delayDuration={400}>
       <div
@@ -156,28 +184,30 @@ function Sidebar({
       >
         {sidebarOpen && (
           <>
-            <SidebarNav />
-            <SidebarHeader
-              onWorkspaceBoardMenuOpenChange={setWorkspaceBoardMenuOpen}
-              activityOptionsTarget={setAgentOptionsTarget}
-            />
+            <SidebarNav onNavigate={closeWorkspaceBoard} />
+            {!projectNavigation ? (
+              <SidebarHeader
+                onWorkspaceBoardMenuOpenChange={setWorkspaceBoardMenuOpen}
+                activityOptionsTarget={setAgentOptionsTarget}
+              />
+            ) : null}
             <SeveredTerminalDaemonBanner />
             <StalledTerminalDaemonBanner />
-            {sidebarBody === 'agents' ? (
-              <React.Suspense fallback={<div className="min-h-0 flex-1" />}>
-                <ActivityThreadCollapseContext.Provider value={agentsCollapseState}>
-                  <SidebarAgentsList
-                    readFilter={agentReadFilter}
-                    setReadFilter={setAgentReadFilter}
-                    groupBy={agentGroupBy}
-                    setGroupBy={setAgentGroupBy}
-                    query={agentQuery}
-                    setQuery={setAgentQuery}
-                    optionsTarget={agentOptionsTarget}
-                    scrollTopRef={agentsScrollTopRef}
-                  />
-                </ActivityThreadCollapseContext.Provider>
-              </React.Suspense>
+            {projectNavigation ? (
+              <section
+                className="sidebar-workspace-section"
+                aria-label={translate('dashboard.sidebar.activityView', 'Activity view')}
+              >
+                <SidebarHeader
+                  hideWorkspaceOptions
+                  sectionTitle={translate('dashboard.sidebar.activityView', 'Activity view')}
+                  onWorkspaceBoardMenuOpenChange={setWorkspaceBoardMenuOpen}
+                  activityOptionsTarget={setAgentOptionsTarget}
+                />
+                {sidebarBody === 'agents' ? agentsList : null}
+              </section>
+            ) : sidebarBody === 'agents' ? (
+              agentsList
             ) : (
               <>
                 <LocalGitToolchainScanBanner />
@@ -198,11 +228,14 @@ function Sidebar({
             <div className="relative shrink-0">
               <SetupScriptPromptCard />
 
-              <SidebarToolbar
-                workspaceBoardOpen={workspaceBoardOpen}
-                workspaceBoardDragPreviewOpen={workspaceBoardDragPreviewOpen}
-                onWorkspaceBoardToggle={toggleWorkspaceBoard}
-              />
+              {!projectNavigation ? (
+                <SidebarToolbar
+                  workspaceBoardOpen={workspaceBoardOpen}
+                  workspaceBoardDragPreviewOpen={workspaceBoardDragPreviewOpen}
+                  onWorkspaceBoardToggle={toggleWorkspaceBoard}
+                />
+              ) : null}
+              <SidebarFooter />
             </div>
           </>
         )}

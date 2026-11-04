@@ -11,14 +11,13 @@ export function getDropIndicatorClasses(dropIndicator: DropIndicator): string {
   return ''
 }
 
-// Keep the foreground marker above selection/unread layers; zero horizontal inset avoids scrollWidth jitter at the strip’s end.
-export const ACTIVE_TAB_INDICATOR_CLASSES =
-  'pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-foreground z-20'
+// The active surface fits inside the hit rectangle, leaving drop-cue pseudo-elements free.
+export const ACTIVE_TAB_INDICATOR_CLASSES = 'tab-active-shape'
 
 export function getTabRootStateClasses(isActive: boolean): string {
   return isActive
-    ? 'bg-[color-mix(in_srgb,var(--foreground)_6%,var(--card))] text-foreground'
-    : 'bg-card text-muted-foreground hover:text-foreground'
+    ? 'tab-item tab-item-active text-foreground'
+    : 'tab-item text-muted-foreground hover:text-foreground'
 }
 
 export function getTabStripBorderClasses(

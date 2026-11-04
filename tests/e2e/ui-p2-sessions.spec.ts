@@ -180,6 +180,7 @@ test('collapses navigation panes while preserving content and narrow-window acce
 test('reuses the full workbench from project management and creates in context', async ({
   orcaPage: page
 }) => {
+  // Exercises retained terminals, project navigation, and asynchronous worktree creation.
   test.setTimeout(150_000)
   const fixture = await seedSessions(page, 0)
   const secondTabId = await page.evaluate((id) => {
@@ -207,7 +208,7 @@ test('reuses the full workbench from project management and creates in context',
     .getByRole('button', { name: 'New task', exact: true })
     .boundingBox())!
   expect(searchBounds.y + searchBounds.height).toBeLessThanOrEqual(newTaskBounds.y)
-  await expect(searchControl).toContainText('Shift')
+  await expect(searchControl).toContainText(/Shift|⇧/)
   await page.getByRole('button', { name: 'Projects', exact: true }).click()
   const pane = page.getByTestId('projects-navigation-pane')
   await expect(pane).toBeVisible()
@@ -220,7 +221,7 @@ test('reuses the full workbench from project management and creates in context',
   await page.mouse.up()
   await expect.poll(async () => (await pane.boundingBox())!.width).toBeGreaterThan(beforeWidth + 60)
   await resizeHandle.dblclick()
-  await expect.poll(async () => (await pane.boundingBox())!.width).toBe(320)
+  await expect.poll(async () => (await pane.boundingBox())!.width).toBe(360)
   await expect(page.getByRole('button', { name: 'Project sessions', exact: true })).toHaveCount(0)
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(pane.getByText('Ungrouped', { exact: true })).toHaveCount(0)
@@ -268,7 +269,7 @@ test('reuses the full workbench from project management and creates in context',
       state.worktreesByRepo[candidate.id]?.some((worktree) => worktree.id === id)
     )!
     const group = await state.createProjectGroup('Project navigation group', 'local')
-    if (!group || !(await state.moveProjectToGroup(repo.id, group.id, undefined, 'local'))) {
+    if (!group || !(await state.moveProjectToGroup(repo, group.id))) {
       throw new Error('Could not seed project group')
     }
   }, fixture.worktreeId)
@@ -404,6 +405,7 @@ test('filters real session rows and preserves search through narrow list/detail 
 test('returns to the same terminal and browser guest without duplicate tabs or PTY replacement', async ({
   orcaPage: page
 }) => {
+  // Starts a browser guest and checks terminal/guest identity through repeated navigation.
   test.setTimeout(150_000)
   const fixture = await seedSessions(page, 0)
   const boundPane = page
@@ -526,6 +528,7 @@ test('returns to the same terminal and browser guest without duplicate tabs or P
 test('restores a virtual list position and selected row after leaving the session center', async ({
   orcaPage: page
 }) => {
+  // Builds a large virtual session inventory and restores a deep list position.
   test.setTimeout(150_000)
   await seedSessions(page, 36)
   await openSessions(page)
@@ -600,6 +603,7 @@ test('keeps connection and activity indicators within a session row', async ({
 test('terminates an archived session through its real terminal owner', async ({
   orcaPage: page
 }) => {
+  // Waits for the real terminal process to exit and session inventory to reconcile.
   test.setTimeout(150_000)
   await seedSessions(page, 1)
   await openSessions(page)
@@ -688,8 +692,8 @@ test('keeps the activity toggle available after closing its sidebar view', async
 test('opens the workspace board from the projects heading', async ({ orcaPage: page }) => {
   await page.getByRole('button', { name: 'Projects', exact: true }).click()
   const pane = page.getByTestId('projects-navigation-pane')
-  const board = pane.getByRole('button', { name: 'Workspace board', exact: true })
-  await expect(page.getByRole('button', { name: 'Workspace board', exact: true })).toHaveCount(1)
+  const board = pane.getByRole('button', { name: 'Board', exact: true })
+  await expect(page.getByRole('button', { name: 'Board', exact: true })).toHaveCount(1)
   await expect(page.getByRole('region', { name: 'Activity view', exact: true })).toBeVisible()
   const boardBox = (await board.boundingBox())!
   const addBox = (await pane

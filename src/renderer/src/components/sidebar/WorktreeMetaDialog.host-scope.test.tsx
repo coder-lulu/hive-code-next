@@ -94,7 +94,22 @@ describe('workspace details exact host selection', () => {
       expect(screen.queryByText(hidden)).toBeNull()
       fireEvent.click(screen.getByRole('button', { name: 'Save' }))
       await waitFor(() =>
-        expect(update).toHaveBeenCalledWith('shared-id', {}, { executionHostId: host })
+        expect(update).toHaveBeenCalledWith(
+          'shared-id',
+          {},
+          {
+            executionHostId: host,
+            githubLinkBase:
+              host === 'local'
+                ? null
+                : {
+                    hostId: host,
+                    instanceId: null,
+                    linkedPR: null,
+                    suppressedGitHubPR: null
+                  }
+          }
+        )
       )
     }
   )

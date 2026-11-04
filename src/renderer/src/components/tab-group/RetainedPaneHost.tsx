@@ -22,6 +22,10 @@ function shouldUseCssAnchorPositioning(): boolean {
 type RetainedPaneHostProps = {
   groupId: string | undefined
   isVisible: boolean
+  anchorName?: string
+  anchorTarget?: HTMLElement
+  onFocus?: () => void
+  'data-session-terminal'?: string
   measureWhileHidden?: boolean
   fitTerminal?: boolean
   /** Unfocused side of a split: overlays sit outside the group's DOM, so they take its dim here. */
@@ -35,6 +39,9 @@ type RetainedPaneHostProps = {
 export function RetainedPaneHost({
   groupId,
   isVisible,
+  anchorName: explicitAnchorName,
+  anchorTarget,
+  onFocus,
   measureWhileHidden = false,
   fitTerminal = false,
   dimmed = false,
@@ -42,25 +49,32 @@ export function RetainedPaneHost({
   children,
   ...identity
 }: RetainedPaneHostProps): React.JSX.Element {
-  const anchorName = groupId !== undefined ? tabGroupBodyAnchorName(groupId) : undefined
+  const anchorName =
+    explicitAnchorName ?? (groupId !== undefined ? tabGroupBodyAnchorName(groupId) : undefined)
   const overlayRef = useRef<HTMLDivElement | null>(null)
   const [measuredFallbackRect, setMeasuredFallbackRect] = useState<TabGroupBodyRect | null>(null)
   // Why: a hidden host renders display:none, so it has no use for group geometry until shown.
   const measuresFallbackRect =
-    groupId !== undefined && !shouldUseCssAnchorPositioning() && (isVisible || measureWhileHidden)
+    Boolean(anchorName) && !shouldUseCssAnchorPositioning() && (isVisible || measureWhileHidden)
   // Measure before mounting child xterms: child layout effects run first and would fit a placeholder rectangle.
   const [awaitsFirstFallbackRect, setAwaitsFirstFallbackRect] = useState(measuresFallbackRect)
   useLayoutEffect(() => {
     const container = overlayRef.current?.parentElement
-    if (!measuresFallbackRect || groupId === undefined || !container) {
+    const geometryKey = anchorTarget ? anchorName : groupId
+    if (!measuresFallbackRect || !geometryKey || !container) {
       setAwaitsFirstFallbackRect(false)
       return
     }
-    return subscribeTabGroupBodyRect(groupId, container, (rect) => {
-      setMeasuredFallbackRect(rect)
-      setAwaitsFirstFallbackRect(false)
-    })
-  }, [groupId, measuresFallbackRect])
+    return subscribeTabGroupBodyRect(
+      geometryKey,
+      container,
+      (rect) => {
+        setMeasuredFallbackRect(rect)
+        setAwaitsFirstFallbackRect(false)
+      },
+      anchorTarget
+    )
+  }, [anchorName, anchorTarget, groupId, measuresFallbackRect])
 
   useLayoutEffect(() => {
     if (!fitTerminal || !isVisible || !anchorName) {
@@ -135,10 +149,14 @@ export function RetainedPaneHost({
     [anchorName, isVisible, measuredFallbackRect, measureWhileHidden, visibleOpacity]
   )
   const focusGroup = useCallback(() => {
+    if (onFocus) {
+      onFocus()
+      return
+    }
     if (groupId !== undefined && onFocusOwningGroup) {
       onFocusOwningGroup(groupId)
     }
-  }, [groupId, onFocusOwningGroup])
+  }, [groupId, onFocusOwningGroup, onFocus])
 
   return (
     <div

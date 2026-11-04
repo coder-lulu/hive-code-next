@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   PLUGIN_MARKETPLACE_CATEGORY_LIMIT,
   PLUGIN_MARKETPLACE_ENTRY_LIMIT,
+  OFFICIAL_MARKETPLACE_GIT_SOURCE,
   isMarketplaceListingSupported,
   isConfiguredMarketplaceGitSource,
   isOfficialOrganizationGitSource,
+  isOfficialMarketplaceGitSource,
   hasOfficialPluginPublisher,
   isReservedPluginIdentity,
   gitRepositoryOwnerLabel,
@@ -24,6 +26,10 @@ function listing(id = 'community.nord'): Record<string, unknown> {
 }
 
 describe('pluginMarketplaceSchema', () => {
+  it('seeds a catalog whose repository satisfies the official source policy', () => {
+    expect(isOfficialMarketplaceGitSource(OFFICIAL_MARKETPLACE_GIT_SOURCE.url)).toBe(true)
+  })
+
   it('parses a bounded, pinned Git marketplace index', () => {
     expect(
       pluginMarketplaceSchema.parse({

@@ -20014,6 +20014,7 @@
       "archive": "세션 보관",
       "archived": "보관됨",
       "backToList": "세션 목록으로 돌아가기",
+      "chooseWorkspace": "워크스페이스 선택",
       "chooseWorktreeRepo": "새 워크트리의 저장소와 기기를 선택하세요.",
       "clearSearch": "검색 지우기",
       "closeView": "세션 보기 닫기",
@@ -20324,6 +20325,7 @@
   },
   "dashboard": {
     "sidebar": {
+      "activityView": "활동 보기",
       "openActivity": "활동 보기",
       "closeActivity": "활동 보기 닫기",
       "projects": "프로젝트",

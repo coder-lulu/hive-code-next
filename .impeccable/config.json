@@ -1,0 +1,15 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": ["src/renderer/src/components/tab-bar/drop-indicator.ts"],
+        "createdAt": "2026-11-04T02:26:19.949Z",
+        "reason": "Agent review: lines 6 and 9 are existing transient 2px tab drag-and-drop insertion cues, shown only for left/right drop targets and absent for null; verified call sites and drop-indicator.test.ts. Preserve functional placement feedback."
+      }
+    ]
+  }
+}

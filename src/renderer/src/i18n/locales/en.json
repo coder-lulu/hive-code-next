@@ -21027,6 +21027,7 @@
       "archive": "Archive session",
       "archived": "Archived",
       "backToList": "Back to session list",
+      "chooseWorkspace": "Select a workspace",
       "chooseWorktreeRepo": "Choose the repository and device for the new worktree.",
       "clearSearch": "Clear search",
       "closeView": "Close session view",
@@ -21346,6 +21347,7 @@
   },
   "dashboard": {
     "sidebar": {
+      "activityView": "Activity view",
       "openActivity": "View activity",
       "closeActivity": "Turn off activity view",
       "projects": "Projects",

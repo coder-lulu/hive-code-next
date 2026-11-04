@@ -4,8 +4,7 @@ export type Platform = 'ios' | 'android'
 
 export type InstallCopy = { ctaLabel: string; url: string }
 
-export const ANDROID_INSTALL_GUIDE_URL =
-  'https://github.com/coder-lulu/hive-code-next/docs/android-apk'
+export const ANDROID_INSTALL_GUIDE_URL = 'https://www.onorca.dev/docs/android-apk'
 
 export function getInstallCopy(platform: Platform): InstallCopy {
   return platform === 'ios'
@@ -21,6 +20,6 @@ export function getInstallCopy(platform: Platform): InstallCopy {
           'auto.components.mobile.mobile.platform.copy.downloadApk',
           'Download APK'
         ),
-        url: 'https://github.com/coder-lulu/hive-code-next/download/android'
+        url: 'https://www.onorca.dev/download/android'
       }
 }

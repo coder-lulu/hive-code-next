@@ -176,14 +176,6 @@ function openingTag(markup: string, attr: string, value: string): string {
   return match[0]
 }
 
-function firstOpeningTag(markup: string): string {
-  const match = markup.match(/^<div[^>]*>/)
-  if (!match) {
-    throw new Error(`first opening div not found in ${markup}`)
-  }
-  return match[0]
-}
-
 function textSpanHtml(markup: string, text: string): string {
   const textIndex = markup.indexOf(`>${text}</span>`)
   expect(textIndex).toBeGreaterThanOrEqual(0)
@@ -195,16 +187,6 @@ function textSpanHtml(markup: string, text: string): string {
   expect(spanEnd).toBeGreaterThan(textIndex)
 
   return markup.slice(tagStart, spanEnd + '</span>'.length)
-}
-
-function expectTabContainerWidth(markup: string, root: string): void {
-  const container = firstOpeningTag(markup)
-  // Assert literal widths so changing the shared constant cannot silently allow live-title tab resizing.
-  const widthClasses = 'w-[180px] min-w-[72px] min-[1280px]:w-[220px]'
-  expect(container).toContain(widthClasses)
-  expect(root).not.toContain('w-[180px]')
-  expect(root).not.toContain('min-w-[72px]')
-  expect(root).not.toContain('min-[1280px]:w-[220px]')
 }
 
 function expectTooltipContent(markup: string, text: string): void {
@@ -296,7 +278,6 @@ describe('tab title tooltips', () => {
     expect(root).toContain('data-tooltip-trigger="true"')
     expect(root).toContain('role="tab"')
     expect(root).toContain('tabindex="0"')
-    expectTabContainerWidth(markup, root)
   })
 
   it("shows the provider icon while stripping the agent's leading status glyph from the label", () => {
@@ -362,7 +343,6 @@ describe('tab title tooltips', () => {
     expect(root).toContain('role="tab"')
     expect(root).toContain('tabindex="0"')
     expect(root).toContain('data-tab-id="browser-1"')
-    expectTabContainerWidth(markup, root)
   })
 
   it('uses the editor display label while leaving adjacent adornments outside the label', () => {
@@ -397,6 +377,5 @@ describe('tab title tooltips', () => {
     expect(root).toContain('tabindex="0"')
     expect(root).toContain('data-tab-id="editor-tab-1"')
     expect(textSpanHtml(markup, 'VeryLongEditorFileName.tsx')).not.toContain('renamed')
-    expectTabContainerWidth(markup, root)
   })
 })

@@ -1,4 +1,8 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/constants'
+import { isFloatingTerminalWorkspaceId } from '@/lib/floating-terminal'
+import { resolveActiveFloatingWorkspaceSurface } from '@/lib/floating-workspace-surface-ownership'
 import { parseWorkspaceKey } from '../../../shared/workspace-scope'
 import type { TerminalTab } from '../../../shared/terminal-tab-types'
 import { useAppStore } from '../store'
@@ -32,6 +36,50 @@ export function useTerminalWorkspaceFoundation() {
   const worktreesById = useWorktreeMap()
   const folderWorkspaces = useAppStore((state) => selectFolderWorkspaces(state))
   const activeWorktreeId = useAppStore((state) => state.activeWorktreeId)
+  const activeView = useAppStore((state) => state.activeView)
+  const floatingWorkspaceIds = useAppStore(
+    useShallow((state) =>
+      state.activeView === 'sessions'
+        ? [
+            ...new Set([
+              ...Object.keys(state.tabsByWorktree),
+              ...Object.keys(state.unifiedTabsByWorktree)
+            ])
+          ].filter(isFloatingTerminalWorkspaceId)
+        : isFloatingTerminalWorkspaceId(state.activeWorktreeId)
+          ? [state.activeWorktreeId!]
+          : []
+    )
+  )
+  const needsLocalFloatingCwd = floatingWorkspaceIds.includes(FLOATING_TERMINAL_WORKTREE_ID)
+  const floatingTerminalCwd = useAppStore((state) => state.settings?.floatingTerminalCwd ?? '')
+  const [floatingCwdResolution, setFloatingCwdResolution] = useState<{
+    requestedPath: string
+    cwd: string
+  } | null>(null)
+  const resolvedFloatingTerminalCwd =
+    needsLocalFloatingCwd && floatingCwdResolution?.requestedPath === floatingTerminalCwd
+      ? floatingCwdResolution.cwd
+      : null
+  useEffect(() => {
+    if (!needsLocalFloatingCwd) {
+      return
+    }
+    let cancelled = false
+    void window.api.app
+      .getFloatingTerminalCwd({ path: floatingTerminalCwd })
+      .then((cwd) => {
+        if (!cancelled) {
+          setFloatingCwdResolution({ requestedPath: floatingTerminalCwd, cwd })
+        }
+      })
+      .catch((error) => {
+        console.error('Could not resolve the temporary-session directory', error)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [needsLocalFloatingCwd, floatingTerminalCwd])
   const renderedActiveWorktreeId = activeWorktreeId
   const activeWorktreeDeferralHostId = useAppStore((state) =>
     getResolvedExecutionHostIdForWorktree(state, renderedActiveWorktreeId)
@@ -53,13 +101,22 @@ export function useTerminalWorkspaceFoundation() {
     })
     // A WSL-moved project's chats mount beside the catalog; it lists none of its workspaces.
     const moved = parseWslMovedSurfacesKey(wslMovedSurfacesKey)
-    return moved.length > 0 ? [...surfaces, ...moved] : surfaces
+    const floatingSurfaces = floatingWorkspaceIds.flatMap((id) => {
+      const surface = resolveActiveFloatingWorkspaceSurface(
+        id,
+        id === FLOATING_TERMINAL_WORKTREE_ID ? resolvedFloatingTerminalCwd : null
+      )
+      return surface && !surfaces.some((entry) => entry.id === id) ? [surface] : []
+    })
+    return [...surfaces, ...moved, ...floatingSurfaces]
   }, [
     worktreesById,
     folderWorkspaces,
     activeFolderSurfaceId,
     activeFolderSurfaceHostId,
-    wslMovedSurfacesKey
+    wslMovedSurfacesKey,
+    floatingWorkspaceIds,
+    resolvedFloatingTerminalCwd
   ])
   // Reuse equal ID arrays across worktree row replacements to avoid restarting mount/park effects and rebuilding their Sets.
   const workspaceSurfaceIds = useReusedArrayIdentity(
@@ -69,7 +126,6 @@ export function useTerminalWorkspaceFoundation() {
     () => new Set(workspaceSurfaceIds),
     [workspaceSurfaceIds]
   )
-  const activeView = useAppStore((state) => state.activeView)
   // Root subscriptions track mount/parking transitions; LiveTerminalTabBar alone consumes title-only updates.
   const tabsByWorktree = useAppStore((state) =>
     terminalTopologyProjectionRef.current!.project(state.tabsByWorktree)

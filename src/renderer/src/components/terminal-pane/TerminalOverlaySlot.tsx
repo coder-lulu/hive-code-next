@@ -8,6 +8,7 @@ import TerminalPane from './TerminalPane'
 import type { HiddenTerminalPrewarm } from './terminal-pane-types'
 import { closeTerminalTab } from '../terminal/terminal-tab-actions'
 import { shouldDeferParkedPtyExitTabClose } from './terminal-parked-tab-watchers'
+import { SESSION_DETAIL_ANCHOR_NAME } from '../sessions/session-detail-anchor'
 
 type TerminalOverlaySlotProps = {
   terminalTabId: string
@@ -38,7 +39,7 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
   startupCwd,
   groupId,
   isWorktreeActive,
-  isVisible,
+  isVisible: isGroupVisible,
   isActive,
   hiddenPrewarm = null,
   dimmed = false,
@@ -47,6 +48,12 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
   consumeSuppressedPtyExit,
   captureEmptiedReaction
 }: TerminalOverlaySlotProps): React.JSX.Element {
+  const isSessionDetail = activityTerminalPortal?.slotId.startsWith('session-detail') === true
+  const isVisible = isGroupVisible || isSessionDetail
+  const sessionAnchorName = isSessionDetail
+    ? activityTerminalPortal?.target.style.getPropertyValue('anchor-name') ||
+      SESSION_DETAIL_ANCHOR_NAME
+    : undefined
   const [shouldMeasureHiddenStartup, setShouldMeasureHiddenStartup] = useState(
     () => useAppStore.getState().pendingStartupByTabId[terminalTabId] !== undefined
   )
@@ -63,12 +70,13 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
       key={`${terminalTabId}-${terminalGeneration ?? 0}`}
       tabId={terminalTabId}
       worktreeId={worktreeId}
+      onReady={isSessionDetail ? activityTerminalPortal?.onReady : undefined}
       cwd={startupCwd ?? worktreePath}
       isActive={isActive || activityTerminalPortal?.active === true}
       // Retain TerminalPane outside reparented group subtrees to preserve TUI state; visibility still throttles hidden rendering.
       isVisible={isVisible || activityTerminalPortal !== null}
       isWorktreeActive={isWorktreeActive || activityTerminalPortal !== null}
-      isolatedPaneKey={activityTerminalPortal?.paneKey ?? null}
+      isolatedPaneKey={activityTerminalPortal?.paneKey || null}
       measureWhileHidden={prewarm !== null}
       warmRendererWhileHidden={prewarm === 'warm'}
       onPtyExit={(ptyId, exitCode) => {
@@ -97,7 +105,7 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
     />
   )
 
-  if (activityTerminalPortal) {
+  if (activityTerminalPortal && !isSessionDetail) {
     return createPortal(
       terminalPane,
       activityTerminalPortal.target,
@@ -105,9 +113,13 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
     )
   }
 
-  return (
+  return createPortal(
     <RetainedPaneHost
-      groupId={groupId}
+      groupId={isSessionDetail ? undefined : groupId}
+      anchorName={sessionAnchorName}
+      anchorTarget={isSessionDetail ? activityTerminalPortal?.target : undefined}
+      onFocus={isSessionDetail ? activityTerminalPortal?.onFocus : undefined}
+      data-session-terminal={isSessionDetail ? terminalTabId : undefined}
       isVisible={isVisible}
       measureWhileHidden={shouldMeasureHiddenStartup || prewarm !== null}
       fitTerminal
@@ -116,6 +128,7 @@ export const TerminalOverlaySlot = memo(function TerminalOverlaySlot({
       onFocusOwningGroup={onFocusOwningGroup}
     >
       {terminalPane}
-    </RetainedPaneHost>
+    </RetainedPaneHost>,
+    document.body
   )
 })

@@ -220,7 +220,7 @@ export type PluginCatalogGitSource = z.infer<typeof catalogV2GitSourceSchema>
 
 export const OFFICIAL_MARKETPLACE_GIT_SOURCE: PluginMarketplaceGitSource = {
   kind: 'git',
-  url: 'https://github.com/coder-lulu/hive-code-next',
+  url: 'https://github.com/stablyai/orca-plugins.git',
   ref: 'main'
 }
 

@@ -270,12 +270,17 @@ export default function TabGroupPanel({
       {/* Omit external strips entirely because hidden duplicates would still register competing drag sortables. */}
       {tabStrip !== 'attached' ? null : (
         <div
-          className="@container/tab-strip h-[32px] shrink-0 border-b border-border bg-card"
+          className="tab-group-strip shrink-0"
           data-tab-group-strip-id={groupId}
           data-terminal-focus-release-surface="true"
           data-worktree-id={worktreeId}
         >
-          <div className="flex h-full items-stretch pr-1.5">
+          <div
+            className={cn(
+              'tab-group-strip-content flex h-full items-stretch pr-1.5',
+              reserveClosedExplorerToggleSpace && 'tab-group-strip-content-reserves-window-chrome'
+            )}
+          >
             {/* Electron needs a same-tree no-drag region beneath the floating header controls. Keep this in flow so the first tab remains clickable. */}
             {reserveCollapsedSidebarHeaderSpace && !sidebarOpen ? (
               <div

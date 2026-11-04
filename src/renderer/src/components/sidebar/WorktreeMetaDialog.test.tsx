@@ -3,6 +3,7 @@ import { act, createContext, useContext, type ReactNode } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '@/store'
+import { setRendererUiLanguage } from '@/i18n/i18n'
 import type { GitHubWorkItem } from '../../../../shared/github/work-item-types'
 import type { Worktree } from '../../../../shared/worktree/types'
 import type { WorktreeMeta } from '../../../../shared/worktree/meta-types'
@@ -149,6 +150,21 @@ describe('workspace linked work editor', () => {
     Object.defineProperty(window, 'api', { configurable: true, value: { shell: { openUrl } } })
   })
   afterEach(cleanup)
+
+  it('updates the open dialog language without losing an unsaved note', async () => {
+    openDialog()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Notes' }), {
+      target: { value: 'Unsaved draft' }
+    })
+    try {
+      await act(() => setRendererUiLanguage('zh'))
+      expect(screen.getByRole('heading', { name: '工作区详情' })).toBeTruthy()
+      expect(screen.getByRole('textbox', { name: '笔记' })).toHaveProperty('value', 'Unsaved draft')
+      expect(updateWorktreeMeta).not.toHaveBeenCalled()
+    } finally {
+      await act(() => setRendererUiLanguage('en'))
+    }
+  })
 
   it('adds multiple reviews and tasks without displacing existing links', async () => {
     openDialog({ linkedPR: 1, linkedIssue: 2 })
@@ -330,7 +346,15 @@ describe('workspace linked work editor', () => {
     openDialog({ hostId: 'runtime:host-1' }, { executionHostId: 'runtime:host-1' })
     await add('4')
     await save()
-    expect(updateWorktreeMeta.mock.calls[0]?.[2]).toEqual({ executionHostId: 'runtime:host-1' })
+    expect(updateWorktreeMeta.mock.calls[0]?.[2]).toEqual({
+      executionHostId: 'runtime:host-1',
+      githubLinkBase: {
+        hostId: 'runtime:host-1',
+        instanceId: null,
+        linkedPR: null,
+        suppressedGitHubPR: null
+      }
+    })
   })
   it('Enter adds another link and leaves the editor open', async () => {
     openDialog()
@@ -428,7 +452,10 @@ describe('workspace linked work editor', () => {
       })
     )
     expect(updateWorktreeMeta.mock.calls[0]?.[1]).not.toHaveProperty('linkedPR')
-    expect(updateWorktreeMeta.mock.calls[0]?.[2]).toEqual({ suppressHostedReviewRefresh: true })
+    expect(updateWorktreeMeta.mock.calls[0]?.[2]).toEqual({
+      suppressHostedReviewRefresh: true,
+      githubLinkBase: null
+    })
   })
 
   it('blocks known foreign issue URLs with an explanation', () => {
@@ -645,7 +672,15 @@ describe('workspace linked work editor', () => {
     expect(updateWorktreeMeta.mock.calls[0]).toEqual([
       original.id,
       {},
-      { executionHostId: 'ssh:other' }
+      {
+        executionHostId: 'ssh:other',
+        githubLinkBase: {
+          hostId: 'ssh:other',
+          instanceId: null,
+          linkedPR: null,
+          suppressedGitHubPR: null
+        }
+      }
     ])
   })
   it('does not close a new owner’s draft when an earlier save completes', async () => {

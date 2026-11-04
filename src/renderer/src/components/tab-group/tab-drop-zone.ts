@@ -1,7 +1,7 @@
 import type { TabDropZone } from './tab-drag-data'
 
-/** Matches TabGroupPanel tab row height (`h-[32px]`). */
-export const TAB_GROUP_TAB_STRIP_HEIGHT_PX = 32
+/** Fallback for unmounted panes; mounted drop targets use their measured body edge. */
+export const TAB_GROUP_TAB_STRIP_HEIGHT_PX = 36
 
 type PaneRect = { left: number; top: number; width: number; height: number }
 

@@ -65,6 +65,8 @@ vi.mock('./SidebarToolbar', () => ({
   default: () => <div data-testid="sidebar-toolbar" />
 }))
 
+vi.mock('./SidebarFooter', () => ({ default: () => <div data-testid="sidebar-footer" /> }))
+
 vi.mock('./WorkspaceBoardDrawer', () => ({
   default: ({
     leftSidebarStyle,
@@ -115,6 +117,7 @@ function setSidebarState(settings: GlobalSettings, statusBarVisible = true): voi
     detectedWorktreesByRepo: {},
     setSidebarWidth: vi.fn(),
     settings,
+    sessionsView: { navigation: 'sessions' },
     sidebarOpen: true,
     sidebarWidth: 320,
     statusBarVisible
@@ -122,14 +125,27 @@ function setSidebarState(settings: GlobalSettings, statusBarVisible = true): voi
 }
 
 function renderSidebar(): string {
-  return renderToStaticMarkup(
-    <Sidebar worktreeScrollOffsetRef={{ current: 0 }} worktreeScrollAnchorRef={{ current: null }} />
-  )
+  return renderToStaticMarkup(sidebarElement())
 }
 
 function sidebarElement(): ReactNode {
   return (
-    <Sidebar worktreeScrollOffsetRef={{ current: 0 }} worktreeScrollAnchorRef={{ current: null }} />
+    <Sidebar
+      worktreeScrollOffsetRef={{ current: 0 }}
+      worktreeScrollAnchorRef={{ current: null }}
+      workspaceBoardPanel={{
+        ...mocks.panel,
+        workspaceBoardMenuOpen: false,
+        openWorkspaceBoard: vi.fn(),
+        toggleWorkspaceBoard: vi.fn(),
+        handleWorkspaceBoardOpenChange: vi.fn(),
+        setWorkspaceBoardMenuOpen: vi.fn(),
+        closeWorkspaceBoard: mocks.closeWorkspaceBoard,
+        previewWorkspaceBoardFromDrag: vi.fn(),
+        solidifyWorkspaceBoardFromDrag: vi.fn(),
+        cancelWorkspaceBoardDragPreview: vi.fn()
+      }}
+    />
   )
 }
 

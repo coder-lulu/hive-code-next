@@ -20816,6 +20816,7 @@
       "archive": "Archiver la session",
       "archived": "Archivé",
       "backToList": "Retour à la liste des sessions",
+      "chooseWorkspace": "Sélectionner un espace de travail",
       "chooseWorktreeRepo": "Choisissez le dépôt et l’appareil du nouveau worktree.",
       "clearSearch": "Effacer la recherche",
       "closeView": "Fermer la vue de session",
@@ -21127,6 +21128,7 @@
   },
   "dashboard": {
     "sidebar": {
+      "activityView": "Vue d’activité",
       "openActivity": "Voir l’activité",
       "closeActivity": "Désactiver la vue d’activité",
       "projects": "Projets",

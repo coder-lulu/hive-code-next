@@ -216,12 +216,6 @@ vi.mock('../right-sidebar/status-display', () => ({
   STATUS_LABELS: {}
 }))
 
-vi.mock('./drop-indicator', () => ({
-  ACTIVE_TAB_SURFACE_CLASSES: 'active-tab-indicator',
-  getDropIndicatorClasses: () => '',
-  getTabRootStateClasses: () => ''
-}))
-
 vi.mock('@/components/editor/markdown-preview-controls', () => ({
   canOpenMarkdownPreview: () => false
 }))

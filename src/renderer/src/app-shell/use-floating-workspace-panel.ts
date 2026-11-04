@@ -14,6 +14,10 @@ import { createFloatingWorkspaceTourInteractionSnapshot } from '@/lib/floating-w
 import { persistFloatingTerminalPanelOpen } from '../components/floating-terminal/floating-terminal-panel-view-state'
 import { useAppStore } from '../store'
 import { selectFloatingVisibleTabCount } from '../store/selectors'
+import {
+  mainWorkbenchOwnsFloatingWorkspace,
+  shouldMountFloatingWorkspacePanel
+} from '@/lib/floating-workspace-surface-ownership'
 
 export type FloatingWorkspacePanelState = ReturnType<typeof useFloatingWorkspacePanel>
 
@@ -35,6 +39,9 @@ export function useFloatingWorkspacePanel() {
   )
   const statusBarVisible = useAppStore((s) => s.statusBarVisible)
   const visibleTabCount = useAppStore(selectFloatingVisibleTabCount)
+  const mainWorkbenchOwnsWorkspace = useAppStore((s) =>
+    mainWorkbenchOwnsFloatingWorkspace(s.activeView, s.activeWorktreeId)
+  )
 
   // Return focus to the prior surface when hotkey-minimizing the overlay.
   const returnFocusRef = useRef<HTMLElement | null>(null)
@@ -123,8 +130,16 @@ export function useFloatingWorkspacePanel() {
     }
   }, [settingsHydrated, enabled, setOpenWithFocus])
 
-  const shouldMountPanel = enabled && (open || visibleTabCount > 0)
-  const showToggleButton = enabled && (triggerLocation === 'floating-button' || !statusBarVisible)
+  const shouldMountPanel = shouldMountFloatingWorkspacePanel({
+    enabled,
+    open,
+    visibleTabCount,
+    mainWorkbenchOwnsWorkspace
+  })
+  const showToggleButton =
+    enabled &&
+    !mainWorkbenchOwnsWorkspace &&
+    (triggerLocation === 'floating-button' || !statusBarVisible)
   // Stable identity lets memoized root surfaces skip the App render each workspace switch causes.
   return useMemo(
     () => ({

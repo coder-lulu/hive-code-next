@@ -20014,6 +20014,7 @@
       "archive": "セッションをアーカイブ",
       "archived": "アーカイブ済み",
       "backToList": "セッション一覧に戻る",
+      "chooseWorkspace": "ワークスペースを選択",
       "chooseWorktreeRepo": "新規ワークツリーのリポジトリとデバイスを選択してください。",
       "clearSearch": "検索をクリア",
       "closeView": "セッションビューを閉じる",
@@ -20324,6 +20325,7 @@
   },
   "dashboard": {
     "sidebar": {
+      "activityView": "アクティビティビュー",
       "openActivity": "アクティビティを表示",
       "closeActivity": "アクティビティビューを閉じる",
       "projects": "プロジェクト",

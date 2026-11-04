@@ -3,7 +3,14 @@ import { loadSettingsPage } from '../components/settings/settings-page-loader'
 import { memo, Suspense, useCallback, useRef } from 'react'
 import { lazyWithRetry as lazy } from '@/lib/lazy-with-retry'
 import { translate } from '@/i18n/i18n'
+import { useAppStore } from '../store'
 import Sidebar from '../components/Sidebar'
+import { trackSidebarLiveWidth } from '../components/sidebar/sidebar-live-width'
+import { SidebarSettingsHelpMenu } from '../components/sidebar/SidebarSettingsHelpMenu'
+import {
+  useWorkspaceBoardPanel,
+  type WorkspaceBoardPanelState
+} from '../components/sidebar/useWorkspaceBoardPanel'
 import RightSidebar from '../components/right-sidebar'
 import { RecoverableRenderErrorBoundary } from '../components/error-boundaries/RecoverableRenderErrorBoundary'
 import { FloatingTerminalToggleButton } from '../components/floating-terminal/FloatingTerminalToggleButton'
@@ -13,6 +20,7 @@ import { TitlebarLeftControls } from './TitlebarLeftControls'
 import { RightSidebarToggle, TitlebarMainStrip } from './TitlebarMainStrip'
 import type { AppChromeLayout } from './use-app-chrome-layout'
 import type { FloatingWorkspacePanelState } from './use-floating-workspace-panel'
+import { resolveSettingsHelpPlacement } from './titlebar-settings-help-placement'
 
 // Skips the shell render each workspace switch causes; its props only change on toggle.
 const MemoFloatingTerminalToggleButton = memo(FloatingTerminalToggleButton)
@@ -22,8 +30,18 @@ const WorktreeCreationPanel = lazy(
   () => import('../components/worktree-creation/WorktreeCreationPanel')
 )
 const TaskPage = lazy(() => import('../components/task-page/TaskPage'))
+const ProjectWorkspaceNavigation = lazy(
+  () => import('../components/sessions/ProjectWorkspaceNavigation')
+)
+const SessionsPage = lazy(() => import('../components/sessions/SessionsPage'))
 const AutomationsPage = lazy(() => import('../components/automations/AutomationsPage'))
 const ActivityPrototypePage = lazy(() => import('../components/activity/ActivityPrototypePage'))
+const TemporarySessionsActivityView = lazy(
+  () => import('../components/activity/TemporarySessionsActivityView')
+)
+const DeviceConnectionsPage = lazy(
+  () => import('../components/device-connections/DeviceConnectionsPage')
+)
 const Settings = lazy(loadSettingsPage)
 const SkillsPage = lazy(() => import('../components/skills/SkillsPage'))
 const ArtifactsPage = lazy(() => import('../components/artifacts/ArtifactsPage'))
@@ -37,10 +55,12 @@ type WorktreeSidebarScrollRefs = {
 
 function WorktreeSidebar({
   layout,
-  scrollRefs
+  scrollRefs,
+  workspaceBoardPanel
 }: {
   layout: AppChromeLayout
   scrollRefs: WorktreeSidebarScrollRefs
+  workspaceBoardPanel: WorkspaceBoardPanelState
 }): React.JSX.Element {
   return (
     <RecoverableRenderErrorBoundary
@@ -63,6 +83,7 @@ function WorktreeSidebar({
       <Sidebar
         worktreeScrollOffsetRef={scrollRefs.scrollOffsetRef}
         worktreeScrollAnchorRef={scrollRefs.scrollAnchorRef}
+        workspaceBoardPanel={workspaceBoardPanel}
       />
     </RecoverableRenderErrorBoundary>
   )
@@ -70,15 +91,36 @@ function WorktreeSidebar({
 
 function ActivePage({ layout }: { layout: AppChromeLayout }): React.JSX.Element {
   const { activeView, hasActiveWorktree, activePendingCreationId, creationLayoutActive } = layout
+  const projectNavigation = useAppStore((s) => s.sessionsView.navigation === 'projects')
+  const activityPageScope = useAppStore((s) => s.activityPageScope)
   return (
     <>
       {activeView === 'settings' ? <Settings /> : null}
       {activeView === 'skills' ? <SkillsPage /> : null}
       {activeView === 'artifacts' ? <ArtifactsPage /> : null}
       {activeView === 'tasks' ? <TaskPage /> : null}
+      {activeView === 'sessions' ? (
+        projectNavigation ? (
+          <section
+            className="session-detail session-detail-empty"
+            data-testid="project-workspace-empty"
+          >
+            <h2>{translate('components.sessions.chooseWorkspace', 'Select a workspace')}</h2>
+          </section>
+        ) : (
+          <SessionsPage reserveTopChrome={layout.stackedSidebarOpen} />
+        )
+      ) : null}
       {activeView === 'automations' ? <AutomationsPage /> : null}
-      {activeView === 'activity' ? <ActivityPrototypePage /> : null}
+      {activeView === 'activity' ? (
+        activityPageScope === 'temporary-sessions' ? (
+          <TemporarySessionsActivityView />
+        ) : (
+          <ActivityPrototypePage />
+        )
+      ) : null}
       {activeView === 'space' ? <WorkspaceSpacePage /> : null}
+      {activeView === 'device-connections' ? <DeviceConnectionsPage /> : null}
       {activeView === 'terminal' && creationLayoutActive && activePendingCreationId ? (
         <WorktreeCreationPanel
           creationId={activePendingCreationId}
@@ -97,8 +139,32 @@ export function AppWorkspaceShell(props: {
   floatingWorkspace: FloatingWorkspacePanelState
 }): React.JSX.Element {
   const { layout, floatingWorkspace } = props
+  const projectNavigation = useAppStore(
+    (s) =>
+      s.sessionsView.navigation === 'projects' &&
+      (s.activeView === 'sessions' ||
+        (s.activeView === 'terminal' && Boolean(s.activeWorktreeId || s.activePendingCreationId)))
+  )
+  const sidebarWidth = useAppStore((s) => s.sidebarWidth)
+  const workspaceBoardPanel = useWorkspaceBoardPanel()
+  const stackedMainStripMounted =
+    layout.stackedSidebarOpen &&
+    layout.activeView !== 'sessions' &&
+    layout.activeView !== 'automations' &&
+    layout.activeView !== 'artifacts'
+  const settingsHelpPlacement = resolveSettingsHelpPlacement({
+    creationLayoutActive: layout.creationLayoutActive,
+    mainStripMounted: !layout.leftTitlebarChromeLayout.shouldMount || stackedMainStripMounted,
+    workspaceChromeActive: layout.workspaceChromeActive,
+    rightSidebarVisible: layout.showRightSidebarControls && layout.rightSidebarOpen
+  })
   const titlebarLeftControls = <TitlebarLeftControls layout={layout} />
-  const titlebarMainStrip = <TitlebarMainStrip layout={layout} />
+  const titlebarMainStrip = (
+    <TitlebarMainStrip
+      layout={layout}
+      showSettingsHelpControls={settingsHelpPlacement === 'main-strip'}
+    />
+  )
   // Keep scroll memory above sidebar view remounts to preserve list position.
   const scrollOffsetRef = useRef(0)
   const scrollAnchorRef = useRef<VirtualizedScrollAnchor>(null)
@@ -136,7 +202,13 @@ export function AppWorkspaceShell(props: {
               layout.leftTitlebarChromeLayout.shouldMount ? (
                 /* Remove the collapsed header from flex layout so panes reclaim the left edge. */
                 <div
-                  className={`flex min-h-0 flex-col shrink-0${layout.sidebarOpen ? '' : ' relative w-0 overflow-visible'}`}
+                  ref={trackSidebarLiveWidth}
+                  className={`flex min-h-0 min-w-0 flex-col shrink-0${layout.sidebarOpen ? '' : ' relative w-0 overflow-visible'}`}
+                  style={
+                    layout.sidebarOpen
+                      ? { width: `var(--workspace-sidebar-live-width, ${sidebarWidth}px)` }
+                      : undefined
+                  }
                 >
                   <div
                     // The floating header covers the center border; restore the seam and size to its own controls.
@@ -157,23 +229,39 @@ export function AppWorkspaceShell(props: {
                   </div>
                   {/* Keep a shrinkable flex viewport below the fixed header so the sidebar can scroll. */}
                   <div className="flex min-h-0 flex-1">
-                    <WorktreeSidebar layout={layout} scrollRefs={sidebarScrollRefs} />
+                    <WorktreeSidebar
+                      layout={layout}
+                      scrollRefs={sidebarScrollRefs}
+                      workspaceBoardPanel={workspaceBoardPanel}
+                    />
                   </div>
                 </div>
               ) : (
-                <WorktreeSidebar layout={layout} scrollRefs={sidebarScrollRefs} />
+                <WorktreeSidebar
+                  layout={layout}
+                  scrollRefs={sidebarScrollRefs}
+                  workspaceBoardPanel={workspaceBoardPanel}
+                />
               )
             ) : null}
-            <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
+            {projectNavigation ? (
+              <Suspense fallback={<AppPageLoadingFallback />}>
+                <ProjectWorkspaceNavigation workspaceBoardPanel={workspaceBoardPanel} />
+              </Suspense>
+            ) : null}
+            <div
+              data-workspace-content-region
+              className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden"
+            >
               {/* Automations/artifacts own their headers; another titlebar would leave an empty stripe. */}
-              {layout.stackedSidebarOpen &&
-              layout.activeView !== 'automations' &&
-              layout.activeView !== 'artifacts' ? (
-                <div className="titlebar">{titlebarMainStrip}</div>
-              ) : null}
-              <div className="relative flex flex-1 min-w-0 min-h-0 overflow-hidden">
+              {stackedMainStripMounted ? <div className="titlebar">{titlebarMainStrip}</div> : null}
+              <div
+                className={`relative flex flex-1 min-w-0 min-h-0 overflow-hidden${
+                  settingsHelpPlacement === 'shell-overlay' ? ' shell-overlay-chrome-active' : ''
+                }`}
+              >
                 {/* Match the open sidebar header’s alignment to prevent toggle jitter. */}
-                {layout.workspaceChromeActive && !layout.rightSidebarOpen && (
+                {settingsHelpPlacement === 'shell-overlay' && (
                   <div
                     className="absolute top-0 z-10 flex items-center h-[36px]"
                     style={
@@ -184,6 +272,7 @@ export function AppWorkspaceShell(props: {
                       } as React.CSSProperties
                     }
                   >
+                    <SidebarSettingsHelpMenu />
                     {layout.showRightSidebarControls ? <RightSidebarToggle /> : null}
                   </div>
                 )}
@@ -224,7 +313,7 @@ export function AppWorkspaceShell(props: {
                     </RecoverableRenderErrorBoundary>
                   </Suspense>
                 </div>
-                {floatingWorkspace.showToggleButton ? (
+                {floatingWorkspace.showToggleButton && layout.activeView !== 'sessions' ? (
                   <MemoFloatingTerminalToggleButton
                     open={floatingWorkspace.open}
                     onToggle={toggleFloatingWorkspace}
@@ -250,7 +339,7 @@ export function AppWorkspaceShell(props: {
               'Retry the sidebar or switch tabs to reload this surface.'
             )}
           >
-            <RightSidebar />
+            <RightSidebar showSettingsHelpControls={settingsHelpPlacement === 'right-sidebar'} />
           </RecoverableRenderErrorBoundary>
         ) : null}
       </div>

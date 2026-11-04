@@ -220,12 +220,6 @@ vi.mock('../sidebar/WorktreeCardHelpers', () => ({
   }
 }))
 
-vi.mock('./drop-indicator', () => ({
-  ACTIVE_TAB_SURFACE_CLASSES: 'active-tab-indicator',
-  getDropIndicatorClasses: () => '',
-  getTabRootStateClasses: () => ''
-}))
-
 vi.mock('./middle-button-default-guard', () => ({
   preventMiddleButtonDefault: vi.fn()
 }))
